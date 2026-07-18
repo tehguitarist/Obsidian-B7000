@@ -1,0 +1,22 @@
+Darkglass B7k
+
+Controls
+
+Master: Whereas the Level Knob controls the output of the overdrive section the Master volume adjusts the overall volume of the unit. Ideal for fine tuning the output on clean mode. It also serves as a DI level control.
+Blend: Mixes the clean input signal with the overdriven signal. The clean signal remains at unity gain while the volume of the overdriven signal is set by the Level knob, allowing for fine control of the blend ratio.
+Level: Sets the volume of the overdriven signal.
+Drive: Sets the amount of saturation in the overdriven signal.
+Attack Switch: Sets the amount of treble content to saturate: The “Boost” setting emphasizes the treble content extra clarity and presence. The “Flat” position leaves this register untouched while the “Cut” position will reduce the amount of high frequencies being saturated.
+Grunt Switch: Sets the amount of low frequency content to saturate by selecting between three different bass boost levels before the clipping stage.
+Bass: +-12dB @ 100Hz
+Lo Mids: +-12dB switchable 250Hz, 500Hz and 1kHz
+Hi Mids: +-12dB switchable 750Hz, 1.5KHz and 3kHz
+Treble: +-12dB @ 5kHz.
+Technical Specifications
+
+Input Impedance: 1MΩ
+Output Impedance: 1kΩ
+Current Consumption: ~120mA
+Voltage: 9V DC (Center Negative)
+
+
