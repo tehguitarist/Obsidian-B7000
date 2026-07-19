@@ -46,7 +46,12 @@ Volume/trim/metering/bypass live in the processor, not the WDF tree (architectur
 2. Instantiate `CMakeLists.txt` from `CMakeLists.txt.template`: plugin name **Obsidian-B7000**,
    company Leigh Pierce, codes (pick 4-char codes, e.g. `Ob7k`/`LPrc`), AU+VST3,
    `COPY_PLUGIN_AFTER_BUILD TRUE`, SYSTEM-include chowdsp_wdf, `PEDAL_WARNING_FLAGS` gate.
-3. Minimal `PluginProcessor`/`PluginEditor` (pass-through audio, empty black editor).
+3. Minimal `PluginProcessor`/`PluginEditor` (pass-through audio, empty black editor). Decide bus
+   layouts here: mono + stereo (the pedal is a mono circuit — stereo = two independent `PedalDSP`
+   instances per architecture.md, never a summed path). Add `juce::ScopedNoDenormals` to
+   `processBlock` from day one (decaying WDF cap states denormal and quietly eat CPU), and
+   override `getBypassParameter()` to return the `bypass` param so hosts wire their own bypass
+   control to it.
 4. **Full APVTS parameter set now** (IDs are forever — architecture.md):
    - Pots (`AudioParameterFloat` 0..1, taper in DSP): `master`, `blend`, `level`, `drive`,
      `lo`, `lo_mid`, `hi_mid`, `hi`.
@@ -55,8 +60,20 @@ Volume/trim/metering/bypass live in the processor, not the WDF tree (architectur
      minimum-bass position (4n7 only), throws add 47n or 220n — order the UI/param to mirror the
      hardware), `lo_mid_freq` (250/500/1k), `hi_mid_freq` (750/1.5k/3k).
    - Bools: `bypass`, `dist_engage` (default **true**; overrides BLEND to 100% clean when false,
-     own ~5ms crossfade — circuit.md "Footswitches"), `trim_link` (default false), `hq` (defer —
-     add only if FeatureProfile justifies; reserve the ID).
+     own ~5ms crossfade — circuit.md "Footswitches"), `trim_link` (default false), `hq` (whether
+     the toggle is *justified* is a Phase 9 decision, but the PARAMETER must be handled now — an
+     APVTS ID cannot be "reserved" by omission, and adding one later can shift AU integer parameter
+     IDs and silently break session recall in Logic-family hosts unless params carry
+     `juce::ParameterID` version hints. **No audio/CPU impact either way — this is purely session
+     compatibility.** Do BOTH of the following in THIS phase, not at Phase 9:
+       - Construct every parameter with a versioned `ParameterID{"id", 1}` — the JUCE-idiomatic
+         default that future-proofs *any* later addition (bump the hint to `2`, `3`, … for params
+         added in future versions so existing AU IDs stay put).
+       - Also add `hq` now as a **default-true no-op** the DSP ignores until Phase 9. Since we
+         already know it's coming, materialising it removes it as a special case: Phase 9 just
+         wires up an existing param with no layout change and no version-hint arithmetic to
+         remember (a forgotten hint bump would reintroduce the recall bug). Only cost is a
+         host-visible parameter that does nothing until Phase 9 — trivial.)
    - Trims/OS: `input_trim`, `output_trim` (dB), `oversampling`, `render_oversampling`.
 5. CI: activate `.github/workflows/ci.yml` placeholders; `ctest` skeleton with one dummy test.
 
@@ -75,21 +92,51 @@ assert −3 dB point within 1% of 1/(2πRC), and that a `CapacitorT` missing `.p
 
 Build order = signal order, each stage a header in `src/dsp/`, each with a console FR test
 comparing against the analytic transfer function (tolerance ±0.25 dB 20 Hz–10 kHz, document any
-bilinear-warp deviation above; prewarp HF caps per dsp.md where corners are fixed):
+bilinear-warp deviation above; prewarp HF caps per dsp.md where corners are fixed). Pick an
+interim `kInputRef` now (a nominal bass-DI level, ~1–3 V/FS — the template's 0.87 is a guitar-rig
+number) and use it consistently through Phases 4–6 so the nonlinear tests exercise realistic drive
+levels; the capture anchor replaces it at Phase 7:
 
 1. **InputBuffer** (R1/C1/R2/R3): ~1.6 Hz HP, unity. Clean tap point.
 2. **TrebleAttack** (stage 3): three switch positions validated independently against nodal
    reference (add its TF to `eq_reference.py` first). Precomputed S-matrix per position OR live
    ImpedanceCalculator — positions differ topologically (node grounded vs cap bridge vs open), so
-   follow dsp.md: precompute per topology, swap `setSMatrixData()`.
+   follow dsp.md: precompute per topology, swap `setSMatrixData()`. Define the stage BOUNDARY
+   explicitly before writing the TF: the ladder's input node is the JFET drain itself (the C5 leg
+   taps G pre-R7, circuit.md node graph), so its corners depend on the J201 stage's output
+   impedance (raised by the C4 bootstrap) — decide whether the fitted J201 block's output is an
+   ideal voltage source (loading absorbed into the fitted gain/shaper) or carries an explicit
+   source Z, and use the SAME convention in `eq_reference.py` and the WDF stage, or the oracle and
+   the implementation will disagree for no real reason.
 3. **DriveStage** (IC2_A): ideal-op-amp decomposition; gain 4×–78× vs VR3; C-taper (fit per
    dsp.md; beware taper floor on the 100k). DC-step polarity test (non-inverting).
-4. **RecoveryBridgedT**: unity buffer + passive bridged-T; validate notch at 717 Hz/−28 dB vs
+4. **RecoveryBridgedT**: unity buffer + passive bridged-T; validate notch at ~717 Hz vs
    `eq_reference.py` (ideal values for now; capture reshape in Phase 7). Live
    ImpedanceCalculator (linear network, tolerance-sensitive → keep values as variables).
+   ⚠ Two test-design caveats: (a) the oracle `bridged_t_tf()` is UNLOADED (a fair approximation —
+   the real load is R24 + the SK's bootstrapped passband input impedance, which is light — but the
+   WDF stage will include the real load), so either validate the bridged-T in isolation against
+   the unloaded oracle and then the bridged-T→SK pair together, or add the load to the oracle
+   first; (b) the blanket ±0.25 dB tolerance is meaningless at the bottom of a deep notch — assert
+   the notch FREQUENCY within a few % and its DEPTH within a few dB, ±0.25 dB elsewhere. (The
+   real unit's notch may be far shallower anyway — risk #1.)
 5. **SallenKey2** (×2 instances, different values): FR vs textbook SK response.
 6. **LevelBlend**: dividers/crossfade (plain gains, not WDF); audio-taper for LEVEL;
-   `dist_engage` override hook here.
+   `dist_engage` override hook here. ⚠ **Two alignment risks at this summing node, not one** (dsp.md
+   "Dry/wet phase alignment"; circuit.md BLEND note): (a) the clean tap is pre-JFET, i.e.
+   pre-oversampled-region — do NOT wire the crossfade up before Phase 6's delay-compensation is in
+   place, or the FR test will show a false comb-filter defect that's actually a missing feature;
+   (b) the OD path's cumulative sign at this node depends on the J201 stage's polarity (unconfirmed
+   — see its DC-step test later in this phase) plus the clipper's known inversion — an end-to-end
+   DC-step test from input to this node is required before trusting the crossfade, independent of
+   and in addition to the delay fix. Also: do NOT model LEVEL and BLEND as two independent ideal
+   unloaded dividers — the LEVEL wiper (source impedance up to ~25k at mid-rotation) drives BLEND
+   pin3 while the clean side (IC1_A out, ~0 Ω) drives pin1, so the crossfade law is asymmetric
+   (≈3.5 dB OD-vs-clean imbalance at LEVEL=noon/BLEND=noon relative to the ideal equal mix — and
+   the real pedal genuinely does this, so modeling it is fidelity, not pedantry), and BLEND in
+   turn loads the LEVEL divider. Solve the small resistive network (LEVEL pot + BLEND pot + both
+   source impedances) exactly per block — three nodes of algebra, cheap — and the
+   `blend-0700/1200` captures validate the resulting law at Phase 7.
 7. **EQ block**: Baxandall (coupled BASS+TREBLE — ONE WDF/nodal network), LO-MID, HI-MID (each
    an inverting-unity + pot network stage; series cap switchable via live ImpedanceCalculator).
    Validate every band at min/centre/max + both mid switches at all 3 positions against
@@ -103,8 +150,21 @@ gain + soft waveshaper (nominal from Fairchild datasheet SPICE params; structure
 bootstrap behaviour captured by the fit. Sine + DC-step polarity test; expect mild asymmetric
 soft compression, NOT hard clipping.
 
+**Op-amp output-rail saturation (ALL op-amp stages — easy to forget because every stage above is
+labelled "linear"):** calibration doc §6 requires an asymmetric output clamp (~[1.2, 7.8] V on the
+8.6 V rail; dead-linear → short parabolic knee → HARD clamp, `setRailVoltages()`) on EVERY op-amp
+output, and it is genuinely part of this pedal's sound: IC2_A at max DRIVE is ×78 and hits its own
+rails BEFORE the 4049 does, and the mid stages can boost up to +28 dB. Implement the clamp as one
+shared utility in this phase and apply it per stage as each is built; measure the worst-case node
+per stage (calibration §6 "compounding gain"). Stages inside the Phase 6 OS region (IC2_A through
+the SK filters) get their clamps oversampled + ADAA'd along with everything else; the EQ stages
+(IC5_B/C/D, IC6_A) run at base rate — keep their clamps anyway (post-LEVEL signal usually sits
+below the rails, but extreme boost settings do clip in the real unit) and give them the same
+piecewise-antiderivative ADAA (≈0 CPU, dsp.md) rather than leaving a base-rate hard clamp to alias.
+
 **GATE 4:** every linear stage's FR test in ctest and green; dsp-validator run per stage;
-polarity verified per stage; J201 stage behaves plausibly (gain ~×10–30 region, soft).
+polarity verified per stage; rail clamp present on every op-amp output (a missing clamp is a gate
+failure, not a refinement); J201 stage behaves plausibly (gain ~×10–30 region, soft).
 
 ## Phase 5 — The clipper (nonlinear #2, the heart) + switch topologies
 
@@ -133,9 +193,25 @@ combos render finite and stable; dsp-validator pass on the stage.
 3. Aliasing measurement test (JUCE FFT console exe): sweep at high drive, assert aliasing
    components at 4× are below the harmonic floor by a documented margin; OSFidelity probe
    (build.md) for the low-OS top-octave restore decision.
+4. **Wire up the BLEND (and bypass) delay-compensation line now** (dsp.md "Dry/wet phase
+   alignment across the oversampled region"): a base-rate `DelayLine` on the clean tap sized to
+   `getLatencyInSamples()`, updated in lockstep with OS-factor reinit; same line (or a second
+   instance) compensates the bypass dry copy. This is the natural point to add it — the
+   oversampler and its latency reporting now exist for the first time. Also report latency to the
+   HOST: `setLatencySamples()` in `prepareToPlay` AND again whenever the runtime OS factor
+   changes mid-session — host PDC and the internal dry-path delay are different problems (dsp.md
+   "do NOT over-correct"); do both, conflate neither.
+5. **Null/impulse test at BLEND=50%, swept across 1×/2×/4×/8×** — read the failure signature,
+   don't just check "is there a notch": comb-filter notches that SHIFT with OS factor mean the
+   delay line is missing/stale (fix per step 4); a broadband/mostly-flat cancellation or a null at
+   the wrong BLEND setting that does NOT shift with OS factor means a sign/polarity mismatch in
+   the OD chain instead (re-run the end-to-end DC-step test from Phase 4's LevelBlend note,
+   starting with the J201 stage) — dsp.md gives both signatures explicitly. Repeat both checks for
+   the bypass crossfade transition.
 
 **GATE 6:** aliasing test green; 1× vs 8× FR delta documented; CPU per OS factor measured
-(PerfBenchmark); no NaN/Inf anywhere in a full-random-automation soak.
+(PerfBenchmark); BLEND and bypass null/impulse tests show neither OS-factor-dependent comb-filtering
+NOR an unexplained broadband/sign-mismatch null; no NaN/Inf anywhere in a full-random-automation soak.
 
 ## Phase 7 — CAPTURE SESSION + full-chain integration + calibration
 
@@ -149,7 +225,9 @@ Then:
    matched-pair diffs); reshape the bridged-T to the measured notch (or lack of one — it's
    tolerance-sensitive); confirm mid-band boost ranges + GRUNT corners + taper shapes
    (two-point minimum per pot, matched-pair method for coupled ones); output makeup =
-   level-match to captures (may exceed 1.0 — no headroom pad).
+   level-match to captures (may exceed 1.0 — no headroom pad). Also confirm the TL07x rail-clamp
+   levels against any capture that drives a stage into its rails (nonlinear doc §3 — the
+   [~1.2, ~7.8] V estimates are ±0.5 V placeholders until then).
 3. Decompose any residual level deficit per calibration doc §4 before touching constants.
 
 **GATE 7:** A/B harness (`analyze.py`): 1/3-oct FR within target tolerance on the essential
@@ -158,17 +236,32 @@ matrix, swept-THD tracks, null depth documented, knob-tracking pass/fail table g
 
 ## Phase 8 — UI
 
-1. Centre pedal face from the **`ui/` assets** (per `ui/ui-replacements.md`: 2× res, crop-don't-
-   stretch, alpha-safe rotation) — 8 knobs (B7K-Ultra layout: MASTER/LEVEL/BLEND/DRIVE top,
-   LO/LO-MID/HI-MID/HI bottom), 2 footswitches (bypass + DIST), ATTACK/GRUNT 3-pos toggles,
-   2 mid-freq selectors, LED per footswitch.
-2. Peripheral chrome from `src/ui/` (PedalLookAndFeel, VUMeter, trims + Trim Link, OS strip,
+1. **Centre pedal face from the provided base image + CSV** (positions/sizes; layout is
+   data-driven, not hand-placed — see `ui.md` "Centre pedal face"). Confirm the CSV schema when it
+   arrives before building the layout parser. No bypass label needed (already on the base image).
+   Element set (8 knobs — MASTER/LEVEL/BLEND/DRIVE top, LO/LO-MID/HI-MID/HI bottom; 2 footswitches
+   bypass+DIST; ATTACK/GRUNT 3-pos toggles; 2 mid-freq selectors; LED per footswitch) follows
+   `ui/ui-replacements.md` prep rules (2× res, crop-don't-stretch, alpha-safe rotation) for any
+   individual component PNGs composited against the base image. **If the base image + CSV haven't
+   arrived when Phase 8 opens, don't stall the build:** do items 2–4's peripheral/chrome work
+   first (asset-independent) and leave the centre face as a placeholder — Phase 9 doesn't depend
+   on the face layout.
+2. **Switch-label text** (`ThreePositionSwitch`, the only pedal-face element that renders text):
+   embed **Lexend Exa** as binary data and load via `Typeface::createSystemTypefaceFor()`; update
+   `cSWLabelActive`/`cSWLabelInactive` to opaque-white/semi-opaque-white (replacing the current
+   light-/dark-blue constants) — see `ui.md` for the exact spec. Do not apply Lexend Exa to
+   peripheral chrome text (OS strip, trims, tooltips) — that stays on the existing default font.
+3. Peripheral chrome from `src/ui/` (PedalLookAndFeel, VUMeter, trims + Trim Link, OS strip,
    scale) per `docs/ui-peripheral-spec.md` + ui.md (tooltips 2-dp, trim readout labels,
-   selector visual language, resize persistence with debounced default-save).
-3. Headless editor render test (build.md) at 0.5×/1×/2.5×; VU/trim bounds check at extremes.
+   selector visual language, resize persistence with debounced default-save). Apply the VU
+   idle-noise gate and re-check its threshold against the FINAL Phase 7 makeup value
+   (calibration §7 — the idle floor moves with makeup, so re-verify if Phase 9 changes it).
+4. Headless editor render test (build.md) at 0.5×/1×/2.5×; VU/trim bounds check at extremes;
+   verify the embedded Lexend Exa renders (not silently falling back to a system font).
 
 **GATE 8:** headless renders correct at all scales; params bind; bypass/DIST LEDs track APVTS
-directly; no drawing outside LookAndFeel.
+directly; no drawing outside LookAndFeel; switch labels render in Lexend Exa with correct
+opaque/semi-opaque selected/unselected states.
 
 ## Phase 9 — Reference validation + performance pass
 
@@ -214,3 +307,24 @@ and implemented or explicitly rejected.
    constrain every fitted taper with ≥2 knob points.
 7. **DIST footswitch semantics** — it must override BLEND *mix target* only (EQ/Master keep
    processing the clean signal), with its own crossfade; do not implement as a second bypass.
+8. **BLEND/bypass phase cancellation — TWO distinct causes, don't fix one and assume it's solved:**
+   (a) *delay*: the clean tap (BLEND) and dry copy (bypass) both split off before the oversampled
+   region; without a delay line matched to `getLatencyInSamples()`, the crossfade comb-filters at
+   every BLEND position, not just visibly in an FR plot but audibly (this exact bug cost a past
+   project real debugging time). (b) *polarity*: independent of delay, the OD path reaching BLEND
+   already carries one confirmed inversion (the clipper) plus an unconfirmed one (the J201 stage's
+   sign) — a per-stage-only DC-step regime can miss an aggregate sign error at the BLEND node
+   itself. Phase 6 now builds and null-tests both explicitly, with distinct failure signatures
+   (dsp.md) — do not let Phase 4's LevelBlend stage get marked done without both checks (see that
+   stage's note).
+9. **Op-amp rail clipping is unscheduled by default** — every stage in the Phase 4 table is
+   labelled "linear", which made it easy for the original plan to omit TL07x output clamps
+   entirely (it did — fixed in the 2026-07-20 review). IC2_A at ×78 rails BEFORE the clipper;
+   the mids can boost +28 dB. Phase 4's rail-clamp paragraph schedules it; a missing clamp is a
+   gate-4 failure.
+10. **LEVEL→BLEND loading** — the two pots are NOT independent ideal dividers (finite LEVEL-wiper
+    source impedance → ≈3.5 dB crossfade imbalance at noon/noon); model the resistive network
+    exactly (Phase 4 item 6), validate against the blend captures.
+11. **Phase 8 asset dependency** — the centre-face base image + CSV come from the user; chrome
+    work proceeds without them (Phase 8 item 1 note) so the build never blocks on an external
+    deliverable.

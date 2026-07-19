@@ -222,6 +222,15 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > D1/D2 are **input-protection / rail clamps** (window ≈ [−0.6, +9.6] V around the ~4.5V bias), NOT
 > tight signal clippers. They only conduct on large excursions. The audible clipping is the 4049
 > transition-region saturation. See `dsp.md` for the CMOS-inverter waveshaper model.
+>
+> **R19 (1k) = the 4049's supply dropper (found 2026-07-19):** +9V → R19 → IC3 pin1 (VDD); IC3 is
+> the ONLY IC with a series supply resistor. The unbuffered 4049 draws mA-scale class-A current in
+> its linear region, so the clipper's effective rail sits **below** the 8.6V op-amp rail (IR drop,
+> plausibly ~0.5–3V depending on bias current) and **sags with signal** (compression). Model the
+> 4049 clip ceiling as fitted-to-capture, NOT as a stiff 8.6V; the D1/D2 clamps still reference the
+> full +9V rail (the inverter output can no longer reach it). The fit-to-capture VTC absorbs the
+> static drop; the dynamic sag is an optional second-order refinement (flag in
+> `docs/nonlinear-component-modeling.md`).
 
 ### Recovery + bandlimiting (IC2_B, IC4_B, IC4_A)
 | Ref | Value | Function |
@@ -275,40 +284,55 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | R28 / R29 | 10k / 22k | IC5_B inverting gain = −R29/R28 = **−2.2×** |
 | IC5_B | TL074ACN | inverting gain stage |
 | C21 | 100n | coupling into tone stack |
-| **BASS** VR4 (LO) | 100k B | R33(10k), R34(10k), C25(22n), C26(22n), out R35(10k). ±12 dB @ ~100 Hz |
-| **TREBLE** VR5 (HI) | 100k B | R36(3k3), C28(10n), C29(10n). ±12 dB @ ~5 kHz |
-| IC5_C | TL074ACN | Baxandall summing amp for BASS+TREBLE: R37(1M)∥C30(47pF) fb; out C31(2u2) |
-| **LO-MID** VR6 | 100k B | R38(2k2), R39(2k2), R40(220k), R41(220k), C32(22n across); around IC5_D. **C33 switchable** (see below) |
-| IC5_D | TL074ACN | LO-MID peaking-filter amp |
-| **HI-MID** VR7 | 100k B | R42(2k2), R43(2k2), R44(220k), R45(220k), C34(6n8 across); around IC6_A. **C35 switchable** (see below) |
-| IC6_A | TL074ACN | HI-MID peaking-filter amp |
+| **BASS** VR4 (LO) | 100k B | R33(10k) in→lug3, R34(10k) lug1→out, C25/C26(22n) lug→wiper each side, R35(10k) wiper→(−). ±12 dB @ ~100 Hz (ideal extremes ±16 dB @40 Hz) |
+| **TREBLE** VR5 (HI) | 100k B | C28(10n) in→lug3, C29(10n) lug1→out, R36(3k3) wiper→(−). ±12 dB @ ~5 kHz (ideal extremes ±16 dB) |
+| IC5_C | TL074ACN | Baxandall summing amp for BASS+TREBLE: R37(1M "1m")∥C30(47pF) fb; out C31(2u2) |
+| **LO-MID** VR6 | 100k B | R38(2k2) in→lug3, R39(2k2) lug1→out, R41(220k) in→(−), R40(220k) (−)→out, C32(22n across lugs); around IC5_D. **C33 wiper→(−) switchable** (see below) |
+| IC5_D | TL074ACN | LO-MID peaking-filter amp (inverting-unity flat path) |
+| **HI-MID** VR7 | 100k B | R42(2k2) in→lug3, R43(2k2) lug1→out, R44(220k) in→(−), R45(220k) (−)→out, C34(6n8 across lugs); around IC6_A. **C35 wiper→(−) switchable** (see below) |
+| IC6_A | TL074ACN | HI-MID peaking-filter amp (inverting-unity flat path); out C36(2u2) → IC6_B |
 
 **Switchable mid-frequency caps [ENG-caps]** — 3-position selector per band swaps the *series* cap
 only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
 
-| LO-MID (C33) | centre | | HI-MID (C35) | centre |
-|---|---|---|---|---|
-| 47n | 250 Hz | | 15n ⚠ | 750 Hz (large extrapolation — validate) |
-| 10n | 500 Hz (fit-exact; table-confirmed) | | 3n3 | 1.5 kHz (table-confirmed) |
-| 2n2 | 1 kHz | | 820pF | 3 kHz |
+| LO-MID (C33) | sim centre (target) | peak | | HI-MID (C35) | sim centre (target) | peak |
+|---|---|---|---|---|---|---|
+| 47n | 229 Hz (250, −8.5%) | ±28.0 dB | | 15n | 728 Hz (750, −2.9%) | ±28.0 dB |
+| 10n | 496 Hz (500, −0.9%) | ±23.0 dB | | 3n3 | 1552 Hz (1.5k, +3.5%) | ±23.3 dB |
+| 2n2 | 1058 Hz (1k, +5.8%) | ±14.5 dB | | 820pF | 3116 Hz (3k, +3.9%) | ±15.6 dB |
 
-> Original board's fixed values were C33=22n (~340 Hz) and C35=680pF (~3.3 kHz). Model each mid band
-> as a switched topology: the series cap is the only thing that changes → an `ImpedanceCalculator`
-> that reads the port impedance live recomputes correctly on cap swap (no per-position precomputed
-> matrix needed — see `dsp.md` "Fixed (non-runtime) circuit variants" reasoning, applied per switch
-> position). The 750 Hz hi-mid cap is extrapolated well past the documented table floor (1.5 kHz) —
-> flag for validation; it may want a different value once the peaking transfer function is simulated.
+> ✅ **Validated by full nodal sim of the verified topology (2026-07-19, open item c), and the sim
+> itself is cross-validated against the p.3 MEASURED tables** (triple-check pass): every table row
+> the sim covers agrees within ~3% in frequency and ~1–2.5 dB in peak gain — e.g. 3n3: sim
+> 1552 Hz/+23.3 dB vs measured 1.55 kHz/23 dB; 680p: sim 3419 Hz/+14.5 dB vs measured 3.3 kHz/14 dB;
+> 22n: sim 334 Hz/+26 dB vs measured 340 Hz/24 dB. All six [ENG] positions land within
+> −8.5%…+5.8% of the Ultra targets — including the previously-suspect 15n→750 Hz (728 Hz, fine).
+> **The peak boost/cut range genuinely varies with position (±14.5…±28 dB, Q ~1.4–2.0)** — the p.3
+> measured table shows the same monotonic trend on real hardware (26→18 dB lo-mid, 23→12.6 dB
+> hi-mid), so this is faithful single-cap behaviour, not a sim artifact; the capture matrix will
+> still confirm the absolute numbers. (A constant-range alternative — switching BOTH caps as a
+> scaled pair, sim-verified exact — exists if the real Ultra ever contradicts this, but the table
+> evidence makes that unlikely.) Original board's fixed values: C33=22n (334 Hz), C35=680pF
+> (3.42 kHz). Model each mid band as a switched topology: the series cap is the only thing that
+> changes → an `ImpedanceCalculator` that reads the port impedance live recomputes correctly on cap
+> swap (no per-position precomputed matrix needed — see `dsp.md` "Fixed (non-runtime) circuit
+> variants" reasoning, applied per switch position).
 
 ### MASTER volume [ENG] — designed post-EQ stage
 | Ref | Value | Function |
 |-----|-------|----------|
-| **MASTER (VR8)** | 100k **A taper** [ENG] | overall output volume; also sets the XLR DI level. Post-EQ divider: top = HI-MID (IC6_A) output via C36, bottom = VD, wiper → IC6_B (+). Unity at full CW. |
+| **MASTER (VR8)** | 100k **A taper** [ENG] | overall output volume; also sets the XLR DI level. Post-EQ divider: top = HI-MID (IC6_A) output via **C36 (2u2 — schematic-verified part)**, bottom = VD, wiper → IC6_B (+). Unity at full CW. |
 
 > **MASTER placement [ENG].** Real Ultra's Master is the last control and governs both the ¼" out and
 > the DI. Cleanest faithful placement: insert as a divider between the EQ end (IC6_A → C36) and the
 > output buffer IC6_B — so IC6_B buffers the post-Master signal feeding BOTH ¼" (R47) and the XLR DI.
 > No new op-amp needed (reuses IC6_B). Calibrate unity/headroom at build (calibration doc §2); a small
 > make-up may be wanted since a post-EQ divider can only attenuate.
+> **Sim-checked (2026-07-19, open item c):** C36(2u2) into the 100k pot gives a 0.72 Hz HPF corner —
+> inaudible; the divider is flat, attenuation-only, unity at full CW; pot loading on the IC6_A op-amp
+> output is negligible. Bonus: the stock board has NO bias resistor on IC6_B(+) after C36 (verified),
+> so the pot's VD leg supplies the missing DC path — the [ENG] insertion is electrically cleaner than
+> stock and costs nothing.
 
 ### Output (¼" jack) — IC6_B
 | Ref | Value | Function |
@@ -385,6 +409,14 @@ DRIVE = variable resistance to AC ground → gain sweeps. Coupled to level (see 
 C11 always in forward path; SW2 (On-Off-On) adds C12 or C13 (or neither) in parallel → sets the
 HF/bass content into R16. Three positions = three effective coupling caps: 4n7 / 4n7∥47n / 4n7∥220n.
 
+> ⚠ **GRUNT corners depend on the 4049's FINITE open-loop gain (2026-07-19 sim).** The HPF corner is
+> `1/(2π·C·(R16 + Zin_node))` where `Zin_node ≈ R18/(1+A0)`. With an ideal virtual ground the corners
+> are 4.98k/453/104 Hz, but at a realistic unbuffered-4049 A0 of ~20–30 they drop to ~1.5–1.9k /
+> 137–177 / 32–41 Hz — a large voicing difference. **Model the R16/cap-bank/4049 as a coupled
+> network with the fitted finite-gain VTC, not as "HPF then waveshaper"** — treating the 4049 input
+> as an ideal virtual ground gets the GRUNT voicing audibly wrong. Fit A0 from the capture (or the
+> datasheet VTC slope) and re-check the three GRUNT corners against captures.
+
 ### CLIPPER (IC3 CD4049UBE) — **Nonlinear** (CMOS inverter, shunt feedback)
 ```
 Node "W" (4049 in, pin3): R16 leg2, R18 leg1, C14 leg1, D1 anode, D2 cathode
@@ -396,11 +428,46 @@ to +9V/GND at node W. Not a standard op-amp — see `dsp.md` CMOS section.
 
 ### IC4_B / IC4_A — **Linear** 2nd-order Sallen-Key low-pass (unity gain), build directly.
 ### IC5_A/B — buffer + inverting gain (−2.2), **Linear**, direct.
-### Baxandall BASS/TREBLE (IC5_C), LO-MID (IC5_D), HI-MID (IC6_A) — **Linear active tone**
-Standard active Baxandall (bass/treble) + two peaking mid stages. Pots are dividers with end lugs
-across the cap networks, wipers to the summing/feedback nodes. Full per-node redraw recommended
-before building the tone stack (values captured above; node detail is the remaining work here).
-### IC6_B — unity output buffer, **Linear**, direct.
+
+### Baxandall BASS/TREBLE (IC5_C) — ✅ **NODES VERIFIED (2026-07-19 pixel-zoom redraw)**
+One coupled network around IC5_C ((+) = VD; feedback R37 1M ∥ C30 47p — R37 is labelled "1m" on
+the schematic = 1 MΩ, the classic `m`-notation gotcha):
+```
+TSin (C21 out)   : R33 leg1, C28 leg1                       (stack input rail)
+Node A (VR4.3)   : R33 leg2, C25 leg1, bass-pot upper end
+Node Wb (VR4.2)  : bass wiper, C25 leg2, C26 leg1, R35 leg1  (caps go lug->WIPER, not across lugs)
+Node B (VR4.1)   : C26 leg2, R34 leg1, bass-pot lower end
+Node T3 (VR5.3)  : C28 leg2, treble-pot upper end
+Node Wt (VR5.2)  : treble wiper, R36 leg1
+Node T1 (VR5.1)  : C29 leg1, treble-pot lower end
+(−) node (pin9)  : R35 leg2, R36 leg2, R37 leg1, C30 leg1    (both wipers sum into virtual gnd)
+Vout (pin8)      : R37 leg2, C30 leg2, R34 leg2, C29 leg2, C31 leg1 (out rail returns both lower legs)
+```
+Boost = wiper toward the input-side lug (VR4.3 / VR5.3). Ideal-sim extremes (2026-07-19 nodal sim):
+bass ±16–17 dB @40 Hz (±11.5 @100 Hz), treble ±16 dB @5 kHz (±18.5 @10 kHz), both-flat ≈ 0 dB
+(−0.2 dB); the spec's "±12 dB" figures are conservative mid-rotation numbers, not the ideal extremes.
+
+### LO-MID (IC5_D) / HI-MID (IC6_A) — ✅ **NODES VERIFIED (2026-07-19)**; identical topology
+Flat inverting-unity path + frequency-selective pot leg. LO-MID designators (HI-MID in parens):
+```
+Min  = C31 out (= IC5_D pin14 out for HI-MID): R38 leg1 (R42), R41 leg1 (R44)
+P3   = pot lug3: R38 leg2 (R42), C32 leg1 (C34), pot upper end
+P1   = pot lug1: R39 leg1 (R43), C32 leg2 (C34), pot lower end
+W    = wiper   : C33 leg1 (C35)                                [series cap = the switchable one]
+(−)  = pin13 (pin2): R41 leg2 (R44), C33 leg2 (C35), R40 leg1 (R45)
+Vout = pin14 (pin1): R40 leg2 (R45), R39 leg2 (R43), → next stage
+(+)  = VD.  R41/R44 = input→(−) 220k;  R40/R45 = (−)→out 220k  (flat gain −1, i.e. unity inverting)
+```
+Boost = wiper toward P3 (input side); B-taper centre = exactly flat (sim: 0.00 dB max deviation).
+Each mid stage inverts; the two mids + IC5_B (−2.2) + IC5_C Baxandall = 4 inversions total in the
+EQ → net non-inverting through the EQ block (confirm with the per-stage DC-step tests anyway).
+
+### IC6_B — unity output buffer, **Linear**, direct. C36 = 2u2 (schematic-verified) couples
+IC6_A out → IC6_B (+). ⚠ Stock board shows **no DC-bias resistor** on IC6_B (+) after C36
+(verified at pixel zoom — the pin5 wire has no junction): the [ENG] MASTER pot (100k to VD)
+inserted at this exact node **provides the missing DC path**, so the engineered design is
+electrically cleaner than the stock float and needs no extra bias part. Irrelevant to DSP
+(model ideal bias), but explains why no bias-R appears in the BOM here.
 
 ## Op-amp model
 - **TL072ACP / TL074ACN**, single +9V/GND supply (VD=4.5V). NOT rail-to-rail → model asymmetric
@@ -414,7 +481,19 @@ before building the tone stack (values captured above; node detail is the remain
   perceptually coupled to LEVEL. Model the gain-leg resistance directly; re-check output level after.
 - **BLEND (VR1) + LEVEL (VR2)**: LEVEL scales the OD, BLEND crossfades OD↔clean. Not a shared WDF
   network (they're plain dividers/crossfade), but model as the crossfade described above, not two
-  independent gains.
+  independent gains. ⚠ **Two distinct alignment risks at this summing node — see `dsp.md` "Dry/wet
+  phase alignment across the oversampled region" for both:**
+  - **Delay:** the clean tap splits off at IC1_A, BEFORE the J201 JFET stage — and everything from
+    the JFET through the SK filters sits inside the oversampled region (dsp.md Oversampling). The
+    OD side picks up the oversampler's FIR latency and the clean tap does not, at every BLEND
+    position, not just during a transition — delay-compensate the clean tap to
+    `getLatencyInSamples()` before wiring BLEND up in Phase 4/6 of the build plan.
+  - **Polarity:** the OD path reaching BLEND already carries one confirmed inversion (the CD4049
+    clipper, gain ≈ −48.5) and the J201 JFET stage's sign is NOT yet confirmed (see JFET node graph
+    above — needs its own DC-step test). These are BOTH upstream of BLEND, separate from the "4
+    inversions in the EQ" note below (which is downstream, post-BLEND, and doesn't cover this). Run
+    an end-to-end DC-step test from input to the BLEND summing node on the OD side before trusting
+    the crossfade sign, not just per-stage tests.
 - **MASTER (VR8) [ENG]**: post-EQ output volume; governs BOTH the ¼" out and the XLR DI level (they
   share IC6_B). Model as a divider before IC6_B, not a per-output gain.
 - **4-band EQ**: BASS+TREBLE share the IC5_C summing node (one Baxandall network — model coupled).
@@ -430,6 +509,24 @@ BLEND. **Two footswitches** control it (main true-bypass + a second DIST-engage 
 BLEND crossfade) — see Footswitches below; this is an Ultra-only addition, not a second gain stage.
 
 ## Validation notes
+
+- **TRIPLE-CHECK PASS (2026-07-19, session 3) — schematic ↔ BOM ↔ circuit.md ↔ dsp.md all agree.**
+  Four independent legs, all clean: (1) BOM pages 1–2 extracted and diffed against every table in
+  this file — 100% match (R1–R54 + R-LED, C1–C39 incl. the electrolytic split, ICs, Q1/Q2, D1–D4,
+  all 7 pot values+tapers, switches). (2) A fresh-eyes agent re-verified 11 load-bearing topology
+  claims against the primary p.4 image WITHOUT reading this file — all 11 CONFIRMED (input pulldown,
+  C4 bootstrap, DRIVE rheostat, clipper + D1/D2, IC2_B unity + bridged-T node graph, both SKs,
+  LEVEL/BLEND lugs + clean-tap rail traced end-to-end to IC5_A(+), GRUNT parallel caps, treble/ATTACK
+  nodes, C36→IC6_B float + output net). (3) The backup schematic corroborates the 2026-07-19
+  tone-stack redraws (Baxandall, both mids, output buffer — identical topology, different
+  designators; its C36-equivalent ALSO floats IC6_B(+), so the missing bias is a design-family
+  quirk, not a primary-schematic error). (4) The p.3 MEASURED f/dB tables agree with the nodal sim
+  (`analysis/eq_reference.py`) within ~3% / ±2.5 dB on every comparable row — sim, schematic, and
+  measurement mutually consistent. Also cross-checked: `info.txt` control wording/ranges, dsp.md
+  diode params + nonlinear-parts list, and all derived numbers in this file (SK corners 10.7k/3.3k,
+  DRIVE gain 4–78×, clipper −48.5, IC5_B −2.2) recomputed from the component values — all agree.
+  Note: GRUNT positions have no official names (info.txt: "three different bass boost levels");
+  the physical On-Off-On CENTRE is the minimum-bass position (C11 4n7 alone).
 - **C33 (LO-MID series cap): primary schematic p.4 = 22n AND BOM = 22n → use 22n.** Backup schematic
   (2021 "B7X" rev) shows 2200pF for the equivalent cap — a **revision difference**, not our board.
   Confirmed by zooming both the schematic symbol and the BOM table.
@@ -446,11 +543,17 @@ BLEND crossfade) — see Footswitches below; this is an Ultra-only addition, not
   permanently forward-biased, which is impossible (see clipper node graph).
 - **Q1/Q2 role confirmed** as an active gain stage (Q1 CS + Q2 active load), NOT analog switches —
   do not model as a switched topology.
-- **R19 (1k) — OPEN ITEM.** Present in the primary BOM (R19 = 1k) but not located in the traced
-  signal path (input→buffer→JFET→treble→drive→grunt→clipper→recovery→SK→SK→level→blend→EQ→out is
-  complete without it; the clipper→recovery run is C15/R20 only). Likely a small series/isolation
-  resistor in the clean-blend tap or a utility position. Not signal-critical (1k into a high-Z node
-  is negligible), but confirm its node during layout/DSP so the BOM fully reconciles.
+- **R19 (1k) — RESOLVED (2026-07-19 grid-scan + pixel-zoom verification).** It is NOT in the signal
+  path: R19 sits **in series between the +9V rail and IC3 pin 1 (VDD of the CD4049UBE clipper)** —
+  found in the power-pin column (page fraction ≈ x 0.42, y 0.21–0.29), strut reading
+  `+9V → R19 1k → IC3_PWR pin 1 … pin 8 → GND`. All five op-amp supply stubs (IC1/IC2/IC4 TL072
+  `4-…-8`, IC5/IC6 TL074 `11-…-4`) are direct wires; **IC3 is the only IC with a series supply
+  resistor**. This is the classic CD4049-overdrive supply dropper (same trick as the Red Llama):
+  the unbuffered 4049 draws class-A current when biased linear, so R19 (i) drops the clipper's
+  effective rail below the ~8.6V main rail and (ii) adds signal-dependent supply sag/compression.
+  **Model consequence:** the 4049's clip ceiling is LOWER and softer than the op-amp rail — do not
+  model the clipper rails as a stiff 8.6V (see the CLIPPER section note). D1/D2 still clamp to the
+  full +9V rail. BOM now fully reconciles: **R1–R54 all located.**
 - **BOM ↔ circuit.md reconciled (2026-07-19):** every R (R1–R54), every C (film + electrolytic),
   all ICs (IC1/2/4=TL072ACP, IC3=4049N, IC5/6=TL074ACN), Q1/Q2=J201, D1/D2=1N4148, D3=1N5817,
   D4=LED, and all pot **tapers** (BLEND 100k B, DRIVE 100k C, LEVEL 100k A, HI/LO/HI-MIDS/LO-MID
@@ -466,9 +569,11 @@ schematic-verified — behaviourally faithful to the Ultra, tuned/validated late
 - **[ENG] 3-way ATTACK** — schematic's 2-position ULTRA-HI (Boost/Cut) extended to On-Off-On with a
   centre Flat (C8 disconnected). Base network nodes still need lug-level verification.
 - **[ENG-caps] Switchable mid frequencies** — 3-position selectors, caps **computed** (E12) to hit the
-  real Ultra centres, anchored to the p.3 Ultra-Mod measured f-vs-C tables (clean fit f ∝ C^−0.49):
-  Lo-Mid 250/500/1k = 47n/10n/2n2; Hi-Mid 750/1.5k/3k = **15n(⚠ extrapolated)**/3n3/820pF. The
-  10n→500 Hz and 3n3→1.5k points are table-confirmed; 750 Hz is well past the table floor — validate.
+  real Ultra centres: Lo-Mid 250/500/1k = 47n/10n/2n2; Hi-Mid 750/1.5k/3k = 15n/3n3/820pF.
+  ✅ **All six positions now validated by full nodal sim of the verified topology (2026-07-19)** —
+  within −8.5%…+5.8% of targets, incl. the formerly-suspect 15n→750 Hz (728 Hz). Remaining open
+  question is the per-position boost RANGE (±14.5…±28 dB varies with cap — see mid-band table
+  note); confirm against captures.
 - `info.txt` (Ultra spec) is now the **control/behaviour reference** (Master, Attack Boost/Flat/Cut,
   switchable mid ranges). Its mid ranges (Lo 250/500/1k, Hi 750/1.5k/3k) are the switch targets.
 - **What did NOT change:** JFET front end, CD4049UBE clipper (+ D1/D2 clamps), IC2_A DRIVE, GRUNT,

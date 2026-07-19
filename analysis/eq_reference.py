@@ -68,16 +68,22 @@ def baxandall_tf(f, ab, at, Rp=100e3, R33=10e3, R34=10e3, R35=10e3, R36=3.3e3,
         out[i] = x[6]
     return out
 
-def bridged_t_tf(f, R22=100e3, R23=33e3, C16=680e-12, C17=22e-9, Rload=10e3):
-    """buf-out --C16--> Nout ; buf-out --R22--> Nmid --R23--> Nout ; Nmid --C17--> GND ; Nout --Rload--> (SK in, ~GND-ish load approx)."""
+def bridged_t_tf(f, R22=100e3, R23=33e3, C16=680e-12, C17=22e-9, Rload=None):
+    """buf-out --C16--> Nout ; buf-out --R22--> Nmid --R23--> Nout ; Nmid --C17--> GND.
+
+    Rload=None (default) = UNLOADED — the documented ~717 Hz/−28 dB numbers, and a fair
+    approximation: the real load is R24(10k) + the IC4_B SK's input impedance, which is
+    bootstrapped high in the SK passband (output ≈ input at 717 Hz << 10.7 kHz corner).
+    Pass a resistance to sensitivity-check loading; the WDF stage includes the real load,
+    so expect small notch-region deviations vs this unloaded oracle (build-plan Phase 4)."""
     w = 2j * np.pi * f
     out = np.zeros(len(f), dtype=complex)
     for i, s in enumerate(w):
         y16, y17 = s * C16, s * C17
-        # unknowns [Nmid, Nout]; Vin = 1 (ideal buffer out). Load: R24=10k into SK (approx high-Z beyond) -> use open then note.
+        # unknowns [Nmid, Nout]; Vin = 1 (ideal buffer out)
         M = np.zeros((2, 2), dtype=complex); b = np.zeros(2, dtype=complex)
         M[0, 0] = 1 / R22 + 1 / R23 + y17; M[0, 1] = -1 / R23; b[0] = 1 / R22
-        M[1, 1] = 1 / R23 + y16 + (0 if Rload is None else 0); M[1, 0] = -1 / R23; b[1] = y16
+        M[1, 1] = 1 / R23 + y16 + (0 if Rload is None else 1 / Rload); M[1, 0] = -1 / R23; b[1] = y16
         # unloaded (SK input is high-Z through R24 into unity SK ~ follows), good first approx
         x = np.linalg.solve(M, b)
         out[i] = x[1]

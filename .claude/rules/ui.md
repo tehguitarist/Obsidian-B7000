@@ -4,6 +4,46 @@
 > meters, oversampling strip, resizable UI, bypass footswitch, LED) lives in
 > `docs/ui-peripheral-spec.md`, and the working code is in `src/ui/`. This file is the high-level
 > contract; the spec is the detail.
+>
+> **This project also ships image assets in `ui/`** (knobs, footswitch up/down, LEDs on/off,
+> 3-position switches, panel textures, VU trim) — PNGs with alpha, drawn at knob-noon, rotation-safe.
+> Follow `ui/ui-replacements.md` when using them: keep 2× resolution at 100% UI scale (sharp up to
+> 200%+), crop-to-fit (never stretch), and resize/convert copies to minimise plugin size (preserve
+> originals). Prefer these for the centre pedal face; the procedural `PedalLookAndFeel` still owns
+> the peripheral chrome (side panels, OS strip, VU bars).
+
+## Centre pedal face (this pedal) — layout source & typography
+
+**Layout will be data-driven, not hand-placed.** The user will provide a base image plus a CSV of
+sizes/positions for the centre pedal face; build the layout from that CSV against the base image
+rather than guessing coordinates from the `ui/` PNGs individually. Details of exactly which
+elements the CSV covers (knobs only vs. knobs+switches+jacks, coordinate origin/units) are TBD until
+it arrives — don't pre-build a layout system that assumes a specific CSV schema; confirm the schema
+when the file lands.
+
+**No bypass label needed for this pedal** — the base image already has one printed on it. Don't add
+a code-rendered "BYPASS" text label near the footswitch the way a from-scratch build might.
+
+**Only the 3-way switch selector options render text on the pedal face** (ATTACK Boost/Flat/Cut,
+GRUNT's three positions, LO-MID/HI-MID frequency labels) — no other pedal-face element needs
+code-rendered text; everything else is conveyed by the base image/knob graphics. This is exactly
+`ThreePositionSwitch`'s label row (`src/ui/ThreePositionSwitch.h`).
+
+- **Colour/opacity, not the current scheme:** selected option = **opaque white**; unselected
+  options = **semi-opaque white**. This REPLACES the current `cSWLabelActive` (light blue
+  `0x90C0E0`) / `cSWLabelInactive` (dark blue `0x3A5A78`) constants in `PedalLookAndFeel.h` — both
+  need to become white at different alphas (exact unselected alpha TBD at implementation time, e.g.
+  ~40–50%, confirm visually against the base image before locking a value).
+- **Typeface: "Lexend Exa"**, for pedal-face text ONLY (i.e. these switch labels) — do NOT apply it
+  to peripheral chrome text (OS/RENDER combo boxes, scale button, VU/trim labels, tooltips), which
+  keep the existing default JUCE font per `docs/ui-peripheral-spec.md`. Lexend Exa is a Google Font
+  (OFL-licensed) and is not a system font — embed the `.ttf` as binary data (`juce_add_binary_data`
+  / `BinaryData.h`) and load it via `juce::Typeface::createSystemTypefaceFor()` rather than
+  assuming it's installed on the build/user machine; don't skip this and fall back silently to a
+  system font if the embed is missing.
+
+Further pedal-face elements (knob arrangement, jacks, footswitch/LED placement) to be worked out
+once the base image + CSV arrive — don't design that layout speculatively ahead of them.
 
 ## Principles
 

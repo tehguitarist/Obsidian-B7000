@@ -191,6 +191,74 @@ audible accuracy). Leave free/near-free features always-on (a toggle for them is
 - Consider a **separate render-time OS factor**: in `processBlock`, pick the higher factor when
   `isNonRealtime()` is true (offline bounce) — see architecture.md.
 
+### Dry/wet phase alignment across the oversampled region (BLEND, bypass)
+
+**Two DIFFERENT bugs both show up as "BLEND/bypass phase cancels" — a relative DELAY between the
+two paths, and a SIGN/POLARITY flip in one of them. Check both; they have different fixes and
+different diagnostic signatures.** This general class bit a past project hard enough to be worth
+a standing rule whenever a dry/clean path rejoins a path that went through more processing.
+
+**(A) Delay.** Any signal that splits off BEFORE the oversampled region and is later summed with a
+signal that went THROUGH it picks up a relative delay equal to the oversampler's FIR latency — if
+uncompensated, the sum is comb-filtered, not just "a bit softer." `juce::dsp::Oversampling`'s
+anti-imaging/anti-aliasing FIRs have real group delay (`getLatencyInSamples()`, reported in
+BASE-rate samples), and it is invisible in isolation — each path sounds fine soloed, the damage
+only shows up once they're mixed. Two summing points in this architecture are exposed to it:
+
+- **BLEND crossfade** (this pedal): the clean tap comes off IC1_A, BEFORE the J201 JFET stage —
+  and the JFET → clipper → recovery/bridged-T → SK filters all sit INSIDE the oversampled region
+  (per the OS-region rule above). So the OD path is delayed by the OS latency and the clean tap
+  is not, every single sample, at every BLEND position — not just during a transition.
+- **True-bypass crossfade**: the dry copy is taken pre-DSP; the wet chain includes the same
+  oversampled region. Less perceptually critical (only active during the ~5 ms transition), but
+  the same fix applies — see architecture.md "Bypass".
+
+**Fix:** run the non-oversampled (dry/clean) path through a plain sample delay line
+(`juce::dsp::DelayLine`, base-rate, no interpolation needed — `getLatencyInSamples()` is an
+integer count for FIR mode) sized to the CURRENT oversampler's reported latency, before summing.
+Update the delay length at the same point you reinit the oversampler on a factor change (dsp.md's
+existing "reset() + initProcessing() then update the factor" rule) — do not try to interpolate the
+delay-length change either; one documented block-gap, same as the OS-switch policy already states.
+Recompute from whichever factor is active this block (realtime vs `render_oversampling`), matching
+the existing "Pick OS factor... reinit if changed" processBlock step.
+
+**(B) Polarity/sign.** Independent of delay: if the CUMULATIVE sign of the OD path reaching the
+BLEND summing node doesn't match what the real circuit actually produces, the sum is wrong at
+every OS factor — a delay line does nothing for this. This is a real exposure here, not a
+hypothetical: the OD path from input to BLEND already carries one **confirmed** inversion (the
+CD4049 clipper, gain ≈ −48.5 — circuit.md CLIPPER section) and the **J201 JFET stage's sign is
+explicitly flagged as unconfirmed** (circuit.md JFET node graph — "confirm output polarity with a
+DC-step test in every stage" applies here specifically, not just as boilerplate). A per-stage
+DC-step test can pass for every individual stage and STILL leave an aggregate sign error at BLEND —
+e.g. the JFET sign is mis-modeled, or a `PolarityInverterT` is added/omitted reflexively (dsp.md's
+existing warning: "NOT reflexively for inverting op-amps — verify against the schematic"). Since
+there is only one physical input splitting into the clean tap and the OD path, the real circuit has
+one definite sign relationship between them at the BLEND pot — the model must reproduce THAT
+relationship, not assume unity or assume it's already correct because each stage passed alone. Once
+the full OD chain up to BLEND is implemented, run one END-TO-END DC-step test from input through to
+the BLEND summing node (both sides: clean tap and OD path) and compare signs directly, in addition
+to (not instead of) the existing per-stage tests.
+
+**Do NOT over-correct.** `setLatencySamples()` reports TOTAL plugin latency to the host for its
+own PDC — that fixes alignment against OTHER tracks/plugins, and does nothing for the (A) internal
+mismatch; don't assume one solves the other. Conversely, the WDF/analog stages' own
+frequency-dependent phase shift (tone stack, bridged-T, SK filters) is **faithful, expected drift**
+— a real B7K Ultra's clean-blend path is not phase-coherent with its OD path either, because the
+real OD path really does run through more filtering. Only the discrete integer-sample BULK delay
+from the oversampling FIRs is a pure digital artifact with no analog equivalent; that's the only
+delay-side thing to compensate. Similarly, don't "fix" a genuine odd-inversion-count sign
+difference between clean and OD — reproduce whatever the real circuit does, confirmed by the
+DC-step chain, not by assumption.
+
+**Verify with a null/impulse test at BLEND=50%, and read the FAILURE SIGNATURE to tell (A) from
+(B):**
+- Comb-filter notches that SHIFT position as you sweep OS factors (1×/2×/4×/8×), tracking
+  `getLatencyInSamples()` → **(A) missing/stale delay line.**
+- A broadband/mostly-flat cancellation (or unexpected reinforcement) that does **NOT** move with OS
+  factor, or a null/boost that appears at the wrong BLEND setting relative to the analytic/nodal
+  expectation → **(B) sign mismatch** — re-run the end-to-end DC-step test on the OD chain,
+  starting with the JFET stage.
+
 ## Top-octave accuracy: bilinear cap warping near Nyquist
 
 Linear stages run at base rate, and chowdsp's trapezoidal capacitor (companion `R = 1/(2 C fs)`) is

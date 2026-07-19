@@ -194,5 +194,44 @@ high, execute routine work cheap) is what should persist.
   alpha, noon-position, rotation-safe) with prep guidelines in `ui/ui-replacements.md` (2x-resolution
   policy, crop-don't-stretch, resize-to-minimise). Use these for the Step 8 pedal face instead of
   procedural drawing where they fit; keep `src/ui/` LookAndFeel for the peripheral chrome.
+- **UI spec additions (2026-07-20, awaiting a base image + CSV from the user):** the centre pedal
+  face layout will be data-driven from that CSV (positions/sizes), not hand-placed — confirm its
+  schema when it arrives. No bypass label needed (base image has one printed). Only the 3-way
+  switch selector labels (ATTACK/GRUNT/mid-freq) render text on the pedal face; all other elements
+  read text-free. That text: **font = Lexend Exa** (embed as binary data, this pedal's face text
+  ONLY — peripheral chrome keeps its existing font), **colour = white**, opaque when selected,
+  semi-opaque when not — replaces `PedalLookAndFeel`'s current `cSWLabelActive`/`cSWLabelInactive`
+  light-/dark-blue constants. Full spec in `ui.md` "Centre pedal face"; plan updated in
+  `docs/build-plan.md` Phase 8. Further pedal-face elements TBD until the assets land.
 - **Full build plan: `docs/build-plan.md`** (2026-07-19) — step-by-step from submodules to release,
   with per-step validation gates and the capture-session checklist folded in.
+- **Build-plan review pass (2026-07-20):** thorough gap analysis of the plan against calibration/
+  validation/nonlinear docs + circuit.md; fixes applied to `docs/build-plan.md`. Biggest catch:
+  **TL07x op-amp rail clamps were never scheduled anywhere** (calibration §6 requires them on every
+  op-amp output; IC2_A at ×78 rails BEFORE the 4049 at max DRIVE; mids boost +28 dB) — now a Phase 4
+  paragraph + gate item + risk #9. Also added: **LEVEL→BLEND pot loading** (not independent
+  dividers; ≈3.5 dB crossfade imbalance at noon/noon — model the resistive network exactly, Phase 4
+  item 6 + risk #10); bridged-T test-oracle caveats (oracle is unloaded; assert notch freq tight /
+  depth loose, not ±0.25 dB at a notch bottom); treble/ATTACK stage-boundary decision (its input
+  node is the JFET drain — pick one source-impedance convention for oracle AND WDF stage); `hq`
+  APVTS-ID gotcha (can't "reserve" by omission — no audio/CPU impact, purely AU session-recall
+  compatibility; **resolved: do BOTH** — version-hint every param `ParameterID{"id",1}` AND add
+  `hq` now as a default-true no-op, decided with the user 2026-07-20); Phase 2 additions (bus
+  layout, `ScopedNoDenormals`, `getBypassParameter()`); Phase 6 host
+  `setLatencySamples()` on OS-factor change (distinct from the internal delay line); Phase 7 TL07x
+  rail confirmation from captures; Phase 8 VU idle-gate recheck vs final makeup + don't-stall-on-
+  assets fallback; interim `kInputRef` (~1–3 V/FS bass level) for Phases 4–6. `eq_reference.py`
+  `bridged_t_tf` dead `Rload` param made functional (default None/unloaded — documented 717 Hz/
+  −28.1 dB numbers unchanged, verified by re-run).
+- **BLEND/bypass dry-wet phase-alignment gotcha added (2026-07-20, user's own hard-won lesson from
+  another project) — covers BOTH delay and polarity, not delay alone:** (a) the clean BLEND tap
+  splits off pre-JFET, i.e. before the oversampled region — an uncompensated crossfade against the
+  OD path (which picks up the oversampler's FIR latency) comb-filters at every BLEND position; (b)
+  independent of delay, the OD path reaching BLEND already carries one confirmed inversion (the
+  clipper, ≈−48.5) plus an UNCONFIRMED one (the J201 stage's sign — needs its own DC-step test),
+  so a per-stage-only test regime can miss an aggregate sign error at the BLEND node itself. Both
+  fixes + null-test signatures (comb notches that shift with OS factor = delay bug; broadband/
+  wrong-setting nulls that don't shift = polarity bug) now in `dsp.md` ("Dry/wet phase alignment
+  across the oversampled region"), cross-referenced from `architecture.md` (Bypass), `circuit.md`
+  (BLEND note), and `docs/build-plan.md` (Phase 4/6 + risk #8). Build the delay line AND run the
+  end-to-end DC-step test in Phase 6; don't ship Phase 4's BLEND stage without both.

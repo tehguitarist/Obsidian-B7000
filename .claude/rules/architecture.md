@@ -94,6 +94,12 @@ const int wantFactor = isNonRealtime()
 - True bypass: dry input routed to output, DSP skipped when bypassed.
 - ~5 ms crossfade (`SmoothedValue bypassMix`) on transitions to avoid clicks.
 - On DAW recall, the UI must reflect the restored `bypass` parameter — read APVTS, not a stale flag.
+- **The dry copy used for this crossfade must be delay-compensated to the wet chain's current
+  oversampling latency before summing** — see `dsp.md` "Dry/wet phase alignment across the
+  oversampled region". The dry copy is taken pre-DSP (zero latency); the wet chain includes the
+  oversampled nonlinear stage (nonzero latency), so an uncompensated crossfade phase-cancels during
+  the transition. Same fix, same rule as the BLEND control (circuit.md) — one shared delay line
+  sized off `getLatencyInSamples()` can serve both summing points.
 
 ## Input/output trim link
 
