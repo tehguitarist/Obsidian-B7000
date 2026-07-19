@@ -62,7 +62,17 @@ decomposition** we already use (R16 input, R18∥C14 fb, D1/D2 as hard clamps at
   the real-unit capture (§4).
 - **Asymmetry → even harmonics is intrinsic and required** (n-ch vT≈1.57 vs |p-ch vT|≈0.48; α differs
   ~6×). Fit it from a capture — don't just bolt on a token mismatch `m`.
-- Scale the curve to **VDD≈8.6V** (after the D3 Schottky drop), not 9V.
+- Scale the curve to the clipper's ACTUAL rail, which is **below 8.6V**: R19 (1k, located 2026-07-19)
+  sits in series between the +9V rail and IC3's VDD pin — the only IC with a supply dropper. The
+  unbuffered 4049's class-A linear-region current (mA-scale) drops ~0.5–3V across it, so the clip
+  ceiling is lower AND softer than the op-amp rail, with signal-dependent sag (compression), exactly
+  the Red Llama trick. **Calibrate the ceiling to the bypass+drive captures** (the static drop is
+  absorbed by the fit); dynamic sag is an optional refinement — try static first, add a simple
+  supply-sag state (VDD_eff = 8.6 − I_DD(Vout)·1k, one-pole smoothed) only if captured feel demands it.
+- The 4049's **finite open-loop gain (~20–30) is part of the voicing**: the GRUNT HPF corners depend
+  on the input node's impedance R18/(1+A0) (sim 2026-07-19: ideal-virtual-ground corners 4.98k/453/104
+  Hz vs ~1.5–1.9k/137–177/32–41 Hz at A0≈20–30). Model R16 + GRUNT bank + the fitted finite-gain VTC
+  as one coupled stage, and verify the three GRUNT corners against captures after fitting A0.
 - Oversample (hardest nonlinearity in the chain) + ADAA per `dsp.md`. Keep C14∥R18 and the GRUNT cap
   bank in the linear WDF part.
 - Escalate to a full 2-MOSFET Newton solve at the WDF root **only if** the static fit fails to match

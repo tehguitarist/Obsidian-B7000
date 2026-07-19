@@ -103,31 +103,31 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 1 (Schematic analysis) — DONE + FULL VERIFICATION PASS (2026-07-19).** `circuit.md`
-> filled, revised for the ULTRA target, and now cross-checked node-by-node + value-by-value against
-> primary p.4, backup, and both BOM pages. Found 1 major correction (IC2_B is a unity buffer, not a
-> +12 dB shelf), 1 minor topology fix (C4 bootstrap, not to GND), 1 wording fix (ATTACK Cut), 1 open
-> item (R19 1k unlocated). Everything else — all R/C/IC/Q/D values, pot tapers, treble/ATTACK nodes,
-> DRIVE rheostat, GRUNT, clipper + D1/D2 orientation, both Sallen-Keys, LEVEL/BLEND, full EQ, output —
-> matches. See circuit.md "IC2_B CORRECTION" note and updated Validation notes.
-> Full chain traced IN→OUT: input buffer → J201 JFET gain → treble/ATTACK → DRIVE (IC2_A) → GRUNT →
-> CD4049UBE clipper (D1/D2 = rail clamps, CMOS soft-clip) → recovery → 2× Sallen-Key LPF → LEVEL →
-> BLEND(clean crossfade) → EQ (4-band, switchable mids) → MASTER → output buffer. XLR DI + power
-> beyond VD skipped. **Ultra features are engineered [ENG]** — see circuit.md (Master, 3-way Attack,
-> switchable-mid caps).
-> Web research (2026-07-19) confirmed Master/Attack wording + both mid-freq sets exactly, and
-> surfaced a genuinely new requirement: the real Ultra has a **second DIST-engage footswitch**
-> (independent of main bypass) not derivable from our schematic — see circuit.md "Footswitches".
-> **NEXT:** (a) ✅ treble/ATTACK nodes verified; ✅ GRUNT C13 = 220n verified (BOM+schematic);
-> Baxandall/mid tone-stack node detail still wants a full per-node redraw before building the tone
-> stack (values all confirmed, node graph is the remaining work). (b) **IC2_B follow-up (NEW, important):**
-> the recovery stage is a unity buffer + passive bridged-T, NOT a +12 dB shelf — an ideal sim shows a
-> deep ~720 Hz notch, which is surprising; **capture the real unit's clipper→EQ-in response to confirm
-> the actual shape before modelling**, and remove the assumed recovery-gain from any gain-staging plan.
-> (c) sanity-check the [ENG] mid-freq caps + Master gain-staging with a filter sim; (d) design the
-> DIST-engage footswitch (2nd bool, overrides BLEND crossfade to 100% clean) alongside main bypass at
-> the architecture/APVTS step; (e) locate R19 (1k); (f) then Step 2 CMake scaffold once `libs/`
-> submodules (JUCE, chowdsp_wdf, xsimd) are added — not yet present.
+> **CURRENT: Step 1 (Schematic analysis) — COMPLETE, all open items closed (2026-07-19 session 3).**
+> `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
+> against primary p.4, backup, and both BOM pages, PLUS (session 3): ✅ Baxandall + LO-MID/HI-MID
+> tone-stack per-node redraw (verified node graphs now in circuit.md — R35/R36 wiper→(−) roles,
+> R40/R41 + R44/R45 flat-unity legs, C25/C26 lug→wiper, C36 2u2 real); ✅ R19 located (= the 4049's
+> +9V supply dropper → clipper rail is LOWER/softer than the op-amp rail — real modeling consequence);
+> ✅ [ENG] mid-cap table validated by nodal sim (all 6 positions within ±8.5%; per-position boost
+> range varies ±14.5–28 dB — capture-validate); ✅ Master gain-staging sim-checked (0.72 Hz corner,
+> flat, unity CW; the pot also fixes the stock board's missing IC6_B bias); ✅ GRUNT corners shown to
+> depend on the 4049's finite open-loop gain (model coupled, not HPF→waveshaper); BOM fully
+> reconciled R1–R54.
+> Full chain: input buffer → J201 JFET gain → treble/ATTACK → DRIVE (IC2_A) → GRUNT → CD4049UBE
+> clipper (R19-dropped rail; D1/D2 = rail clamps) → IC2_B unity buffer + bridged-T (~717 Hz notch,
+> capture-validate) → 2× Sallen-Key LPF → LEVEL → BLEND(clean crossfade) → EQ (4-band, switchable
+> mids) → MASTER[ENG] → output buffer. XLR DI + power beyond VD skipped. Ultra features are [ENG].
+> **TRIPLE-CHECK PASS also done (same session):** BOM↔circuit.md 100% diff-clean; 11 load-bearing
+> topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
+> backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
+> ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
+> **NEXT: Step 2 (CMake scaffold) — follow `docs/build-plan.md`** (the full step-by-step plan for the
+> rest of the build, written 2026-07-19). First actions: add `libs/` submodules (JUCE, chowdsp_wdf,
+> xsimd — not yet present), instantiate CMakeLists.txt from the template, minimal
+> PluginProcessor/Editor loading in a DAW. Remaining capture-blocked items (bridged-T shape, 4049
+> VTC/J201 fits, mid boost ranges, kInputRef) are scheduled inside the plan — they do NOT block
+> Steps 2–5.
 
 ## Project-specific carry-forwards
 
@@ -139,8 +139,9 @@ high, execute routine work cheap) is what should persist.
   Plus 3-way ATTACK[ENG] + 3-way GRUNT switches, and 3-position Lo-Mid/Hi-Mid freq selectors[ENG].
 - **Engineered (not schematic-verified) parts** — flagged [ENG] in circuit.md: MASTER volume stage
   (post-EQ divider → IC6_B, also DI level); 3-way ATTACK (2-pos ULTRA-HI + centre Flat); switchable
-  mid caps — Lo-Mid 47n/10n/2n2 (250/500/1k), Hi-Mid 15n⚠/3n3/820pF (750/1.5k/3k), computed from the
-  p.3 Ultra-Mod tables (f∝1/√C). 750 Hz hi-mid is extrapolated — validate. **Plus a 2nd DIST-engage
+  mid caps — Lo-Mid 47n/10n/2n2 (250/500/1k), Hi-Mid 15n/3n3/820pF (750/1.5k/3k). ✅ All six
+  positions validated by nodal sim (±8.5% worst) AND the sim cross-checks against the p.3 measured
+  tables (~3% / ±2.5 dB) — see circuit.md mid-band note. **Plus a 2nd DIST-engage
   footswitch** (real Ultra has 2 footswitches; ours only has 1 in the BOM) — model as a bool that
   overrides the BLEND crossfade to 100% clean, not a second bypass loop.
 - **Web-confirmed 2026-07-19** (real Darkglass manual + reviews): Master/Attack wording and both
@@ -161,7 +162,7 @@ high, execute routine work cheap) is what should persist.
   — do it in one matched session; it also resolves the IC2_B ~720 Hz bridged-T notch question.
 - **Capture unit CONFIRMED = a real B7K Ultra, audio-only (¼" in→out, no internal probing).** Big
   win: we capture & VALIDATE all [ENG] features directly (Master, 3-way Attack, DIST footswitch,
-  switchable mids incl. the extrapolated 750 Hz Hi-Mid). Nonlinear models + the IC2_B notch are
+  switchable mids incl. the 750 Hz Hi-Mid). Nonlinear models + the IC2_B notch are
   inferred from composite in→out (control-isolation + matched-pair diff). Finalized capture MATRIX
   (~29 essential takes, deviation-from-REF-OD-baseline filenames) = `docs/nonlinear-component-modeling.md`
   §4. Parser `parse_capture()` added to `analysis/analyze.py` (8 pots + 4 three-way switches + DIST,
@@ -178,3 +179,20 @@ high, execute routine work cheap) is what should persist.
 - **C4 (JFET Q2)** connects gate→source(output) as a bootstrap, NOT gate→GND (was mis-stated).
 - **R19 (1k)** is in the BOM but not yet located in the traced path — minor, non-critical, find it later.
 - **Reusable crop tool** for the dense p.4 schematic: `schematics/crop.py` (see circuit.md crop index).
+- **R19 (1k) RESOLVED (2026-07-19):** it's the CD4049's +9V supply dropper (only IC with one) —
+  clipper clip-ceiling is BELOW the 8.6V op-amp rail and sags with signal. Calibrate the ceiling to
+  captures, don't hardcode 8.6V. BOM fully reconciles (R1–R54 all located).
+- **Tone stack fully node-verified (2026-07-19):** Baxandall (both wipers sum into IC5_C virtual gnd
+  via R35/R36; C25/C26 run lug→wiper; R37 fb is 1 MΩ, schematic label "1m") and both mid stages
+  (R41/R44 in→(−), R40/R45 (−)→out flat-unity legs; wiper→series-cap→(−)). Node graphs in circuit.md.
+  Nodal sim validates all six [ENG] mid-cap positions (±8.5% worst) — per-position boost range varies
+  (±14.5–28 dB), confirm against captures. GRUNT corners need the 4049's finite gain (~20–30) — model
+  the clipper input as a coupled network, not ideal-virtual-ground.
+- **C36 = 2u2 is schematic-verified** (EQ out coupling). Stock board has NO bias R on IC6_B(+) after
+  C36; the [ENG] Master pot's VD leg supplies the DC path — cleaner than stock, no extra part.
+- **UI assets ready in `ui/`** (knobs, footswitch, LEDs, switches, textures, VU trim — PNG with
+  alpha, noon-position, rotation-safe) with prep guidelines in `ui/ui-replacements.md` (2x-resolution
+  policy, crop-don't-stretch, resize-to-minimise). Use these for the Step 8 pedal face instead of
+  procedural drawing where they fit; keep `src/ui/` LookAndFeel for the peripheral chrome.
+- **Full build plan: `docs/build-plan.md`** (2026-07-19) — step-by-step from submodules to release,
+  with per-step validation gates and the capture-session checklist folded in.
