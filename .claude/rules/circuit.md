@@ -54,7 +54,7 @@ Designator scheme used throughout this file = **primary schematic (p.4) numberin
 | 0.27,0.28–0.46,0.47 | JFET drain node + treble network (C5/C9/C6/R12/R14/R7/R8) + ULTRA-HI switch (C8) + R11/C7/R13 |
 | 0.44,0.28–0.63,0.47 | IC2_A DRIVE stage (R15/C10 fb, R17/DRIVE/R32 gain leg) + GRUNT switch (C11/C12/C13) + start of clipper |
 | 0.518,0.30–0.585,0.45 | **Clipper**: R16, D1/D2 clamps to +9V/GND, IC3 CD4049UBE, R18/C14 fb (D1/D2 both cathode-up) |
-| 0.62,0.28–0.80,0.47 | IC2_B recovery (hi-shelf) + IC4_B Sallen-Key LPF start |
+| 0.62,0.28–0.80,0.47 | IC2_B recovery (UNITY BUFFER + passive bridged-T, see correction note) + IC4_B Sallen-Key LPF start |
 | 0.77,0.28–0.97,0.50 | IC4_A Sallen-Key LPF + LEVEL (VR2) + BLEND (VR1) pots |
 | 0.13,0.47–0.34,0.68 | IC5_A buffer, IC5_B inverting gain, BASS band (VR4 LO) start |
 | 0.30,0.46–0.52,0.70 | TREBLE (VR5 HI), IC5_C summing amp, LO-MID (VR6) start |
@@ -126,7 +126,8 @@ IN ─R1‖ ─C1─(VD bias R2)─R3─▶ IC1_A buffer ─┬─▶ C2/R4 ─�
    ┌─────────────────────────────────────────────────────┘   ▼
  (to BLEND pin1)                          ─▶ IC2_A DRIVE (non-inv, gain 4–78×) ─▶ GRUNT cap bank
                                                          ▼
-     R16 ─▶ IC3 CD4049UBE clipper (D1/D2 = rail clamps; CMOS soft-clip) ─▶ C15/R20 ─▶ IC2_B recovery
+     R16 ─▶ IC3 CD4049UBE clipper (D1/D2 = rail clamps; CMOS soft-clip) ─▶ C15/R20 ─▶ IC2_B UNITY BUFFER
+                                                         ▼  (then passive bridged-T shaping: C16/R22/R23/C17 — NOT a gain stage; see correction note)
                                                          ▼
         IC4_B Sallen-Key LPF (~10.7k) ─▶ IC4_A Sallen-Key LPF (~3.3k) ─▶ LEVEL(VR2) ─▶ BLEND(VR1) wiper
                                                          ▼
@@ -166,7 +167,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | R5 | 1M | Q1 gate/source bias reference (gate leak to GND) |
 | Q2 | J201 | **active load** for Q1 (gate fixed at +4.5V, drain +9V, source = Q1 drain = output node) |
 | R9 / R10 | 1M / 1M | +9V→GND divider = +4.5V for Q2 gate |
-| C4 | 22n | Q2 gate bias bypass to GND |
+| C4 | 22n | Q2 gate→source(output) bootstrap cap — connects the Q2 gate (4.5V bias node) to the OUTPUT node (Q1 drain / Q2 source), **NOT to GND**. Bootstraps Q2's gate to its source at AC → constant Vgs → higher AC output impedance (better active load). Schematic-verified at pixel zoom 2026-07-19. |
 
 ### Treble / pre-clip network + ATTACK switch — VERIFY NODES; 3rd position is [ENG]
 | Ref | Value | Function |
@@ -181,11 +182,14 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | C7 | 100n | coupling into IC2_A |
 | R13 | 1M | bias IC2_A (+) to VD |
 
-> **ATTACK 3-way [ENG].** Schematic ships a 2-position SPDT (On-On) here: throw A bridges C8 across
-> R8 (HF bypasses the series R → **Boost**), throw B shunts C8 to GND (HF dumped → **Cut**). The Ultra
-> needs a 3rd **Flat** setting → change to **On-Off-On (SP3T)**, centre = C8 disconnected (neither
-> bridge nor shunt → flat treble into clip). This is the minimal, natural extension of the documented
-> network; the base 2-position node graph still needs lug-level verification (see Topology).
+> **ATTACK 3-way [ENG].** Schematic ships a 2-position SPDT On-On here (BOM: "Ultra Hi — SPDT On-On",
+> confirmed). **Node graph now verified (2026-07-19):** switch common (pin1) = the **R7/R8 junction**.
+> Boost (pin2) connects C8(220pF) from that junction to the *post-R8* node → **C8 bridges R8** (HF
+> bypasses the series R → treble boost into the clipper). Cut (pin3) connects the R7/R8 junction
+> **directly to GND** (dumps the treble-ladder HF to ground) — note the mechanism is *grounding the
+> node*, not "shunting C8 to GND"; C8 is left dangling in the Cut position. The Ultra needs a 3rd
+> **Flat** setting → change to **On-Off-On (SP3T)**, centre = common floating (neither bridge nor
+> shunt → flat). This is the minimal, natural extension of the now-verified 2-position network.
 
 ### DRIVE gain stage (IC2_A)
 | Ref | Value | Function |
@@ -225,15 +229,38 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | C15 | 2u2 | coupling from clipper out |
 | R20 | 10k | series into IC2_B (+) |
 | R21 | 1M | bias IC2_B (+) to VD |
-| IC2_B | TL072ACP | non-inv **high-shelf recovery**: R22(100k) fb, R23(33k)+C17(22n) gain leg → unity DC, ~4× (+12 dB) above ~220 Hz |
-| R22 / R23 / C17 | 100k / 33k / 22n | IC2_B feedback + gain leg |
-| C16 | 680pF | coupling to IC4_B |
+| IC2_B | TL072ACP | ⚠ **UNITY-GAIN BUFFER** — pin6(−) is tied directly to pin7(out) (verified pixel-zoom on BOTH primary p.4 AND backup; no component in the −→out path). **NOT** a +12 dB active gain stage. See correction note below. |
+| R22 / R23 / C17 / C16 | 100k / 33k / 22n / 680pF | **passive bridged-T network** hanging off the buffer output (see node graph), NOT an op-amp feedback/gain leg |
 | IC4_B | TL072ACP | **2nd-order Sallen-Key LPF ≈ 10.7 kHz** (unity buffer) |
 | R24 / R25 | 10k / 22k | IC4_B SK resistors |
 | C27 / C18 | 1n / 1n | IC4_B SK caps (C27 to GND, C18 feedback) |
 | IC4_A | TL072ACP | **2nd-order Sallen-Key LPF ≈ 3.3 kHz** (unity buffer) — final OD bandlimit |
 | R26 / R27 | 22k / 47k | IC4_A SK resistors |
 | C20 / C19 | 1n / 2n2 | IC4_A SK caps (C20 to GND, C19 feedback) |
+
+> ⚠ **IC2_B CORRECTION (2026-07-19 verification).** An earlier reading called IC2_B a "non-inv
+> high-shelf recovery, ~4× (+12 dB) above ~220 Hz." **That is WRONG** — it was inferred from the
+> R22/R23/C17 *values* assuming the textbook active-shelf topology, but the actual wiring (verified at
+> pixel zoom on BOTH the primary p.4 AND the backup schematic — they agree exactly) is:
+> - **IC2_B is a UNITY-GAIN VOLTAGE FOLLOWER**: pin6(−) ties straight to pin7(out), no component
+>   between them. Buffer input = clipper out via C15(2u2)/R20(10k), biased by R21(1M) to VD.
+> - The R22/R23/C16/C17 parts form a **passive bridged-T network on the buffer output**, feeding
+>   R24 → IC4_B SK:
+>   ```
+>   Node "buf out" (=pin7=pin6): C16 leg1, R22 leg1
+>   Node "Nout"    : C16 leg2, R23 leg1, R24 leg1(→IC4_B SK)
+>   Node "Nmid"    : R22 leg2, R23 leg2, C17 leg1   (C17 leg2 → GND)
+>   ```
+>   i.e. C16(680pF) bridges buf-out→Nout; R22(100k)+R23(33k) is the "T" (buf-out→Nmid→Nout) with
+>   C17(22n) the shunt leg (Nmid→GND). This is a bridged-T, not a feedback/gain leg.
+> - **There is NO +12 dB of makeup gain here.** This stage is unity + passive shaping. Do not budget
+>   a recovery-gain boost into the gain-staging — that changes the whole level calibration (calib doc).
+> - **This is exactly the "same VALUES ≠ same TOPOLOGY" trap** warned about in the gotchas above.
+> - An ideal-component sim of the bridged-T (into the IC4_B SK) shows a deep midrange notch/scoop
+>   (~−28 dB @ ~720 Hz, ideal, tolerance-sensitive) rather than a shelf. That depth is surprising for
+>   this pedal, so **the exact response of this section MUST be validated against a real-unit capture**
+>   before finalising the model — but the *topology* (unity buffer + bridged-T) is firmly verified.
+>   The bridged-T is a live-`ImpedanceCalculator` linear network; model it as passive, not as gain.
 
 ### LEVEL, BLEND (crossfade mix)
 | Ref | Value | Function |
@@ -304,9 +331,14 @@ only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
   in chowdsp = ideality factor n, NOT a count.
 - **D3 = 1N5817** Schottky (supply, not signal). **D4 = 3mm red LED** (status, not signal).
 - **IC3 = CD4049UBE** CMOS inverter — the real nonlinearity. Model its transfer curve (fit to
-  CD4049UB datasheet Vin/Vout, or to a capture) inside the shunt-feedback gain. See `dsp.md`.
+  CD4049UB datasheet Vin/Vout, or to a capture) inside the shunt-feedback gain. See `dsp.md` AND
+  **`docs/nonlinear-component-modeling.md` §1** (DAFx-2020 "Red Llama" model + fitted params, TI
+  datasheet, recommended asymmetric-tanh-VTC-waveshaper approach; PDFs in `docs/refs/`).
 - **Q1, Q2 = J201** N-channel JFETs — active gain stage (Q1 common-source, Q2 active load).
-  Modellable; large-signal square-law (Shichman-Hodges) or a fitted gain+soft-waveshaper. See `dsp.md`.
+  Modellable; large-signal square-law (Shichman-Hodges) or a fitted gain+soft-waveshaper. See `dsp.md`
+  AND **`docs/nonlinear-component-modeling.md` §2** (SPICE param sets, WDF-JFET papers, the ~5:1
+  part spread → fit-to-capture; PDFs in `docs/refs/`). **These two (CD4049UBE + J201) are the ONLY
+  non-WDF-native parts** — everything else is R/C/ideal-op-amp/diode. See that doc's §4 capture list.
 
 ## Topology — node graphs
 
@@ -323,16 +355,23 @@ Node "Q1 gate"  : R4 leg2, R5 leg1(?), Q1 gate    (signal in from buffer via C2�
 Node "Q1 source": Q1 source, R6 leg1, C3 leg1     (R6∥C3 other legs → GND)
 Node "OUT/G"    : Q1 drain, Q2 source, R7 leg1     (this is the stage output → treble net)
 Node "Q2 gate"  : R9/R10 divider mid (+4.5V), C4 leg1
+Node "OUT/G"    : Q1 drain, Q2 source, R7 leg1, **C4 leg2** (C4 bootstraps gate→source, verified — NOT to GND)
 Q2 drain → +9V.
 ```
 Not a WDF-native element — implement Q1/Q2 as a coupled JFET pair solve, or fit to captures (`dsp.md`).
 
-### Treble network + ATTACK (SW1) — **Linear, switched** — ⚠ **VERIFY NODES**; pos3 [ENG]
-Bridging cap C8 (220pF) is routed by SW1. Three positions to model (precomputed matrix each):
-**Boost** = C8 bridges R8; **Flat** [ENG] = C8 open; **Cut** = C8 shunts to GND. Re-trace lug-by-lug
-before building: which of R7/R8, C5/C9/C6, R12/R14 sit series vs shunt, and exactly which two nodes
-C8 lands on in Boost vs Cut. (Traced as a treble ladder feeding IC2_A; least-confirmed node graph in
-the path. The Flat centre position is an engineered addition, not on the schematic.)
+### Treble network + ATTACK (SW1) — **Linear, switched** — ✅ **NODES VERIFIED (2026-07-19)**; pos3 [ENG]
+Node graph confirmed at pixel zoom (primary p.4):
+```
+Top rail : OUT/G ─R7(200k)─ M ─R8(470k)─ P ─(→ R11(470k)→GND, C7(100n)→IC2_A)
+Lower    : G(pre-R7) ─C5(22n)─ L1 ─C9(22n)─ L2 ─C6(22n)─ L3
+           L1 ─R12(6k8)─ GND ;  L2 ─R14(22k)─ GND
+Ties     : L3 = M (C6-right tied up to the R7/R8 junction) ;  ULTRA-HI common (pin1) = M
+Switch   : Boost(pin2)=C8(220pF) bridges R8 (M↔P) ; Cut(pin3)= M→GND directly ; Flat[ENG]=common open
+```
+So R7/R8 are the series top-rail; C5/C9/C6 a parallel series-cap ladder (G→M) with R12/R14 shunting
+the two intermediate cap nodes to GND. All values match the tables. (Previously the least-confirmed
+node graph in the path; now fully traced. Flat centre is the engineered addition, not on schematic.)
 
 ### IC2_A DRIVE — **Linear** (non-inv gain), DRIVE pot is a rheostat in the gain leg
 ```
@@ -407,6 +446,17 @@ BLEND crossfade) — see Footswitches below; this is an Ultra-only addition, not
   permanently forward-biased, which is impossible (see clipper node graph).
 - **Q1/Q2 role confirmed** as an active gain stage (Q1 CS + Q2 active load), NOT analog switches —
   do not model as a switched topology.
+- **R19 (1k) — OPEN ITEM.** Present in the primary BOM (R19 = 1k) but not located in the traced
+  signal path (input→buffer→JFET→treble→drive→grunt→clipper→recovery→SK→SK→level→blend→EQ→out is
+  complete without it; the clipper→recovery run is C15/R20 only). Likely a small series/isolation
+  resistor in the clean-blend tap or a utility position. Not signal-critical (1k into a high-Z node
+  is negligible), but confirm its node during layout/DSP so the BOM fully reconciles.
+- **BOM ↔ circuit.md reconciled (2026-07-19):** every R (R1–R54), every C (film + electrolytic),
+  all ICs (IC1/2/4=TL072ACP, IC3=4049N, IC5/6=TL074ACN), Q1/Q2=J201, D1/D2=1N4148, D3=1N5817,
+  D4=LED, and all pot **tapers** (BLEND 100k B, DRIVE 100k C, LEVEL 100k A, HI/LO/HI-MIDS/LO-MID
+  100k B) match. BOM lists **7 pots (no MASTER)**, **Ultra-Hi = SPDT On-On (2-pos)**, and **one
+  3PDT stomp** — independently confirming the MASTER volume, the 3-way ATTACK, and the 2nd DIST
+  footswitch are all [ENG] (not on this board).
 
 ### Ultra build — engineered deviations from the schematic (decided 2026-07-19)
 Target = **B7K Ultra**, but our schematic is the original B7K. These parts are **engineered**, not

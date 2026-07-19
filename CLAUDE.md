@@ -53,6 +53,11 @@ high, execute routine work cheap) is what should persist.
 
 ## Essential reading (template learnings — do not skip)
 
+- **`docs/nonlinear-component-modeling.md`** — the ONLY two non-WDF-native parts are the **CD4049UBE
+  clipper** and the **J201 JFET stage**; this doc has the datasheets/papers/SPICE + recommended
+  modeling approach + the pre-DSP capture list for both (source PDFs in `docs/refs/`). Read before
+  the nonlinear-stage build steps.
+
 - **`docs/calibration-and-gain-staging.md`** — input-load (`kInputRef`) calibration, output-makeup
   calibration (level-match to captures — NOT a ~0.9 headroom pad; see §2), the DRIVE taper-floor
   bug, output-load (negligible), internal-vs-output clipping, op-amp rails, VU idle gate. This is
@@ -98,7 +103,13 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 1 (Schematic analysis) — DONE; `circuit.md` filled + revised for the ULTRA target.**
+> **CURRENT: Step 1 (Schematic analysis) — DONE + FULL VERIFICATION PASS (2026-07-19).** `circuit.md`
+> filled, revised for the ULTRA target, and now cross-checked node-by-node + value-by-value against
+> primary p.4, backup, and both BOM pages. Found 1 major correction (IC2_B is a unity buffer, not a
+> +12 dB shelf), 1 minor topology fix (C4 bootstrap, not to GND), 1 wording fix (ATTACK Cut), 1 open
+> item (R19 1k unlocated). Everything else — all R/C/IC/Q/D values, pot tapers, treble/ATTACK nodes,
+> DRIVE rheostat, GRUNT, clipper + D1/D2 orientation, both Sallen-Keys, LEVEL/BLEND, full EQ, output —
+> matches. See circuit.md "IC2_B CORRECTION" note and updated Validation notes.
 > Full chain traced IN→OUT: input buffer → J201 JFET gain → treble/ATTACK → DRIVE (IC2_A) → GRUNT →
 > CD4049UBE clipper (D1/D2 = rail clamps, CMOS soft-clip) → recovery → 2× Sallen-Key LPF → LEVEL →
 > BLEND(clean crossfade) → EQ (4-band, switchable mids) → MASTER → output buffer. XLR DI + power
@@ -107,12 +118,16 @@ high, execute routine work cheap) is what should persist.
 > Web research (2026-07-19) confirmed Master/Attack wording + both mid-freq sets exactly, and
 > surfaced a genuinely new requirement: the real Ultra has a **second DIST-engage footswitch**
 > (independent of main bypass) not derivable from our schematic — see circuit.md "Footswitches".
-> **NEXT:** (a) verify the 3 flagged schematic-verified node graphs (treble/ATTACK base network,
-> GRUNT C13 value, Baxandall/mid tone-stack node detail) — `schematic-checker` job; (b) sanity-check
-> the [ENG] mid-freq caps + Master gain-staging with a filter sim; (c) design the DIST-engage
-> footswitch (2nd bool, overrides BLEND crossfade to 100% clean) alongside main bypass at the
-> architecture/APVTS step; (d) then Step 2 CMake scaffold once `libs/` submodules (JUCE, chowdsp_wdf,
-> xsimd) are added — not yet present.
+> **NEXT:** (a) ✅ treble/ATTACK nodes verified; ✅ GRUNT C13 = 220n verified (BOM+schematic);
+> Baxandall/mid tone-stack node detail still wants a full per-node redraw before building the tone
+> stack (values all confirmed, node graph is the remaining work). (b) **IC2_B follow-up (NEW, important):**
+> the recovery stage is a unity buffer + passive bridged-T, NOT a +12 dB shelf — an ideal sim shows a
+> deep ~720 Hz notch, which is surprising; **capture the real unit's clipper→EQ-in response to confirm
+> the actual shape before modelling**, and remove the assumed recovery-gain from any gain-staging plan.
+> (c) sanity-check the [ENG] mid-freq caps + Master gain-staging with a filter sim; (d) design the
+> DIST-engage footswitch (2nd bool, overrides BLEND crossfade to 100% clean) alongside main bypass at
+> the architecture/APVTS step; (e) locate R19 (1k); (f) then Step 2 CMake scaffold once `libs/`
+> submodules (JUCE, chowdsp_wdf, xsimd) are added — not yet present.
 
 ## Project-specific carry-forwards
 
@@ -137,6 +152,29 @@ high, execute routine work cheap) is what should persist.
   clamps (~[−0.6, +9.6]V), rarely conduct. Model the 4049 transfer curve as the nonlinearity.
 - **JFET stage (Q1/Q2 J201)** is an active gain stage (Q1 common-source + Q2 active load), not
   switches — needs a JFET device model or fitted gain+waveshaper. (See circuit.md / dsp.md.)
+- **Non-WDF-native parts = ONLY the CD4049UBE clipper + the J201 JFET stage** (everything else is
+  R/C/ideal-op-amp/diode). Modeling sources gathered 2026-07-19 → `docs/nonlinear-component-modeling.md`
+  (+ 4 PDFs in `docs/refs/`: TI CD4049 datasheet, DAFx-2020 "Red Llama" CD4049-overdrive model,
+  Fairchild J201 datasheet, DAFx-2024 JFET-WDF). Recommended: fit an asymmetric-tanh VTC waveshaper
+  for the 4049 (DAFx params as ground-truth), and fit gain+soft-waveshaper for the J201 (part spread
+  ~5:1 → must fit-to-capture, nominal SPICE won't match). **Pre-DSP capture plan is §4 of that doc**
+  — do it in one matched session; it also resolves the IC2_B ~720 Hz bridged-T notch question.
+- **Capture unit CONFIRMED = a real B7K Ultra, audio-only (¼" in→out, no internal probing).** Big
+  win: we capture & VALIDATE all [ENG] features directly (Master, 3-way Attack, DIST footswitch,
+  switchable mids incl. the extrapolated 750 Hz Hi-Mid). Nonlinear models + the IC2_B notch are
+  inferred from composite in→out (control-isolation + matched-pair diff). Finalized capture MATRIX
+  (~29 essential takes, deviation-from-REF-OD-baseline filenames) = `docs/nonlinear-component-modeling.md`
+  §4. Parser `parse_capture()` added to `analysis/analyze.py` (8 pots + 4 three-way switches + DIST,
+  tested against the whole matrix). Missing DC/rail values → take nominal from datasheets, calibrate
+  the clip ceiling to the bypass+drive captures.
 - **Value discrepancies resolved:** C33 = 22n (primary+BOM; backup's 2200pF is a different rev).
-  GRUNT C13 = 220n (primary; backup 22n). Using primary values throughout.
+  GRUNT C13 = 220n (primary; backup 22n). Using primary values throughout. Both re-confirmed against
+  BOM + schematic in the 2026-07-19 verification pass.
+- **IC2_B recovery is a UNITY BUFFER, not a +12 dB active shelf** (verified in BOTH schematics —
+  pin6 tied to pin7). The 100k/33k/680pF/22n parts are a passive bridged-T on the buffer output, not
+  a feedback/gain leg. Consequence: **no recovery makeup gain exists** — do not budget +12 dB into
+  gain-staging. Ideal sim of the bridged-T = deep ~720 Hz notch/scoop (tolerance-sensitive, surprising)
+  → capture the real unit before finalising this section. Classic "same values ≠ same topology" trap.
+- **C4 (JFET Q2)** connects gate→source(output) as a bootstrap, NOT gate→GND (was mis-stated).
+- **R19 (1k)** is in the BOM but not yet located in the traced path — minor, non-critical, find it later.
 - **Reusable crop tool** for the dense p.4 schematic: `schematics/crop.py` (see circuit.md crop index).

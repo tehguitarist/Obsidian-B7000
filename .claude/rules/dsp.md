@@ -68,6 +68,14 @@ warp (see "Top-octave accuracy" below), check this before reaching for a prewarp
 
 ## Nonlinear elements (clipping diodes)
 
+> **This pedal's actual nonlinearities are NOT diodes.** The two non-WDF-native nonlinear parts are
+> the **CD4049UBE CMOS-inverter clipper** and the **J201 JFET gain stage** — their modeling sources,
+> recommended fits (asymmetric-tanh VTC waveshaper; fitted gain+waveshaper), SPICE/datasheet data,
+> and pre-DSP capture plan live in **`docs/nonlinear-component-modeling.md`** (PDFs in `docs/refs/`).
+> D1/D2 (1N4148) here are only rail clamps that rarely conduct — the diode guidance below still
+> applies to modeling those clamps, and to the general WDF-nonlinearity patterns (ADAA, omega,
+> asymmetry) that the CMOS/JFET waveshapers reuse.
+
 ```cpp
 // Antiparallel pair (symmetric clip):
 wdft::DiodePairT<double, decltype(next), wdft::DiodeQuality::Good, AccurateOmega> dp { next, Is, Vt, nDiodes };

@@ -311,3 +311,63 @@ def parse_filename(name, knobs=("B", "T", "V", "G")):
     out["mode"] = mode
     out["sw"] = ["up", "mid", "down"][mode]
     return out
+
+
+# --- B7K Ultra capture-filename parser --------------------------------------------------------
+# The Ultra has 8 pots + 4 three-way switches + a DIST footswitch — too many for the single-letter
+# scheme above. Captures use DEVIATION-FROM-BASELINE naming (see docs/nonlinear-component-modeling.md
+# §4): every take is the fixed test signal at the REF-OD baseline EXCEPT the controls named in the
+# filename. Tokens are hyphenated name-value pairs in any order, space/underscore separated,
+# case-insensitive, e.g.:
+#   "drive-1700 grunt-hi.wav"   "bass-0700 dist-off.wav"   "himidfreq-750 himid-1700 dist-off.wav"
+#   "bypass.wav"   "ref-od.wav"   "ref-clean.wav"
+# Pot values are clock HHMM (0700=min .. 1200=noon .. 1700=max); the plain 0-10 form also works.
+POT_TOKENS = ("master", "blend", "level", "drive", "bass", "treble", "lomid", "himid")
+# pedal-silkscreen / shorthand aliases -> canonical pot name
+POT_ALIASES = {"lo": "bass", "hi": "treble", "vol": "master", "m": "master", "bl": "blend",
+               "lv": "level", "d": "drive", "b": "bass", "t": "treble", "lm": "lomid", "hm": "himid"}
+SWITCH_MAPS = {
+    "attack":    {"cut": 0, "flat": 1, "boost": 2},
+    "grunt":     {"lo": 0, "mid": 1, "hi": 2},
+    "lomidfreq": {"250": 0, "500": 1, "1k": 2, "1000": 2},
+    "himidfreq": {"750": 0, "1500": 1, "1k5": 1, "3k": 2, "3000": 2},
+}
+# REF-OD baseline: pots as 0..1 (blend=1.0 == full OD / fully CW), switches as index (mid=1),
+# DIST engaged, not bypassed. REF-CLEAN is this with dist=False.
+BASELINE = {
+    "master": 0.5, "blend": 1.0, "level": 0.5, "drive": 0.5,
+    "bass": 0.5, "treble": 0.5, "lomid": 0.5, "himid": 0.5,
+    "attack": 1, "grunt": 1, "lomidfreq": 1, "himidfreq": 1,
+    "dist": True, "bypass": False,
+}
+SWITCH_LABELS = {k: {v: n for n, v in m.items() if isinstance(v, int)} for k, m in SWITCH_MAPS.items()}
+
+
+def parse_capture(name):
+    """B7K Ultra capture filename -> full control dict, starting from the REF-OD BASELINE and applying
+    the deviations named in `name`. Returns all 8 pots (0..1), the 4 switch indices (+ a `<sw>_label`
+    for each), and the `dist`/`bypass` booleans; controls not named stay at baseline. Deviation naming
+    is documented in docs/nonlinear-component-modeling.md §4."""
+    low = re.sub(r"\.wav$", "", name, flags=re.IGNORECASE).lower()
+    out = dict(BASELINE)
+    if re.search(r"\bbypass\b", low):
+        out["bypass"] = True
+    if re.search(r"\bdist[-_\s]?off\b", low) or re.search(r"\bref[-_\s]?clean\b", low):
+        out["dist"] = False
+    elif re.search(r"\bdist[-_\s]?on\b", low):
+        out["dist"] = True
+    for sw, m in SWITCH_MAPS.items():                     # three-way switches
+        tok = re.search(rf"\b{sw}-([a-z0-9]+)", low)
+        if tok and tok.group(1) in m:
+            out[sw] = m[tok.group(1)]
+    for tok in POT_TOKENS:                                # pots by canonical name
+        mm = re.search(rf"\b{tok}-(\d+)\b", low)
+        if mm:
+            out[tok] = knob_to_x(mm.group(1))
+    for alias, canon in POT_ALIASES.items():             # pots by alias / silkscreen label
+        mm = re.search(rf"\b{alias}-(\d+)\b", low)
+        if mm:
+            out[canon] = knob_to_x(mm.group(1))
+    for sw in SWITCH_MAPS:
+        out[f"{sw}_label"] = SWITCH_LABELS[sw][out[sw]]
+    return out
