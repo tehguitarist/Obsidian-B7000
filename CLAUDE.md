@@ -194,17 +194,33 @@ high, execute routine work cheap) is what should persist.
   alpha, noon-position, rotation-safe) with prep guidelines in `ui/ui-replacements.md` (2x-resolution
   policy, crop-don't-stretch, resize-to-minimise). Use these for the Step 8 pedal face instead of
   procedural drawing where they fit; keep `src/ui/` LookAndFeel for the peripheral chrome.
-- **UI spec additions (2026-07-20, awaiting a base image + CSV from the user):** the centre pedal
-  face layout will be data-driven from that CSV (positions/sizes), not hand-placed — confirm its
-  schema when it arrives. No bypass label needed (base image has one printed). Only the 3-way
-  switch selector labels (ATTACK/GRUNT/mid-freq) render text on the pedal face; all other elements
-  read text-free. That text: **font = Lexend Exa** (embed as binary data, this pedal's face text
+- **UI assets + layout CSV LANDED (2026-07-20)** — base image `ui/b7k_texture_base.png` (1960×1540,
+  no alpha), layout `ui/component positions.csv`, reference photo `ui/B7K ORIGINAL.jpg`. Full spec
+  now in `ui.md` "Centre pedal face". Key facts: **CSV coords are base-texture pixel space** (origin
+  top-left, X/Y = element centre, Width target, **blank Height = scale proportionally to Width**) —
+  map every coord through one base-px→face-px scale. **Asset map:** knobs=`T_Knob.png`, footswitches
+  =`Footswitch_up`/`footswitch_down`, LEDs=`blue_led_off`/`blue_led_on`, switches=`switch_up`/`_Mid`/
+  `_down`, peripheral trims=`vol_trim.png` (NOT the old `Trim knob.png`). Two footswitches + two LEDs
+  in the CSV (distortion + bypass) — confirms the [ENG] 2nd DIST footswitch. **ATTACK/GRUNT icon
+  glyphs = render procedurally** (`juce::Path`, shelf lines/curves; CSV reserves 110×77 boxes) — I
+  can draw these, no artwork needed from the user unless an exact match is wanted. LO-MID/HI-MID use
+  text labels. **Switch-position→value mappings CONFIRMED by user 2026-07-20** (top/up→bottom/down),
+  now in circuit.md: **ATTACK** up=Flat(float)/mid=Boost(C8 bridges R8)/down=Cut(R7-R8 junc→GND)
+  — note centre=Boost, not the schematic's centre=Flat; **LO-MID** up=500Hz(10n)/mid=1k(2n2)/
+  down=250Hz(47n); **HI-MID** up=1.5k(3n3)/mid=3k(820pF)/down=750Hz(15n); **GRUNT** ⚠assumed, VERIFY
+  at capture: up/Boost=4n7∥220n(most)/mid/Cut=4n7 alone(least)/down/Flat=4n7∥47n(medium). That text: **font = Lexend Exa** (embed as binary data, this pedal's face text
   ONLY — peripheral chrome keeps its existing font), **colour = white**, opaque when selected,
   semi-opaque when not — replaces `PedalLookAndFeel`'s current `cSWLabelActive`/`cSWLabelInactive`
   light-/dark-blue constants. Full spec in `ui.md` "Centre pedal face"; plan updated in
   `docs/build-plan.md` Phase 8. Further pedal-face elements TBD until the assets land.
 - **Full build plan: `docs/build-plan.md`** (2026-07-19) — step-by-step from submodules to release,
   with per-step validation gates and the capture-session checklist folded in.
+- **UI pulled forward to Phase 4b (decided 2026-07-20 with user):** build a functional, APVTS-bound
+  pedal face at the END of Phase 4 (before the Phase 5 clipper), so all Phase 5+ human-in-the-loop
+  checks are done on real knobs/switches instead of the DAW's generic slider editor. Safe because
+  APVTS is frozen at Phase 2 + UI is DSP-decoupled. Calibration-dependent polish (VU idle-gate
+  threshold, final label opacity, headless scale gate) STAYS at Phase 8 — a second UI touch there is
+  expected, not rework. Full rationale + scope in `docs/build-plan.md` "UI timing" + "Phase 4b".
 - **Build-plan review pass (2026-07-20):** thorough gap analysis of the plan against calibration/
   validation/nonlinear docs + circuit.md; fixes applied to `docs/build-plan.md`. Biggest catch:
   **TL07x op-amp rail clamps were never scheduled anywhere** (calibration §6 requires them on every

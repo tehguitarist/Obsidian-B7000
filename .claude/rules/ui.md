@@ -14,12 +14,36 @@
 
 ## Centre pedal face (this pedal) — layout source & typography
 
-**Layout will be data-driven, not hand-placed.** The user will provide a base image plus a CSV of
-sizes/positions for the centre pedal face; build the layout from that CSV against the base image
-rather than guessing coordinates from the `ui/` PNGs individually. Details of exactly which
-elements the CSV covers (knobs only vs. knobs+switches+jacks, coordinate origin/units) are TBD until
-it arrives — don't pre-build a layout system that assumes a specific CSV schema; confirm the schema
-when the file lands.
+**Layout is data-driven, not hand-placed.** The base image and CSV have arrived (2026-07-20):
+- **Base image:** `ui/b7k_texture_base.png` (1960×1540, no alpha — it's the panel background). It's
+  higher-res than the plugin renders at; scale it to the actual face size, don't assume 1:1 pixels.
+- **Layout CSV:** `ui/component positions.csv`. Schema = `Component, X (centre), Y (centre), Width,
+  Height`. **Coordinates are in base-texture pixel space** (origin top-left, same 1960×1540 grid as
+  `b7k_texture_base.png`); X/Y are the element **centre**, Width is the target width, and **Height is
+  optional — blank means scale the asset proportionally to Width** (all knobs/footswitches/LEDs/
+  switches are blank-height square-ish assets; only the icon/text label boxes give an explicit
+  height). Build the face by scaling the base image to the rendered face rect and mapping every CSV
+  coord through the same base-px→face-px scale factor. Do NOT hardcode coordinates from the `ui/`
+  PNGs individually.
+
+**Asset → element map (all in `ui/`, PNGs with alpha except the texture, noon-position, rotation-safe):**
+| Element | Asset(s) | CSV rows |
+|---|---|---|
+| Pedal-face knobs (8) | `T_Knob.png` | Master/Blend/level/drive/bass/Lo Mids/Hi mids/Treble knob |
+| Peripheral trim knobs (in/out side panels) | `vol_trim.png` | not in CSV (side panels, not face) |
+| Footswitches (2) | `Footswitch_up.png` (default) / `footswitch_down.png` | distortion + bypass footswitch |
+| LEDs (2) | `blue_led_off.png` / `blue_led_on.png` | distortion + bypass blue on/off led |
+| 3-way switches (4) | `switch_up.png` / `switch_Mid.png` / `switch_down.png` | attack/grunt/low mids/hi mids switch |
+
+`Trim knob.png` is the old peripheral trim asset — **use `vol_trim.png` instead** for the halo trims.
+
+> ⚠ **Switch-position → value mapping is NOT settled from this photo.** The reference photo's
+> frequency labels are non-ascending top-to-bottom (Lo Mids: 500 / 1 k / 250 Hz; Hi Mids: 1.5 k /
+> 3 k / 750 Hz) and the user noted they *"slightly adjusted the three-way switches and associated
+> labels"* for visibility. So do NOT lock the up/mid/down → cap-value (circuit.md mid-band table)
+> or ATTACK/GRUNT position → topology mapping from this image — confirm the intended physical
+> position of each option with the user (and against captures) before wiring `ThreePositionSwitch`
+> `onChange(pos)` to a DSP value.
 
 **No bypass label needed for this pedal** — the base image already has one printed on it. Don't add
 a code-rendered "BYPASS" text label near the footswitch the way a from-scratch build might.
@@ -42,8 +66,21 @@ code-rendered text; everything else is conveyed by the base image/knob graphics.
   assuming it's installed on the build/user machine; don't skip this and fall back silently to a
   system font if the embed is missing.
 
-Further pedal-face elements (knob arrangement, jacks, footswitch/LED placement) to be worked out
-once the base image + CSV arrive — don't design that layout speculatively ahead of them.
+**ATTACK / GRUNT icon glyphs (the shelf-curve indicators, not text) — render procedurally.** Unlike
+the LO-MID/HI-MID switches (which use text-frequency labels via `ThreePositionSwitch`'s label row),
+ATTACK and GRUNT use small line/curve glyphs showing the shelf position (see `ui/B7K ORIGINAL.jpg`:
+a rising shelf / flat / falling shelf for ATTACK; wavy-curve variants for GRUNT). These are simple
+strokes — draw them with `juce::Path` (straight segments + quadratic/cubic curves) in a LookAndFeel
+override, stroked in the same white-with-per-position-alpha scheme as the text labels (opaque =
+selected, semi-opaque = unselected). Procedural is preferred over bitmaps here: crisp at every UI
+scale, recolourable, no extra binary assets. The CSV reserves the boxes for them (`attack icons`
+110×77 @ 545,655; `grunt icons` 110×77 @ 1422,655) — render the three stacked glyphs within that
+rect. (If an exact artwork match to the real pedal is wanted later, the user can supply SVG/PNG and
+we swap the Path draw for an image; the box placement is identical either way.)
+
+Remaining pedal-face detail still to confirm at build time: exact unselected-label alpha (see above),
+input/output jack rendering (not in the CSV — the real pedal's jacks are on the enclosure sides, so
+likely not drawn on the face at all; confirm), and the switch-position→value mappings flagged above.
 
 ## Principles
 

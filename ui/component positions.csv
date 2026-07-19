@@ -1,0 +1,21 @@
+﻿Component,X (centre point),Y (centre point),Width,"Height (If not provided, just scale to width)"
+Master knob,542,480,310,
+Blend knob,765,480,310,
+level knob,1198,480,310,
+drive knob,1642,480,310,
+bass knob,542,695,310,
+Lo Mids Knob,765,695,310,
+Hi mids knob,1198,695,310,
+Treble knob,1642,695,310,
+distortion up/down footswitch,344,1323,265,
+bypass up/down footswitch,1617,1323,265,
+Distortion blue on/off led,324,1046,85,
+bypass blue on/off led,1637,1046,85,
+attack switch,545,502,146,
+attack icons,545,655,110,77
+grunt switch,1422,502,146,
+grunt icons,1422,655,110,77
+low mids switch,545,877,146,
+low mids text,545,1028,110,110
+hi mids switch,1422,877,146,
+hi mids text,1422,1028,110,110

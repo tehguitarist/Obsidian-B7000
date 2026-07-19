@@ -182,6 +182,12 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | C7 | 100n | coupling into IC2_A |
 | R13 | 1M | bias IC2_A (+) to VD |
 
+> **UI switch-position map (user-confirmed 2026-07-20), top(up)→bottom(down):**
+> **ATTACK** = up **Flat** (common floating), mid **Boost** (C8 bridges R8), down **Cut** (R7/R8
+> junction→GND). Note the mechanical mapping differs from the schematic's "On-Off-On centre=Flat"
+> plan — here the CENTRE position is Boost — but the three electrical networks are unchanged; just
+> route `switch_up`→open, `switch_Mid`→C8-bridge, `switch_down`→ground.
+>
 > **ATTACK 3-way [ENG].** Schematic ships a 2-position SPDT On-On here (BOM: "Ultra Hi — SPDT On-On",
 > confirmed). **Node graph now verified (2026-07-19):** switch common (pin1) = the **R7/R8 junction**.
 > Boost (pin2) connects C8(220pF) from that junction to the *post-R8* node → **C8 bridges R8** (HF
@@ -204,7 +210,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 ### GRUNT switch + coupling into clipper
 | Ref | Value | Function |
 |-----|-------|----------|
-| GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels) |
+| GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels). **UI position map (assumed 2026-07-20 — ⚠ VERIFY against capture): up/Boost = 4n7∥220n (MOST low end), mid/Cut = 4n7 alone (LEAST), down/Flat = 4n7∥47n (MEDIUM).** Semantics Cut<Flat<Boost. |
 | C11 | 4n7 | always in forward path |
 | C12 | 47n | added in GRUNT pos 1 (via switch) |
 | C13 | 220n | added in GRUNT pos 3 (via switch) — **primary=220n; backup=22n (rev diff), see Validation** |
@@ -291,6 +297,13 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | IC5_D | TL074ACN | LO-MID peaking-filter amp (inverting-unity flat path) |
 | **HI-MID** VR7 | 100k B | R42(2k2) in→lug3, R43(2k2) lug1→out, R44(220k) in→(−), R45(220k) (−)→out, C34(6n8 across lugs); around IC6_A. **C35 wiper→(−) switchable** (see below) |
 | IC6_A | TL074ACN | HI-MID peaking-filter amp (inverting-unity flat path); out C36(2u2) → IC6_B |
+
+**UI switch-position map (user-confirmed 2026-07-20), top(up)→bottom(down):**
+- **LO-MID:** up = **500 Hz (C33=10n)**, mid = **1 kHz (C33=2n2)**, down = **250 Hz (C33=47n)**.
+- **HI-MID:** up = **1.5 kHz (C35=3n3)**, mid = **3 kHz (C35=820pF)**, down = **750 Hz (C35=15n)**.
+
+Wire `switch_up`/`_Mid`/`_down` → the series-cap value above (per the table). Frequency order is
+non-monotonic with switch position by design (matches the real pedal's silkscreen).
 
 **Switchable mid-frequency caps [ENG-caps]** — 3-position selector per band swaps the *series* cap
 only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):

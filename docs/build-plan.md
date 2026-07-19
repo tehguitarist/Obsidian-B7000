@@ -40,6 +40,31 @@ Volume/trim/metering/bypass live in the processor, not the WDF tree (architectur
 
 ---
 
+## UI timing — functional pass pulled forward (decision 2026-07-20)
+
+The UI is split into two passes instead of one Phase-8 block:
+
+- **Functional UI (Phase 4b, end of Phase 4 — before Phase 5's clipper):** build the data-driven
+  centre pedal face (base image + CSV, `ui.md`) with all controls **bound to APVTS** — knobs,
+  switches, footswitches, LEDs. Goal is *interactive testability*, not final polish: from Phase 5
+  onward every "turn DRIVE/GRUNT/BLEND up and check X" request is done on real controls instead of
+  the DAW's generic slider editor. **Safe to build here** because the APVTS set is frozen at Phase 2
+  and the UI is DSP-decoupled (`architecture.md`) — no param churn, no DSP entanglement, and the
+  assets + switch-position mappings are all confirmed (`ui.md`, `circuit.md`).
+- **Why not earlier:** at Phase 2 the plugin is pass-through — nothing to audition. End of Phase 4
+  (linear chain + J201 audible) is the first useful point.
+- **Not a blocker either way:** JUCE exposes every APVTS param to the host's generic editor, so
+  interactive testing is *possible* without any custom UI — the functional pass is a
+  quality-of-life upgrade for the human-in-the-loop checks, not a prerequisite for them.
+
+**What stays at Phase 8** (needs finished DSP/calibration, so a second UI touch is expected, not
+rework): the VU idle-noise-gate threshold (moves with the final Phase 7 output makeup), final
+label-opacity tuning against the base image, peripheral-chrome polish, and the headless
+scale-verification GATE. Phase 8 below is the authoritative full UI spec; Phase 4b is the subset of
+it that's worth having early.
+
+---
+
 ## Phase 2 — Repo + CMake scaffold (routine work; cheap model fine)
 
 1. Add submodules: `libs/JUCE`, `libs/chowdsp_wdf`, `libs/xsimd` (build.md commands).
@@ -166,6 +191,23 @@ piecewise-antiderivative ADAA (≈0 CPU, dsp.md) rather than leaving a base-rate
 polarity verified per stage; rail clamp present on every op-amp output (a missing clamp is a gate
 failure, not a refinement); J201 stage behaves plausibly (gain ~×10–30 region, soft).
 
+### Phase 4b — Functional UI pass (routine; after GATE 4, before Phase 5)
+
+Build the APVTS-bound centre pedal face now so Phase 5+ checks are interactive (see "UI timing"
+above). Scope = the *functional* subset of Phase 8, not the polish:
+- Data-driven face from `ui/b7k_texture_base.png` + `ui/component positions.csv` (base-texture px
+  space, centre-anchored, blank-height = scale-to-width — `ui.md`). Composite the component PNGs
+  (`T_Knob`, `switch_up/_Mid/_down`, `Footswitch_up/_down`, `blue_led_on/_off`) per the asset map.
+- Bind every control to its APVTS param (`SliderParameterAttachment` etc.); switches use the
+  confirmed position→value maps (`circuit.md`). ATTACK/GRUNT icon glyphs rendered procedurally
+  (`juce::Path`); LO-/HI-MID text labels in Lexend Exa (embed the .ttf now).
+- LEDs + bypass/DIST read the APVTS bools directly (`ui.md` metering note).
+- Enough peripheral chrome to be usable (trims, OS strip) is fine but optional here.
+
+**No formal gate** — this pass is a testing convenience. Its correctness is verified for real at
+GATE 8 (headless scale renders, VU gate vs final makeup, label states). Don't spend Phase 8's
+polish budget here; just get controls on screen and wired.
+
 ## Phase 5 — The clipper (nonlinear #2, the heart) + switch topologies
 
 1. Implement the **GRUNT bank + R16 + finite-gain 4049 + R18∥C14 + D1/D2** as ONE coupled stage
@@ -235,6 +277,12 @@ matrix, swept-THD tracks, null depth documented, knob-tracking pass/fail table g
 8 pots + 4 switches + DIST at the captured points.
 
 ## Phase 8 — UI
+
+> **Note (2026-07-20):** the *functional* pedal-face UI is built earlier in **Phase 4b** (see "UI
+> timing"). By the time Phase 8 opens, items 1–2 below are likely already done and bound — treat
+> this phase as **finishing + verifying** them (calibration-dependent bits, gate) plus the
+> peripheral chrome in item 3, not building the face from scratch. If Phase 4b was skipped or
+> deferred, Phase 8 builds the whole thing as originally written.
 
 1. **Centre pedal face from the provided base image + CSV** (positions/sizes; layout is
    data-driven, not hand-placed — see `ui.md` "Centre pedal face"). Confirm the CSV schema when it
