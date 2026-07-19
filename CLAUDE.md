@@ -1,8 +1,10 @@
-# <PEDAL NAME> — Project Memory  (from the pedal-plugin template)
+# Obsidian-B7000 — Project Memory  (from the pedal-plugin template)
 
-> <PEDAL NAME> is a circuit-level emulation of the <original pedal> built as an AU/VST3 plugin
-> using JUCE 8+ and chowdsp_wdf WDF modelling.
-> Author/Company: <you>
+> Obsidian-B7000 is a circuit-level emulation of the **Darkglass B7K Ultra** bass overdrive/DI preamp,
+> built as an AU/VST3 plugin using JUCE 8+ and chowdsp_wdf. The schematic we have ("Black Mirror VII"
+> by PCB Guitar Mania, rev 1.1v) is the ORIGINAL B7K clone; the Ultra-only features (Master volume,
+> 3-way Attack, switchable mid frequencies) are **engineered on top of it** — see circuit.md [ENG] tags.
+> Author/Company: Leigh Pierce
 
 This project was scaffolded from a reusable template. The generic, hard-won engineering lives in
 the rules + docs below — read them before writing DSP or UI. Replace every `<...>` placeholder.
@@ -96,9 +98,45 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: <step> — <what's done / what's next>.**
+> **CURRENT: Step 1 (Schematic analysis) — DONE; `circuit.md` filled + revised for the ULTRA target.**
+> Full chain traced IN→OUT: input buffer → J201 JFET gain → treble/ATTACK → DRIVE (IC2_A) → GRUNT →
+> CD4049UBE clipper (D1/D2 = rail clamps, CMOS soft-clip) → recovery → 2× Sallen-Key LPF → LEVEL →
+> BLEND(clean crossfade) → EQ (4-band, switchable mids) → MASTER → output buffer. XLR DI + power
+> beyond VD skipped. **Ultra features are engineered [ENG]** — see circuit.md (Master, 3-way Attack,
+> switchable-mid caps).
+> Web research (2026-07-19) confirmed Master/Attack wording + both mid-freq sets exactly, and
+> surfaced a genuinely new requirement: the real Ultra has a **second DIST-engage footswitch**
+> (independent of main bypass) not derivable from our schematic — see circuit.md "Footswitches".
+> **NEXT:** (a) verify the 3 flagged schematic-verified node graphs (treble/ATTACK base network,
+> GRUNT C13 value, Baxandall/mid tone-stack node detail) — `schematic-checker` job; (b) sanity-check
+> the [ENG] mid-freq caps + Master gain-staging with a filter sim; (c) design the DIST-engage
+> footswitch (2nd bool, overrides BLEND crossfade to 100% clean) alongside main bypass at the
+> architecture/APVTS step; (d) then Step 2 CMake scaffold once `libs/` submodules (JUCE, chowdsp_wdf,
+> xsimd) are added — not yet present.
 
 ## Project-specific carry-forwards
 
 > Record decisions, measured constants (kInputRef, rail voltages, makeup), and open questions here
 > as you go, so the next session resumes cleanly.
+
+- **Target = Darkglass B7K Ultra** (schematic is the original-B7K "Black Mirror VII" clone; Ultra
+  extras engineered on top). **8 pots**: MASTER[ENG], BLEND, LEVEL, DRIVE, LO, HI, LO-MID, HI-MID.
+  Plus 3-way ATTACK[ENG] + 3-way GRUNT switches, and 3-position Lo-Mid/Hi-Mid freq selectors[ENG].
+- **Engineered (not schematic-verified) parts** — flagged [ENG] in circuit.md: MASTER volume stage
+  (post-EQ divider → IC6_B, also DI level); 3-way ATTACK (2-pos ULTRA-HI + centre Flat); switchable
+  mid caps — Lo-Mid 47n/10n/2n2 (250/500/1k), Hi-Mid 15n⚠/3n3/820pF (750/1.5k/3k), computed from the
+  p.3 Ultra-Mod tables (f∝1/√C). 750 Hz hi-mid is extrapolated — validate. **Plus a 2nd DIST-engage
+  footswitch** (real Ultra has 2 footswitches; ours only has 1 in the BOM) — model as a bool that
+  overrides the BLEND crossfade to 100% clean, not a second bypass loop.
+- **Web-confirmed 2026-07-19** (real Darkglass manual + reviews): Master/Attack wording and both
+  mid-frequency sets match our `info.txt`/computed values exactly — high confidence. The DIST
+  footswitch was new information, not previously in any doc.
+- **Supply: single 9V, no charge pump.** 9V → D3 (1N5817) → +9V rail ≈ 8.6V. **VD = 4.5V**
+  (R30/R31 10k/10k divider + 100µF, unbuffered). Op-amps TL072ACP/TL074ACN, clipper CD4049**UBE**.
+- **Clipping = CMOS inverter (CD4049UBE) overdrive**, NOT diodes. D1/D2 (1N4148) are input rail
+  clamps (~[−0.6, +9.6]V), rarely conduct. Model the 4049 transfer curve as the nonlinearity.
+- **JFET stage (Q1/Q2 J201)** is an active gain stage (Q1 common-source + Q2 active load), not
+  switches — needs a JFET device model or fitted gain+waveshaper. (See circuit.md / dsp.md.)
+- **Value discrepancies resolved:** C33 = 22n (primary+BOM; backup's 2200pF is a different rev).
+  GRUNT C13 = 220n (primary; backup 22n). Using primary values throughout.
+- **Reusable crop tool** for the dense p.4 schematic: `schematics/crop.py` (see circuit.md crop index).
