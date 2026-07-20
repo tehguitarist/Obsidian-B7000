@@ -61,7 +61,7 @@ jobs:
           ls -la "$HOME/Library/Audio/Plug-Ins/Components/" || true
           ok=0
           for i in 1 2 3 4; do
-            if auval -v aufx <Cod1> <Mfr1>; then ok=1; break; fi
+            if auval -v aufx Ob7k LPrc; then ok=1; break; fi
             echo "::warning::auval attempt $i failed; bouncing AudioComponentRegistrar and retrying"
             killall -9 AudioComponentRegistrar 2>/dev/null || true
             sleep 5

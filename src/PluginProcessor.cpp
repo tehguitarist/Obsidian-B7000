@@ -1,0 +1,166 @@
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+#include "dsp/PedalDSP.h"
+
+ObsidianB7000AudioProcessor::ObsidianB7000AudioProcessor()
+    : AudioProcessor(BusesProperties()
+                        .withInput("Input", juce::AudioChannelSet::stereo(), true)
+                        .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      apvts(*this, nullptr, juce::Identifier("PARAMETERS"), createParameterLayout())
+{
+    bypassParam = static_cast<juce::AudioParameterBool*>(apvts.getParameter("bypass"));
+}
+
+ObsidianB7000AudioProcessor::~ObsidianB7000AudioProcessor() = default;
+
+juce::AudioProcessorValueTreeState::ParameterLayout ObsidianB7000AudioProcessor::createParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout params;
+
+    // Pots (0..1, taper applied in DSP)
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"master", 1}, "Master",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"blend", 1}, "Blend",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"level", 1}, "Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"drive", 1}, "Drive",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"lo", 1}, "Lo",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"lo_mid", 1}, "Lo Mid",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"hi_mid", 1}, "Hi Mid",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"hi", 1}, "Hi",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+
+    // Switches
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"attack", 1}, "Attack",
+        juce::StringArray{"Flat", "Boost", "Cut"}, 0));
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"grunt", 1}, "Grunt",
+        juce::StringArray{"Boost", "Cut", "Flat"}, 0));
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"lo_mid_freq", 1}, "Lo Mid Freq",
+        juce::StringArray{"250Hz", "500Hz", "1kHz"}, 2));
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"hi_mid_freq", 1}, "Hi Mid Freq",
+        juce::StringArray{"750Hz", "1.5kHz", "3kHz"}, 2));
+
+    // Bools
+    params.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"bypass", 1}, "Bypass", false));
+    params.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"dist_engage", 1}, "Dist Engage", true));
+    params.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"trim_link", 1}, "Trim Link", false));
+    params.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"hq", 1}, "HQ", true));
+
+    // Trims
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"input_trim", 1}, "Input Trim",
+        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f));
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"output_trim", 1}, "Output Trim",
+        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f));
+
+    // Oversampling
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"oversampling", 1}, "Oversampling",
+        juce::StringArray{"1x", "2x", "4x", "8x"}, 1));
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"render_oversampling", 1}, "Render Oversampling",
+        juce::StringArray{"1x", "2x", "4x", "8x"}, 3));
+
+    return params;
+}
+
+const juce::String ObsidianB7000AudioProcessor::getName() const
+{
+    return JucePlugin_Name;
+}
+
+bool ObsidianB7000AudioProcessor::acceptsMidi() const { return false; }
+bool ObsidianB7000AudioProcessor::producesMidi() const { return false; }
+bool ObsidianB7000AudioProcessor::isMidiEffect() const { return false; }
+double ObsidianB7000AudioProcessor::getTailLengthSeconds() const { return 0.0; }
+
+int ObsidianB7000AudioProcessor::getNumPrograms() { return 1; }
+int ObsidianB7000AudioProcessor::getCurrentProgram() { return 0; }
+void ObsidianB7000AudioProcessor::setCurrentProgram(int) {}
+const juce::String ObsidianB7000AudioProcessor::getProgramName(int) { return {}; }
+void ObsidianB7000AudioProcessor::changeProgramName(int, const juce::String&) {}
+
+void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+{
+    scratch.setSize(2, samplesPerBlock);
+    bypassMix.reset(sampleRate, 0.02);
+    bypassMix.setCurrentAndTargetValue(0.0f);
+}
+
+void ObsidianB7000AudioProcessor::releaseResources() {}
+
+void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+
+    auto totalNumInputChannels = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear(i, 0, buffer.getNumSamples());
+}
+
+bool ObsidianB7000AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    if (layouts.getMainInputChannelSet() != juce::AudioChannelSet::mono()
+        && layouts.getMainInputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+        return false;
+    return true;
+}
+
+juce::AudioProcessorEditor* ObsidianB7000AudioProcessor::createEditor()
+{
+    return new ObsidianB7000AudioProcessorEditor(*this);
+}
+
+bool ObsidianB7000AudioProcessor::hasEditor() const { return true; }
+
+void ObsidianB7000AudioProcessor::getStateInformation(juce::MemoryBlock& destData)
+{
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    copyXmlToBinary(*xml, destData);
+}
+
+void ObsidianB7000AudioProcessor::setStateInformation(const void* data, int sizeInBytes)
+{
+    std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+    if (xml != nullptr)
+        apvts.replaceState(juce::ValueTree::fromXml(*xml));
+}
+
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    return new ObsidianB7000AudioProcessor();
+}
+
+juce::AudioParameterBool* ObsidianB7000AudioProcessor::getBypassParameter() const
+{
+    return bypassParam;
+}
+
+

@@ -1,0 +1,66 @@
+cmake_minimum_required(VERSION 3.15)
+
+project(ObsidianB7000 VERSION 0.1.0)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
+
+enable_testing()
+
+if (MSVC)
+    set(PEDAL_WARNING_FLAGS /W4)
+else()
+    set(PEDAL_WARNING_FLAGS -Wall -Wextra)
+endif()
+
+add_subdirectory(libs/JUCE)
+add_subdirectory(libs/xsimd)
+add_subdirectory(libs/chowdsp_wdf)
+
+get_target_property(_chowdsp_inc chowdsp_wdf INTERFACE_INCLUDE_DIRECTORIES)
+set_target_properties(chowdsp_wdf PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_chowdsp_inc}")
+
+juce_add_plugin(ObsidianB7000
+    COMPANY_NAME "Leigh Pierce"
+    BUNDLE_ID com.leighpierce.obsidianb7000
+    PLUGIN_MANUFACTURER_CODE LPrc
+    PLUGIN_CODE Ob7k
+    FORMATS AU VST3
+    PRODUCT_NAME "Obsidian-B7000"
+    COPY_PLUGIN_AFTER_BUILD TRUE
+)
+
+target_sources(ObsidianB7000
+    PRIVATE
+        src/PluginProcessor.cpp
+        src/PluginEditor.cpp
+        src/ui/PedalLookAndFeel.cpp
+        src/dsp/PedalDSP.h
+)
+
+target_compile_definitions(ObsidianB7000
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+target_link_libraries(ObsidianB7000
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+        chowdsp::chowdsp_wdf
+        xsimd
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_options(ObsidianB7000 PRIVATE ${PEDAL_WARNING_FLAGS})
+
+# Tests
+add_executable(DummyTest tests/DummyTest.cpp)
+target_compile_options(DummyTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME DummyTest COMMAND DummyTest)
