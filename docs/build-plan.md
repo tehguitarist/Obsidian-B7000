@@ -13,7 +13,7 @@
 | 1 — Schematic analysis | Complete | 2026-07-19 | — |
 | 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
-| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓ (2026-07-20) | per-stage FR + dsp-validator |
+| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓ (2026-07-20) | per-stage FR + dsp-validator |
 | 4b — Functional UI pass | Not started | — | — |
 | 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
@@ -165,16 +165,20 @@ levels; the capture anchor replaces it at Phase 7:
    ⚠ Two Phase-7 capture-fit carry-forwards (both flagged in-code, non-blocking): DRIVE taper
    SHAPE (`kTaperExp=1.5` interim — confirm direction + p vs a matched-pair drive capture) and the
    symmetric ±3.3 V rail estimate (real TL07x is asymmetric around VD, positive may clip first).
-4. **RecoveryBridgedT**: unity buffer + passive bridged-T; validate notch at ~717 Hz vs
-   `eq_reference.py` (ideal values for now; capture reshape in Phase 7). Live
-   ImpedanceCalculator (linear network, tolerance-sensitive → keep values as variables).
-   ⚠ Two test-design caveats: (a) the oracle `bridged_t_tf()` is UNLOADED (a fair approximation —
-   the real load is R24 + the SK's bootstrapped passband input impedance, which is light — but the
-   WDF stage will include the real load), so either validate the bridged-T in isolation against
-   the unloaded oracle and then the bridged-T→SK pair together, or add the load to the oracle
-   first; (b) the blanket ±0.25 dB tolerance is meaningless at the bottom of a deep notch — assert
-   the notch FREQUENCY within a few % and its DEPTH within a few dB, ±0.25 dB elsewhere. (The
-   real unit's notch may be far shallower anyway — risk #1.)
+4. ✅ **RecoveryBridgedT**: unity buffer + passive bridged-T; notch validated at ~717 Hz vs
+   `eq_reference.py`. **DONE 2026-07-20** (`src/dsp/RecoveryBridgedT.h`,
+   `tests/RecoveryBridgedTTest.cpp`, dsp-validator PASS w/ full KCL re-derivation). Realised as
+   **2-node MNA + trapezoidal companion caps** (same conventions as TrebleAttack; precomputed 2×2
+   inverse) rather than a WDF ImpedanceCalculator — a bridge network isn't a series/parallel tree,
+   and MNA maps 1:1 onto the oracle. Values kept as `constexpr` (tolerance-sensitive → capture-
+   reshape at Phase 7). Test honoured BOTH caveats: (a) validated the ISOLATED stage against the
+   UNLOADED oracle (`bridged_t_tf()` default; the R24→SK load is light + bootstrapped, deferred to
+   the Phase-7 bridged-T→SK pair test — the oracle's Rload arg models Nout→GND, NOT the real
+   series-into-high-Z topology, so it's only a sensitivity bound); (b) split assertions — notch
+   FREQUENCY tight (±3%, landed 716 Hz), DEPTH loose (≤−20 dB, landed −28), ±0.25 dB only on the
+   gentle shoulders, steep flanks + HF treated as bilinear warp (verified by 48k→96k shrink). FR
+   matched oracle <0.02 dB through the notch. RailClamp on the buffer output (GATE), disabled by
+   default. DC-step = unity/non-inverting. **⚠ real notch DEPTH still capture-validate — risk #1.**
 5. **SallenKey2** (×2 instances, different values): FR vs textbook SK response.
 6. **LevelBlend**: dividers/crossfade (plain gains, not WDF); audio-taper for LEVEL;
    `dist_engage` override hook here. ⚠ **Two alignment risks at this summing node, not one** (dsp.md

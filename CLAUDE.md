@@ -127,15 +127,26 @@ high, execute routine work cheap) is what should persist.
 > ✅ **RailClamp (shared, `src/dsp/RailClamp.h`)** — op-amp output-rail saturation (calibration §6:
 >    dead-linear→parabolic knee→hard clamp; C1-continuous; disabled by default so linear stage tests
 >    stay valid). The per-stage rail-clamp GATE item — landed with DriveStage (IC2_A at ×78 rails first);
->    **apply it to EVERY subsequent op-amp stage** (Recovery, SK×2, EQ block, MasterOut).
+>    **apply it to EVERY subsequent op-amp stage** (SK×2, EQ block, MasterOut).
+> ✅ **RecoveryBridgedT (IC2_B, stage #5)** — `src/dsp/RecoveryBridgedT.h` +
+>    `tests/RecoveryBridgedTTest.cpp` (dsp-validator PASS 2026-07-20, full KCL re-derivation).
+>    Unity-gain buffer + passive bridged-T (R22 100k/R23 33k/C16 680pF/C17 22n), NOT a +12 dB shelf
+>    (no recovery make-up gain). Built as 2-node MNA + trapezoidal companion caps (same conventions
+>    as TrebleAttack), precomputed 2×2 inverse; output = V(Nout). FR matches the UNLOADED oracle
+>    (`bridged_t_tf`) to <0.02 dB through the notch (717 Hz ≪ Nyquist so warp negligible there); HF
+>    shoulders warp bilinear-expected, →0 at 96k. Notch dead-on 716 Hz/−28 dB; test asserts
+>    freq-tight (±3%) + depth-loose (≤−20 dB) per the Phase-4 caveat. RailClamp on the buffer op-amp
+>    output (GATE, disabled by default). DC-step = unity/non-inverting. **⚠ Phase-7 carry-forward:
+>    real notch DEPTH is loaded (R24→SK, deferred) + tolerance-sensitive → capture-validate (risk #1);
+>    the isolated stage is unloaded by design, matching the unloaded oracle 1:1.**
 > **⚠ ATTACK-SWITCH TOPOLOGY CORRECTED THIS SESSION** (found while building the oracle): circuit.md's
 >    "triple-checked" node graph had the switch **pole** wrong (named node M as common → implied a Cut
 >    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
 >    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
 >    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
-> **STILL TODO in Step 4:** RecoveryBridgedT → SallenKey ×2 → LevelBlend → EQ block → MasterOut, THEN
->    the J201 nonlinear stage. RailClamp now exists — apply it to each remaining op-amp stage as built
->    (calibration §6, GATE item). (Build-plan Phase 4.)
+> **STILL TODO in Step 4:** SallenKey ×2 → LevelBlend → EQ block → MasterOut, THEN the J201 nonlinear
+>    stage. RailClamp now exists — apply it to each remaining op-amp stage as built (calibration §6,
+>    GATE item). (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
 > All three phases done: schematic ✓ → scaffold (20 params, AU+VST3, auval PASS) ✓ → WDF smoke test ✓.
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
@@ -156,14 +167,21 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: RecoveryBridgedT (IC2_B)** — unity buffer + passive bridged-T (R22/R23/C16/C17), NOT a
-> gain stage (circuit.md IC2_B CORRECTION). Add `bridged_t_tf` is already in `eq_reference.py`
-> (~717 Hz / −28.1 dB unloaded notch). Build as a live-ImpedanceCalculator linear network (values as
-> variables — tolerance-sensitive, capture-reshape at Phase 7). ⚠ Test-design caveats (build-plan
-> Phase 4 item 4): oracle is UNLOADED (validate bridged-T alone vs it, then the bridged-T→SK pair
-> together, OR add the load to the oracle); assert notch FREQUENCY tight + DEPTH loose, ±0.25 dB
-> elsewhere (a blanket ±0.25 dB at a −28 dB notch bottom is meaningless). Apply the new `RailClamp`
-> to the IC2_B buffer output. The real-unit notch may be far shallower (risk #1) — capture-validate.
+> **NEXT: SallenKey ×2** (IC4_B ~10.7 kHz → IC4_A ~3.3 kHz), build-plan Phase 4 item 5. Two
+> instances of a textbook 2nd-order unity-gain Sallen-Key LPF, different values:
+>   • IC4_B: R24 10k / R25 22k, C27 1n (→GND) / C18 1n (feedback) → fc ≈ 10.7 kHz.
+>   • IC4_A: R26 22k / R27 47k, C20 1n (→GND) / C19 2n2 (feedback) → fc ≈ 3.3 kHz (final OD bandlimit).
+> These are the last stage of the OD chain before LEVEL/BLEND. No oracle exists yet — add a
+> `sallen_key_tf(f, R1, R2, C1, C2)` to `eq_reference.py` (standard SK transfer fn) and validate FR
+> +2nd-order rolloff/Q vs it (same 48k/96k bilinear-warp split as the other stages; the SK corners
+> are lower than the bridged-T so top-octave warp will show — assert tight ≤2 kHz, shrink 48k→96k
+> above). Build via MNA + trapezoidal companion caps (consistent with TrebleAttack/RecoveryBridgedT;
+> a unity-gain SK is a clean 2-node solve) OR chowdsp WDF — pick MNA for oracle 1:1. Apply `RailClamp`
+> to EACH SK op-amp output (GATE item, disabled by default). ⚠ Both SKs sit INSIDE the Phase-6
+> oversampled region (dsp.md OS-region rule) — their bilinear warp is resolved there, so don't
+> prewarp-fight it in the base-rate test. After both SKs: LevelBlend (build-plan item 6 — the
+> asymmetric-crossfade + dual phase-alignment risks; do NOT wire the crossfade before Phase 6's
+> delay-comp), then the EQ block, MasterOut, then the J201 nonlinear front-end.
 
 ## Project-specific carry-forwards
 
