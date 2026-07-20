@@ -13,7 +13,7 @@
 | 1 — Schematic analysis | Complete | 2026-07-19 | — |
 | 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
-| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓ (2026-07-20) | per-stage FR + dsp-validator |
+| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓ (2026-07-20) | per-stage FR + dsp-validator |
 | 4b — Functional UI pass | Not started | — | — |
 | 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
@@ -150,8 +150,21 @@ levels; the capture anchor replaces it at Phase 7:
    for Phase 4 (source Z = 0), loading absorbed into the J201 fit at Phase 7 capture; same
    convention in `eq_reference.py` and the stage. Positions differ topologically (cap bridge / cap
    shunt / open); `setAttack()` zeros C8's state on swap, glitch-free crossfade deferred to Phase 5.
-3. **DriveStage** (IC2_A): ideal-op-amp decomposition; gain 4×–78× vs VR3; C-taper (fit per
-   dsp.md; beware taper floor on the 100k). DC-step polarity test (non-inverting).
+3. ✅ **DriveStage** (IC2_A): ideal-op-amp decomposition; gain 4×–78× vs VR3; C-taper (fit per
+   dsp.md; beware taper floor on the 100k). DC-step polarity test (non-inverting). **DONE
+   2026-07-20** (`src/dsp/DriveStage.h`, `tests/DriveStageTest.cpp`, `drive_stage_tf` in
+   `eq_reference.py`, dsp-validator PASS). Companion-model (trapezoidal C10 in the feedback leg,
+   like TrebleAttack's MNA — maps 1:1 to the oracle), NOT a WDF tree. DC gains 4.164×/77.744×
+   exact; FR ≤0.06 dB through 2 kHz all four DRIVE settings; top-octave deviation confirmed pure
+   bilinear warp (shrinks 48k→96k, resolved by the Phase-6 OS region — C10 corner ~10.3 kHz is
+   knob-INDEPENDENT so it's a clean prewarp candidate IF this stage ever runs base-rate, but it's
+   inside the OS region so leave it). Taper reaches EXACTLY 0 Ω at full drive (dodges the §3 floor
+   trap). **Shared `RailClamp` utility (`src/dsp/RailClamp.h`) landed here** (calibration §6:
+   dead-linear→parabolic knee→hard clamp; disabled by default so linear tests stay valid) —
+   this is the per-stage rail-clamp GATE item; apply it to every subsequent op-amp stage.
+   ⚠ Two Phase-7 capture-fit carry-forwards (both flagged in-code, non-blocking): DRIVE taper
+   SHAPE (`kTaperExp=1.5` interim — confirm direction + p vs a matched-pair drive capture) and the
+   symmetric ±3.3 V rail estimate (real TL07x is asymmetric around VD, positive may clip first).
 4. **RecoveryBridgedT**: unity buffer + passive bridged-T; validate notch at ~717 Hz vs
    `eq_reference.py` (ideal values for now; capture reshape in Phase 7). Live
    ImpedanceCalculator (linear network, tolerance-sensitive → keep values as variables).

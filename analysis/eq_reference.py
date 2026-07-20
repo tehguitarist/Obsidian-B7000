@@ -64,6 +64,32 @@ def treble_attack_tf(f, position, R7=200e3, R8=470e3, R11=470e3, R12=6.8e3, R14=
         out[i] = x[4]
     return out
 
+def drive_stage_tf(f, Rdrive, R15=330e3, C10=47e-12, R17=3.3e3, R32=1e3):
+    """DRIVE stage (IC2_A) — circuit.md "DRIVE gain stage (IC2_A)".
+
+    Non-inverting op-amp gain stage. Signal enters IC2_A(+) as V(Q) (the TrebleAttack
+    output); the (-) node sits at V(+) for an ideal op-amp and draws no current, so the
+    stage decomposes (dsp.md "ideal op-amp decomposition") into:
+        gain-set leg Zg  = R17 + Rdrive + R32   (- node -> AC ground/VD; purely resistive)
+        feedback leg Zf  = R15 || C10           (- node -> output)
+        Vout = Vin * (1 + Zf/Zg)                (non-inverting)
+      Zf(s) = R15 / (1 + s*R15*C10)   -> only frequency-dependence is the C10 HF rolloff
+                                          of the feedback impedance (corner ~10.3 kHz).
+
+    Rdrive = the DRIVE rheostat's electrical resistance (0 .. 100k). The knob->Rdrive
+    taper (C-taper, knob up = LESS R = MORE gain) is a SEPARATE concern validated apart
+    from FR — this oracle takes the electrical value directly so the C++ FR test can drive
+    matched Rdrive values (same decoupling as the TrebleAttack test's fixed values).
+
+    DC gain check: Rdrive=100k -> 1+330k/104.3k = 4.16x (min); Rdrive=0 -> 1+330k/4.3k
+    = 77.7x (max) — matches circuit.md's "~4x .. ~78x".
+    """
+    w = 2j * np.pi * f
+    Zg = R17 + Rdrive + R32
+    Zf = R15 / (1.0 + w * R15 * C10)
+    return 1.0 + Zf / Zg
+
+
 def mid_stage_tf(f, a, C33, Rp=100e3, R38=2.2e3, R39=2.2e3, R40=220e3, R41=220e3, C32=22e-9):
     """Return complex gain Vout/Vin of the mid peaking stage at frequencies f, pot position a."""
     w = 2j * np.pi * f

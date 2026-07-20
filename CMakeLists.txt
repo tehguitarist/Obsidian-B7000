@@ -79,3 +79,7 @@ add_test(NAME InputBufferTest COMMAND InputBufferTest)
 add_executable(TrebleAttackTest tests/TrebleAttackTest.cpp)
 target_compile_options(TrebleAttackTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME TrebleAttackTest COMMAND TrebleAttackTest)
+
+add_executable(DriveStageTest tests/DriveStageTest.cpp)
+target_compile_options(DriveStageTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME DriveStageTest COMMAND DriveStageTest)

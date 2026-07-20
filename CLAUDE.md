@@ -114,13 +114,28 @@ high, execute routine work cheap) is what should persist.
 >    this for a linear passive block; same bilinear discretisation as chowdsp caps). Matches oracle
 >    ≤0.05 dB <2 kHz for all 3 positions; HF deviation is bilinear warp (shrinks 48k→96k, resolved by
 >    the OS region). setAttack() zeros C8 state on swap; glitch-free crossfade is a Phase-5 add.
+> ✅ **DriveStage (IC2_A, stage #4)** — `src/dsp/DriveStage.h` + `tests/DriveStageTest.cpp` +
+>    `drive_stage_tf` in `eq_reference.py` (dsp-validator PASS 2026-07-20). Non-inverting op-amp
+>    gain via ideal-op-amp decomposition (`Ig=Vin/Zg`, `Vf` across R15∥C10, `Vout=Vin+Vf`);
+>    trapezoidal companion for C10 (like TrebleAttack's MNA, maps 1:1 to oracle — NOT a WDF tree).
+>    DC gains EXACT: 4.164× (Rd=100k, min) … 77.744× (Rd=0, max); FR ≤0.06 dB through 2 kHz all four
+>    DRIVE settings; top octave = pure bilinear warp (C10 corner ~10.3 kHz, resolved by the OS region).
+>    Non-inverting confirmed by DC-step. DRIVE taper reaches EXACTLY 0 Ω at full drive (dodges §3 floor
+>    trap). **⚠ Two Phase-7 capture-fit carry-forwards (flagged in-code): DRIVE taper SHAPE
+>    (`kTaperExp=1.5` interim `100k·(1-x)^1.5` — confirm direction + p vs a matched-pair drive capture)
+>    and the symmetric ±3.3 V rail estimate (real TL07x asymmetric around VD, positive may clip first).**
+> ✅ **RailClamp (shared, `src/dsp/RailClamp.h`)** — op-amp output-rail saturation (calibration §6:
+>    dead-linear→parabolic knee→hard clamp; C1-continuous; disabled by default so linear stage tests
+>    stay valid). The per-stage rail-clamp GATE item — landed with DriveStage (IC2_A at ×78 rails first);
+>    **apply it to EVERY subsequent op-amp stage** (Recovery, SK×2, EQ block, MasterOut).
 > **⚠ ATTACK-SWITCH TOPOLOGY CORRECTED THIS SESSION** (found while building the oracle): circuit.md's
 >    "triple-checked" node graph had the switch **pole** wrong (named node M as common → implied a Cut
 >    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
 >    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
 >    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
-> **STILL TODO in Step 4:** DRIVE (IC2_A) → RecoveryBridgedT → SallenKey ×2 → LevelBlend → EQ block →
->    MasterOut, THEN the J201 nonlinear stage, THEN op-amp rail clamps on every stage. (Build-plan Phase 4.)
+> **STILL TODO in Step 4:** RecoveryBridgedT → SallenKey ×2 → LevelBlend → EQ block → MasterOut, THEN
+>    the J201 nonlinear stage. RailClamp now exists — apply it to each remaining op-amp stage as built
+>    (calibration §6, GATE item). (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
 > All three phases done: schematic ✓ → scaffold (20 params, AU+VST3, auval PASS) ✓ → WDF smoke test ✓.
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
@@ -141,10 +156,14 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: DRIVE stage (IC2_A)** — non-inverting op-amp gain (1+R15/(R17+DRIVE+R32), ~4×–78×),
-> DRIVE = 100k C-taper rheostat in the gain leg. Add its TF to `eq_reference.py` first, then build
-> via the ideal-op-amp decomposition (dsp.md), DC-step polarity (non-inverting), taper fit + floor
-> trap (dsp.md §tapers), and remember the TL07x output rail clamp (calibration §6) is a Step-4 gate item.
+> **NEXT: RecoveryBridgedT (IC2_B)** — unity buffer + passive bridged-T (R22/R23/C16/C17), NOT a
+> gain stage (circuit.md IC2_B CORRECTION). Add `bridged_t_tf` is already in `eq_reference.py`
+> (~717 Hz / −28.1 dB unloaded notch). Build as a live-ImpedanceCalculator linear network (values as
+> variables — tolerance-sensitive, capture-reshape at Phase 7). ⚠ Test-design caveats (build-plan
+> Phase 4 item 4): oracle is UNLOADED (validate bridged-T alone vs it, then the bridged-T→SK pair
+> together, OR add the load to the oracle); assert notch FREQUENCY tight + DEPTH loose, ±0.25 dB
+> elsewhere (a blanket ±0.25 dB at a −28 dB notch bottom is meaningless). Apply the new `RailClamp`
+> to the IC2_B buffer output. The real-unit notch may be far shallower (risk #1) — capture-validate.
 
 ## Project-specific carry-forwards
 
