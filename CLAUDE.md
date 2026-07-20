@@ -105,6 +105,22 @@ high, execute routine work cheap) is what should persist.
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **CURRENT: Step 4 (stage-by-stage linear DSP) — IN PROGRESS (2026-07-20).**
 > Phase completion tracking in `docs/build-plan.md` §"Where we are" — update both files.
+> **STEP-4 STAGES DONE SO FAR (each: FR test vs oracle in ctest + dsp-validator PASS):**
+> ✅ **InputBuffer (IC1_A)** — `src/dsp/InputBuffer.h` + `tests/InputBufferTest.cpp`. ~1.59 Hz HP
+>    (C1/R2), unity, non-inverting; matches analytic oracle ~0 dB at 44.1/48/96k. R1/R3 omitted from
+>    isolated TF (justified). ✅ **TrebleAttack (treble net + ATTACK, stage #3)** — `src/dsp/TrebleAttack.h`
+>    + `tests/TrebleAttackTest.cpp`. Built as **MNA (nodal + trapezoidal-companion caps, precomputed
+>    inverse per position)** — NOT a WDF tree, because R7∥ladder→M is a loop (dsp-validator endorsed
+>    this for a linear passive block; same bilinear discretisation as chowdsp caps). Matches oracle
+>    ≤0.05 dB <2 kHz for all 3 positions; HF deviation is bilinear warp (shrinks 48k→96k, resolved by
+>    the OS region). setAttack() zeros C8 state on swap; glitch-free crossfade is a Phase-5 add.
+> **⚠ ATTACK-SWITCH TOPOLOGY CORRECTED THIS SESSION** (found while building the oracle): circuit.md's
+>    "triple-checked" node graph had the switch **pole** wrong (named node M as common → implied a Cut
+>    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
+>    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
+>    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
+> **STILL TODO in Step 4:** DRIVE (IC2_A) → RecoveryBridgedT → SallenKey ×2 → LevelBlend → EQ block →
+>    MasterOut, THEN the J201 nonlinear stage, THEN op-amp rail clamps on every stage. (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
 > All three phases done: schematic ✓ → scaffold (20 params, AU+VST3, auval PASS) ✓ → WDF smoke test ✓.
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
@@ -125,8 +141,10 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: Step 4 (stage-by-stage linear DSP)** — build stages in signal order, each with FR test
-> vs analytic transfer function. Start with input buffer + JFET stage.
+> **NEXT: DRIVE stage (IC2_A)** — non-inverting op-amp gain (1+R15/(R17+DRIVE+R32), ~4×–78×),
+> DRIVE = 100k C-taper rheostat in the gain leg. Add its TF to `eq_reference.py` first, then build
+> via the ideal-op-amp decomposition (dsp.md), DC-step polarity (non-inverting), taper fit + floor
+> trap (dsp.md §tapers), and remember the TL07x output rail clamp (calibration §6) is a Step-4 gate item.
 
 ## Project-specific carry-forwards
 
@@ -204,8 +222,11 @@ high, execute routine work cheap) is what should persist.
   glyphs = render procedurally** (`juce::Path`, shelf lines/curves; CSV reserves 110×77 boxes) — I
   can draw these, no artwork needed from the user unless an exact match is wanted. LO-MID/HI-MID use
   text labels. **Switch-position→value mappings CONFIRMED by user 2026-07-20** (top/up→bottom/down),
-  now in circuit.md: **ATTACK** up=Flat(float)/mid=Boost(C8 bridges R8)/down=Cut(R7-R8 junc→GND)
-  — note centre=Boost, not the schematic's centre=Flat; **LO-MID** up=500Hz(10n)/mid=1k(2n2)/
+  now in circuit.md: **ATTACK** up=Flat(C8 pole open)/mid=Boost(C8 bridges R8)/down=Cut(C8 shunts
+  P→GND) — note centre=Boost, not the schematic's centre=Flat. ⚠ **CORRECTED 2026-07-20:** Cut is
+  a C8→GND *shunt* (treble rolloff), NOT "R7-R8 junc→GND" (that earlier reading grounded node M and
+  MUTED the path — wrong pole assignment; see circuit.md "ATTACK-SWITCH CORRECTION"). No position
+  mutes; UI up/mid/down order unchanged. **LO-MID** up=500Hz(10n)/mid=1k(2n2)/
   down=250Hz(47n); **HI-MID** up=1.5k(3n3)/mid=3k(820pF)/down=750Hz(15n); **GRUNT** ⚠assumed, VERIFY
   at capture: up/Boost=4n7∥220n(most)/mid/Cut=4n7 alone(least)/down/Flat=4n7∥47n(medium). That text: **font = Lexend Exa** (embed as binary data, this pedal's face text
   ONLY — peripheral chrome keeps its existing font), **colour = white**, opaque when selected,

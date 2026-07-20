@@ -173,29 +173,43 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | Ref | Value | Function |
 |-----|-------|----------|
 | R7 | 200k | on JFET-drain signal rail |
-| R8 | 470k | on signal rail (C8 bridges across via switch) |
+| R8 | 470k | on signal rail (C8 bridges it, or not, per switch — see correction below) |
 | C5, C9, C6 | 22n, 22n, 22n | treble-shaping ladder (lower rail) |
 | R12, R14 | 6k8, 22k | shunt legs to GND in treble ladder |
-| C8 | 220pF | HF cap routed by ATTACK switch |
+| C8 | 220pF | HF cap whose **bottom plate is the ATTACK switch pole**; top plate fixed to node P (post-R8). Boost→bottom to M (bridges R8); Cut→bottom to GND (shunt at P); Flat→bottom open. See correction below. |
 | **ATTACK (SW1)** | **SP3T / On-Off-On** | **3-way Boost/Flat/Cut** [ENG]. Sets treble content into the clipper. |
 | R11 | 470k | to GND at IC2_A input side |
 | C7 | 100n | coupling into IC2_A |
 | R13 | 1M | bias IC2_A (+) to VD |
 
 > **UI switch-position map (user-confirmed 2026-07-20), top(up)→bottom(down):**
-> **ATTACK** = up **Flat** (common floating), mid **Boost** (C8 bridges R8), down **Cut** (R7/R8
-> junction→GND). Note the mechanical mapping differs from the schematic's "On-Off-On centre=Flat"
-> plan — here the CENTRE position is Boost — but the three electrical networks are unchanged; just
-> route `switch_up`→open, `switch_Mid`→C8-bridge, `switch_down`→ground.
+> **ATTACK** = up **Flat** (pole floating), mid **Boost** (C8 bridges R8), down **Cut** (C8 shunts
+> P→GND). The mechanical CENTRE is Boost (differs from the schematic's "On-Off-On centre=Flat" plan),
+> but the three electrical networks are unchanged; route `switch_up`→pole open, `switch_Mid`→pole to
+> M (C8 bridges R8), `switch_down`→pole to GND (C8 shunts P). **The forward path
+> G→R7→M→R8→P→C7→IC2_A is intact in ALL three positions — no position mutes.**
 >
-> **ATTACK 3-way [ENG].** Schematic ships a 2-position SPDT On-On here (BOM: "Ultra Hi — SPDT On-On",
-> confirmed). **Node graph now verified (2026-07-19):** switch common (pin1) = the **R7/R8 junction**.
-> Boost (pin2) connects C8(220pF) from that junction to the *post-R8* node → **C8 bridges R8** (HF
-> bypasses the series R → treble boost into the clipper). Cut (pin3) connects the R7/R8 junction
-> **directly to GND** (dumps the treble-ladder HF to ground) — note the mechanism is *grounding the
-> node*, not "shunting C8 to GND"; C8 is left dangling in the Cut position. The Ultra needs a 3rd
-> **Flat** setting → change to **On-Off-On (SP3T)**, centre = common floating (neither bridge nor
-> shunt → flat). This is the minimal, natural extension of the now-verified 2-position network.
+> > ⚠ **ATTACK-SWITCH CORRECTION (2026-07-20 — supersedes the earlier "2026-07-19 verified" node
+> > graph).** The prior reading had the switch **common = node M (R7/R8 junction)** with throws to
+> > {C8, GND}, and described Cut as **"M→GND directly."** **That is WRONG** — it makes the Cut
+> > position **short the only forward-path node to ground → full mute** (P is isolated from the input;
+> > a nodal sim gives V(out)=0 at every frequency). A shipping "Ultra Hi — SPDT On-On" *tone* switch
+> > cannot have a silent position. Re-read from the primary p.4 AND the backup at pixel zoom
+> > (2026-07-20), and independently re-verified by the schematic-checker agent + the BOM function:
+> > **the switch POLE is C8's bottom-plate node** (C8's top plate is permanently on node P, post-R8);
+> > the two throws are **M** and **GND**. So:
+> > - **Boost** (pole→M): C8(220pF) spans M↔P → **bridges R8** → HF bypasses the 470k → treble boost.
+> >   (Only this description survived the old error, because it's the same under either pole reading —
+> >   which is why the bug went unnoticed.)
+> > - **Cut** (pole→GND): C8 becomes a **220pF shunt from P to GND** → HF rolloff at the IC2_A input
+> >   (~3 kHz corner) → treble cut. C8 is **actively shunting**, NOT "dangling," and **M is NOT
+> >   grounded** — the forward path stays intact.
+> > - **Flat** [ENG] (pole open, On-Off-On centre): C8's bottom plate floats → C8 inert → flat.
+> >
+> > The [ENG] change is still just adding the centre-off position; the two real (Boost/Cut) throws are
+> > the stock board's. Oracle in `analysis/eq_reference.py` (`treble_attack_tf`) implements this
+> > corrected topology (Boost>Flat>Cut treble, all finite). Lesson: this is the classic "which
+> > terminal is the pole" trap — the mute was the tell.
 
 ### DRIVE gain stage (IC2_A)
 | Ref | Value | Function |
@@ -397,18 +411,22 @@ Q2 drain → +9V.
 ```
 Not a WDF-native element — implement Q1/Q2 as a coupled JFET pair solve, or fit to captures (`dsp.md`).
 
-### Treble network + ATTACK (SW1) — **Linear, switched** — ✅ **NODES VERIFIED (2026-07-19)**; pos3 [ENG]
-Node graph confirmed at pixel zoom (primary p.4):
+### Treble network + ATTACK (SW1) — **Linear, switched** — ✅ **NODES RE-VERIFIED (2026-07-20, corrected)**; pos3 [ENG]
+Node graph confirmed at pixel zoom (primary p.4 + backup), pole assignment independently re-verified
+2026-07-20 (see "ATTACK-SWITCH CORRECTION" note above — the earlier 2026-07-19 graph had the switch
+pole wrong and implied a mute):
 ```
-Top rail : OUT/G ─R7(200k)─ M ─R8(470k)─ P ─(→ R11(470k)→GND, C7(100n)→IC2_A)
+Top rail : OUT/G ─R7(200k)─ M ─R8(470k)─ P ─(→ R11(470k)→GND, C7(100n)→IC2_A)   [forward path, ALWAYS intact]
 Lower    : G(pre-R7) ─C5(22n)─ L1 ─C9(22n)─ L2 ─C6(22n)─ L3
            L1 ─R12(6k8)─ GND ;  L2 ─R14(22k)─ GND
-Ties     : L3 = M (C6-right tied up to the R7/R8 junction) ;  ULTRA-HI common (pin1) = M
-Switch   : Boost(pin2)=C8(220pF) bridges R8 (M↔P) ; Cut(pin3)= M→GND directly ; Flat[ENG]=common open
+Ties     : L3 = M (C6-right tied to the R7/R8 junction)
+C8       : top plate = P (fixed) ; bottom plate = SW1 POLE
+Switch   : SW1 pole = C8 bottom.  Boost→pole to M (C8 spans M↔P = bridges R8) ;
+           Cut→pole to GND (C8 = P→GND shunt) ; Flat[ENG]→pole open (C8 inert)
 ```
 So R7/R8 are the series top-rail; C5/C9/C6 a parallel series-cap ladder (G→M) with R12/R14 shunting
-the two intermediate cap nodes to GND. All values match the tables. (Previously the least-confirmed
-node graph in the path; now fully traced. Flat centre is the engineered addition, not on schematic.)
+the two intermediate cap nodes to GND. The switch only reroutes C8's bottom plate — it never breaks
+the forward path (no mute). All values match the tables. Flat centre is the engineered addition.
 
 ### IC2_A DRIVE — **Linear** (non-inv gain), DRIVE pot is a rheostat in the gain leg
 ```
@@ -523,6 +541,13 @@ BLEND crossfade) — see Footswitches below; this is an Ultra-only addition, not
 
 ## Validation notes
 
+- ⚠ **TRIPLE-CHECK PASS caveat (added 2026-07-20):** leg (2) below listed "treble/ATTACK nodes" as
+  CONFIRMED, but the ATTACK **switch pole assignment** was in fact wrong (it named node M as the
+  common, implying a Cut-position mute). Caught 2026-07-20 while building the `treble_attack_tf`
+  oracle and corrected above ("ATTACK-SWITCH CORRECTION"). The treble **ladder/R7/R8/R11/C7 nodes**
+  the triple-check verified were correct; only the switch pole/throw mapping was not. Takeaway: the
+  triple-check confirmed component *connectivity* well but missed a pole-vs-throw orientation on one
+  switch — the kind of error that only surfaces when you actually simulate the stage (the mute did).
 - **TRIPLE-CHECK PASS (2026-07-19, session 3) — schematic ↔ BOM ↔ circuit.md ↔ dsp.md all agree.**
   Four independent legs, all clean: (1) BOM pages 1–2 extracted and diffed against every table in
   this file — 100% match (R1–R54 + R-LED, C1–C39 incl. the electrolytic split, ICs, Q1/Q2, D1–D4,

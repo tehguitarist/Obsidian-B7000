@@ -13,7 +13,7 @@
 | 1 — Schematic analysis | Complete | 2026-07-19 | — |
 | 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
-| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | — | — |
+| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓ (2026-07-20) | per-stage FR + dsp-validator |
 | 4b — Functional UI pass | Not started | — | — |
 | 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
@@ -135,17 +135,21 @@ interim `kInputRef` now (a nominal bass-DI level, ~1–3 V/FS — the template's
 number) and use it consistently through Phases 4–6 so the nonlinear tests exercise realistic drive
 levels; the capture anchor replaces it at Phase 7:
 
-1. **InputBuffer** (R1/C1/R2/R3): ~1.6 Hz HP, unity. Clean tap point.
-2. **TrebleAttack** (stage 3): three switch positions validated independently against nodal
-   reference (add its TF to `eq_reference.py` first). Precomputed S-matrix per position OR live
-   ImpedanceCalculator — positions differ topologically (node grounded vs cap bridge vs open), so
-   follow dsp.md: precompute per topology, swap `setSMatrixData()`. Define the stage BOUNDARY
-   explicitly before writing the TF: the ladder's input node is the JFET drain itself (the C5 leg
-   taps G pre-R7, circuit.md node graph), so its corners depend on the J201 stage's output
-   impedance (raised by the C4 bootstrap) — decide whether the fitted J201 block's output is an
-   ideal voltage source (loading absorbed into the fitted gain/shaper) or carries an explicit
-   source Z, and use the SAME convention in `eq_reference.py` and the WDF stage, or the oracle and
-   the implementation will disagree for no real reason.
+1. ✅ **InputBuffer** (R1/C1/R2/R3): ~1.6 Hz HP, unity. Clean tap point. **DONE 2026-07-20**
+   (`src/dsp/InputBuffer.h`, `tests/InputBufferTest.cpp`; WDF C1/R2 HP, dsp-validator PASS).
+2. ✅ **TrebleAttack** (stage 3): three switch positions validated against the nodal oracle
+   (`treble_attack_tf` added to `eq_reference.py`). **DONE 2026-07-20** (`src/dsp/TrebleAttack.h`,
+   `tests/TrebleAttackTest.cpp`, dsp-validator PASS). Realised as **MNA** (nodal + trapezoidal
+   companion caps, one precomputed matrix inverse per position — equivalent to the dsp.md
+   "precompute per topology, swap the matrix" rule) rather than a WDF tree, because R7∥ladder→M is
+   a genuine loop, not a series/parallel tree. **⚠ TOPOLOGY CORRECTION during this step:** the
+   ATTACK switch **pole = C8's bottom plate** (throws M / GND), NOT common=M — the old circuit.md
+   reading grounded M and implied a Cut-position MUTE; corrected in circuit.md (see
+   "ATTACK-SWITCH CORRECTION") after re-reading both schematics + a schematic-checker pass. Stage
+   BOUNDARY (as decided, user-confirmed): the J201 drain (node G) is an **ideal voltage source**
+   for Phase 4 (source Z = 0), loading absorbed into the J201 fit at Phase 7 capture; same
+   convention in `eq_reference.py` and the stage. Positions differ topologically (cap bridge / cap
+   shunt / open); `setAttack()` zeros C8's state on swap, glitch-free crossfade deferred to Phase 5.
 3. **DriveStage** (IC2_A): ideal-op-amp decomposition; gain 4×–78× vs VR3; C-taper (fit per
    dsp.md; beware taper floor on the 100k). DC-step polarity test (non-inverting).
 4. **RecoveryBridgedT**: unity buffer + passive bridged-T; validate notch at ~717 Hz vs

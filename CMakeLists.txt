@@ -69,3 +69,13 @@ add_executable(RCLowpassTest tests/RCLowpassTest.cpp)
 target_link_libraries(RCLowpassTest PRIVATE chowdsp::chowdsp_wdf)
 target_compile_options(RCLowpassTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME RCLowpassTest COMMAND RCLowpassTest)
+
+# Phase 4 — stage-by-stage linear DSP tests
+add_executable(InputBufferTest tests/InputBufferTest.cpp)
+target_link_libraries(InputBufferTest PRIVATE chowdsp::chowdsp_wdf)
+target_compile_options(InputBufferTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME InputBufferTest COMMAND InputBufferTest)
+
+add_executable(TrebleAttackTest tests/TrebleAttackTest.cpp)
+target_compile_options(TrebleAttackTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME TrebleAttackTest COMMAND TrebleAttackTest)

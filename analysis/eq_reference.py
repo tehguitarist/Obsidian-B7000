@@ -16,6 +16,54 @@ BAXANDALL (IC5_C):
 """
 import numpy as np
 
+def treble_attack_tf(f, position, R7=200e3, R8=470e3, R11=470e3, R12=6.8e3, R14=22e3, R13=1e6,
+                     C5=22e-9, C9=22e-9, C6=22e-9, C7=100e-9, C8=220e-12):
+    """TrebleAttack stage (circuit.md "Treble network + ATTACK", node graph VERIFIED 2026-07-19).
+
+    Convention (build-plan Phase 4, user-confirmed 2026-07-20): the J201 drain (node G) is an
+    IDEAL voltage source (source Z = 0) — revisit with an explicit Rout at Phase 7 capture.
+    Stage output = V(Q) = the voltage presented to IC2_A(+); the DRIVE stage multiplies it.
+    IC2_A(+) draws no current, so V(Q) is a clean stage boundary.
+
+    Nodes (signal ground = VD = 0):
+      G(=Vin) --R7--> M --R8--> P                          (top rail; M = R7/R8 junction)
+      G --C5--> L1 --C9--> L2 --C6--> M                     (lower series-cap ladder; L3 = M)
+      L1 --R12--> GND ;  L2 --R14--> GND                    (ladder shunts)
+      P --R11--> GND ;  P --C7--> Q ;  Q --R13--> GND       (coupling into IC2_A(+))
+    ATTACK position (UI top->bottom = Flat/Boost/Cut). The switch POLE is C8's
+    bottom plate (C8 top is permanently on P); the two throws are M and GND —
+    node M is NEVER grounded, so the forward path is intact in every position
+    (schematic-verified 2026-07-20, corrects the earlier "Cut = M->GND" error):
+      'flat'  : pole open        -> C8 inactive; base network only
+      'boost' : pole -> M        -> C8 bridges R8 (M<->P): HF bypass -> treble boost
+      'cut'   : pole -> GND      -> C8 (220pF) shunts P to GND: HF rolloff -> treble cut
+    """
+    w = 2j * np.pi * f
+    out = np.zeros(len(f), dtype=complex)
+    pos = position.lower()
+    for i, s in enumerate(w):
+        yC5, yC9, yC6, yC7, yC8 = s * C5, s * C9, s * C6, s * C7, s * C8
+        Vin = 1.0
+        # Unknowns: [M, P, L1, L2, Q]. Forward path M->R8->P intact in all positions.
+        # Boost: C8 couples M<->P. Cut: C8 shunts P->GND. Flat: C8 absent.
+        gMP = yC8 if pos == 'boost' else 0.0   # C8 as R8 bridge
+        gPg = yC8 if pos == 'cut' else 0.0     # C8 as shunt at P
+        A = np.zeros((5, 5), dtype=complex); b = np.zeros(5, dtype=complex)
+        # M: (M-Vin)/R7 + (M-P)/R8 + (M-L2)*yC6 + (M-P)*gMP = 0
+        A[0, 0] = 1 / R7 + 1 / R8 + yC6 + gMP; A[0, 1] = -(1 / R8 + gMP); A[0, 3] = -yC6
+        b[0] = Vin / R7
+        # P: (P-M)/R8 + P/R11 + (P-Q)*yC7 + (P-M)*gMP + P*gPg = 0
+        A[1, 1] = 1 / R8 + 1 / R11 + yC7 + gMP + gPg; A[1, 0] = -(1 / R8 + gMP); A[1, 4] = -yC7
+        # L1: (L1-Vin)*yC5 + (L1-L2)*yC9 + L1/R12 = 0
+        A[2, 2] = yC5 + yC9 + 1 / R12; A[2, 3] = -yC9; b[2] = yC5 * Vin
+        # L2: (L2-L1)*yC9 + (L2-M)*yC6 + L2/R14 = 0
+        A[3, 3] = yC9 + yC6 + 1 / R14; A[3, 2] = -yC9; A[3, 0] = -yC6
+        # Q: (Q-P)*yC7 + Q/R13 = 0
+        A[4, 4] = yC7 + 1 / R13; A[4, 1] = -yC7
+        x = np.linalg.solve(A, b)
+        out[i] = x[4]
+    return out
+
 def mid_stage_tf(f, a, C33, Rp=100e3, R38=2.2e3, R39=2.2e3, R40=220e3, R41=220e3, C32=22e-9):
     """Return complex gain Vout/Vin of the mid peaking stage at frequencies f, pot position a."""
     w = 2j * np.pi * f

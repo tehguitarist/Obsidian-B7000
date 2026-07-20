@@ -12,3 +12,6 @@ JuceLibraryCode/
 __pycache__/
 .venv/
 analysis/pedal_results*/
+
+# Generated schematic rasters (regenerate via schematics/crop.py; sources are PDFs)
+schematics/*.png
