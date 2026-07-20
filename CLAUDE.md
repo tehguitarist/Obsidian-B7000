@@ -103,7 +103,7 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 1 (Schematic analysis) — COMPLETE, all open items closed (2026-07-19 session 3).**
+> **CURRENT: Step 2 (CMake scaffold) — COMPLETE (2026-07-20). NEXT: Step 3 (chowdsp_wdf smoke test).**
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
 > against primary p.4, backup, and both BOM pages, PLUS (session 3): ✅ Baxandall + LO-MID/HI-MID
 > tone-stack per-node redraw (verified node graphs now in circuit.md — R35/R36 wiper→(−) roles,
@@ -122,12 +122,8 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: Step 2 (CMake scaffold) — follow `docs/build-plan.md`** (the full step-by-step plan for the
-> rest of the build, written 2026-07-19). First actions: add `libs/` submodules (JUCE, chowdsp_wdf,
-> xsimd — not yet present), instantiate CMakeLists.txt from the template, minimal
-> PluginProcessor/Editor loading in a DAW. Remaining capture-blocked items (bridged-T shape, 4049
-> VTC/J201 fits, mid boost ranges, kInputRef) are scheduled inside the plan — they do NOT block
-> Steps 2–5.
+> **NEXT: Step 3 (chowdsp_wdf smoke test)** — RC lowpass console exe, verify −3 dB within 1% at
+> 44.1/48/96k. After that: Step 4 stage-by-stage linear DSP.
 
 ## Project-specific carry-forwards
 
