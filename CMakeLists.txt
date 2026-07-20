@@ -83,3 +83,7 @@ add_test(NAME TrebleAttackTest COMMAND TrebleAttackTest)
 add_executable(DriveStageTest tests/DriveStageTest.cpp)
 target_compile_options(DriveStageTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME DriveStageTest COMMAND DriveStageTest)
+
+add_executable(RecoveryBridgedTTest tests/RecoveryBridgedTTest.cpp)
+target_compile_options(RecoveryBridgedTTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME RecoveryBridgedTTest COMMAND RecoveryBridgedTTest)
