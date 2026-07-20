@@ -292,16 +292,50 @@ void PedalLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& but
 
         if (active)
         {
-            // Subtle glow
             g.setColour(juce::Colour(cOSBtnActiveBdr).withAlpha(0.3f));
             g.drawRoundedRectangle(b.expanded(1.5f), corner + 1.5f, 1.5f);
         }
+    }
+    else if (button.getComponentID() == "os-selector")
+    {
+        const float corner = 4.0f;
+        const bool down = button.isDown();
+
+        g.setColour(down ? juce::Colour(cOSBtnActiveBdr).withAlpha(0.4f)
+                         : juce::Colour(cOSBtnActiveBg));
+        g.fillRoundedRectangle(b, corner);
+        g.setColour(juce::Colour(cOSBtnActiveBdr));
+        g.drawRoundedRectangle(b.reduced(0.5f), corner, 1.0f);
+
+        const float arrowW  = 5.0f;
+        const float arrowH  = 3.0f;
+        const float arrowCX = b.getRight() - 8.0f;
+        const float arrowCY = b.getCentreY();
+        juce::Path arrow;
+        arrow.startNewSubPath(arrowCX - arrowW * 0.5f, arrowCY - arrowH * 0.5f);
+        arrow.lineTo(arrowCX,                           arrowCY + arrowH * 0.5f);
+        arrow.lineTo(arrowCX + arrowW * 0.5f,           arrowCY - arrowH * 0.5f);
+        g.setColour(juce::Colour(cOSLabel));
+        g.strokePath(arrow, juce::PathStrokeType(1.2f, juce::PathStrokeType::curved,
+                                                  juce::PathStrokeType::rounded));
     }
 }
 
 void PedalLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,
                                        bool, bool down)
 {
+    if (button.getComponentID() == "os-selector")
+    {
+        const juce::Colour col = juce::Colour(cOSBtnActive);
+        g.setColour(col);
+        g.setFont(juce::Font(juce::FontOptions(juce::jmax(7.0f, (float)button.getHeight() * 0.38f),
+                                                juce::Font::bold)));
+        auto area = button.getLocalBounds();
+        if (down) area = area.translated(0, 1);
+        g.drawText(button.getButtonText(), area, juce::Justification::centred, false);
+        return;
+    }
+
     const bool active = button.getToggleState();
     const juce::Colour col = active ? juce::Colour(cOSBtnActive) : juce::Colour(cOSLabel);
     g.setColour(col);

@@ -118,6 +118,23 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    // Update level metering
+    float peakIn = 0.0f, peakOut = 0.0f;
+    for (int ch = 0; ch < totalNumInputChannels; ++ch)
+    {
+        auto* channelData = buffer.getReadPointer(ch);
+        for (int s = 0; s < buffer.getNumSamples(); ++s)
+            peakIn = juce::jmax(peakIn, std::abs(channelData[s]));
+    }
+    for (int ch = 0; ch < totalNumOutputChannels; ++ch)
+    {
+        auto* channelData = buffer.getReadPointer(ch);
+        for (int s = 0; s < buffer.getNumSamples(); ++s)
+            peakOut = juce::jmax(peakOut, std::abs(channelData[s]));
+    }
+    inputLevel.store(peakIn);
+    outputLevel.store(peakOut);
+
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 }

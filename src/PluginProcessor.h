@@ -46,6 +46,9 @@ public:
     juce::AudioParameterBool* bypassParam;
     juce::SmoothedValue<float> bypassMix;
 
+    std::atomic<float> inputLevel { 0.0f };
+    std::atomic<float> outputLevel { 0.0f };
+
     static constexpr float kInputRef = 0.87f;
     static constexpr float kOutputMakeup = 0.9f;
 

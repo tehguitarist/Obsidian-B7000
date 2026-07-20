@@ -22,8 +22,8 @@ public:
     static constexpr juce::uint32 cTrimLabel       = 0xFF5588AAu;
     static constexpr juce::uint32 cTrimArc         = 0xFF2A5898u;
     static constexpr juce::uint32 cTrimArcTrack    = 0xFF101E30u;
-    static constexpr juce::uint32 cSWLabelActive   = 0xFF90C0E0u;
-    static constexpr juce::uint32 cSWLabelInactive = 0xFF3A5A78u;
+    static constexpr juce::uint32 cSWLabelActive   = 0xFFFFFFFFu;
+    static constexpr juce::uint32 cSWLabelInactive = 0x73FFFFFFu;
     static constexpr juce::uint32 cBypassLabel     = 0xFF2E4A60u;
     static constexpr juce::uint32 cMeterLow        = 0xFF44CC44u;
     static constexpr juce::uint32 cMeterMid        = 0xFFCCBA00u;
