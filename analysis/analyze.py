@@ -23,15 +23,6 @@ T = G.segment_times()   # {segment_name: (t0, t1)} — single source of truth (n
 def load(path):
     sr, x = wavfile.read(path)
     if x.dtype.kind in "iu":
-        # Integer PCM can't represent samples past its own full-scale: a plugin render that
-        # legitimately exceeds 0 dBFS at high drive+volume (see calibration-and-gain-staging.md
-        # §2 — this is faithful, not a bug) gets hard-clipped/wrapped by an integer WAV writer
-        # with no error and no warning in the file itself. That silently corrupts exactly the
-        # high-drive captures where THD/harmonic-balance accuracy matters most. OfflineRender and
-        # any capture used for a level- or clipping-sensitive comparison should be 32-bit float.
-        print(f"WARNING: {path} is integer PCM ({x.dtype}) — output >0 dBFS would have been "
-              f"clipped by this format. Use 32-bit float WAV for renders/captures "
-              f"(see validation-and-capture.md).")
         x = x.astype(np.float64) / np.iinfo(x.dtype).max
     else:
         x = x.astype(np.float64)
@@ -75,21 +66,6 @@ def rms_db(x):
     return 20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12)
 
 
-def normalize_gain(test, ref):
-    """Optimal-gain-match `test` onto `ref` (least-squares scalar) and return (test_scaled,
-    gain_db). Run this before comparing SHAPE (transfer()/banded_thd()/harmonic placement) so a
-    pure level offset between plugin render and capture doesn't masquerade as a tonal or
-    distortion-amount difference. Always inspect gain_db too, though — a per-capture wobble is
-    ordinary capture-gain noise, but the SAME offset showing up consistently across many captures
-    is a real input/output calibration gap (see validation-and-capture.md §4 and
-    calibration-and-gain-staging.md §2) and should be traced back to the source, not silently
-    absorbed capture-by-capture. Same gain-match math as null_depth() uses internally, exposed
-    separately here so shape comparisons can normalize without going through the null path."""
-    n = min(len(test), len(ref))
-    g = float(np.dot(ref[:n], test[:n]) / (np.dot(test[:n], test[:n]) + 1e-30))
-    return test * g, 20 * np.log10(abs(g) + 1e-20)
-
-
 def transfer(out, inp):
     f, Pxy = sps.csd(inp, out, FS, nperseg=8192)
     f, Pxx = sps.welch(inp, FS, nperseg=8192)
@@ -107,36 +83,38 @@ def fractional_octave_freqs(f_lo=20.0, f_hi=20000.0, frac=3):
     return [f_lo * 2.0 ** (i / frac) for i in range(n + 1)]
 
 
-# Standard 31-band 1/3-octave graphic-EQ center frequencies, 20 Hz - 20 kHz (ISO 266 preferred
-# numbers) — the fixed grid for BOTH the full-range frequency response and the THD-by-band
-# analysis below, so the two line up at identical frequencies rather than being independently
-# binned. THD only reports the subset of this grid inside its own 100 Hz-12 kHz range (see
-# banded_thd()) — it does not define its own band edges.
-THIRD_OCTAVE_31_CENTERS = (
-    20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800,
-    1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000,
+# Named regions where this pedal has narrow, must-resolve FR features; densified past the 1/6-oct
+# base so the notch depth / peak Q read accurately (values from circuit.md / reference-fr-targets).
+# (f_lo, f_hi, frac): local fractional-octave resolution inside that band.
+INTEREST_BANDS = (
+    (300.0, 520.0, 24),     # ~430 Hz bridged-T mid-cut (V1e/V1l) + V2 MID low throw (~430 Hz)
+    (600.0, 1000.0, 24),    # the DEEP ~800 Hz twin-T character notch (all revisions) — the sharpest feature
+    (2500.0, 5000.0, 12),   # TREBLE peak (V1l/V2 ~3-4 kHz) + PRESENCE migrating peak (up to ~4.8 kHz)
+    (7000.0, 13000.0, 12),  # speaker-sim HF rolloff / low-OS top-octave droop region
 )
 
 
-def third_octave_bands(centers=THIRD_OCTAVE_31_CENTERS):
-    """(lo, center, hi) triples for `centers` — edges are the geometric mean with each neighbour
-    (a symmetric 2**(1/6) half-band split at the first/last centre, which have no neighbour on
-    one side)."""
-    centers = list(centers)
-    edge = 2.0 ** (1.0 / 6.0)   # half a 1/3-octave, for the outer edges of the end bands
-    bands = []
-    for i, fc in enumerate(centers):
-        lo = (centers[i - 1] * fc) ** 0.5 if i > 0 else fc / edge
-        hi = (fc * centers[i + 1]) ** 0.5 if i < len(centers) - 1 else fc * edge
-        bands.append((lo, fc, hi))
-    return bands
+def analysis_freqs(f_lo=20.0, f_hi=20000.0, base_frac=6, interest=INTEREST_BANDS):
+    """The reporting frequency grid for FR analyses: a 1/6-octave base (~60 pts, finer than a 24-band
+    EQ) with extra points injected inside INTEREST_BANDS so the ~800 Hz notch, ~430 Hz mid features,
+    treble peak, and HF rolloff are resolved. Returns a sorted, de-duplicated list. The sweep itself
+    is continuous (transfer() has ~6 Hz bins) — this only sets where the tables/plots sample it."""
+    freqs = set(fractional_octave_freqs(f_lo, f_hi, base_frac))
+    for lo, hi, frac in interest:
+        freqs.update(x for x in fractional_octave_freqs(lo, hi, frac) if lo - 1e-6 <= x <= hi + 1e-6)
+    return sorted(freqs)
 
 
-def band_response(f, mag, centers=THIRD_OCTAVE_31_CENTERS):
-    """Sample a continuous FR curve (from transfer()) at the standard 31-band centers. Returns
-    {center_hz: gain_dB} — the per-band FR readout that pairs with banded_thd()'s per-band THD on
-    the same grid, so a report can show FR and THD side-by-side at identical frequencies."""
-    return {fc: float(gain_at(f, mag, fc)) for fc in centers}
+def sweep_segments():
+    """Ordered {input_dBFS: segment_name} for every full-range sweep (clean + driven). Iterate this
+    to read FR (transfer) and THD (harmonic_thd_curve) as a function of INPUT LEVEL — the
+    hot-pickup-vs-rolled-off-volume characterisation. -30 ('sweep_clean') is the primary clean read."""
+    segs = {G.CLEAN_FR_LEVELS_DB[0]: "sweep_clean"}
+    for db in G.CLEAN_FR_LEVELS_DB[1:]:
+        segs[db] = f"sweep_clean_{db}"
+    for db in G.DRIVEN_LEVELS_DB:
+        segs[db] = f"sweep_drv_{db}"
+    return dict(sorted(segs.items()))
 
 
 # --- THD: discrete tone + continuous Farina swept-sine ----------------------------------------
@@ -149,11 +127,38 @@ def thd(x, f0):
     return 100 * harm / (fund + 1e-20), fund
 
 
-def harmonic_thd_curve(capture_sweep, ref_sweep, max_order=7):
+ORDER_LIMIT_MARGIN = 0.95   # keep order N only while N*f <= SWEEP_F1*this (edge spike sits AT f1/N)
+
+
+def harmonic_thd_curve(capture_sweep, ref_sweep, max_order=7, order_limit=True):
     """Continuous THD(f) via Farina exponential-sweep harmonic separation. Deconvolve the captured
     driven sweep against the clean reference sweep; the N-th harmonic IR is time-advanced by
     dt_N = T*ln(N)/ln(f1/f0), so gate each, FFT, and map to the fundamental axis. Returns
-    (freqs, thd_pct, {order: |H|}). VALIDATE against discrete-tone thd() before trusting it."""
+    (freqs, thd_pct, {order: |H|}).
+
+    ORDER LIMITING (`order_limit=True`, the default — added 2026-07-17 after this curve was finally
+    validated against thd(), as this docstring had demanded all along; it FAILED).
+
+    The deconvolution divides by the reference sweep's spectrum, which carries NO energy above
+    SWEEP_F1 (20 kHz). So order N is only measurable while N*f <= SWEEP_F1: past that, the
+    regularised division (|X|^2 + eps) blows up and order N produces a large SPURIOUS EDGE SPIKE
+    at exactly f = SWEEP_F1/N, then collapses to ~0. Measured on V1E D0.50 (analysis/
+    farina_validate.py --probe), H7 re fundamental:
+        2800 Hz -53.0 dB | 2857 Hz -35.0 | 2874 Hz -16.8 | 2900 Hz -10.7 | 3000 Hz -76.9
+    i.e. a 36 dB spike centred on 20000/7 = 2857 Hz, which drove THD 4.7% -> 29.7% and was
+    reported as a real "plugin THD 14.0% vs pedal 2.4% @2874 Hz" finding on nearly every V1E
+    capture. The same artefact sits at 20000/6=3333, 20000/5=4000 (this one broke the 4 kHz
+    discrete-tone bracket test), 20000/4=5000, 20000/3=6667, 20000/2=10000.
+
+    The fix masks order N above SWEEP_F1*ORDER_LIMIT_MARGIN/N. Consequences worth knowing:
+      * Nothing below 19000/7 = 2714 Hz changes AT ALL (every order is still in band there), so
+        every THD fit ever made on this project — all at the 100/200 Hz anchors — is untouched.
+      * Coverage EXTENDS above the old 3 kHz ceiling instead of stopping: at 6 kHz H2+H3 remain
+        valid; at 9.5 kHz H2 alone. Above ~9.5 kHz this sweep can measure NO harmonic, and above
+        12 kHz THD does not exist at 48 kHz at all (H2 would land past Nyquist). "THD at 18 kHz"
+        is not a measurable quantity here — it is not a tooling gap.
+      * `Hn` is returned masked too, so per-order magnitudes agree with the THD built from them.
+    Pass order_limit=False only to reproduce a pre-2026-07-17 number."""
     n = min(len(capture_sweep), len(ref_sweep))
     y = capture_sweep[:n].astype(np.float64); x = ref_sweep[:n].astype(np.float64)
     nfft = 1 << int(np.ceil(np.log2(2 * n)))
@@ -181,41 +186,20 @@ def harmonic_thd_curve(capture_sweep, ref_sweep, max_order=7):
     for N in range(2, max_order + 1):
         frN, mag = gated_spectrum(N)
         Hn[N] = np.interp(fr, frN / N, mag, left=0.0, right=0.0)   # remap harmonic->fundamental axis
+        if order_limit:
+            # Order N is unmeasurable once its harmonic leaves the reference sweep's band.
+            Hn[N] = np.where(N * fr <= G.SWEEP_F1 * ORDER_LIMIT_MARGIN, Hn[N], 0.0)
     with np.errstate(divide="ignore", invalid="ignore"):
         harm = np.sqrt(sum(Hn[N] ** 2 for N in range(2, max_order + 1)))
         thd_pct = 100.0 * harm / (H1 + 1e-20)
     return fr, thd_pct, Hn
 
 
-def banded_thd(fr, thd_pct, Hn, f_lo=100.0, f_hi=12000.0, centers=THIRD_OCTAVE_31_CENTERS, max_order=7):
-    """Bucket harmonic_thd_curve()'s continuous THD(f) + per-harmonic magnitudes onto the standard
-    31-band grid (`third_octave_bands()`/`band_response()` above), reporting only the bands whose
-    CENTER falls in [f_lo, f_hi] (default 100 Hz-12 kHz) — a THD-focused SUBSET of the full-range
-    FR grid, not a separately-binned range, so THD bands line up exactly with the FR bands at the
-    same frequencies. A single aggregate THD% (or the raw continuous curve) can hide two very
-    different-sounding circuits that happen to land on the same number — this reports, per band,
-    the THD% AND each harmonic order's amplitude relative to the fundamental (dB), so you can see
-    WHERE distortion concentrates and WHICH orders dominate at each frequency, not just how much
-    there is in aggregate. Returns a list of dicts:
-      {center, f_lo, f_hi, thd_pct, harmonics: {order: dB_below_fundamental}}
-    A band with no swept-sweep energy in range gets thd_pct=None and an empty harmonics dict
-    rather than a misleading zero."""
-    out = []
-    for lo, fc, hi in third_octave_bands(centers):
-        if fc < f_lo or fc > f_hi:
-            continue
-        mask = (fr >= lo) & (fr < hi)
-        if not np.any(mask):
-            out.append({"center": fc, "f_lo": lo, "f_hi": hi, "thd_pct": None, "harmonics": {}})
-            continue
-        band = {"center": fc, "f_lo": lo, "f_hi": hi,
-                 "thd_pct": float(np.nanmean(thd_pct[mask])), "harmonics": {}}
-        h1 = np.nanmean(Hn[1][mask]) + 1e-20
-        for N in range(2, max_order + 1):
-            hn = np.nanmean(Hn[N][mask])
-            band["harmonics"][N] = float(20 * np.log10(hn / h1 + 1e-20))
-        out.append(band)
-    return out
+def thd_max_measurable_hz(max_order=2):
+    """Highest fundamental at which THD is measurable from this sweep, using orders up to
+    `max_order`. THD needs at least H2, so the ceiling is SWEEP_F1*margin/2 ~= 9.5 kHz — and no
+    test signal can beat FS/4 = 12 kHz at 48 kHz, because H2 lands past Nyquist above that."""
+    return min(G.SWEEP_F1 * ORDER_LIMIT_MARGIN / max_order, FS / (2.0 * max_order))
 
 
 # --- Sub-sample-aligned null test -------------------------------------------------------------
@@ -310,64 +294,4 @@ def parse_filename(name, knobs=("B", "T", "V", "G")):
     out = {k: knob_to_x(g(k)) for k in knobs}
     out["mode"] = mode
     out["sw"] = ["up", "mid", "down"][mode]
-    return out
-
-
-# --- B7K Ultra capture-filename parser --------------------------------------------------------
-# The Ultra has 8 pots + 4 three-way switches + a DIST footswitch — too many for the single-letter
-# scheme above. Captures use DEVIATION-FROM-BASELINE naming (see docs/nonlinear-component-modeling.md
-# §4): every take is the fixed test signal at the REF-OD baseline EXCEPT the controls named in the
-# filename. Tokens are hyphenated name-value pairs in any order, space/underscore separated,
-# case-insensitive, e.g.:
-#   "drive-1700 grunt-hi.wav"   "bass-0700 dist-off.wav"   "himidfreq-750 himid-1700 dist-off.wav"
-#   "bypass.wav"   "ref-od.wav"   "ref-clean.wav"
-# Pot values are clock HHMM (0700=min .. 1200=noon .. 1700=max); the plain 0-10 form also works.
-POT_TOKENS = ("master", "blend", "level", "drive", "bass", "treble", "lomid", "himid")
-# pedal-silkscreen / shorthand aliases -> canonical pot name
-POT_ALIASES = {"lo": "bass", "hi": "treble", "vol": "master", "m": "master", "bl": "blend",
-               "lv": "level", "d": "drive", "b": "bass", "t": "treble", "lm": "lomid", "hm": "himid"}
-SWITCH_MAPS = {
-    "attack":    {"cut": 0, "flat": 1, "boost": 2},
-    "grunt":     {"lo": 0, "mid": 1, "hi": 2},
-    "lomidfreq": {"250": 0, "500": 1, "1k": 2, "1000": 2},
-    "himidfreq": {"750": 0, "1500": 1, "1k5": 1, "3k": 2, "3000": 2},
-}
-# REF-OD baseline: pots as 0..1 (blend=1.0 == full OD / fully CW), switches as index (mid=1),
-# DIST engaged, not bypassed. REF-CLEAN is this with dist=False.
-BASELINE = {
-    "master": 0.5, "blend": 1.0, "level": 0.5, "drive": 0.5,
-    "bass": 0.5, "treble": 0.5, "lomid": 0.5, "himid": 0.5,
-    "attack": 1, "grunt": 1, "lomidfreq": 1, "himidfreq": 1,
-    "dist": True, "bypass": False,
-}
-SWITCH_LABELS = {k: {v: n for n, v in m.items() if isinstance(v, int)} for k, m in SWITCH_MAPS.items()}
-
-
-def parse_capture(name):
-    """B7K Ultra capture filename -> full control dict, starting from the REF-OD BASELINE and applying
-    the deviations named in `name`. Returns all 8 pots (0..1), the 4 switch indices (+ a `<sw>_label`
-    for each), and the `dist`/`bypass` booleans; controls not named stay at baseline. Deviation naming
-    is documented in docs/nonlinear-component-modeling.md §4."""
-    low = re.sub(r"\.wav$", "", name, flags=re.IGNORECASE).lower()
-    out = dict(BASELINE)
-    if re.search(r"\bbypass\b", low):
-        out["bypass"] = True
-    if re.search(r"\bdist[-_\s]?off\b", low) or re.search(r"\bref[-_\s]?clean\b", low):
-        out["dist"] = False
-    elif re.search(r"\bdist[-_\s]?on\b", low):
-        out["dist"] = True
-    for sw, m in SWITCH_MAPS.items():                     # three-way switches
-        tok = re.search(rf"\b{sw}-([a-z0-9]+)", low)
-        if tok and tok.group(1) in m:
-            out[sw] = m[tok.group(1)]
-    for tok in POT_TOKENS:                                # pots by canonical name
-        mm = re.search(rf"\b{tok}-(\d+)\b", low)
-        if mm:
-            out[tok] = knob_to_x(mm.group(1))
-    for alias, canon in POT_ALIASES.items():             # pots by alias / silkscreen label
-        mm = re.search(rf"\b{alias}-(\d+)\b", low)
-        if mm:
-            out[canon] = knob_to_x(mm.group(1))
-    for sw in SWITCH_MAPS:
-        out[f"{sw}_label"] = SWITCH_LABELS[sw][out[sw]]
     return out

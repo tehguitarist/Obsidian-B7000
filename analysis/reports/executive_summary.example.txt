@@ -1,0 +1,114 @@
+COMPREHENSIVE EXECUTIVE SUMMARY
+==============================================================================
+source: analysis/reports/comprehensive_data.json  generated 2026-07-19T20:23:17.668917+00:00  OS=8x
+captures: 11  bands: 30
+generator: analysis/report_audit.py --write   (do NOT hand-edit; do NOT regenerate inline)
+
+==============================================================================
+1. FR vs TARGET  (shape metric, median offset removed — L-005)
+   target: |delta| <= 1.5 dB in 60 Hz-12 kHz, <= 3.0 dB outside, over 20 Hz-18 kHz
+==============================================================================
+capture                      rmsFULL rmsTRUST  n>1.5   n>3            worst band
+V1E D0.50 BL1.00                2.76     1.89      5     2        16255Hz -6.8dB
+V1E D1.00 BL1.00                3.16     1.83      5     3           40Hz +5.5dB
+V1E D0.60 BL1.00                2.72     1.65      5     2        16255Hz -5.5dB
+V1L D0.65 BL1.00                8.70     8.65     21    17       16255Hz -28.2dB
+V1L D0.45 BL0.65                5.14     3.55     16     9        12902Hz +8.1dB
+V1L D0.40 BL0.30                2.23     2.05      8     2         5120Hz -5.8dB
+V2 D0.90 BL1.00                 5.19     4.84     17    10       16255Hz -21.0dB
+V2 D0.50 BL1.00                 2.83     2.73     14     2        16255Hz -9.6dB
+V2 D0.50 BL0.90                 3.62     3.15     17     5        12902Hz +9.0dB
+V2 D0.50 BL0.95                 3.30     2.81     14     7        10240Hz +7.1dB
+V2 D0.25 BL1.00                 3.60     3.58     16    11       16255Hz -11.7dB
+
+rev    med rmsFULL med rmsTRUST  med n>tol  (of 54 trusted bands)
+V1E           2.76         1.83          5
+V1L           5.14         3.55         16
+V2            3.60         3.15         16
+
+FR shape error by band, median |delta| across all 11 captures:
+     band   med|d|   max|d|   trusted? 
+       20     7.09    11.64  <- N-004 untrusted
+       25     6.80    13.69  <- N-004 untrusted
+       32     5.70    11.39  <- N-004 untrusted
+       40     4.73     6.87
+       50     3.78     5.34
+       64     2.52     3.93
+      254     2.00     4.53
+      320     1.53     5.03
+      403     1.58     5.95
+      508     0.97     6.41
+      806     2.37     9.94
+     1016     0.97     8.80
+     6451     1.90     3.56
+     8128     1.76     4.37
+    10240     1.21    15.25
+    12902     3.31    22.17
+    16255     6.78    28.16
+
+==============================================================================
+2. THD COVERAGE — can we even measure 'THD 20 Hz-18 kHz'?
+==============================================================================
+  farina  : 27 bands (20 Hz - 8128 Hz)
+  NO DATA :  3 bands -> 10240, 12902, 16255
+
+
+==============================================================================
+3. THD vs LEVEL at 101 Hz — is the error clip-ONSET (level-dep) or static (level-flat)?
+==============================================================================
+capture                                      -18                 -12                  -6
+                                  pedal / plugin      pedal / plugin      pedal / plugin
+V1E D0.50 BL1.00                     0.4 /   1.6         4.5 /   6.4         7.0 /   8.2
+V1E D1.00 BL1.00                    10.4 /   9.4         9.8 /   9.4         8.4 /   9.1
+V1E D0.60 BL1.00                     2.2 /   3.3         6.7 /   7.1         7.2 /   8.4
+V1L D0.65 BL1.00                     8.0 /  10.3        12.1 /  13.3        12.9 /  16.1
+V1L D0.45 BL0.65                     1.9 /   5.3         5.6 /   6.7         7.3 /   8.3
+V1L D0.40 BL0.30                     3.4 /   4.7         4.7 /   5.9         4.4 /   6.8
+V2 D0.90 BL1.00                     10.7 /  16.2        11.5 /  21.0        11.9 /  23.0
+V2 D0.50 BL1.00                      0.4 /   0.4         2.8 /   4.7         7.6 /  14.4
+V2 D0.50 BL0.90                      0.3 /   0.4         3.1 /   4.9         9.0 /  15.0
+V2 D0.50 BL0.95                      0.3 /   0.5         3.7 /   5.9        11.7 /  18.0
+V2 D0.25 BL1.00                      0.2 /   0.6         0.3 /   0.5         0.7 /   3.6
+
+  Read: pedal THD should RISE with level (clip onset). A plugin column that barely
+  moves is a static/level-independent nonlinearity in the wrong place.
+
+==============================================================================
+4. HARMONIC MAGNITUDES (not just THD) — delta = plugin - pedal, dB, sweep_drv_-18
+==============================================================================
+  anchors marked (*) are NOTCH-CONFOUNDED (twin-T ~800 Hz all revs; V1 bridged-T ~430 Hz):
+  they attenuate the FUNDAMENTAL that every ratio divides by, so they are shown but
+  EXCLUDED from the medians below (Gap G). 100/200 Hz are the trustworthy anchors.
+
+capture                  order     100     200    400*   med|d|
+V1E D0.50 BL1.00            H2    +9.9   +14.4   +13.9     12.2
+V1E D0.50 BL1.00            H3   +10.6   +15.6   +43.1     13.1
+V1E D1.00 BL1.00            H2   -14.0   -19.5   -21.0     16.8
+V1E D1.00 BL1.00            H3    -0.5    -0.3    +0.9      0.4
+V1E D0.60 BL1.00            H2    +4.5    +5.9   +17.3      5.2
+V1E D0.60 BL1.00            H3    +4.1    +2.8   +41.3      3.4
+V1L D0.65 BL1.00            H2   -12.8   -12.3    +6.2     12.6
+V1L D0.65 BL1.00            H3    +3.1    +1.9    +6.8      2.5
+V1L D0.45 BL0.65            H2   +16.9   +25.4    +6.7     21.1
+V1L D0.45 BL0.65            H3    +8.3    +0.1    -1.7      4.2
+V1L D0.40 BL0.30            H2   +20.5   +26.2    +8.7     23.3
+V1L D0.40 BL0.30            H3    +2.0    -5.0    -5.2      3.5
+V2 D0.90 BL1.00             H2    +7.2   +15.0    -2.4     11.1
+V2 D0.90 BL1.00             H3    +4.2    -1.3    -9.0      2.7
+V2 D0.50 BL1.00             H2    -1.5    -3.6    +2.8      2.5
+V2 D0.50 BL1.00             H3    +2.0    +1.2    -1.6      1.6
+V2 D0.50 BL0.90             H2    -3.4    +6.2   +18.1      4.8
+V2 D0.50 BL0.90             H3    +8.1    +6.8    -2.0      7.5
+V2 D0.50 BL0.95             H2    -0.1    -1.6    +0.2      0.8
+V2 D0.50 BL0.95             H3    +6.7    +9.7    -1.9      8.2
+V2 D0.25 BL1.00             H2    +9.6    +5.7    +1.9      7.6
+V2 D0.25 BL1.00             H3    +5.2   +19.1   -11.5     12.2
+
+rev   median |H-delta| over H2..H7, CLEAN anchors only  
+V1E        8.9 dB
+V1L       11.6 dB
+V2         6.5 dB
+
+  A correct THD with wrong per-harmonic magnitudes = right total energy, wrong timbre —
+  THD is the rss of these, so it can be right while every term in it is wrong. This is
+  the 'harmonic volume, not just placement' check, and no report produced it before.

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NoAmp Low Rider DI — Comprehensive A/B Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #c9cdd6;
+    --muted: #6b7280;
+    --plugin: #3b82f6;
+    --pedal: #ef4444;
+    --positive: #f59e0b;
+    --negative: #6366f1;
+    --accent: #818cf8;
+    --good: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.5; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+  header .status { font-size: 12px; color: var(--muted); }
+  header .status.loaded { color: var(--good); }
+  header input[type=file] { color: var(--text); font-size: 13px; }
+  header input[type=file]::file-selector-button { background: var(--border); color: var(--text); border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+  nav { display: flex; gap: 2px; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 24px; }
+  nav button { background: none; border: none; color: var(--muted); padding: 10px 18px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; }
+  nav button:hover { color: var(--text); }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  .card h3 { font-size: 14px; margin-bottom: 12px; color: #e2e8f0; }
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .controls label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .controls select, .controls input { background: var(--border); color: var(--text); border: 1px solid #3a3d4a; padding: 5px 10px; border-radius: 4px; font-size: 13px; }
+  .controls .radio-group { display: flex; gap: 4px; }
+  .controls .radio-group button { background: var(--border); border: 1px solid #3a3d4a; color: var(--muted); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .controls .radio-group button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  canvas { max-width: 100%; }
+  .heatmap { display: grid; gap: 2px; overflow-x: auto; }
+  .hm-cell { padding: 4px 6px; text-align: center; font-size: 10px; font-family: 'SF Mono', 'Fira Code', monospace; border-radius: 2px; min-width: 70px; }
+  .hm-header { font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; padding: 4px; white-space: nowrap; }
+  .hm-row-label { font-size: 11px; color: var(--muted); text-align: right; padding: 4px 8px 4px 0; white-space: nowrap; }
+  .hm-rev-divider { grid-column: 1 / -1; height: 1px; background: var(--border); margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  .quick-take { background: #1e1b2e; border: 1px solid #2d2a3f; border-radius: 6px; padding: 14px 18px; margin-top: 16px; }
+  .quick-take h4 { color: var(--accent); margin-bottom: 8px; }
+  .quick-take li { margin-bottom: 4px; font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+  .badge-v1e { background: #312e4a; color: #a78bfa; }
+  .badge-v1l { background: #2d3340; color: #60a5fa; }
+  .badge-v2 { background: #2d3a30; color: #4ade80; }
+  .na-cell { color: var(--muted); background: rgba(255,255,255,.02); }
+  .blank-slate { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .blank-slate p { margin-top: 8px; }
+  .harm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; }
+  .legend { display: flex; gap: 16px; margin-bottom: 12px; font-size: 12px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NoAmp Low Rider DI — A/B Dashboard</h1>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span class="status" id="status">No data loaded</span>
+    <input type="file" id="fileInput" accept=".json">
+  </div>
+</header>
+
+<nav>
+  <button class="active" data-tab="fr">FR Comparison</button>
+  <button data-tab="heatmap">FR Error Heatmap</button>
+  <button data-tab="thd">THD Comparison</button>
+  <button data-tab="harmonics">Harmonic Breakdown</button>
+  <button data-tab="summary">Summary</button>
+</nav>
+
+<main>
+  <div class="blank-slate" id="blankSlate">
+    <h2>No data loaded</h2>
+    <p>Select <code>comprehensive_data.json</code> using the file picker above to begin.</p>
+  </div>
+
+  <div class="tab" id="tab-fr">
+    <div class="card">
+      <div class="controls">
+        <label>Capture: <select id="frCapture"></select></label>
+        <label>Sweep level: <span class="radio-group" id="frLevel"></span></label>
+      </div>
+      <canvas id="frChart" height="400"></canvas>
+    </div>
+    <div class="card">
+      <canvas id="frErrorChart" height="200"></canvas>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-heatmap">
+    <div class="card">
+      <div class="controls">
+        <label>Sweep level: <span class="radio-group" id="hmLevel"></span></label>
+      </div>
+      <div class="heatmap" id="heatmapGrid"></div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-thd">
+    <div class="card">
+      <div class="controls">
+        <label>Capture: <select id="thdCapture"></select></label>
+        <label>Driven level: <span class="radio-group" id="thdLevel"></span></label>
+      </div>
+      <canvas id="thdChart" height="400"></canvas>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-harmonics">
+    <div class="card">
+      <div class="controls">
+        <label>Revision: <select id="harRev"></select></label>
+        <label>Driven level: <span class="radio-group" id="harLevel"></span></label>
+        <label>Anchor freq: <span class="radio-group" id="harAnchor"></span></label>
+      </div>
+      <div class="harm-grid" id="harmGrid"></div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-summary">
+    <div class="card">
+      <h3>Per-Revision Summary</h3>
+      <table id="summaryTable"></table>
+    </div>
+    <div class="quick-take" id="quickTake">
+      <h4>Quick-Take: Top Issues</h4>
+      <ul id="quickTakeList"></ul>
+    </div>
+  </div>
+</main>
+
+<script>
+let DATA = null;
+let charts = {};
+
+function destroyChartKeys(prefix) {
+  Object.keys(charts).filter(k => k.startsWith(prefix)).forEach(k => {
+    charts[k]?.destroy();
+    delete charts[k];
+  });
+}
+
+function parseFile() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      DATA = JSON.parse(reader.result);
+      document.getElementById('status').textContent = `Loaded: ${DATA.meta.num_captures} captures, ${DATA.meta.num_bands} bands, OS=${DATA.meta.os_factor}x`;
+      document.getElementById('status').className = 'status loaded';
+      document.getElementById('blankSlate').style.display = 'none';
+      populateControls();
+      switchTab('fr');
+      updateAllViews();
+    } catch(e) {
+      document.getElementById('status').textContent = 'Parse error: ' + e.message;
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', parseFile);
+
+// --- Tab switching ---
+function switchTab(name) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + name));
+  if (DATA) updateTab(name);
+}
+
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// --- Radio group helper ---
+function buildRadio(containerId, options, defaultValue, onChange) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.textContent = opt.label;
+    btn.dataset.value = opt.value;
+    btn.classList.toggle('active', opt.value === defaultValue);
+    btn.addEventListener('click', () => {
+      el.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      onChange(opt.value);
+    });
+    el.appendChild(btn);
+  });
+  return defaultValue;
+}
+
+function getRadioValue(containerId) {
+  const active = document.getElementById(containerId).querySelector('button.active');
+  return active ? active.dataset.value : null;
+}
+
+// --- Populate controls ---
+let frCaptureIdx = 0, frSweepLevel = 'sweep_clean';
+let hmSweepLevel = 'sweep_clean';
+let thdCaptureIdx = 0, thdSweepLevel = 'sweep_drv_-18';
+let harRev = 'all', harSweepLevel = 'sweep_drv_-18', harAnchorIdx = 0;
+
+function populateControls() {
+  const caps = DATA.captures;
+  const levels = DATA.meta.all_sweep_levels;
+  const drivenLevels = DATA.meta.driven_sweeps;
+  const anchors = DATA.meta.thd_anchors;
+
+  // FR tab
+  const frSel = document.getElementById('frCapture');
+  frSel.innerHTML = caps.map((c,i) => `<option value="${i}">${c.id}</option>`).join('');
+  frSel.value = '0';
+  frSel.addEventListener('change', () => { frCaptureIdx = +frSel.value; updateFR(); });
+
+  buildRadio('frLevel', levels.map(l => ({label: l.replace('sweep_',''), value: l})), 'sweep_clean', v => { frSweepLevel = v; updateFR(); });
+
+  // Heatmap tab
+  buildRadio('hmLevel', levels.map(l => ({label: l.replace('sweep_',''), value: l})), 'sweep_clean', v => { hmSweepLevel = v; updateHeatmap(); });
+
+  // THD tab
+  const thdSel = document.getElementById('thdCapture');
+  thdSel.innerHTML = caps.map((c,i) => `<option value="${i}">${c.id}</option>`).join('');
+  thdSel.value = '0';
+  thdSel.addEventListener('change', () => { thdCaptureIdx = +thdSel.value; updateTHD(); });
+
+  buildRadio('thdLevel', drivenLevels.map(l => ({label: l.replace('sweep_drv_','drv '), value: l})), 'sweep_drv_-18', v => { thdSweepLevel = v; updateTHD(); });
+
+  // Harmonics tab
+  const harRevSel = document.getElementById('harRev');
+  harRevSel.innerHTML = '<option value="all">All Revisions</option><option value="V1E">V1 Early</option><option value="V1L">V1 Late</option><option value="V2">V2</option>';
+  harRevSel.value = 'all';
+  harRevSel.addEventListener('change', () => { harRev = harRevSel.value; updateHarmonics(); });
+
+  buildRadio('harLevel', drivenLevels.map(l => ({label: l.replace('sweep_drv_','drv '), value: l})), 'sweep_drv_-18', v => { harSweepLevel = v; updateHarmonics(); });
+
+  buildRadio('harAnchor', anchors.map((a,i) => ({label: a + ' Hz', value: ''+i})), '0', v => { harAnchorIdx = +v; updateHarmonics(); });
+}
+
+// --- Update per tab ---
+function updateTab(name) {
+  switch(name) {
+    case 'fr': updateFR(); break;
+    case 'heatmap': updateHeatmap(); break;
+    case 'thd': updateTHD(); break;
+    case 'harmonics': updateHarmonics(); break;
+    case 'summary': updateSummary(); break;
+  }
+}
+
+function updateAllViews() {
+  updateFR();
+  updateHeatmap();
+  updateTHD();
+  updateHarmonics();
+  updateSummary();
+}
+
+// === FR Comparison ===
+function updateFR() {
+  if (!DATA) return;
+  destroyChartKeys('fr');
+  const c = DATA.captures[frCaptureIdx];
+  if (!c) return;
+  const bands = DATA.meta.bands;
+  const fr = c.fr[frSweepLevel];
+  if (!fr) return;
+  const plugin = fr.plugin_db, pedal = fr.pedal_db;
+  const diff = plugin.map((v,i) => v - pedal[i]);
+
+  charts.fr = new Chart(document.getElementById('frChart'), {
+    type: 'line',
+    data: {
+      labels: bands,
+      datasets: [
+        { label: 'Plugin', data: plugin, borderColor: '#3b82f6', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0.3 },
+        { label: 'Pedal', data: pedal, borderColor: '#ef4444', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#c9cdd6' } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + ' dB' } } },
+      scales: {
+        x: { type: 'logarithmic', title: { display: true, text: 'Frequency (Hz)', color: '#6b7280' }, ticks: { color: '#6b7280', maxTicksLimit: 20, callback: v => v >= 1000 ? (v/1000).toFixed(v>=10000?0:1)+'k' : v }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { title: { display: true, text: 'Magnitude (dB)', color: '#6b7280' }, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+
+  charts.frErr = new Chart(document.getElementById('frErrorChart'), {
+    type: 'line',
+    data: {
+      labels: bands,
+      datasets: [
+        { label: 'Plugin − Pedal (dB)', data: diff, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', pointRadius: 0, borderWidth: 1.5, fill: true },
+        { label: '+3 dB', data: bands.map(() => 3), borderColor: 'rgba(239,68,68,0.4)', borderDash: [5,5], pointRadius: 0, borderWidth: 1 },
+        { label: '−3 dB', data: bands.map(() => -3), borderColor: 'rgba(239,68,68,0.4)', borderDash: [5,5], pointRadius: 0, borderWidth: 1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#c9cdd6' } } },
+      scales: {
+        x: { type: 'logarithmic', title: { display: true, text: 'Frequency (Hz)', color: '#6b7280' }, ticks: { color: '#6b7280', maxTicksLimit: 20, callback: v => v >= 1000 ? (v/1000).toFixed(v>=10000?0:1)+'k' : v }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { title: { display: true, text: 'Error (dB)', color: '#6b7280' }, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// === FR Error Heatmap ===
+function heatColor(val) {
+  const clamp = 6;
+  const t = Math.max(-1, Math.min(1, val / clamp));
+  if (t < 0) {
+    const s = 0.15 + Math.abs(t) * 0.65;
+    return `hsl(${220 + t * 40}, ${s*100}%, ${20 + Math.abs(t)*15}%)`;
+  } else {
+    const s = 0.15 + t * 0.65;
+    return `hsl(${t * 6}, ${s*100}%, ${20 + t*15}%)`;
+  }
+}
+
+function updateHeatmap() {
+  if (!DATA) return;
+  const bands = DATA.meta.bands;
+  const caps = DATA.captures;
+  const grid = document.getElementById('heatmapGrid');
+  const nCols = caps.length + 1;
+
+  let html = '';
+  // Header row
+  html += `<div class="hm-header"></div>`;
+  caps.forEach(c => {
+    const revCls = 'badge-' + c.rev.toLowerCase();
+    const bl = c.settings.blend;
+    const blendWarn = bl != null && bl < 0.90 ? ' ⚠' : '';
+    html += `<div class="hm-header"><span class="badge ${revCls}">${c.rev}</span> D${(c.settings.drive ?? 0).toFixed(2)}${blendWarn}</div>`;
+  });
+
+  // Data rows
+  bands.forEach((b, bi) => {
+    html += `<div class="hm-row-label">${b >= 1000 ? (b/1000).toFixed(b>=10000?0:1)+'k' : Math.round(b)}</div>`;
+    caps.forEach(c => {
+      const fr = c.fr[hmSweepLevel];
+      if (!fr) { html += '<div class="hm-cell na-cell">—</div>'; return; }
+      const diff = fr.plugin_db[bi] - fr.pedal_db[bi];
+      if (diff == null || isNaN(diff)) { html += '<div class="hm-cell na-cell">—</div>'; return; }
+      const bg = heatColor(diff);
+      const fg = Math.abs(diff) > 3 ? '#fff' : '#c9cdd6';
+      html += `<div class="hm-cell" style="background:${bg};color:${fg}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}</div>`;
+    });
+  });
+
+  grid.style.gridTemplateColumns = `minmax(50px, auto) repeat(${caps.length}, 1fr)`;
+  grid.innerHTML = html;
+}
+
+// === THD Comparison ===
+function updateTHD() {
+  if (!DATA) return;
+  destroyChartKeys('thd');
+  const c = DATA.captures[thdCaptureIdx];
+  if (!c) return;
+  const bands = DATA.meta.bands;
+  const thd = c.thd[thdSweepLevel];
+  if (!thd) return;
+
+  const labels = [];
+  const pluginData = [];
+  const pedalData = [];
+  const naLabels = [];
+  const naPlugin = [];
+  const naPedal = [];
+
+  bands.forEach((b, i) => {
+    const src = thd.source[i];
+    if (src === 'na') {
+      naLabels.push(b >= 1000 ? (b/1000).toFixed(b>=10000?0:1)+'k' : Math.round(b));
+      naPlugin.push(0);
+      naPedal.push(0);
+    } else {
+      labels.push(b >= 1000 ? (b/1000).toFixed(b>=10000?0:1)+'k' : Math.round(b));
+      pluginData.push(thd.plugin_pct[i] ?? 0);
+      pedalData.push(thd.pedal_pct[i] ?? 0);
+    }
+  });
+
+  const datasets = [
+    { label: 'Plugin THD%', data: pluginData, backgroundColor: 'rgba(59,130,246,0.7)', borderColor: '#3b82f6', borderWidth: 1 },
+    { label: 'Pedal THD%', data: pedalData, backgroundColor: 'rgba(239,68,68,0.7)', borderColor: '#ef4444', borderWidth: 1 }
+  ];
+  if (naLabels.length) {
+    datasets.push({ label: 'N/A (no data)', data: naPlugin.map(() => 0), backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 });
+  }
+
+  const allLabels = labels.concat(naLabels.map(l => l + ' ⚠'));
+
+  charts.thd = new Chart(document.getElementById('thdChart'), {
+    type: 'bar',
+    data: { labels: allLabels, datasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#c9cdd6' } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.parsed.y ?? 0).toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', maxRotation: 60, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { title: { display: true, text: 'THD %', color: '#6b7280' }, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// === Harmonic Breakdown ===
+
+function updateHarmonics() {
+  if (!DATA) return;
+  const caps = harRev === 'all' ? DATA.captures : DATA.captures.filter(c => c.rev === harRev);
+  const grid = document.getElementById('harmGrid');
+  grid.innerHTML = '';
+
+  destroyChartKeys('har_');
+
+  caps.forEach((c, ci) => {
+    const har = c.harmonics[harSweepLevel];
+    if (!har) return;
+
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `<h3>${c.id}</h3><canvas id="harCanvas${ci}" height="250"></canvas>`;
+    grid.appendChild(div);
+
+    const ctx = document.getElementById('harCanvas' + ci).getContext('2d');
+    const orders = DATA.meta.harmonic_orders;
+    const ai = harAnchorIdx;
+
+    const pluginVals = orders.map(o => {
+      const key = 'H' + o;
+      return har[key] ? har[key].plugin_db[ai] : null;
+    });
+    const pedalVals = orders.map(o => {
+      const key = 'H' + o;
+      return har[key] ? har[key].pedal_db[ai] : null;
+    });
+
+    charts['har_' + ci] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: orders.map(o => 'H' + o),
+        datasets: [
+          { label: 'Plugin', data: pluginVals, backgroundColor: 'rgba(59,130,246,0.8)', borderColor: '#3b82f6', borderWidth: 1 },
+          { label: 'Pedal', data: pedalVals, backgroundColor: 'rgba(239,68,68,0.7)', borderColor: '#ef4444', borderWidth: 1 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#c9cdd6', font: { size: 10 }, usePointStyle: true, pointStyleWidth: 8 } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.parsed.y ?? 0).toFixed(1) + ' dB' } }
+        },
+        scales: {
+          x: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { title: { display: true, text: 'dB re fundamental', color: '#6b7280' }, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,0.04)' }, min: -80, max: 0 }
+        }
+      }
+    });
+  });
+}
+
+// === Summary ===
+function updateSummary() {
+  if (!DATA) return;
+  const summary = DATA.summary.by_revision;
+  const table = document.getElementById('summaryTable');
+
+  let html = '<thead><tr><th>Revision</th><th>Captures</th><th>FR RMS Mean</th><th>FR RMS Median</th><th>FR RMS Min</th><th>FR RMS Max</th><th>Best</th><th>Worst</th></tr></thead><tbody>';
+  for (const [rev, s] of Object.entries(summary)) {
+    html += `<tr>
+      <td><span class="badge badge-${rev.toLowerCase()}">${rev}</span></td>
+      <td>${s.n_captures}</td>
+      <td>${s.fr_rms_mean.toFixed(2)} dB</td>
+      <td>${s.fr_rms_median.toFixed(2)} dB</td>
+      <td>${s.fr_rms_min.toFixed(2)} dB</td>
+      <td>${s.fr_rms_max.toFixed(2)} dB</td>
+      <td>${s.best_capture}</td>
+      <td>${s.worst_capture}</td>
+    </tr>`;
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  // Quick-take: scan heatmap data for top issues
+  const issues = [];
+  const caps = DATA.captures;
+  const bands = DATA.meta.bands;
+
+  // Find captures with large HF errors
+  caps.forEach(c => {
+    const fr = c.fr['sweep_clean'];
+    if (!fr) return;
+    let hfError = 0, count = 0;
+    bands.forEach((b, i) => {
+      if (b >= 8000) {
+        hfError += Math.abs(fr.plugin_db[i] - fr.pedal_db[i]);
+        count++;
+      }
+    });
+    if (count) {
+      const avg = hfError / count;
+      if (avg > 6) issues.push({ capture: c.id, rev: c.rev, issue: `HF (≥8kHz) avg error ${avg.toFixed(1)} dB`, severity: 'high' });
+      else if (avg > 3) issues.push({ capture: c.id, rev: c.rev, issue: `HF (≥8kHz) avg error ${avg.toFixed(1)} dB`, severity: 'med' });
+    }
+    // Check max error
+    let maxErr = 0, maxBand = 0;
+    bands.forEach((b, i) => {
+      const e = Math.abs(fr.plugin_db[i] - fr.pedal_db[i]);
+      if (e > maxErr) { maxErr = e; maxBand = b; }
+    });
+    if (maxErr > 10) issues.push({ capture: c.id, rev: c.rev, issue: `Max error ${maxErr.toFixed(1)} dB at ${Math.round(maxBand)} Hz`, severity: 'high' });
+  });
+
+  // Sort by severity then error
+  issues.sort((a,b) => (b.severity === 'high' ? 1 : 0) - (a.severity === 'high' ? 1 : 0));
+  const topIssues = issues.slice(0, 8);
+
+  const qtList = document.getElementById('quickTakeList');
+  qtList.innerHTML = topIssues.map(i =>
+    `<li><span class="badge badge-${i.rev.toLowerCase()}">${i.rev}</span> ${i.capture}: ${i.issue} ${i.severity === 'high' ? '⚠' : ''}</li>`
+  ).join('');
+  if (!topIssues.length) qtList.innerHTML = '<li>No major issues detected across captures.</li>';
+}
+</script>
+</body>
+</html>
