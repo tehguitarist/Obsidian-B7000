@@ -87,3 +87,7 @@ add_test(NAME DriveStageTest COMMAND DriveStageTest)
 add_executable(RecoveryBridgedTTest tests/RecoveryBridgedTTest.cpp)
 target_compile_options(RecoveryBridgedTTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME RecoveryBridgedTTest COMMAND RecoveryBridgedTTest)
+
+add_executable(SallenKeyLPFTest tests/SallenKeyLPFTest.cpp)
+target_compile_options(SallenKeyLPFTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME SallenKeyLPFTest COMMAND SallenKeyLPFTest)

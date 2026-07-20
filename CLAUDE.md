@@ -139,12 +139,22 @@ high, execute routine work cheap) is what should persist.
 >    output (GATE, disabled by default). DC-step = unity/non-inverting. **⚠ Phase-7 carry-forward:
 >    real notch DEPTH is loaded (R24→SK, deferred) + tolerance-sensitive → capture-validate (risk #1);
 >    the isolated stage is unloaded by design, matching the unloaded oracle 1:1.**
+> ✅ **SallenKeyLPF (IC4_B + IC4_A, stage #6)** — `src/dsp/SallenKeyLPF.h` + `tests/SallenKeyLPFTest.cpp`
+>    (2026-07-20). Two instances of a 2nd-order unity-gain Sallen-Key LPF: IC4_B ≈10.7 kHz (R24 10k/
+>    R25 22k, C18 1n feedback/C27 1n to GND) and IC4_A ≈3.3 kHz (R26 22k/R27 47k, C19 2n2 feedback/
+>    C20 1n to GND). Built as MNA + trapezoidal companion caps (precomputed 2×2 inverse, consistent
+>    with TrebleAttack/RecoveryBridgedT), NOT a WDF tree. Validated against `eq_reference.py ::
+>    sallen_key_lpf_tf`: FR ≤0.25 dB through 2 kHz at 48k (both instances), HF deviation = bilinear
+>    warp (shrinks 48k→96k for all frequencies). 2nd-order asymptotic rolloff ~−12 dB/oct at 768 kHz
+>    (avoids warp in the measurement). DC-step unity non-inverting. RailClamp on each SK op-amp output
+>    (GATE item, disabled by default). Both SKs sit inside the Phase-6 oversampled region — bilinear
+>    warp resolved there, no prewarp needed. ctest PASS (1/1).
 > **⚠ ATTACK-SWITCH TOPOLOGY CORRECTED THIS SESSION** (found while building the oracle): circuit.md's
 >    "triple-checked" node graph had the switch **pole** wrong (named node M as common → implied a Cut
 >    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
 >    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
 >    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
-> **STILL TODO in Step 4:** SallenKey ×2 → LevelBlend → EQ block → MasterOut, THEN the J201 nonlinear
+> **STILL TODO in Step 4:** LevelBlend → EQ block → MasterOut, THEN the J201 nonlinear
 >    stage. RailClamp now exists — apply it to each remaining op-amp stage as built (calibration §6,
 >    GATE item). (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
@@ -167,21 +177,17 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: SallenKey ×2** (IC4_B ~10.7 kHz → IC4_A ~3.3 kHz), build-plan Phase 4 item 5. Two
-> instances of a textbook 2nd-order unity-gain Sallen-Key LPF, different values:
->   • IC4_B: R24 10k / R25 22k, C27 1n (→GND) / C18 1n (feedback) → fc ≈ 10.7 kHz.
->   • IC4_A: R26 22k / R27 47k, C20 1n (→GND) / C19 2n2 (feedback) → fc ≈ 3.3 kHz (final OD bandlimit).
-> These are the last stage of the OD chain before LEVEL/BLEND. No oracle exists yet — add a
-> `sallen_key_tf(f, R1, R2, C1, C2)` to `eq_reference.py` (standard SK transfer fn) and validate FR
-> +2nd-order rolloff/Q vs it (same 48k/96k bilinear-warp split as the other stages; the SK corners
-> are lower than the bridged-T so top-octave warp will show — assert tight ≤2 kHz, shrink 48k→96k
-> above). Build via MNA + trapezoidal companion caps (consistent with TrebleAttack/RecoveryBridgedT;
-> a unity-gain SK is a clean 2-node solve) OR chowdsp WDF — pick MNA for oracle 1:1. Apply `RailClamp`
-> to EACH SK op-amp output (GATE item, disabled by default). ⚠ Both SKs sit INSIDE the Phase-6
-> oversampled region (dsp.md OS-region rule) — their bilinear warp is resolved there, so don't
-> prewarp-fight it in the base-rate test. After both SKs: LevelBlend (build-plan item 6 — the
-> asymmetric-crossfade + dual phase-alignment risks; do NOT wire the crossfade before Phase 6's
-> delay-comp), then the EQ block, MasterOut, then the J201 nonlinear front-end.
+> **NEXT: LevelBlend** (build-plan Phase 4 item 6). Divider/crossfade after the SK filters:
+> LEVEL (VR2 100k A-taper) → BLEND (VR1 100k B-taper) crossfade between clean (IC1_A tap) and
+> OD path. Key constraint: LEVEL and BLEND are NOT independent ideal dividers — the LEVEL wiper
+> (source Z up to ~25k at mid-rotation) drives BLEND pin3 while the clean side (~0Ω) drives pin1,
+> creating an asymmetric crossfade (~3.5 dB OD-vs-clean imbalance at noon/noon). Solve the small
+> 3-node resistive network exactly. `dist_engage` bool overrides BLEND to 100% clean (not a second
+> bypass — crossfade happens at Phase 6). ⚠ Two phase-alignment risks deferred to Phase 6: (1) the
+> clean tap is pre-oversampled-region → delay-mismatch crossfade comb-filters until the latency
+> line is in place; (2) aggregate polarity at the BLEND node depends on J201's sign (unconfirmed).
+> Do NOT wire the BLEND crossfade until Phase 6 has delay-comp + end-to-end DC-step test.
+> RailClamp on LEVEL's op-amp output (GATE item, disabled by default).
 
 ## Project-specific carry-forwards
 

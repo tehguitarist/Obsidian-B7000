@@ -163,6 +163,30 @@ def bridged_t_tf(f, R22=100e3, R23=33e3, C16=680e-12, C17=22e-9, Rload=None):
         out[i] = x[1]
     return out
 
+def sallen_key_lpf_tf(f, R1, R2, C1, C2):
+    """Unity-gain (voltage-follower) 2nd-order Sallen-Key LOW-PASS (IC4_B, IC4_A).
+
+    Topology (circuit.md "Recovery + bandlimiting", IC4_B/IC4_A rows):
+        Vin --R1--> X --R2--> Y(=op-amp + input) ;  Y --C2--> GND
+        C1 from X to Vout ;  op-amp = unity follower so Vout = V(Y)
+    C1 = the FEEDBACK cap (mid-node X -> output), C2 = the to-GND cap at the + input.
+
+    Derived by the SAME 2-node nodal formulation the C++ MNA stage implements
+    (unknowns X, Y; the op-amp OUTPUT node O = Y is DRIVEN, so C1's current at
+    node X couples to Y via O=Y but injects NOTHING into node Y's KCL — the
+    asymmetry that makes an active SK non-reciprocal). Closed form:
+        H(s) = 1 / (1 + s*C2*(R1+R2) + s^2 * R1*R2*C1*C2)
+    -> w0 = 1/sqrt(R1 R2 C1 C2) ; both w0 and the damping term C2*(R1+R2) are
+    symmetric in R1<->R2 (so R1-vs-R2 assignment is irrelevant), but Q depends
+    on C2 ALONE in the s-term, so the C1(feedback)/C2(GND) assignment matters.
+
+    IC4_B: R1=10k(R24) R2=22k(R25) C1=1n(C18) C2=1n(C27)   -> fc ~ 10.7 kHz
+    IC4_A: R1=22k(R26) R2=47k(R27) C1=2n2(C19) C2=1n(C20)  -> fc ~ 3.3 kHz
+    """
+    s = 2j * np.pi * f
+    return 1.0 / (1.0 + s * C2 * (R1 + R2) + s * s * R1 * R2 * C1 * C2)
+
+
 f = np.logspace(np.log10(10), np.log10(20000), 1200)
 
 print("=" * 72)
