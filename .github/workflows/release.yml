@@ -213,7 +213,7 @@ jobs:
           }
 
           Write-Host "Using makensis at $makensisPath"
-          & $makensisPath /DVERSION=$version /DARTEFACTS_DIR="$PWD\build\ObsidianB7000_artefacts\Release\VST3" installer\windows\Pedal.nsi
+          & $makensisPath /DVERSION=$version /DARTEFACTS_DIR="$PWD\build\ObsidianB7000_artefacts\Release\VST3" installer\windows\Obsidian-B7000.nsi
 
           Move-Item "installer\windows\Obsidian-B7000-Windows-v$version-Installer.exe" .
 

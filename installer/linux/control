@@ -1,9 +1,8 @@
-Package: <pedal>
+Package: obsidianb7000
 Version: __VERSION__
 Section: sound
 Priority: optional
 Architecture: amd64
-Maintainer: <You> <<you>@example.com>
-Description: <Pedal> plugin (VST3)
- Replace this description with one line about your plugin, plus optional indented
- continuation lines (each must start with a single space).
+Maintainer: Leigh Pierce <leighpierce@github.com>
+Description: Obsidian-B7000 plugin (VST3)
+ Darkglass B7K Ultra circuit-level emulation bass overdrive/DI preamp.
