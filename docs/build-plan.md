@@ -8,6 +8,19 @@
 
 ## Where we are
 
+| Phase | Status | Completed | Gate |
+|-------|--------|-----------|------|
+| 1 — Schematic analysis | Complete | 2026-07-19 | — |
+| 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
+| 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
+| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | — | — |
+| 4b — Functional UI pass | Not started | — | — |
+| 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
+| 6 — Oversampling wiring + delay compensation | Not started | — | — |
+| 7 — Full-chain integration + level calibration | Not started | — | — |
+| 8 — Full UI (polish, VU gate, headless) | Not started | — | — |
+| 9 — HQ/Eco + final sweep | Not started | — | — |
+
 Schematic analysis is **complete and closed**: full chain traced and verified, tone-stack node
 graphs redrawn, R19 located (4049 supply dropper), [ENG] mid caps sim-validated, C36 verified,
 IC2_B unity-buffer correction locked in. No schematic questions block any build phase.

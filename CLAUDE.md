@@ -103,7 +103,10 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20). NEXT: Step 4 (stage-by-stage DSP).**
+> **CURRENT: Step 4 (stage-by-stage linear DSP) — IN PROGRESS (2026-07-20).**
+> Phase completion tracking in `docs/build-plan.md` §"Where we are" — update both files.
+> **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
+> All three phases done: schematic ✓ → scaffold (20 params, AU+VST3, auval PASS) ✓ → WDF smoke test ✓.
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
 > against primary p.4, backup, and both BOM pages, PLUS (session 3): ✅ Baxandall + LO-MID/HI-MID
 > tone-stack per-node redraw (verified node graphs now in circuit.md — R35/R36 wiper→(−) roles,
