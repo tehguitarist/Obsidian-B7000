@@ -1,13 +1,9 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-// All colour constants are uint32 to avoid constexpr Colour portability issues.
-// Use as juce::Colour(PedalLookAndFeel::cFoo).
-
 class PedalLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
-    // ── Colour constants ──────────────────────────────────────────────────────
     static constexpr juce::uint32 cBackground      = 0xFF050912u;
     static constexpr juce::uint32 cPedalFace       = 0xFF070D1Au;
     static constexpr juce::uint32 cPedalBorder     = 0xFF18293Fu;
@@ -40,16 +36,14 @@ public:
 
     PedalLookAndFeel();
 
-    // Called by PluginEditor::paint() to draw the mottled pedal face background.
-    void paintPedalBackground(juce::Graphics& g, juce::Rectangle<int> bounds);
+    void setKnobImage(const juce::Image& img) { knobImage = img; }
+    void setFootswitchImages(const juce::Image& up, const juce::Image& down) { fsUpImage = up; fsDownImage = down; }
+    void setTrimImage(const juce::Image& img) { trimImage = img; }
 
-    // ── LookAndFeel overrides ─────────────────────────────────────────────────
-    // Rotary sliders: differentiated by componentID — "trim" = halo style, else = pedal knob.
     void drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                           juce::Slider& slider) override;
 
-    // Buttons: componentID "bypass" = dome footswitch; "os" = segmented OS button.
     void drawButtonBackground(juce::Graphics& g, juce::Button& button,
                               const juce::Colour& backgroundColour,
                               bool shouldDrawButtonAsHighlighted,
@@ -59,15 +53,20 @@ public:
                         bool shouldDrawButtonAsHighlighted,
                         bool shouldDrawButtonAsDown) override;
 
-    // Labels: transparent background, colour taken from component colourId.
     void drawLabel(juce::Graphics& g, juce::Label& label) override;
 
-    // ComboBox: dark OS-strip style with a subtle arrow.
     void drawComboBox(juce::Graphics& g, int width, int height, bool isButtonDown,
                       int buttonX, int buttonY, int buttonW, int buttonH,
                       juce::ComboBox& box) override;
 
     juce::Font getComboBoxFont(juce::ComboBox& box) override;
-
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override;
+
+private:
+    void drawTrimHalo(juce::Graphics& g, juce::Rectangle<float> bounds, float sliderPos,
+                      float startAngle, float endAngle);
+    void drawKnobFromImage(juce::Graphics& g, const juce::Image& img, juce::Rectangle<float> bounds,
+                           float sliderPos, float startAngle, float endAngle);
+
+    juce::Image knobImage, fsUpImage, fsDownImage, trimImage;
 };

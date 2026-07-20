@@ -18,30 +18,33 @@ juce::AudioProcessorValueTreeState::ParameterLayout ObsidianB7000AudioProcessor:
     juce::AudioProcessorValueTreeState::ParameterLayout params;
 
     // Pots (0..1, taper applied in DSP)
+    const auto potAttrs = juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+        [] (float v, int) { return juce::String(v, 2); });
+
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"master", 1}, "Master",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"blend", 1}, "Blend",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"level", 1}, "Level",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"drive", 1}, "Drive",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"lo", 1}, "Lo",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"lo_mid", 1}, "Lo Mid",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"hi_mid", 1}, "Hi Mid",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"hi", 1}, "Hi",
-        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.5f, potAttrs));
 
     // Switches
     params.add(std::make_unique<juce::AudioParameterChoice>(

@@ -49,6 +49,9 @@ public:
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
 
+    float getInputLevel(int /*ch*/) const { return inputLevel.load(); }
+    float getOutputLevel(int /*ch*/) const { return outputLevel.load(); }
+
     static constexpr float kInputRef = 0.87f;
     static constexpr float kOutputMakeup = 0.9f;
 

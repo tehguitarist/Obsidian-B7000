@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(ObsidianB7000 VERSION 0.2.1)
+project(ObsidianB7000 VERSION 0.2.3)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,6 +44,7 @@ juce_add_binary_data(ObsidianB7000Assets
         ui/switch_down.png
         ui/vol_trim.png
         ui/LexendExa-Regular.ttf
+        ui/LexendExa-Bold.ttf
 )
 
 target_sources(ObsidianB7000
@@ -51,6 +52,7 @@ target_sources(ObsidianB7000
         src/PluginProcessor.cpp
         src/PluginEditor.cpp
         src/ui/PedalLookAndFeel.cpp
+        src/ui/PedalFace.cpp
         src/dsp/PedalDSP.h
 )
 

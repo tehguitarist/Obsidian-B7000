@@ -6,14 +6,14 @@ class SwitchToggle : public juce::Component
 public:
     std::function<void(int)> onChange;
 
-    void setPosition(int pos)
+    void setPosition(int pos, bool notifyCallback = true)
     {
         pos = juce::jlimit(0, 2, pos);
         if (pos != position)
         {
             position = pos;
             repaint();
-            if (onChange)
+            if (onChange && notifyCallback)
                 onChange(position);
         }
     }
