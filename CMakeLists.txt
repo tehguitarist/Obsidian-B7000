@@ -91,3 +91,7 @@ add_test(NAME RecoveryBridgedTTest COMMAND RecoveryBridgedTTest)
 add_executable(SallenKeyLPFTest tests/SallenKeyLPFTest.cpp)
 target_compile_options(SallenKeyLPFTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME SallenKeyLPFTest COMMAND SallenKeyLPFTest)
+
+add_executable(LevelBlendTest tests/LevelBlendTest.cpp)
+target_compile_options(LevelBlendTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME LevelBlendTest COMMAND LevelBlendTest)

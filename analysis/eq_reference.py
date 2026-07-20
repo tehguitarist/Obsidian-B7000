@@ -186,6 +186,36 @@ def sallen_key_lpf_tf(f, R1, R2, C1, C2):
     s = 2j * np.pi * f
     return 1.0 / (1.0 + s * C2 * (R1 + R2) + s * s * R1 * R2 * C1 * C2)
 
+def level_blend_tf(level, blend, vo=1.0, vc=0.0, p=1.43):
+    """LEVEL (VR2) + BLEND (VR1) — loaded resistive network, DC transfer.
+
+    A 1-node KCL solve for the loaded LEVEL/BLEND pot pair (see LevelBlend.h
+    for full circuit topology). Returns Vout for a given OD (vo) and clean (vc)
+    input, with the LEVEL taper exponent p (power law: L = level^p).
+
+    At Phase 7, p is fit to the blend-0700/1200 captures; this default matches
+    kLevelTaperExp = 1.43 in the C++ stage (dsp.md §tapers recommended start).
+
+    Referenced by tests/LevelBlendTest.cpp as the analytic oracle.
+    """
+    # LEVEL taper (power law).
+    L = 0.0 if level <= 0.0 else (1.0 if level >= 1.0 else level ** p)
+    B = np.clip(blend, 0.0, 1.0)  # B-taper = linear
+
+    # LEVEL wiper voltage (loaded by the 100k BLEND pot).
+    if L <= 0.0:
+        vw = 0.0
+    elif L >= 1.0:
+        vw = vo
+    else:
+        invRup = 1.0 / (1.0 - L)
+        invRdn = 1.0 / L
+        invTotal = invRup + invRdn + 1.0
+        vw = (vo * invRup + vc) / invTotal
+
+    # BLEND wiper = linear crossfade.
+    return (1.0 - B) * vc + B * vw
+
 
 f = np.logspace(np.log10(10), np.log10(20000), 1200)
 

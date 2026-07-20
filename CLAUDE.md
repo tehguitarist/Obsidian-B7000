@@ -149,12 +149,23 @@ high, execute routine work cheap) is what should persist.
 >    (avoids warp in the measurement). DC-step unity non-inverting. RailClamp on each SK op-amp output
 >    (GATE item, disabled by default). Both SKs sit inside the Phase-6 oversampled region — bilinear
 >    warp resolved there, no prewarp needed. ctest PASS (1/1).
+> ✅ **LevelBlend (VR2 LEVEL + VR1 BLEND)** — `src/dsp/LevelBlend.h` + `tests/LevelBlendTest.cpp`
+>    (2026-07-20). Passive resistive network (LEVEL 100k A-taper OD volume divider + BLEND 100k
+>    B-taper clean/OD crossfade) with exact loading interaction between the two pots. Solves the
+>    1-node KCL equation for the LEVEL wiper voltage (loaded by the BLEND pot), then applies the
+>    BLEND linear crossfade. Taper: `powerLawTaper(x, 1.0, 1.43)` for LEVEL (interim, fits at Phase 7),
+>    linear for BLEND. `dist_engage` bool forces 100% clean output (the DIST footswitch override).
+>    Validated against `eq_reference.py :: level_blend_tf`: DC gain matches oracle to ±0.001 dB across
+>    7 knob position pairs; loading deficit of −1.82 dB at noon/noon confirmed (lower than the ideal-
+>    taper ≈3.5 dB because power-law taper at noon gives L≈0.371). No RailClamp (passive stage —
+>    no op-amp output). ctest PASS (1/1). ⚠ BLEND crossfade wiring + dist_engage smoothing deferred
+>    to Phase 6 (needs delay-comp + end-to-end DC-step per build-plan risk #8).
 > **⚠ ATTACK-SWITCH TOPOLOGY CORRECTED THIS SESSION** (found while building the oracle): circuit.md's
 >    "triple-checked" node graph had the switch **pole** wrong (named node M as common → implied a Cut
 >    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
 >    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
 >    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
-> **STILL TODO in Step 4:** LevelBlend → EQ block → MasterOut, THEN the J201 nonlinear
+> **STILL TODO in Step 4:** EQ block → MasterOut, THEN the J201 nonlinear
 >    stage. RailClamp now exists — apply it to each remaining op-amp stage as built (calibration §6,
 >    GATE item). (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
@@ -177,17 +188,15 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: LevelBlend** (build-plan Phase 4 item 6). Divider/crossfade after the SK filters:
-> LEVEL (VR2 100k A-taper) → BLEND (VR1 100k B-taper) crossfade between clean (IC1_A tap) and
-> OD path. Key constraint: LEVEL and BLEND are NOT independent ideal dividers — the LEVEL wiper
-> (source Z up to ~25k at mid-rotation) drives BLEND pin3 while the clean side (~0Ω) drives pin1,
-> creating an asymmetric crossfade (~3.5 dB OD-vs-clean imbalance at noon/noon). Solve the small
-> 3-node resistive network exactly. `dist_engage` bool overrides BLEND to 100% clean (not a second
-> bypass — crossfade happens at Phase 6). ⚠ Two phase-alignment risks deferred to Phase 6: (1) the
-> clean tap is pre-oversampled-region → delay-mismatch crossfade comb-filters until the latency
-> line is in place; (2) aggregate polarity at the BLEND node depends on J201's sign (unconfirmed).
-> Do NOT wire the BLEND crossfade until Phase 6 has delay-comp + end-to-end DC-step test.
-> RailClamp on LEVEL's op-amp output (GATE item, disabled by default).
+> **NEXT: EQ block** (build-plan Phase 4 item 7). Four bands: Baxandall (coupled BASS+TREBLE as one
+> network) + LO-MID + HI-MID (each inverting-unity + pot network with 3-position series-cap switch)
+> + the post-blend unity buffer IC5_A. Refer to `circuit.md` for node graphs (already verified) and
+> `analysis/eq_reference.py` for per-band oracle curves (already computed). Validate each band at
+> min/centre/max plus both mid switches at all 3 positions. RailClamp on EVERY op-amp output in the
+> block (IC5_A, IC5_B, IC5_C, IC5_D, IC6_A — GATE item). Check the 4-inversion net polarity (the
+> whole EQ inverts 4 times: IC5_B × −2.2 = 1, Baxandall is inverting = 2, LO-MID inverting = 3,
+> HI-MID inverting = 4 → net non-inverting = even). This is the most complex remaining Phase 4
+> task — coupled multiband network, 6 switch positions, 5+ op-amp stages. Apply RailClamp to each.
 
 ## Project-specific carry-forwards
 
