@@ -179,23 +179,31 @@ levels; the capture anchor replaces it at Phase 7:
    gentle shoulders, steep flanks + HF treated as bilinear warp (verified by 48k→96k shrink). FR
    matched oracle <0.02 dB through the notch. RailClamp on the buffer output (GATE), disabled by
    default. DC-step = unity/non-inverting. **⚠ real notch DEPTH still capture-validate — risk #1.**
-5. **SallenKey2** (×2 instances, different values): FR vs textbook SK response.
-6. **LevelBlend**: dividers/crossfade (plain gains, not WDF); audio-taper for LEVEL;
-   `dist_engage` override hook here. ⚠ **Two alignment risks at this summing node, not one** (dsp.md
-   "Dry/wet phase alignment"; circuit.md BLEND note): (a) the clean tap is pre-JFET, i.e.
-   pre-oversampled-region — do NOT wire the crossfade up before Phase 6's delay-compensation is in
-   place, or the FR test will show a false comb-filter defect that's actually a missing feature;
-   (b) the OD path's cumulative sign at this node depends on the J201 stage's polarity (unconfirmed
-   — see its DC-step test later in this phase) plus the clipper's known inversion — an end-to-end
-   DC-step test from input to this node is required before trusting the crossfade, independent of
-   and in addition to the delay fix. Also: do NOT model LEVEL and BLEND as two independent ideal
-   unloaded dividers — the LEVEL wiper (source impedance up to ~25k at mid-rotation) drives BLEND
-   pin3 while the clean side (IC1_A out, ~0 Ω) drives pin1, so the crossfade law is asymmetric
-   (≈3.5 dB OD-vs-clean imbalance at LEVEL=noon/BLEND=noon relative to the ideal equal mix — and
-   the real pedal genuinely does this, so modeling it is fidelity, not pedantry), and BLEND in
-   turn loads the LEVEL divider. Solve the small resistive network (LEVEL pot + BLEND pot + both
-   source impedances) exactly per block — three nodes of algebra, cheap — and the
-   `blend-0700/1200` captures validate the resulting law at Phase 7.
+5. ✅ **SallenKeyLPF (IC4_B + IC4_A, stage #6)**: two instances of a 2nd-order unity-gain Sallen-Key
+   LPF. **DONE 2026-07-20** (`src/dsp/SallenKeyLPF.h`, `tests/SallenKeyLPFTest.cpp`). Built as MNA +
+   trapezoidal companion caps (precomputed 2×2 inverse, consistent with TrebleAttack/RecoveryBridgedT).
+   Validated against `analysis/eq_reference.py :: sallen_key_lpf_tf`: FR ≤0.25 dB through 2 kHz at
+   48k (both instances), HF deviation = bilinear warp (shrinks 48k→96k for all frequencies).
+   2nd-order asymptotic rolloff ~−12 dB/oct at 768 kHz (avoids warp in the measurement; the original
+   4×/8× fc test at 192 kHz hit Nyquist-induced warp for IC4_B at 85.8 kHz, fixed by raising SR to
+   768 kHz). DC-step unity non-inverting. RailClamp on each SK op-amp output (GATE, disabled by
+   default). Both SKs sit inside the Phase-6 oversampled region — bilinear warp resolved there, no
+   prewarp needed. ctest PASS (1/1).
+6. ✅ **LevelBlend (VR2 LEVEL + VR1 BLEND, stage #7/8)**: passive resistive network with exact
+   loading interaction between the two pots. **DONE 2026-07-20** (`src/dsp/LevelBlend.h`,
+   `tests/LevelBlendTest.cpp`). Solved as a 1-node KCL: `Vw = (Vo/(1-L) + Vc) / (1/(1-L) + 1/L + 1)`
+   for the LEVEL wiper, then `Vout = (1-B)*Vc + B*Vw` for the BLEND crossfade. LEVEL uses
+   `powerLawTaper(x, 1.0, 1.43)` (interim power-law fit, p captured at Phase 7; note the real
+   loading deficit at noon/noon is −1.82 dB with p=1.43, not the ideal-linear ≈3.5 dB cited in the
+   old spec). BLEND is linear B-taper. `dist_engage` bool forces 100% clean output (the DIST
+   footswitch override, crossfade smoothing deferred to Phase 6). No RailClamp needed (passive
+   stage — no op-amp output). Validated against `analysis/eq_reference.py :: level_blend_tf`: DC
+   gain matches oracle to ±0.001 dB across 7 knob-position pairs. ctest PASS (1/1).
+   ⚠ **Two alignment risks at this summing node** deferred to Phase 6 (risk #8 below): (a) delay-
+   mismatch crossfade comb-filters without the Phase 6 latency line; (b) aggregate polarity at the
+   BLEND node depends on J201's unconfirmed sign + clipper's known inversion — an end-to-end DC-step
+   test from input to BLEND is required before trusting the crossfade. Do NOT wire the BLEND
+   crossfade until Phase 6.
 7. **EQ block**: Baxandall (coupled BASS+TREBLE — ONE WDF/nodal network), LO-MID, HI-MID (each
    an inverting-unity + pot network stage; series cap switchable via live ImpedanceCalculator).
    Validate every band at min/centre/max + both mid switches at all 3 positions against
@@ -405,8 +413,9 @@ and implemented or explicitly rejected.
    the mids can boost +28 dB. Phase 4's rail-clamp paragraph schedules it; a missing clamp is a
    gate-4 failure.
 10. **LEVEL→BLEND loading** — the two pots are NOT independent ideal dividers (finite LEVEL-wiper
-    source impedance → ≈3.5 dB crossfade imbalance at noon/noon); model the resistive network
-    exactly (Phase 4 item 6), validate against the blend captures.
+    source impedance → −1.82 dB crossfade imbalance at noon/noon with the interim power-law taper
+    p=1.43; ≈3.5 dB if the taper were linear at L=0.5); model the resistive network exactly (Phase
+    4 item 6 — DONE), validate against the blend captures at Phase 7.
 11. **Phase 8 asset dependency** — the centre-face base image + CSV come from the user; chrome
     work proceeds without them (Phase 8 item 1 note) so the build never blocks on an external
     deliverable.
