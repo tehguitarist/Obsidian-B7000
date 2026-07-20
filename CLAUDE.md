@@ -103,7 +103,7 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 2 (CMake scaffold) — COMPLETE (2026-07-20). NEXT: Step 3 (chowdsp_wdf smoke test).**
+> **CURRENT: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20). NEXT: Step 4 (stage-by-stage DSP).**
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
 > against primary p.4, backup, and both BOM pages, PLUS (session 3): ✅ Baxandall + LO-MID/HI-MID
 > tone-stack per-node redraw (verified node graphs now in circuit.md — R35/R36 wiper→(−) roles,
@@ -122,8 +122,8 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: Step 3 (chowdsp_wdf smoke test)** — RC lowpass console exe, verify −3 dB within 1% at
-> 44.1/48/96k. After that: Step 4 stage-by-stage linear DSP.
+> **NEXT: Step 4 (stage-by-stage linear DSP)** — build stages in signal order, each with FR test
+> vs analytic transfer function. Start with input buffer + JFET stage.
 
 ## Project-specific carry-forwards
 

@@ -64,3 +64,8 @@ target_compile_options(ObsidianB7000 PRIVATE ${PEDAL_WARNING_FLAGS})
 add_executable(DummyTest tests/DummyTest.cpp)
 target_compile_options(DummyTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME DummyTest COMMAND DummyTest)
+
+add_executable(RCLowpassTest tests/RCLowpassTest.cpp)
+target_link_libraries(RCLowpassTest PRIVATE chowdsp::chowdsp_wdf)
+target_compile_options(RCLowpassTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME RCLowpassTest COMMAND RCLowpassTest)
