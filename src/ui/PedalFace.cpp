@@ -85,10 +85,13 @@ void PedalFace::buildComponents()
         t.setPosition(def);
         addAndMakeVisible(t);
     };
+    // Initial lever positions must match each param's DEFAULT index once mapped
+    // through the read map (updateLEDs): attack/grunt default val0 -> pos0;
+    // lo/hi-mid default val2 (1kHz/3kHz) -> pos1 (mid) via midMap {1,2,0}.
     setupToggle(attackToggle, 0);
     setupToggle(gruntToggle,  0);
-    setupToggle(loMidToggle,  2);
-    setupToggle(hiMidToggle,  2);
+    setupToggle(loMidToggle,  1);
+    setupToggle(hiMidToggle,  1);
 
     attackToggle.onChange = [this](int pos) {
         if (auto* p = dynamic_cast<AudioParameterChoice*>(state.getParameter("attack")))
@@ -124,6 +127,14 @@ void PedalFace::buildComponents()
             p->endChangeGesture();
         }
     };
+
+    // Clicking a label/icon row selects that position: drive the paired toggle
+    // (which fires its onChange → writes the param) and update the clicked
+    // component immediately so there's no wait for the next timer sync.
+    attackIcons.onSelect = [this](int pos) { attackToggle.setPosition(pos); attackIcons.setPosition(pos); };
+    gruntIcons.onSelect  = [this](int pos) { gruntToggle.setPosition(pos);  gruntIcons.setPosition(pos); };
+    loMidText.onSelect   = [this](int pos) { loMidToggle.setPosition(pos);  loMidText.setPosition(pos); };
+    hiMidText.onSelect   = [this](int pos) { hiMidToggle.setPosition(pos);  hiMidText.setPosition(pos); };
 
     // ── Position map (ratios of 1960×1540 base texture) ──
     components = {
@@ -224,7 +235,10 @@ void PedalFace::updateLEDs()
             if (text)  text->setPosition(pos);
         }
     };
-    static constexpr int midMap[] = { 2, 0, 1 };
+    // pos->val map: MUST match the write map in the loMid/hiMid onChange handlers
+    // (both { up:val1, mid:val2, down:val0 }). Keeping these two tables in sync is
+    // what stops the lever snapping back off the bottom position — see loMidToggle.onChange.
+    static constexpr int midMap[] = { 1, 2, 0 };
     syncChoice("attack",      attackToggle,  &attackIcons, nullptr,       nullptr);
     syncChoice("grunt",       gruntToggle,   &gruntIcons,  nullptr,       nullptr);
     syncChoice("lo_mid_freq", loMidToggle,   nullptr,      &loMidText,    midMap);

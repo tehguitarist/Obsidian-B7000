@@ -21,6 +21,20 @@ public:
 
     int getPosition() const { return position; }
 
+    // Fired when the user clicks one of the three label rows (top/mid/bottom third).
+    // Wire this to the paired toggle so the label doubles as a click target.
+    std::function<void(int)> onSelect;
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        auto b = getLocalBounds().toFloat();
+        if (b.isEmpty()) return;
+        const float relY = e.position.y - b.getY();
+        if (relY < 0.0f || relY >= b.getHeight()) return;
+        const int pos = juce::jlimit(0, 2, (int)(relY / (b.getHeight() / 3.0f)));
+        if (onSelect) onSelect(pos);
+    }
+
     void paint(juce::Graphics& g) override
     {
         auto b = getLocalBounds().toFloat();
