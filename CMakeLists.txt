@@ -133,3 +133,7 @@ add_test(NAME MasterOutTest COMMAND MasterOutTest)
 add_executable(JfetStageTest tests/JfetStageTest.cpp)
 target_compile_options(JfetStageTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME JfetStageTest COMMAND JfetStageTest)
+
+add_executable(ClipperTest tests/ClipperTest.cpp)
+target_compile_options(ClipperTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME ClipperTest COMMAND ClipperTest)

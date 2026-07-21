@@ -103,10 +103,59 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 5 IN PROGRESS — J201 JFET stage (nonlinear #1) STRUCTURE ✅ DONE (2026-07-21).
-> All linear stages (Step 4) ✅ COMPLETE incl. MasterOut. NEXT within Step 5: CD4049UBE clipper
-> (nonlinear #2) + GRUNT bank + switch topologies (build-plan Phase 5). Then Phase 4b functional UI.**
-> Phase completion tracking in `docs/build-plan.md` §"Where we are" — update both files.
+> **CURRENT: Phase 5 (CD4049UBE clipper, nonlinear #2 — THE distortion) STRUCTURE ✅ DONE
+> (2026-07-21).** `src/dsp/Clipper.h` + `tests/ClipperTest.cpp` + `clipper_smallsignal_tf` in
+> `eq_reference.py`. GRUNT bank + R16 + finite-gain 4049 VTC + R18∥C14 + D1/D2 modelled as ONE
+> coupled stage (per-sample Newton solve on node W). ctest 14/14 PASS + dsp-validator PASS (all 6
+> checks). All amplitude params (kA0/kSatLo/kSatHi) NOMINAL → Phase-7 capture fit. **NEXT: Phase 6 —
+> oversampling + ADAA** (wrap
+> the J201 + Clipper waveshapers, AccurateOmega, delay-comp the BLEND clean tap, end-to-end DC-step).
+> Phase 4b (functional UI) ✅ DONE (commit 40451af). All linear stages (Step 4) ✅ COMPLETE incl.
+> MasterOut. J201 JFET stage (nonlinear #1) STRUCTURE ✅ DONE. `processBlock` is still passthrough
+> (metering only, `dsp` member unused) — no audible DSP until Phase 7 full-chain integration; UI
+> controls correctly write params but don't yet affect sound (expected, not a bug). Phase completion
+> tracking in `docs/build-plan.md` §"Where we are" — update both files.
+> **PHASE 5 — CD4049UBE CLIPPER STRUCTURE DONE (2026-07-21):** `src/dsp/Clipper.h`. The audible
+> overdrive. Modelled per `docs/nonlinear-component-modeling.md` §1's RECOMMENDED path: a static
+> asymmetric-sigmoid inverter VTC inside the shunt-feedback loop, solved with the 4049's FINITE
+> open-loop gain (kA0, nominal 25) — NOT ideal virtual ground (circuit.md GRUNT note: ideal-vg is
+> audibly wrong). GRUNT cap bank (C11 4n7 always + C12 47n / C13 220n switched → Cut/Flat/Boost) in
+> series with R16 feeds node W; R18∥C14 shunt feedback; both caps are trapezoidal companions (same
+> convention as DriveStage/JfetStage/MasterOut). Node W is an implicit fn of Y=VTC(W), so it's a
+> per-sample **Newton solve** (warm-started, 6 iters, F & F' derived in-header). VTC = inverting
+> per-side tanh (kSatLo/kSatHi asymmetric → the doc's required even harmonics; R19-dropped effective
+> rail folded into the sat levels; closed-form antiderivative for Phase-6 ADAA). **D1/D2 = hard
+> clamps at node W** — Test 5 proves max|W|=1.1 V ≪ the ±3.75 V clamp window even at 8 V drive, so
+> they never conduct in normal operation → no chowdsp DiodeT/AccurateOmega needed for them (that
+> machinery lands in Phase 6 only if residual waveshaper aliasing demands it). **NO RailClamp** (the
+> VTC IS the soft limiting; IC3 is not an op-amp). **NET INVERTING confirmed by the DC-step test** —
+> the OD path carries THIS inversion + the J201's into BLEND (dsp.md polarity note; end-to-end BLEND
+> DC-step still runs in Phase 6). **FINITE-GAIN COUPLING is the load-bearing result:** the GRUNT
+> high-pass corners land at 896/144/36 Hz (Cut/Flat/Boost) — the input-node impedance R18/(1+A0)
+> drags them 5.5×/3.1×/2.9× BELOW the ideal-virtual-ground 4980/453/104 Hz, and finite gain also
+> lowers closed-loop gain below circuit.md's ideal −48.5 (HF plateau ~−16). Small-signal FR matches
+> the oracle ≤0.012 dB <2 kHz; >2 kHz deviation (≤1.0 dB) is bilinear warp of the C14 corner
+> (resolved by the Phase-6 OS region — the stage sits INSIDE it, it's the chain's hardest aliaser).
+> **⚠ Phase-7 capture carry-forwards (all flagged in-code, constants-only refit):** kA0 (open-loop
+> gain — fits BOTH the GRUNT-corner voicing AND the drive-sweep level, primary param), kSatLo/kSatHi
+> (per-side clip ceilings / H2-H3 asymmetry, fit to drive-sweep Farina THD + low-freq H2/H3). GRUNT
+> position→cap map is the ASSUMED UI map (Cut=4n7/Flat=4n7∥47n/Boost=4n7∥220n) — VERIFY at capture.
+> **⚠ GRUNT glitch-free swap deferred to Phase 6** (setGruntCap recomputes coefficients but keeps
+> the cap history → a bounded click on a live swap; crossfade alongside the BLEND work, like
+> TrebleAttack's deferred ATTACK crossfade). ATTACK + mid-freq switch topologies were already done
+> in Phase 4 (TrebleAttack / MidBand) — Phase 5's switch-topology work was the GRUNT bank.
+> **PHASE 4b — FUNCTIONAL UI DONE (2026-07-21):** `src/ui/PedalFace.{h,cpp}` composites the
+> data-driven face from `ui/b7k_texture_base.png` + `ui/component_positions.csv`; all 8 knobs +
+> 2 footswitches + 2 LEDs + 4 three-way switches (ATTACK/GRUNT/LO-MID/HI-MID) bound to APVTS via
+> attachments. Two bugs found+fixed this session: (1) LO-MID/HI-MID pos→val read map
+> (`updateLEDs`'s `midMap`) didn't match the write map (`onChange`), so the bottom lever position
+> snapped back to middle on the next 33 Hz timer tick — both now share `{1,2,0}`. (2) LO-MID/HI-MID
+> text labels (`SwitchLabelText`) and ATTACK/GRUNT icon glyphs (`AttackGruntIcons`) were
+> click-through only via the paired `SwitchToggle`; added `onSelect` + `mouseDown` to both so
+> clicking a label/icon row is equivalent to dragging the lever there. Toggle init positions
+> aligned to each param's actual default index (was causing an open-time flicker). **⚠ Known
+> duplication carry-forward:** the mid pos↔val map now lives in two places (`onChange` handlers +
+> `midMap`) that must be kept in sync by hand — flagged, not yet collapsed into one shared table.
 > **J201 JFET STAGE — STRUCTURE DONE (2026-07-21):** `src/dsp/JfetStage.h` + `tests/JfetStageTest.cpp`
 > + `jfet_stage_lin_tf` in `eq_reference.py`. Path-B (docs/nonlinear-component-modeling.md §2)
 > Wiener-Hammerstein cascade: input HP (C2 1n into R4+R5=1.1M, fc 144.7 Hz — J201 gate draws no

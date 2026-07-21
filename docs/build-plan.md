@@ -15,8 +15,8 @@
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
 | 4 — Stage-by-stage linear DSP | **✅ COMPLETE (2026-07-21)** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓, SallenKeyLPF ✓, LevelBlend ✓ (2026-07-20), EQ block ✓ (EqPreGain + Baxandall + MidBand, 2026-07-21), **MasterOut ✓ (2026-07-21, last linear stage)** | per-stage FR + dsp-validator |
 | 4 (nonlinear #1) — J201 JFET stage | **✅ STRUCTURE DONE (2026-07-21)** | JfetStage ✓: linear shape (HP + HF-lift shelf) + inverting polarity + asym soft waveshaper. All amplitude constants (G0/gmR6/sat) NOMINAL → fit at Phase 7 capture. | linear FR vs oracle + DC-step polarity + nonlinearity sanity (ctest 13/13) + dsp-validator |
-| 4b — Functional UI pass | Not started | — | — |
-| 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
+| 4b — Functional UI pass | **✅ DONE (2026-07-21)** | data-driven pedal face bound to APVTS (commit 40451af) | interactive testability |
+| 5 — Nonlinear clipper + GRUNT + switch topologies | **✅ STRUCTURE DONE (2026-07-21)** | Clipper ✓: GRUNT bank + R16 + finite-gain 4049 VTC + R18∥C14 + D1/D2 as ONE coupled stage (Newton solve). GRUNT corners finite-gain (896/144/36 Hz ≪ ideal-vg). All amplitude params (A0/satLo/satHi) NOMINAL → Phase-7 capture fit. Oversample+ADAA = Phase 6. | small-signal FR vs oracle + GRUNT corners + DC-step polarity + asymmetry + D1/D2-never-conduct (ctest 14/14) + **dsp-validator PASS (all 6 checks, 2026-07-21)** |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
 | 7 — Full-chain integration + level calibration | Not started | — | — |
 | 8 — Full UI (polish, VU gate, headless) | Not started | — | — |

@@ -277,6 +277,45 @@ def jfet_stage_lin_tf(f, G0=15.0, gm_R6=2.277, R4=100e3, R5=1e6, C2=1e-9, R6=3.3
     return -G0 * hp * shelf
 
 
+def clipper_smallsignal_tf(f, Cg, A0=25.0, R16=6.8e3, R18=330e3, C14=220e-12):
+    """CD4049UBE clipper (IC3) — LINEAR small-signal TF (waveshaper ~ unity).
+
+    The clipper is a single unbuffered-CD4049 inverter section wired as a
+    shunt-feedback inverting amp: GRUNT cap bank (Cg) -> R16 into node W (pin3),
+    R18 || C14 shunt feedback from output Y (pin2) back to W, self-biased to the
+    inverter trip point. Its distortion (the audible one) is the inverter VTC,
+    modelled in the C++ stage as an asymmetric sigmoid with FINITE open-loop gain
+    A0. This oracle is the small-signal LINEAR loop transfer (VTC ~ -A0*w near 0):
+
+      H(s) = -A0 * Yin(s) / [ Yin(s) + (A0 + 1) * Yfb(s) ]
+        Yin(s) = 1 / (R16 + 1/(s*Cg))   (series GRUNT cap + R16 input branch)
+        Yfb(s) = 1/R18 + s*C14          (R18 || C14 feedback)
+
+    Two things this captures that an ideal-virtual-ground model does NOT
+    (docs/nonlinear-component-modeling.md §1, circuit.md GRUNT note):
+      * the input-node impedance R18/(1+A0) dominates the input RC, so the GRUNT
+        high-pass corner sits FAR below the ideal 1/(2*pi*Cg*R16). The ACTUAL -3 dB
+        corners of this (bandpass) transfer, with A0=25, are ~900 / 144 / 36 Hz for
+        Cg = 4n7 / 4n7||47n / 4n7||220n -- vs the ideal-vg 4.98k / 453 / 104 Hz
+        (5.5x / 3.1x / 2.9x lower). [The single-pole estimate
+        1/(2*pi*Cg*(R16 + R18/(1+A0))) ~1.74k/158/36 Hz only tracks the large-Cg
+        Boost row; use the -3 dB numbers above, which the C++ stage matches.]
+      * finite gain also lowers the mid-band closed-loop gain well below the
+        ideal -R18/R16 = -48.5 (with A0=25, HF plateau ~ -16).
+
+    ** A0 (open-loop gain, nominal 25 -- community-measured 20-30 on CMOS B7K/B3K
+    stages) governs BOTH the corner and the closed-loop gain, so it is the primary
+    Phase-7 capture-fit parameter, alongside the VTC rail/asymmetry in the C++
+    stage. The -48.5 figure in circuit.md is the ideal-A0 upper bound only. **
+
+    Referenced by tests/ClipperTest.cpp as the small-signal linear oracle.
+    """
+    s = 2j * np.pi * f
+    Yin = 1.0 / (R16 + 1.0 / (s * Cg))
+    Yfb = 1.0 / R18 + s * C14
+    return -A0 * Yin / (Yin + (A0 + 1.0) * Yfb)
+
+
 f = np.logspace(np.log10(10), np.log10(20000), 1200)
 
 print("=" * 72)
@@ -340,6 +379,17 @@ for A0 in [1e9, 30, 20, 10]:
         fc = 1 / (2 * np.pi * C * (R16 + zin))
         print(f"GRUNT {cname:>9} | 4049 open-loop gain {A0 if A0<1e8 else 'ideal':>5}: HPF corner {fc:7.1f} Hz")
     print()
+print("CLIPPER small-signal model (clipper_smallsignal_tf, A0=25 nominal) — the")
+print("actual -3 dB corners the C++ Clipper stage is validated against (Test 2):")
+ff = np.logspace(0, np.log10(5000), 400000)
+for cname, C in [("4n7", 4.7e-9), ("4n7||47n", 51.7e-9), ("4n7||220n", 224.7e-9)]:
+    h = np.abs(clipper_smallsignal_tf(ff, C))
+    plat = h.max()
+    corner = ff[np.where(h >= plat / np.sqrt(2))[0][0]]
+    ideal = 1 / (2 * np.pi * C * R16)
+    print(f"GRUNT {cname:>9}: plateau {20*np.log10(plat):+6.2f} dB  -3dB corner {corner:7.1f} Hz "
+          f"(ideal-vg {ideal:7.1f} Hz -> finite gain drags it {ideal/corner:.1f}x lower)")
+print()
 print("=" * 72)
 print("J201 JFET stage (Q1 CS + Q2 active load) — LINEAR small-signal corners")
 print("=" * 72)
