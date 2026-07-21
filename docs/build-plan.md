@@ -13,7 +13,7 @@
 | 1 — Schematic analysis | Complete | 2026-07-19 | — |
 | 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
-| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓, SallenKeyLPF ✓, LevelBlend ✓ (2026-07-20), EQ block ✓ (EqPreGain + Baxandall + MidBand, 2026-07-21) — **MasterOut is the last linear stage** | per-stage FR + dsp-validator |
+| 4 — Stage-by-stage linear DSP | **✅ COMPLETE (2026-07-21)** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓, SallenKeyLPF ✓, LevelBlend ✓ (2026-07-20), EQ block ✓ (EqPreGain + Baxandall + MidBand, 2026-07-21), **MasterOut ✓ (2026-07-21, last linear stage)** | per-stage FR + dsp-validator |
 | 4b — Functional UI pass | Not started | — | — |
 | 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
@@ -219,8 +219,12 @@ levels; the capture anchor replaces it at Phase 7:
    (oracle boundary) — place C21 (~150 Hz HP into the 10k stack, shapes bass) at the EqPreGain→
    Baxandall boundary at integration. Also fixed an `eq_reference.py` diagnostic-print bug (HI-MID
    peak scan used C32=22n not C34=6n8 → printed 405 not 728 Hz; the oracle function was always correct).
-8. **MasterOut** (LAST linear stage): [ENG] MASTER divider (VR8 100k A) + IC6_B unity buffer +
-   C37/R47/R46 output HP; A-taper. RailClamp on IC6_B output.
+8. ✅ **MasterOut** (LAST linear stage — DONE 2026-07-21, dsp-validator PASS): [ENG] MASTER divider
+   (VR8 100k A) + IC6_B unity buffer + C37/R47/R46 output HP; A-taper (`master^1.43` interim, Phase-7
+   fit). `src/dsp/MasterOut.h` + `tests/MasterOutTest.cpp` + `master_out_tf`. Unloaded wiper (high-Z
+   IC6_B) → pure resistive tap; two single-node MNA HPFs (C36→100k-to-VD, C37→R46), both ~0.72 Hz —
+   NO audible-band caps, so ≤0.00024 dB vs oracle across the whole band and OUTSIDE the OS region.
+   Unity at full CW; non-inverting, AC-coupled. RailClamp on IC6_B output (GATE, disabled by default).
 
 **J201 stage (nonlinear #1)** comes after the linear chain around it works: implement as fitted
 gain + soft waveshaper (nominal from Fairchild datasheet SPICE params; structure per

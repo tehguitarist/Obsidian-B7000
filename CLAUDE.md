@@ -103,7 +103,7 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 4 (stage-by-stage linear DSP) — IN PROGRESS (2026-07-21). EQ block DONE; MasterOut is the last linear stage.**
+> **CURRENT: Step 4 (stage-by-stage linear DSP) — ✅ COMPLETE (2026-07-21). All linear stages done incl. MasterOut. NEXT: Step 5 — J201 nonlinear stage.**
 > Phase completion tracking in `docs/build-plan.md` §"Where we are" — update both files.
 > **STEP-4 STAGES DONE SO FAR (each: FR test vs oracle in ctest + dsp-validator PASS):**
 > ✅ **InputBuffer (IC1_A)** — `src/dsp/InputBuffer.h` + `tests/InputBufferTest.cpp`. ~1.59 Hz HP
@@ -198,9 +198,23 @@ high, execute routine work cheap) is what should persist.
 >    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
 >    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
 >    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
-> **STILL TODO in Step 4:** MasterOut (VR8 MASTER divider + IC6_B buffer + C37/R47/R46 output HP),
->    THEN the J201 nonlinear stage. RailClamp now exists — apply it to each remaining op-amp stage as
->    built (calibration §6, GATE item). (Build-plan Phase 4.)
+> ✅ **MasterOut (VR8 MASTER divider + IC6_B buffer + output HP, stage #9) — DONE (2026-07-21,
+>    dsp-validator PASS all 7 checks).** `src/dsp/MasterOut.h` + `tests/MasterOutTest.cpp` +
+>    `master_out_tf` in `eq_reference.py`. The LAST linear stage. [ENG] MASTER (100k A) post-EQ
+>    divider: top = IC6_A out via C36(2u2), bottom = VD, wiper → IC6_B(+); IC6_B unity buffer;
+>    C37(2u2) → R47(1k series) → OUT, R46(100k) pulldown. The wiper feeds high-Z IC6_B so it is
+>    UNLOADED → the pot is a pure resistive tap: `divRatio = Rbot/Rp = master^p` (A-taper). Built as
+>    two single-node MNA HPFs (C36→100k pot-to-VD; C37→R46) with a unity buffer + RailClamp between
+>    them (same trapezoidal cap conventions as RecoveryBridgedT). **The ONLY caps are two ~0.72 Hz
+>    sub-audio HPFs — NO audible-band caps → NO bilinear warp**, so the stage matches the analytic
+>    oracle to ≤0.00024 dB across the WHOLE band (20 Hz–20 kHz, 48/96k) at master 1.0/0.5/0.25, and
+>    sits OUTSIDE the Phase-6 oversampled region (like InputBuffer's ~1.6 Hz HP). Unity at full CW
+>    (0 dB); non-inverting, AC-coupled (DC gain 0) — step jumps to +divRatio·Vin then decays to ~0,
+>    closing the EQ→MASTER polarity chain (EQ net non-inv + MASTER adds none). RailClamp on IC6_B
+>    output (GATE, disabled by default). ctest registered. **⚠ Phase-7 carry-forward:** MASTER A-taper
+>    SHAPE (`kMasterTaperExp=1.43` interim `master^1.43`) — fit p to the master-sweep captures alongside
+>    the LEVEL taper (same power-law method). RailClamp now applied to every op-amp stage as built
+>    (calibration §6, GATE item). (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
 > All three phases done: schematic ✓ → scaffold (20 params, AU+VST3, auval PASS) ✓ → WDF smoke test ✓.
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
@@ -221,13 +235,12 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: MasterOut** (build-plan Phase 4 item 8 — the LAST linear stage). [ENG] MASTER (VR8, 100k A)
-> post-EQ divider (top = HI-MID/IC6_A out via C36 2u2; bottom = VD; wiper → IC6_B) → IC6_B unity output
-> buffer → C37 (2u2) → R47 (1k series) → OUT, R46 (100k) output pulldown. A-taper (interim power-law,
-> fit at Phase 7); the divider is attenuation-only, unity at full CW; C36 gives a ~0.72 Hz HPF corner
-> (inaudible) and supplies IC6_B's DC bias (stock board floats it — see circuit.md MASTER note).
-> RailClamp on IC6_B output (GATE item). Then Step 5: the J201 nonlinear stage.
-> (EQ block ✅ done 2026-07-21 — see the Step-4 stages list above.)
+> **NEXT: Step 5 — J201 nonlinear stage** (Q1 common-source + Q2 active load; build-plan Phase 5).
+> All linear stages (Step 4) are ✅ COMPLETE incl. MasterOut (see the Step-4 stages list above).
+> The J201 pair is one of only TWO non-WDF-native parts (with the CD4049UBE clipper); needs a fitted
+> gain+soft-waveshaper (~5:1 part spread → fit-to-capture, nominal SPICE won't match) — see
+> `docs/nonlinear-component-modeling.md` §2 + §4 capture plan. Confirm the JFET stage's output SIGN
+> with its own DC-step test (flagged unconfirmed in circuit.md — matters for BLEND polarity).
 
 ## Project-specific carry-forwards
 

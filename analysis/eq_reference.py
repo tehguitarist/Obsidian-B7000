@@ -163,6 +163,30 @@ def bridged_t_tf(f, R22=100e3, R23=33e3, C16=680e-12, C17=22e-9, Rload=None):
         out[i] = x[1]
     return out
 
+def master_out_tf(f, master, Rp=100e3, C36=2.2e-6, C37=2.2e-6, R46=100e3, p=1.43):
+    """MASTER [ENG] divider + IC6_B unity buffer + output HP (see MasterOut.h).
+
+    Signal ground = VD = 0. The MASTER wiper feeds IC6_B(+), a high-Z op-amp
+    input drawing no current, so the wiper is UNLOADED and the transfer factors:
+
+        H(s) = divRatio · [sC36·Rp/(1+sC36·Rp)] · [sC37·R46/(1+sC37·R46)]
+
+      divRatio = Rbot/Rp = master^p  (A-taper divider fraction; full CW → 1).
+      input HPF  (C36 into the 100k pot-to-VD)  corner = 1/(2π·C36·Rp) ≈ 0.72 Hz
+      output HPF (C37 into R46 pulldown)        corner = 1/(2π·C37·R46) ≈ 0.72 Hz
+
+    Both corners are sub-Hz (inaudible) and there are NO audible-band caps, so the
+    magnitude above ~5 Hz is essentially flat at divRatio (unity at full CW). p is
+    fit to the master-sweep captures at Phase 7; default matches kMasterTaperExp in
+    the C++ stage. Referenced by tests/MasterOutTest.cpp as the analytic oracle.
+    """
+    s = 2j * np.pi * f
+    ratio = 0.0 if master <= 0.0 else (1.0 if master >= 1.0 else master ** p)
+    hp_in = s * C36 * Rp / (1.0 + s * C36 * Rp)
+    hp_out = s * C37 * R46 / (1.0 + s * C37 * R46)
+    return ratio * hp_in * hp_out
+
+
 def sallen_key_lpf_tf(f, R1, R2, C1, C2):
     """Unity-gain (voltage-follower) 2nd-order Sallen-Key LOW-PASS (IC4_B, IC4_A).
 
@@ -268,6 +292,11 @@ print("MASTER [ENG] + GRUNT corner notes")
 print("=" * 72)
 C36 = 2.2e-6; Rm = 100e3
 print(f"MASTER: C36(2u2) into 100k pot->VD: HPF corner = {1/(2*np.pi*C36*Rm):.2f} Hz (inaudible; divider is flat). Unity at full CW; attenuation-only.")
+print(f"        C37(2u2) into R46(100k) pulldown: output HPF corner = {1/(2*np.pi*2.2e-6*100e3):.2f} Hz (inaudible).")
+for m in [1.0, 0.75, 0.5, 0.25]:
+    g1k = 20 * np.log10(np.abs(master_out_tf(np.array([1000.0]), m)))[0]
+    ratio = m ** 1.43
+    print(f"        MASTER={m:.2f}: divRatio={ratio:.4f}  1kHz gain {g1k:+6.2f} dB")
 R16, R18 = 6.8e3, 330e3
 for A0 in [1e9, 30, 20, 10]:
     zin = R18 / (1 + A0)

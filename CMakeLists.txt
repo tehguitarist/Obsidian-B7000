@@ -125,3 +125,7 @@ add_test(NAME BaxandallTest COMMAND BaxandallTest)
 add_executable(EqPreGainTest tests/EqPreGainTest.cpp)
 target_compile_options(EqPreGainTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME EqPreGainTest COMMAND EqPreGainTest)
+
+add_executable(MasterOutTest tests/MasterOutTest.cpp)
+target_compile_options(MasterOutTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME MasterOutTest COMMAND MasterOutTest)
