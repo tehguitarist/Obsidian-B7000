@@ -68,6 +68,20 @@ _HIMIDFREQ_IDX = {"750": 0, "1p5k": 1, "3k": 2}        # StringArray{"750Hz","1.
 
 _TOKEN_RE = re.compile(r"^[a-z0-9]+-[a-z0-9]+$")
 _CLOCK_RE = re.compile(r"^(\d{2})(\d{2})$")
+_GAIN_RE = re.compile(r"^([np])(\d+)$")
+_REF_GAIN_RE = re.compile(r"^ref-(od|clean)_gain-([np]\d+)$")
+
+# Measured (NOT nominal-dial) interface-gain deltas per gain-session token, dB. Derived from the
+# cal_1k tone in the ref-clean anchor pair (ref-clean.wav vs ref-clean_gain-n12.wav) — ref-clean is
+# used because its audible path is pure linear stages (BLEND's clean tap is pre-JFET), so cal_1k's
+# level there is an uncontaminated scalar of interface gain. The ref-od pair is NOT usable for this:
+# DIST-on routes cal_1k through the CD4049 clipper, whose compression makes a lowered send level
+# produce a smaller apparent output drop. Only re-derive this from ref-od if a gain-session capture
+# with base-od is ever added — until then this table only needs to cover base-clean captures.
+# Measured 2026-07-22: nominal -12 dB dial -> -12.071 dB actual (ref-clean.wav vs ref-clean_gain-n12.wav).
+_GAIN_SESSION_MEASURED_DB = {
+    -12: -12.071,
+}
 
 # REF-OD baseline (nonlinear-component-modeling.md §4): every pot at noon except Blend
 # (full OD / max); Attack Flat; Grunt "mid" physical position = electrical Cut; both
@@ -101,9 +115,23 @@ def parse_capture(filename):
     if stem == "bypass":
         return {"bypass": True}
     if stem == "ref-od":
-        return dict(_REF_OD, base="od")
+        return dict(_REF_OD, base="od", gainSessionDb=0)
     if stem == "ref-clean":
-        return dict(_REF_OD, base="clean", distEngage=False)
+        return dict(_REF_OD, base="clean", distEngage=False, gainSessionDb=0)
+
+    # Reserved-name variant: the REF-OD/REF-CLEAN baseline re-captured at a non-default interface
+    # gain session (see the "gain" key below) — still zero OTHER deviation, so no base-od/base-clean
+    # trailing token (it isn't a deviation capture, it IS the baseline).
+    m = _REF_GAIN_RE.match(stem)
+    if m:
+        which, gain_tok = m.group(1), m.group(2)
+        gm = _GAIN_RE.match(gain_tok)
+        if not gm:
+            raise ValueError(f"{filename}: gain value '{gain_tok}' must be '[np]<digits>' (e.g. n12, p6)")
+        gain_db = (-1 if gm.group(1) == "n" else 1) * int(gm.group(2))
+        if which == "od":
+            return dict(_REF_OD, base="od", gainSessionDb=gain_db)
+        return dict(_REF_OD, base="clean", distEngage=False, gainSessionDb=gain_db)
 
     tokens = stem.split("_")
     bad = [t for t in tokens if not _TOKEN_RE.match(t)]
@@ -125,7 +153,7 @@ def parse_capture(filename):
     if base not in ("od", "clean"):
         raise ValueError(f"{filename}: base must be 'od' or 'clean', got '{base}'")
 
-    out = dict(_REF_OD, base=base, distEngage=(base == "od"))
+    out = dict(_REF_OD, base=base, distEngage=(base == "od"), gainSessionDb=0)
 
     for key, val in kv.items():
         if key in _POT_KEYS:
@@ -146,6 +174,11 @@ def parse_capture(filename):
             if val not in _HIMIDFREQ_IDX:
                 raise ValueError(f"{filename}: himidfreq value must be one of {list(_HIMIDFREQ_IDX)}")
             out["hiMidFreq"] = _HIMIDFREQ_IDX[val]
+        elif key == "gain":
+            gm = _GAIN_RE.match(val)
+            if not gm:
+                raise ValueError(f"{filename}: gain value '{val}' must be '[np]<digits>' (e.g. n12, p6)")
+            out["gainSessionDb"] = (-1 if gm.group(1) == "n" else 1) * int(gm.group(2))
         else:
             raise ValueError(
                 f"{filename}: unknown deviation key '{key}' (no 'dist-' key either — "
@@ -155,36 +188,81 @@ def parse_capture(filename):
     return out
 
 
+def gain_correction_db(parsed):
+    """dB to ADD to a capture's amplitude to bring it into the ORIGINAL (gainSessionDb=0) session's
+    absolute-level reference frame. 0 for untagged captures. Only needed for ABSOLUTE-level analyses
+    (taper/makeup fits, §4-style level decomposition) — SHAPE-only comparisons already level-
+    normalize (analyze.py::normalize_gain) and don't need this. Raises if a gain session has no
+    measured delta yet (see _GAIN_SESSION_MEASURED_DB) — do not fall back to the nominal dial value,
+    that's exactly the "trust the capture, not the knob" principle this table exists to enforce."""
+    db = parsed.get("gainSessionDb", 0)
+    if db == 0:
+        return 0.0
+    if db not in _GAIN_SESSION_MEASURED_DB:
+        raise ValueError(
+            f"no measured delta for gain session {db:+d} dB — add it to _GAIN_SESSION_MEASURED_DB "
+            f"(derive from the ref-clean.wav vs ref-clean_gain-*.wav cal_1k comparison) before using "
+            f"this capture in an absolute-level analysis"
+        )
+    return -_GAIN_SESSION_MEASURED_DB[db]
+
+
+def gain_correction_linear(parsed):
+    """Linear amplitude multiplier version of gain_correction_db() — multiply load_capture()'s
+    output by this before any absolute-level comparison against a gainSessionDb=0 capture."""
+    return 10.0 ** (gain_correction_db(parsed) / 20.0)
+
+
 # ---- Canonical capture matrix (must match docs/nonlinear-component-modeling.md §4 exactly) ----
 CAPTURE_MATRIX_TIER1 = [
     "bypass.wav", "ref-od.wav", "ref-clean.wav",
+    # Gain-session anchor pair (2026-07-22): interface gain dropped -12 dB partway through the
+    # session to fix clipping on MASTER/EQ-boost captures (see the "gain" key below). This pair
+    # is what measures the real dB delta (_GAIN_SESSION_MEASURED_DB) between the two sessions —
+    # required before any *_gain-n12_* capture below can be trusted for absolute level.
+    "ref-od_gain-n12.wav", "ref-clean_gain-n12.wav",
     "drive-0700_base-od.wav", "drive-0930_base-od.wav",
     "drive-1430_base-od.wav", "drive-1700_base-od.wav",
     "grunt-boost_base-od.wav", "grunt-flat_base-od.wav",
     "attack-boost_base-od.wav", "attack-cut_base-od.wav",
-    "bass-0700_base-clean.wav", "bass-1700_base-clean.wav",
-    "treble-0700_base-clean.wav", "treble-1700_base-clean.wav",
-    "lomid-0700_base-clean.wav", "lomid-1700_base-clean.wav",
-    "himid-0700_base-clean.wav", "himid-1700_base-clean.wav",
-    "lomidfreq-250_lomid-1700_base-clean.wav", "lomidfreq-1k_lomid-1700_base-clean.wav",
-    "himidfreq-750_himid-1700_base-clean.wav", "himidfreq-3k_himid-1700_base-clean.wav",
+    "bass-0700_base-clean.wav", "bass-1700_gain-n12_base-clean.wav",
+    "treble-0700_base-clean.wav", "treble-1700_gain-n12_base-clean.wav",
+    "lomid-0700_base-clean.wav", "lomid-1700_gain-n12_base-clean.wav",
+    "himid-0700_base-clean.wav", "himid-1700_gain-n12_base-clean.wav",
+    "lomidfreq-250_lomid-1700_gain-n12_base-clean.wav", "lomidfreq-1k_lomid-1700_gain-n12_base-clean.wav",
+    "himidfreq-750_himid-1700_gain-n12_base-clean.wav", "himidfreq-3k_himid-1700_gain-n12_base-clean.wav",
     "blend-0700_base-od.wav", "blend-1200_base-od.wav",
-    "level-0700_base-od.wav", "level-1700_base-od.wav",
-    "master-0700_base-clean.wav", "master-1700_base-clean.wav",
+    "level-0700_gain-n12_base-od.wav", "level-1700_gain-n12_base-od.wav",
+    "master-0700_base-clean.wav", "master-1700_gain-n12_base-clean.wav",
 ]
 CAPTURE_MATRIX_TIER2 = [
-    "bass-0930_base-clean.wav", "bass-1430_base-clean.wav",
-    "treble-0930_base-clean.wav", "treble-1430_base-clean.wav",
-    "lomid-0930_base-clean.wav", "lomid-1430_base-clean.wav",
-    "himid-0930_base-clean.wav", "himid-1430_base-clean.wav",
+    "bass-0930_base-clean.wav", "bass-1430_gain-n12_base-clean.wav",
+    "treble-0930_base-clean.wav", "treble-1430_gain-n12_base-clean.wav",
+    "lomid-0930_base-clean.wav", "lomid-1430_gain-n12_base-clean.wav",
+    "himid-0930_base-clean.wav", "himid-1430_gain-n12_base-clean.wav",
     "blend-0930_base-od.wav", "blend-1430_base-od.wav",
-    "level-0930_base-od.wav", "level-1430_base-od.wav",
-    "master-0930_base-clean.wav", "master-1430_base-clean.wav",
+    "level-0930_gain-n12_base-od.wav", "level-1430_gain-n12_base-od.wav",
+    "master-0930_base-clean.wav", "master-1430_gain-n12_base-clean.wav",
     "lomidfreq-250_lomid-0700_base-clean.wav", "lomidfreq-1k_lomid-0700_base-clean.wav",
     "himidfreq-750_himid-0700_base-clean.wav", "himidfreq-3k_himid-0700_base-clean.wav",
     "drive-1700_grunt-boost_base-od.wav", "drive-1700_attack-boost_base-od.wav",
 ]
 CAPTURE_MATRIX = CAPTURE_MATRIX_TIER1 + CAPTURE_MATRIX_TIER2
+
+# ---- Secondary/diagnostic captures (NOT part of the fitting matrix) ----
+# The full LEVEL sweep, kept at its ORIGINAL (gainSessionDb=0) interface gain alongside the primary
+# gain-n12 sweep above. LEVEL is a base-od (DIST-engaged) control, so unlike the base-clean captures
+# fixed the same way, its original-session files can't be corrected into the same absolute-level
+# frame as the gain-n12 primary set (the clipper's compression makes any session-to-session delta
+# for an OD-path capture unreliable — see the "gain" key note in nonlinear-component-modeling.md §4;
+# this is exactly why REF-OD's own cal_1k gave a contaminated -2.857 dB instead of the clean -12.071).
+# Kept on disk (not archived) deliberately: they're a real, repeatable capture of what looks like
+# genuine output-stage compression at high LEVEL settings, worth keeping for future characterization
+# — just never treat them as equivalent to, or splice-able with, the gain-n12 primary sweep.
+CAPTURE_MATRIX_SECONDARY = [
+    "level-0700_base-od.wav", "level-0930_base-od.wav",
+    "level-1430_base-od.wav", "level-1700_base-od.wav",
+]
 
 
 def find_captures(directory=CAPTURE_DIR):

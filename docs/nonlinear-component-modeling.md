@@ -179,7 +179,9 @@ at. There is deliberately no separate "dist-off" token: DIST state is fully dete
 it). If a control matters for a given capture, it gets a token; nothing is implied by context or a
 parenthetical note.
 
-**Reserved (zero-deviation) filenames:** `bypass.wav`, `ref-od.wav`, `ref-clean.wav`.
+**Reserved (zero-deviation) filenames:** `bypass.wav`, `ref-od.wav`, `ref-clean.wav`, plus their
+gain-session variants `ref-od_gain-<tok>.wav` / `ref-clean_gain-<tok>.wav` (see the `gain` key
+below) — still zero *other* deviation, so no trailing `base-*` token.
 
 **Pot keys** (value = 4-digit clock code, `0700`=min … `1200`=noon … `1700`=max, linear between —
 `captures.py::_clock_to_x`, same convention as `analyze.py::clock_to_x`):
@@ -221,12 +223,51 @@ translation layer):
 
 **Baseline key** (required, always the last token): `base-od` / `base-clean`.
 
-### Tier 1 — Essential (29 takes)
+**Gain-session key** (optional; omit entirely if the whole session used one fixed interface gain —
+see `validation-and-capture.md` §3 rule 1, "fix interface gain for the whole session and never touch
+it"). Value = signed dB from the session's original gain, `[np]<digits>` (`n12` = −12 dB, `p6` =
++6 dB):
+
+| Filename key | `captures.py` field | Meaning |
+|---|---|---|
+| `gain` | `gainSessionDb` | interface-gain deviation from the original session, dB |
+
+> ⚠ **Added 2026-07-22, mid-session.** MASTER-max and several EQ-boost-max clean captures
+> (`master-1700`, `bass-1430/1700`, `treble-1430/1700`, `lomid-1430/1700` + its freq variants,
+> `himid-1430/1700` + its freq variants) were pinned against the same hard ceiling (peak 0.98850,
+> hundreds–thousands of flat-topped samples) regardless of which knob was under test — the signature
+> of the recording interface's own input headroom being hit, not 14 independent coincidences. Fix:
+> dropped interface gain −12 dB partway through the session and re-captured just those 14 takes
+> (protocol rule 1 says fix gain for "the whole session," so a mid-session change is deliberately
+> made loud/explicit here rather than silently reusing the same bare filenames). The `gain` key
+> exists so a re-captured-at-different-gain file can never silently look identical to a normal
+> capture — same principle as every other key in this grammar ("if a control matters, it gets a
+> token").
+>
+> **A `gain`-tagged file needs a matching gain-session anchor pair before it can be trusted for
+> ABSOLUTE level** (not needed for shape-only comparisons — `analyze.py::normalize_gain` already
+> handles an arbitrary scalar mismatch there). The anchor is the REF-OD/REF-CLEAN baseline
+> re-captured at the new gain: `ref-od_gain-n12.wav` / `ref-clean_gain-n12.wav` (reserved-name
+> variant — still zero *other* deviation, so no trailing `base-*` token, same as the un-tagged
+> `ref-od.wav`/`ref-clean.wav`). `captures.py::gain_correction_db()`/`gain_correction_linear()`
+> apply the MEASURED delta from that pair's `cal_1k` tone (not the nominal dial value — same
+> "fit to capture, don't trust the control" principle used everywhere else in this project). **Use
+> the ref-CLEAN pair to measure this, not ref-OD**: REF-CLEAN's audible path is pure linear stages
+> (BLEND's clean tap is pre-JFET), so `cal_1k`'s level there is an uncontaminated scalar of
+> interface gain (measured 2026-07-22: −12.071 dB, within 0.07 dB of the −12 dial). REF-OD routes
+> `cal_1k` through the CD4049 clipper, whose compression makes a lowered send level produce a
+> smaller apparent output drop (measured only −2.857 dB for the same nominal −12) — not usable as a
+> linear calibration anchor. All 14 re-captured files are `base-clean`, so this is exactly the pair
+> that matters; only re-derive an OD-side delta if a gain-tagged `base-od` capture is ever added.
+
+### Tier 1 — Essential (31 takes)
 
 ```
 bypass.wav
 ref-od.wav
 ref-clean.wav
+ref-od_gain-n12.wav
+ref-clean_gain-n12.wav
 drive-0700_base-od.wav
 drive-0930_base-od.wav
 drive-1430_base-od.wav
@@ -236,29 +277,30 @@ grunt-flat_base-od.wav
 attack-boost_base-od.wav
 attack-cut_base-od.wav
 bass-0700_base-clean.wav
-bass-1700_base-clean.wav
+bass-1700_gain-n12_base-clean.wav
 treble-0700_base-clean.wav
-treble-1700_base-clean.wav
+treble-1700_gain-n12_base-clean.wav
 lomid-0700_base-clean.wav
-lomid-1700_base-clean.wav
+lomid-1700_gain-n12_base-clean.wav
 himid-0700_base-clean.wav
-himid-1700_base-clean.wav
-lomidfreq-250_lomid-1700_base-clean.wav
-lomidfreq-1k_lomid-1700_base-clean.wav
-himidfreq-750_himid-1700_base-clean.wav
-himidfreq-3k_himid-1700_base-clean.wav
+himid-1700_gain-n12_base-clean.wav
+lomidfreq-250_lomid-1700_gain-n12_base-clean.wav
+lomidfreq-1k_lomid-1700_gain-n12_base-clean.wav
+himidfreq-750_himid-1700_gain-n12_base-clean.wav
+himidfreq-3k_himid-1700_gain-n12_base-clean.wav
 blend-0700_base-od.wav
 blend-1200_base-od.wav
-level-0700_base-od.wav
-level-1700_base-od.wav
+level-0700_gain-n12_base-od.wav
+level-1700_gain-n12_base-od.wav
 master-0700_base-clean.wav
-master-1700_base-clean.wav
+master-1700_gain-n12_base-clean.wav
 ```
 
 | Group | Pins |
 |---|---|
 | `bypass` | **level anchor (kInputRef)** — record first |
 | `ref-od` / `ref-clean` | OD & clean references + DIST-footswitch check (compare the two directly) |
+| `ref-od_gain-n12` / `ref-clean_gain-n12` | **gain-session anchor pair** — measures the real dB delta for every `*_gain-n12_*` capture below |
 | `drive-*` | **CD4049 clipper** amount + harmonics (4 points; drive's own noon baseline is the implicit 5th) |
 | `grunt-*` | pre-clip bass content (baseline already covers electrical Cut) |
 | `attack-*` | **3-way Attack [ENG]** + treble net (baseline already covers Flat) |
@@ -272,19 +314,19 @@ master-1700_base-clean.wav
 
 ```
 bass-0930_base-clean.wav
-bass-1430_base-clean.wav
+bass-1430_gain-n12_base-clean.wav
 treble-0930_base-clean.wav
-treble-1430_base-clean.wav
+treble-1430_gain-n12_base-clean.wav
 lomid-0930_base-clean.wav
-lomid-1430_base-clean.wav
+lomid-1430_gain-n12_base-clean.wav
 himid-0930_base-clean.wav
-himid-1430_base-clean.wav
+himid-1430_gain-n12_base-clean.wav
 blend-0930_base-od.wav
 blend-1430_base-od.wav
-level-0930_base-od.wav
-level-1430_base-od.wav
+level-0930_gain-n12_base-od.wav
+level-1430_gain-n12_base-od.wav
 master-0930_base-clean.wav
-master-1430_base-clean.wav
+master-1430_gain-n12_base-clean.wav
 lomidfreq-250_lomid-0700_base-clean.wav
 lomidfreq-1k_lomid-0700_base-clean.wav
 himidfreq-750_himid-0700_base-clean.wav
@@ -304,6 +346,21 @@ drive-1700_attack-boost_base-od.wav
 `analysis/captures.py::CAPTURE_MATRIX_TIER1` / `CAPTURE_MATRIX_TIER2` are these exact lists,
 byte-for-byte — `python3 analysis/captures.py` parses every one and reports PASS/FAIL, so the doc
 and the parser cannot silently drift apart.
+
+> **Secondary/diagnostic captures (not in the matrix): the full LEVEL sweep at its ORIGINAL
+> (untagged, `gainSessionDb=0`) interface gain** — `level-0700/0930/1430/1700_base-od.wav`, kept
+> alongside the primary `gain-n12` LEVEL sweep above rather than archived. LEVEL is `base-od`
+> (DIST-engaged), so — unlike the `base-clean` captures the `gain-n12` fix already covers — its
+> original-gain files can't be corrected into the same absolute-level frame as the `gain-n12`
+> primary sweep (the CD4049 clipper's compression makes any base-od session-to-session delta
+> unreliable, the same reason REF-OD's own `cal_1k` gave a contaminated −2.857 dB instead of
+> REF-CLEAN's clean −12.071 dB — see the `gain` key note above). They repeatably show what looks
+> like genuine output-stage compression at high LEVEL settings (non-monotonic level, poor
+> waveform-shape null vs. neighboring settings) that the `gain-n12` sweep does not — worth keeping
+> for future characterization, but **never treat them as equivalent to, or splice-able with, the
+> `gain-n12` primary sweep.** Listed in `captures.py::CAPTURE_MATRIX_SECONDARY`, not
+> `CAPTURE_MATRIX` — `find_captures()` will still surface them (nothing hides a file from a
+> directory scan), but no primary fit should read from that list.
 
 ### How each model / the notch is extracted (audio-only)
 - **CD4049 clipper waveshaper** ← Drive sweep + the signal's driven Farina sweeps (continuous
