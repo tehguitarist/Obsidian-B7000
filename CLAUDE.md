@@ -103,7 +103,25 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 6 (oversampling + ADAA + FULL-CHAIN ASSEMBLY) ✅ DONE (2026-07-21).**
+> **CURRENT: Phase 7 PRE-WORK (2026-07-22) — see `docs/phase7-handoff.md` for the full resume point.**
+> Capture session ✅ DONE: 55 files in `analysis/captures/` (gitignored — back them up, they are NOT
+> in the repo), 51/51 matrix filenames parse, disk↔matrix an exact set match. Mid-session the
+> interface's own input headroom clipped 14 MASTER/EQ-boost-max takes (all pinned at peak 0.98850) →
+> gain dropped −12 dB, those 14 re-captured, new `gain-n12` filename token + `gain_correction_db()`
+> measuring the delta from the **ref-CLEAN** anchor pair (−12.071 dB), NOT ref-OD (the CD4049's
+> compression made the same nominal −12 read as −2.857 dB there). Commit `ff5fc5f`.
+> **`FitParams` ✅ DONE (`697339f`, ctest 16/16):** `src/dsp/FitParams.h` + `PedalChain::setFitParams()`
+> make every capture-fit constant runtime-settable (was `static constexpr` → a rebuild per candidate,
+> hopeless for a 3-D search like clipA0×satLo×satHi). Nothing re-tuned — each stage keeps its `kXxx`
+> constexpr as the nominal and initialises the member from it. `kInputRef`/`kOutputMakeup` are
+> deliberately NOT in FitParams (DAW-domain; calibration §1 needs kInputRef to cancel in the linear path).
+> **⛔ NEXT / BLOCKER: `OfflineRender` console exe does not exist yet** — no fit is possible without it.
+> CLI shape + 4 must-honour traps (EQ knob-space inversion mirroring `readParams()`, smoothing-ramp
+> artifact, latency vs `analyze.py::align()` double-compensation, `bypass.wav`'s settings-free parse)
+> are all written up in the handoff doc. Then `captures.py::render_args()` (still `NotImplementedError`).
+> Python on this machine: **`/opt/homebrew/bin/python3.11`** (plain `python3` is 3.13, no numpy).
+>
+> **Phase 6 (oversampling + ADAA + FULL-CHAIN ASSEMBLY) ✅ DONE (2026-07-21).**
 > The chain is now assembled and audible end-to-end for the first time. `src/dsp/PedalChain.h`
 > (JUCE-free) wires all 14 stages in verified order (InputBuffer → [OS region: JFET → Treble/ATTACK
 > → DRIVE → Clipper/GRUNT → Recovery → SK×2] → LevelBlend → C21 100n HP → EqPreGain → Baxandall →
