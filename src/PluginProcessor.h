@@ -47,6 +47,13 @@ public:
     juce::SmoothedValue<float> bypassMix;
     juce::SmoothedValue<float> inputGain, outputGain;
 
+    // Bypass dry-path delay compensation (dsp.md "Dry/wet phase alignment across
+    // the oversampled region") — same fix as PedalDSP's internal BLEND clean-tap
+    // delay, applied at the plugin I/O so the bypass crossfade doesn't comb-filter
+    // during its transition at nonzero OS latency.
+    std::array<juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None>, 2> bypassDelay;
+    juce::AudioBuffer<float> dryDelayedBuffer;
+
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
     std::atomic<bool> bypassed { false };

@@ -98,6 +98,11 @@ public:
 
     int getLatencySamples() const noexcept { return latencySamples; }
 
+    // Largest possible OS-region latency across all prepared factors (base-rate
+    // samples). Used by the processor to size its own bypass-dry delay line —
+    // same "max across factors, retune on change" pattern as cleanDelay below.
+    int getMaxLatencySamples() const noexcept { return maxCleanDelay(); }
+
     // Process a block in place (chain-internal volts).
     void processBlock(double* data, int numSamples) noexcept
     {

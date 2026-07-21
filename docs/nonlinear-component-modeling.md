@@ -149,41 +149,161 @@ no DC values).** Two consequences: (a) we can **capture & validate the [ENG] fea
 Master taper/placement, 3-way Attack, DIST footswitch, and the switchable mid frequencies
 (including the extrapolated 750 Hz Hi-Mid); (b) both nonlinear models and the IC2_B notch are
 **inferred from composite in→out captures** (control-setting isolation + matched-pair differencing,
-`dsp.md`), which is exactly what the `analysis/` harness is built for. Filenames use the parser
-`parse_capture()` in `analyze.py` (deviation-from-baseline naming).
+`dsp.md`), which is exactly what the `analysis/` harness is built for.
 
 ### Setup rules (from `validation-and-capture.md` §3)
 - `python3 analysis/gen_test_signal.py` → play `analysis/test_signal_48k.wav`, one take per row.
 - **Fix interface gain for the whole session; never touch it.** Reamp at a fixed bass-representative
   level (this sets `kInputRef`). 48 kHz / 32-bit float, no interface clipping, full-length files.
 - **Bypass pass FIRST** (level anchor). One control at a time; hold all others at baseline.
+- **Name each file EXACTLY per the grammar below — no free-text notes, no spaces, no shorthand.**
+  `analysis/captures.py::parse_capture()` implements this grammar and will reject (loudly, with a
+  specific reason) anything that doesn't match — run `python3 analysis/captures.py` (no captures on
+  disk yet → it self-validates the matrix below) before and after recording to catch a typo early
+  rather than discovering it mid-fit.
 
-### Two baselines (filenames state only the DEVIATION from these)
+### Two baselines
 - **REF-OD** = `Master noon · Blend FULL OD (CW) · Level noon · Drive noon · Bass/Treble/LoMid/HiMid
-  noon · Attack FLAT · Grunt MID · Lo-Mid-freq 500 · Hi-Mid-freq 1.5k · DIST ON`.
+  noon · Attack FLAT (physical up) · Grunt physical-MID (= electrical Cut) · Lo-Mid-freq 500 Hz
+  (physical up) · Hi-Mid-freq 1.5 kHz (physical up) · DIST ON`.
 - **REF-CLEAN** = REF-OD but **DIST OFF** (forces 100% clean path → EQ sees an undistorted signal).
   Used for all EQ / mid-freq / Master reads.
 
-### Tier 1 — Essential (~29 takes)
-| Filename | Deviation | Pins |
-|----------|-----------|------|
-| `bypass.wav` | true bypass | **level anchor (kInputRef)** — first |
-| `ref-od.wav` / `ref-clean.wav` | — / DIST off | OD & clean references + DIST-footswitch check |
-| `drive-0700/0930/1430/1700.wav` | Drive | **CD4049 clipper** amount + harmonics |
-| `grunt-lo/hi.wav` | Grunt | pre-clip bass content |
-| `attack-boost/cut.wav` | Attack | **3-way Attack [ENG]** + treble net |
-| `bass-0700/1700`, `treble-0700/1700`, `lomid-0700/1700`, `himid-0700/1700` (+`dist-off`) | one EQ band cut/boost, clean | EQ tapers |
-| `lomidfreq-250/1k.wav` (Lo-Mid gain MAX, `dist-off`) | Lo-Mid freq selector | **switchable Lo-Mid centers [ENG-caps]** |
-| `himidfreq-750/3k.wav` (Hi-Mid gain MAX, `dist-off`) | Hi-Mid freq selector | **Hi-Mid centers — validates the 750 Hz guess** |
-| `blend-0700/1200.wav` | Blend | crossfade taper |
-| `level-0700/1700.wav` | Level | LEVEL taper |
-| `master-0700/1700.wav` (`dist-off`) | Master | **Master taper/placement [ENG]** |
+### Capture filename grammar (exact — matches `analysis/captures.py::parse_capture()` 1:1)
 
-### Tier 2 — Extended (if time)
-- Fill each sweep to 5 points (add `0930`/`1430`) for Drive, EQ bands, Blend, Level, Master.
-- Mid-freq selectors at **cut** as well as boost (two-sided → tighter center fit).
-- Drive×switch cross-terms: `drive-1700 grunt-hi.wav`, `drive-1700 attack-boost.wav`.
-- (The middle of every 3-way — grunt-mid, attack-flat, both mid-freqs — is already `ref`.)
+Every filename is either one of **three reserved baseline names**, or an **underscore-joined list
+of `key-value` deviation tokens** ending in a **required trailing `base-od` / `base-clean` token**
+that states — explicitly, every time, no exceptions — which baseline every *unlisted* control sits
+at. There is deliberately no separate "dist-off" token: DIST state is fully determined by
+`base-od`/`base-clean` (REF-CLEAN differs from REF-OD by DIST alone, so the base token already says
+it). If a control matters for a given capture, it gets a token; nothing is implied by context or a
+parenthetical note.
+
+**Reserved (zero-deviation) filenames:** `bypass.wav`, `ref-od.wav`, `ref-clean.wav`.
+
+**Pot keys** (value = 4-digit clock code, `0700`=min … `1200`=noon … `1700`=max, linear between —
+`captures.py::_clock_to_x`, same convention as `analyze.py::clock_to_x`):
+
+| Filename key | PedalChain::Params field | Real control |
+|---|---|---|
+| `drive` | `drive` | DRIVE |
+| `blend` | `blend` | BLEND |
+| `level` | `level` | LEVEL |
+| `master` | `master` | MASTER |
+| `bass` | `lo` | BASS (Baxandall) |
+| `treble` | `hi` | TREBLE (Baxandall) |
+| `lomid` | `loMid` | LO-MID gain |
+| `himid` | `hiMid` | HI-MID gain |
+
+**Switch keys** (value = the literal enum label — matches the APVTS `juce::StringArray` order in
+`PluginProcessor.cpp::createParameterLayout()` exactly, so `parse_capture()`'s index maps need no
+translation layer):
+
+| Filename key | Values (index 0/1/2) | Real control |
+|---|---|---|
+| `attack` | `flat` / `boost` / `cut` | ATTACK [ENG] |
+| `grunt` | `boost` / `cut` / `flat` | GRUNT |
+| `lomidfreq` | `250` / `500` / `1k` | LO-MID freq selector [ENG-caps] |
+| `himidfreq` | `750` / `1p5k` / `3k` | HI-MID freq selector [ENG-caps] |
+
+> ⚠ **GRUNT naming correction (this pass):** an earlier draft of this matrix used `grunt-lo`/
+> `grunt-hi`, which named captures by a vague bass-amount adjective instead of the switch's actual
+> electrical position — and doesn't even correspond to a real position (the three GRUNT positions
+> are `boost`/`cut`/`flat` per `circuit.md`'s UI map). Since REF-OD's baseline already sits at the
+> physical-MID/electrical-Cut position, the two non-baseline captures needed are `boost` and `flat`
+> — that's what the matrix below uses. This is exactly the class of ambiguity this explicit grammar
+> exists to prevent.
+>
+> **Frequency-selector captures also need the matching gain pot pushed to an extreme** (so the peak
+> is visible/measurable) — e.g. `lomidfreq-250_lomid-1700_base-clean.wav`. An earlier draft left
+> this as a prose parenthetical ("Lo-Mid gain MAX"); it's now an explicit `lomid-1700` token like
+> any other deviation, not implied text.
+
+**Baseline key** (required, always the last token): `base-od` / `base-clean`.
+
+### Tier 1 — Essential (29 takes)
+
+```
+bypass.wav
+ref-od.wav
+ref-clean.wav
+drive-0700_base-od.wav
+drive-0930_base-od.wav
+drive-1430_base-od.wav
+drive-1700_base-od.wav
+grunt-boost_base-od.wav
+grunt-flat_base-od.wav
+attack-boost_base-od.wav
+attack-cut_base-od.wav
+bass-0700_base-clean.wav
+bass-1700_base-clean.wav
+treble-0700_base-clean.wav
+treble-1700_base-clean.wav
+lomid-0700_base-clean.wav
+lomid-1700_base-clean.wav
+himid-0700_base-clean.wav
+himid-1700_base-clean.wav
+lomidfreq-250_lomid-1700_base-clean.wav
+lomidfreq-1k_lomid-1700_base-clean.wav
+himidfreq-750_himid-1700_base-clean.wav
+himidfreq-3k_himid-1700_base-clean.wav
+blend-0700_base-od.wav
+blend-1200_base-od.wav
+level-0700_base-od.wav
+level-1700_base-od.wav
+master-0700_base-clean.wav
+master-1700_base-clean.wav
+```
+
+| Group | Pins |
+|---|---|
+| `bypass` | **level anchor (kInputRef)** — record first |
+| `ref-od` / `ref-clean` | OD & clean references + DIST-footswitch check (compare the two directly) |
+| `drive-*` | **CD4049 clipper** amount + harmonics (4 points; drive's own noon baseline is the implicit 5th) |
+| `grunt-*` | pre-clip bass content (baseline already covers electrical Cut) |
+| `attack-*` | **3-way Attack [ENG]** + treble net (baseline already covers Flat) |
+| `bass-*` / `treble-*` / `lomid-*` / `himid-*` | EQ band tapers, read from the clean sweep only |
+| `lomidfreq-*` / `himidfreq-*` | **switchable mid centers [ENG-caps]** — gain pinned to MAX so the peak is measurable |
+| `blend-*` | crossfade taper (full-OD is the baseline; these two are the other two points) |
+| `level-*` | LEVEL taper |
+| `master-*` | **Master taper/placement [ENG]** |
+
+### Tier 2 — Extended (20 takes, if time)
+
+```
+bass-0930_base-clean.wav
+bass-1430_base-clean.wav
+treble-0930_base-clean.wav
+treble-1430_base-clean.wav
+lomid-0930_base-clean.wav
+lomid-1430_base-clean.wav
+himid-0930_base-clean.wav
+himid-1430_base-clean.wav
+blend-0930_base-od.wav
+blend-1430_base-od.wav
+level-0930_base-od.wav
+level-1430_base-od.wav
+master-0930_base-clean.wav
+master-1430_base-clean.wav
+lomidfreq-250_lomid-0700_base-clean.wav
+lomidfreq-1k_lomid-0700_base-clean.wav
+himidfreq-750_himid-0700_base-clean.wav
+himidfreq-3k_himid-0700_base-clean.wav
+drive-1700_grunt-boost_base-od.wav
+drive-1700_attack-boost_base-od.wav
+```
+
+- First 14: fill EQ bands / Blend / Level / Master to 5 sweep points each (Drive already has 5 via
+  its Tier-1 4 points + its own noon baseline, so it's not repeated here).
+- Next 4: mid-freq selectors captured at the gain-MIN extreme too (two-sided → tighter center fit;
+  the gain-MAX side is already in Tier 1).
+- Last 2: Drive×switch cross-terms at max Drive.
+- (The baseline already covers: Grunt physical-mid/electrical-Cut, Attack Flat, and both mid-freq
+  selectors' "up" position — no need to re-capture those as their own zero-deviation takes.)
+
+`analysis/captures.py::CAPTURE_MATRIX_TIER1` / `CAPTURE_MATRIX_TIER2` are these exact lists,
+byte-for-byte — `python3 analysis/captures.py` parses every one and reports PASS/FAIL, so the doc
+and the parser cannot silently drift apart.
 
 ### How each model / the notch is extracted (audio-only)
 - **CD4049 clipper waveshaper** ← Drive sweep + the signal's driven Farina sweeps (continuous

@@ -145,6 +145,7 @@ void ObsidianB7000AudioProcessor::changeProgramName(int, const juce::String&) {}
 void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     scratch.setSize(2, samplesPerBlock);
+    dryDelayedBuffer.setSize(2, samplesPerBlock);
 
     const int startOrder = (int) pOversampling->load();
     for (auto& d : dsp)
@@ -155,6 +156,15 @@ void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPe
     }
     reportedLatency = dsp[0].getLatencySamples();
     setLatencySamples(reportedLatency);
+
+    const int maxBypassDelay = juce::jmax(1, dsp[0].getMaxLatencySamples());
+    for (auto& bd : bypassDelay)
+    {
+        bd.prepare({sampleRate, (juce::uint32) samplesPerBlock, 1});
+        bd.setMaximumDelayInSamples(maxBypassDelay);
+        bd.setDelay((float) reportedLatency);
+        bd.reset();
+    }
 
     bypassMix.reset(sampleRate, 0.005); // ~5 ms bypass crossfade
     bypassMix.setCurrentAndTargetValue(bypassParam->get() ? 1.0f : 0.0f);
@@ -191,6 +201,11 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     {
         reportedLatency = lat;
         setLatencySamples(lat);
+        for (auto& bd : bypassDelay)
+        {
+            bd.setDelay((float) lat);
+            bd.reset(); // one-block gap on the switch, same policy as the OS reinit
+        }
     }
 
     // ---- Params + gain-staging targets (architecture.md processBlock) --------
@@ -223,22 +238,27 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
         float* io = buffer.getWritePointer(ch);
         double* work = scratch.getWritePointer(ch);
+        float* dryDelayed = dryDelayedBuffer.getWritePointer(ch);
 
-        // a/b. input trim (DAW domain) → dry copy → meter → chain volts.
+        // a/b. input trim (DAW domain) → dry copy (delay-compensated for bypass,
+        // dsp.md "Dry/wet phase alignment") → meter → chain volts.
         for (int n = 0; n < numSamples; ++n)
         {
             const float wet = io[n] * inGain.getNextValue();
             peakIn = juce::jmax(peakIn, std::abs(wet));
             work[n] = (double) wet * (double) kInputRef;
+
+            bypassDelay[(size_t) ch].pushSample(0, io[n]);
+            dryDelayed[n] = bypassDelay[(size_t) ch].popSample(0, (float) reportedLatency, true);
         }
 
         // c. run the WDF chain.
         dsp[(size_t) ch].processBlock(work, numSamples);
 
-        // e/f. output makeup+trim, bypass crossfade, output meter.
+        // e/f. output makeup+trim, bypass crossfade (delay-compensated dry), output meter.
         for (int n = 0; n < numSamples; ++n)
         {
-            const float dry = io[n];                       // pre-DSP (DAW domain)
+            const float dry = dryDelayed[n];               // delay-compensated pre-DSP
             const float processed = (float) work[n] * outGain.getNextValue();
             const float mix = bMix.getNextValue();
             const float out = processed * (1.0f - mix) + dry * mix;

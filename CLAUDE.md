@@ -121,9 +121,11 @@ high, execute routine work cheap) is what should persist.
 > std::tanh). (2) **Clipper gets NO ADAA** — its VTC is inside an implicit RC-coupled Newton solve
 > (not memoryless) → Esqueda ADAA doesn't apply; oversampling carries its antialiasing (state-space
 > ADAA deferred unless low-OS listening demands it). (3) **Base-rate tone/master cap PREWARP not yet
-> added** + OSFidelity low-OS top-octave restore → deferred to Phase 8 polish. (4) **Bypass dry copy
-> is NOT delay-compensated** (only BLEND's clean tap is) — fine for the brief hard-A/B crossfade;
-> revisit if a toggle click appears at high OS. (5) **RailClamps still disabled** (need kInputRef
+> added** + OSFidelity low-OS top-octave restore → deferred to Phase 8 polish. (4) **RESOLVED
+> 2026-07-21 (pre-capture check):** bypass dry copy is now delay-compensated the same way as
+> BLEND's clean tap — a per-channel `DelayLine<float>` in `PluginProcessor` (sized via the new
+> `PedalDSP::getMaxLatencySamples()`), retuned on any `reportedLatency` change (`PluginProcessor.h`/
+> `.cpp`). ctest 16/16 still PASS. (5) **RailClamps still disabled** (need kInputRef
 > from capture). **NEXT: Phase 7 — capture session + calibration** (kInputRef anchor, nonlinear-param
 > fits, rail enable, bridged-T reshape, taper fits, OfflineRender exe). Phase-5 clipper structure
 > notes retained below.
@@ -369,10 +371,22 @@ high, execute routine work cheap) is what should persist.
   win: we capture & VALIDATE all [ENG] features directly (Master, 3-way Attack, DIST footswitch,
   switchable mids incl. the 750 Hz Hi-Mid). Nonlinear models + the IC2_B notch are
   inferred from composite in→out (control-isolation + matched-pair diff). Finalized capture MATRIX
-  (~29 essential takes, deviation-from-REF-OD-baseline filenames) = `docs/nonlinear-component-modeling.md`
-  §4. Parser `parse_capture()` added to `analysis/analyze.py` (8 pots + 4 three-way switches + DIST,
-  tested against the whole matrix). Missing DC/rail values → take nominal from datasheets, calibrate
-  the clip ceiling to the bypass+drive captures.
+  (29 Tier-1 essential + 20 Tier-2 extended, explicit `key-value`-token filenames — no implicit
+  state, see the grammar) = `docs/nonlinear-component-modeling.md` §4.
+- **CORRECTED 2026-07-21 (pre-capture check):** the prior note here claiming `parse_capture()` was
+  "added to `analysis/analyze.py`, tested against the whole matrix" was stale/wrong — that function
+  didn't exist yet (still the template's `NotImplementedError` stub). **Now actually implemented in
+  `analysis/captures.py`** (not `analyze.py`), against a fully explicit filename grammar (every
+  filename = `key-value` tokens joined by `_`, ending in a required `base-od`/`base-clean` token;
+  no parenthetical/implied state). Also fixed a real naming bug the old matrix had: `grunt-lo`/
+  `grunt-hi` didn't correspond to any of GRUNT's actual three positions (`boost`/`cut`/`flat` per
+  circuit.md's UI map) — corrected to `grunt-boost`/`grunt-flat` (baseline already covers `cut`).
+  `python3 analysis/captures.py` (via `/opt/homebrew/bin/python3.11` — `python3` on this machine
+  resolves to 3.13, which lacks numpy/scipy; pip installs against 3.11) self-validates all 49
+  documented filenames with no captures on disk yet: 49/49 PASS. `render_args()` (maps parsed
+  settings → `OfflineRender` CLI flags) is still NOT implemented — blocked on `OfflineRender` itself
+  not existing yet (see "NEXT: Phase 7"). Missing DC/rail values → take nominal from datasheets,
+  calibrate the clip ceiling to the bypass+drive captures.
 - **Value discrepancies resolved:** C33 = 22n (primary+BOM; backup's 2200pF is a different rev).
   GRUNT C13 = 220n (primary; backup 22n). Using primary values throughout. Both re-confirmed against
   BOM + schematic in the 2026-07-19 verification pass.
