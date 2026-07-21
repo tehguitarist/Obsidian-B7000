@@ -45,9 +45,11 @@ public:
     juce::AudioBuffer<double> scratch;
     juce::AudioParameterBool* bypassParam;
     juce::SmoothedValue<float> bypassMix;
+    juce::SmoothedValue<float> inputGain, outputGain;
 
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
+    std::atomic<bool> bypassed { false };
 
     float getInputLevel(int /*ch*/) const { return inputLevel.load(); }
     float getOutputLevel(int /*ch*/) const { return outputLevel.load(); }
@@ -56,7 +58,31 @@ public:
     static constexpr float kOutputMakeup = 0.9f;
 
 private:
+    // Build the per-block chain param set from the cached APVTS pointers.
+    PedalChain::Params readParams() const;
+
     std::array<PedalDSP, 2> dsp;
+
+    // Cached parameter pointers (avoid string lookups on the audio thread).
+    std::atomic<float>* pMaster = nullptr;
+    std::atomic<float>* pBlend = nullptr;
+    std::atomic<float>* pLevel = nullptr;
+    std::atomic<float>* pDrive = nullptr;
+    std::atomic<float>* pLo = nullptr;
+    std::atomic<float>* pLoMid = nullptr;
+    std::atomic<float>* pHiMid = nullptr;
+    std::atomic<float>* pHi = nullptr;
+    std::atomic<float>* pAttack = nullptr;
+    std::atomic<float>* pGrunt = nullptr;
+    std::atomic<float>* pLoMidFreq = nullptr;
+    std::atomic<float>* pHiMidFreq = nullptr;
+    std::atomic<float>* pDistEngage = nullptr;
+    std::atomic<float>* pInputTrim = nullptr;
+    std::atomic<float>* pOutputTrim = nullptr;
+    std::atomic<float>* pOversampling = nullptr;
+    std::atomic<float>* pRenderOversampling = nullptr;
+
+    int reportedLatency = -1; // last value pushed to the host via setLatencySamples
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ObsidianB7000AudioProcessor)
 };

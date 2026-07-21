@@ -131,7 +131,15 @@ public:
     {
         ieqC2 = 0.0;
         shelfX1 = shelfY1 = 0.0;
+        uPrev = 0.0;
     }
+
+    // 1st-order ADAA on the waveshaper (dsp.md "ADAA"). Off by default so the
+    // per-stage FR/DC-step oracle (JfetStageTest) validates the raw memoryless
+    // map; PedalChain turns it ON inside the oversampled region (ADAA is IN
+    // ADDITION to oversampling, not instead of it). Glitch-free to toggle —
+    // uPrev updates every sample regardless.
+    void setADAA(bool e) noexcept { adaa = e; }
 
     // Process one sample (real volts in/out, VD-referenced). NET INVERTING.
     inline double process(double x) noexcept
@@ -147,17 +155,45 @@ public:
         shelfY1 = vs;
 
         // ---- Inverting gain + asymmetric soft saturation --------------------
-        return -waveshape(kG0 * vs);
+        const double u = kG0 * vs;
+        const double y = adaa ? adaaShape(u, uPrev) : waveshape(u);
+        uPrev = u;
+        return -y;
     }
 
 private:
     // Per-polarity tanh soft-clip: g(w) = sat * tanh(w/sat). C1-continuous at 0
     // (both sides -> slope 1), asymmetric sat levels -> even harmonics. Reduces to
-    // ~identity for |w| << sat (mild). Antiderivative sat^2*ln cosh(w/sat) (ADAA).
+    // ~identity for |w| << sat (mild).
     static inline double waveshape(double w) noexcept
     {
         const double sat = (w >= 0.0) ? kSatPos : kSatNeg;
         return sat * std::tanh(w / sat);
+    }
+
+    // Numerically-stable ln(cosh(x)) = |x| + log1p(exp(-2|x|)) - ln2.
+    static inline double lncosh(double x) noexcept
+    {
+        const double a = std::abs(x);
+        return a + std::log1p(std::exp(-2.0 * a)) - 0.6931471805599453;
+    }
+
+    // Antiderivative of waveshape: F(w) = sat^2 * ln cosh(w/sat) (per polarity).
+    // C1-continuous at 0 (both branches -> 0), so 1st-order ADAA is well-posed.
+    static inline double waveshapeAD(double w) noexcept
+    {
+        const double sat = (w >= 0.0) ? kSatPos : kSatNeg;
+        return sat * sat * lncosh(w / sat);
+    }
+
+    // 1st-order ADAA: y = (F(u) - F(uPrev)) / (u - uPrev); midpoint fallback when
+    // the two are too close (avoids 0/0), which also keeps it exact at DC.
+    static inline double adaaShape(double u, double uPrev) noexcept
+    {
+        const double du = u - uPrev;
+        if (std::abs(du) < 1.0e-7)
+            return waveshape(0.5 * (u + uPrev));
+        return (waveshapeAD(u) - waveshapeAD(uPrev)) / du;
     }
 
     // Input-HP companion (set in prepare()).
@@ -167,6 +203,9 @@ private:
     // Shelf IIR coefficients (a0-normalised) + state.
     double sb0 = 1.0, sb1 = 0.0, sa1 = 0.0;
     double shelfX1 = 0.0, shelfY1 = 0.0;
+    // ADAA state.
+    bool adaa = false;
+    double uPrev = 0.0;
 
     // JUCE-free (compiled into pure console tests).
     JfetStage(const JfetStage&) = delete;

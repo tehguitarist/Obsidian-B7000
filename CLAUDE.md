@@ -103,13 +103,30 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 5 (CD4049UBE clipper, nonlinear #2 — THE distortion) STRUCTURE ✅ DONE
-> (2026-07-21).** `src/dsp/Clipper.h` + `tests/ClipperTest.cpp` + `clipper_smallsignal_tf` in
-> `eq_reference.py`. GRUNT bank + R16 + finite-gain 4049 VTC + R18∥C14 + D1/D2 modelled as ONE
-> coupled stage (per-sample Newton solve on node W). ctest 14/14 PASS + dsp-validator PASS (all 6
-> checks). All amplitude params (kA0/kSatLo/kSatHi) NOMINAL → Phase-7 capture fit. **NEXT: Phase 6 —
-> oversampling + ADAA** (wrap
-> the J201 + Clipper waveshapers, AccurateOmega, delay-comp the BLEND clean tap, end-to-end DC-step).
+> **CURRENT: Phase 6 (oversampling + ADAA + FULL-CHAIN ASSEMBLY) ✅ DONE (2026-07-21).**
+> The chain is now assembled and audible end-to-end for the first time. `src/dsp/PedalChain.h`
+> (JUCE-free) wires all 14 stages in verified order (InputBuffer → [OS region: JFET → Treble/ATTACK
+> → DRIVE → Clipper/GRUNT → Recovery → SK×2] → LevelBlend → C21 100n HP → EqPreGain → Baxandall →
+> LO-MID → HI-MID → MasterOut); split base/OS-rate prepare so an OS-factor switch re-preps only the
+> OD region. `src/dsp/PedalDSP.h` wraps it: `juce::dsp::Oversampling<double>` FIR half-band over the
+> OD region (one instance per 2×/4×/8×, alloc-free switch; 1× = base-rate per-sample), clean-tap
+> `DelayLine` compensating the OS FIR latency (49/60/64 base samples), realtime-vs-`render_oversampling`
+> factor pick, host `setLatencySamples()` on change. `PluginProcessor::processBlock` now does real
+> DSP (input trim → dry copy → kInputRef → chain → outputGain makeup → bypass crossfade → meters),
+> replacing the old passthrough. JFET waveshaper got 1st-order ADAA (ln-cosh antiderivative). **ctest
+> 16/16 PASS** (added `PedalChainTest` stability/polarity + `OSValidationTest` = GATE 6: LF BLEND=50%
+> magnitude factor-independent ≤0.04 dB → delay comp exact; aliasing 2×−28→8×−34 dB). **AU auval PASS.**
+> **KEY DEVIATIONS (deliberate, in-code + build-plan Phase 6 note):** (1) **AccurateOmega is N/A** —
+> no chowdsp DiodePairT/omega in the path (D1/D2 = never-conducting hard clamps; both shapers are
+> std::tanh). (2) **Clipper gets NO ADAA** — its VTC is inside an implicit RC-coupled Newton solve
+> (not memoryless) → Esqueda ADAA doesn't apply; oversampling carries its antialiasing (state-space
+> ADAA deferred unless low-OS listening demands it). (3) **Base-rate tone/master cap PREWARP not yet
+> added** + OSFidelity low-OS top-octave restore → deferred to Phase 8 polish. (4) **Bypass dry copy
+> is NOT delay-compensated** (only BLEND's clean tap is) — fine for the brief hard-A/B crossfade;
+> revisit if a toggle click appears at high OS. (5) **RailClamps still disabled** (need kInputRef
+> from capture). **NEXT: Phase 7 — capture session + calibration** (kInputRef anchor, nonlinear-param
+> fits, rail enable, bridged-T reshape, taper fits, OfflineRender exe). Phase-5 clipper structure
+> notes retained below.
 > Phase 4b (functional UI) ✅ DONE (commit 40451af). All linear stages (Step 4) ✅ COMPLETE incl.
 > MasterOut. J201 JFET stage (nonlinear #1) STRUCTURE ✅ DONE. `processBlock` is still passthrough
 > (metering only, `dsp` member unused) — no audible DSP until Phase 7 full-chain integration; UI

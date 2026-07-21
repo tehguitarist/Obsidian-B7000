@@ -9,6 +9,43 @@ ObsidianB7000AudioProcessor::ObsidianB7000AudioProcessor()
       apvts(*this, nullptr, juce::Identifier("PARAMETERS"), createParameterLayout())
 {
     bypassParam = static_cast<juce::AudioParameterBool*>(apvts.getParameter("bypass"));
+
+    pMaster = apvts.getRawParameterValue("master");
+    pBlend = apvts.getRawParameterValue("blend");
+    pLevel = apvts.getRawParameterValue("level");
+    pDrive = apvts.getRawParameterValue("drive");
+    pLo = apvts.getRawParameterValue("lo");
+    pLoMid = apvts.getRawParameterValue("lo_mid");
+    pHiMid = apvts.getRawParameterValue("hi_mid");
+    pHi = apvts.getRawParameterValue("hi");
+    pAttack = apvts.getRawParameterValue("attack");
+    pGrunt = apvts.getRawParameterValue("grunt");
+    pLoMidFreq = apvts.getRawParameterValue("lo_mid_freq");
+    pHiMidFreq = apvts.getRawParameterValue("hi_mid_freq");
+    pDistEngage = apvts.getRawParameterValue("dist_engage");
+    pInputTrim = apvts.getRawParameterValue("input_trim");
+    pOutputTrim = apvts.getRawParameterValue("output_trim");
+    pOversampling = apvts.getRawParameterValue("oversampling");
+    pRenderOversampling = apvts.getRawParameterValue("render_oversampling");
+}
+
+PedalChain::Params ObsidianB7000AudioProcessor::readParams() const
+{
+    PedalChain::Params p;
+    p.master = pMaster->load();
+    p.blend = pBlend->load();
+    p.level = pLevel->load();
+    p.drive = pDrive->load();
+    p.lo = pLo->load();
+    p.loMid = pLoMid->load();
+    p.hiMid = pHiMid->load();
+    p.hi = pHi->load();
+    p.attackIdx = (int) pAttack->load();
+    p.gruntIdx = (int) pGrunt->load();
+    p.loMidFreq = (int) pLoMidFreq->load();
+    p.hiMidFreq = (int) pHiMidFreq->load();
+    p.distEngage = pDistEngage->load() >= 0.5f;
+    return p;
 }
 
 ObsidianB7000AudioProcessor::~ObsidianB7000AudioProcessor() = default;
@@ -108,8 +145,24 @@ void ObsidianB7000AudioProcessor::changeProgramName(int, const juce::String&) {}
 void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     scratch.setSize(2, samplesPerBlock);
-    bypassMix.reset(sampleRate, 0.02);
-    bypassMix.setCurrentAndTargetValue(0.0f);
+
+    const int startOrder = (int) pOversampling->load();
+    for (auto& d : dsp)
+    {
+        d.prepare(sampleRate, samplesPerBlock);
+        d.setFactorOrder(startOrder);
+        d.reset();
+    }
+    reportedLatency = dsp[0].getLatencySamples();
+    setLatencySamples(reportedLatency);
+
+    bypassMix.reset(sampleRate, 0.005); // ~5 ms bypass crossfade
+    bypassMix.setCurrentAndTargetValue(bypassParam->get() ? 1.0f : 0.0f);
+
+    inputGain.reset(sampleRate, 0.02);
+    outputGain.reset(sampleRate, 0.02);
+    inputGain.setCurrentAndTargetValue(1.0f);
+    outputGain.setCurrentAndTargetValue(1.0f);
 }
 
 void ObsidianB7000AudioProcessor::releaseResources() {}
@@ -118,28 +171,84 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 {
     juce::ScopedNoDenormals noDenormals;
 
-    auto totalNumInputChannels = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    const int numIn = getTotalNumInputChannels();
+    const int numOut = getTotalNumOutputChannels();
+    const int numSamples = buffer.getNumSamples();
 
-    // Update level metering
+    for (int i = numIn; i < numOut; ++i)
+        buffer.clear(i, 0, numSamples);
+
+    // ---- OS factor: render factor offline, live factor realtime -------------
+    const int wantOrder = isNonRealtime() ? (int) pRenderOversampling->load()
+                                          : (int) pOversampling->load();
+    for (auto& d : dsp)
+        d.setFactorOrder(wantOrder);
+
+    // Report latency to the host (PDC) whenever it changes — distinct from the
+    // internal clean-tap delay (dsp.md "do NOT over-correct").
+    const int lat = dsp[0].getLatencySamples();
+    if (lat != reportedLatency)
+    {
+        reportedLatency = lat;
+        setLatencySamples(lat);
+    }
+
+    // ---- Params + gain-staging targets (architecture.md processBlock) --------
+    const auto params = readParams();
+    for (auto& d : dsp)
+        d.setParams(params);
+
+    const float inTrimDb = pInputTrim->load();
+    const float outTrimDb = pOutputTrim->load();
+    inputGain.setTargetValue(juce::Decibels::decibelsToGain(inTrimDb));
+    // MASTER is inside the chain (MasterOut); output makeup + trim only here.
+    outputGain.setTargetValue(kOutputMakeup * juce::Decibels::decibelsToGain(outTrimDb) / kInputRef);
+
+    bypassMix.setTargetValue(bypassParam->get() ? 1.0f : 0.0f);
+    bypassed.store(bypassParam->get());
+
+    // ---- Snapshot smoothed values so every channel steps identically --------
+    const auto inGainStart = inputGain;
+    const auto outGainStart = outputGain;
+    const auto bypassStart = bypassMix;
+
     float peakIn = 0.0f, peakOut = 0.0f;
-    for (int ch = 0; ch < totalNumInputChannels; ++ch)
+    const int numChans = juce::jmin(numIn, numOut, 2);
+
+    for (int ch = 0; ch < numChans; ++ch)
     {
-        auto* channelData = buffer.getReadPointer(ch);
-        for (int s = 0; s < buffer.getNumSamples(); ++s)
-            peakIn = juce::jmax(peakIn, std::abs(channelData[s]));
+        auto inGain = inGainStart;
+        auto outGain = outGainStart;
+        auto bMix = bypassStart;
+
+        float* io = buffer.getWritePointer(ch);
+        double* work = scratch.getWritePointer(ch);
+
+        // a/b. input trim (DAW domain) → dry copy → meter → chain volts.
+        for (int n = 0; n < numSamples; ++n)
+        {
+            const float wet = io[n] * inGain.getNextValue();
+            peakIn = juce::jmax(peakIn, std::abs(wet));
+            work[n] = (double) wet * (double) kInputRef;
+        }
+
+        // c. run the WDF chain.
+        dsp[(size_t) ch].processBlock(work, numSamples);
+
+        // e/f. output makeup+trim, bypass crossfade, output meter.
+        for (int n = 0; n < numSamples; ++n)
+        {
+            const float dry = io[n];                       // pre-DSP (DAW domain)
+            const float processed = (float) work[n] * outGain.getNextValue();
+            const float mix = bMix.getNextValue();
+            const float out = processed * (1.0f - mix) + dry * mix;
+            io[n] = out;
+            peakOut = juce::jmax(peakOut, std::abs(out));
+        }
     }
-    for (int ch = 0; ch < totalNumOutputChannels; ++ch)
-    {
-        auto* channelData = buffer.getReadPointer(ch);
-        for (int s = 0; s < buffer.getNumSamples(); ++s)
-            peakOut = juce::jmax(peakOut, std::abs(channelData[s]));
-    }
+
     inputLevel.store(peakIn);
     outputLevel.store(peakOut);
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear(i, 0, buffer.getNumSamples());
 }
 
 bool ObsidianB7000AudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const

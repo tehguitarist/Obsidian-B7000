@@ -17,8 +17,8 @@
 | 4 (nonlinear #1) — J201 JFET stage | **✅ STRUCTURE DONE (2026-07-21)** | JfetStage ✓: linear shape (HP + HF-lift shelf) + inverting polarity + asym soft waveshaper. All amplitude constants (G0/gmR6/sat) NOMINAL → fit at Phase 7 capture. | linear FR vs oracle + DC-step polarity + nonlinearity sanity (ctest 13/13) + dsp-validator |
 | 4b — Functional UI pass | **✅ DONE (2026-07-21)** | data-driven pedal face bound to APVTS (commit 40451af) | interactive testability |
 | 5 — Nonlinear clipper + GRUNT + switch topologies | **✅ STRUCTURE DONE (2026-07-21)** | Clipper ✓: GRUNT bank + R16 + finite-gain 4049 VTC + R18∥C14 + D1/D2 as ONE coupled stage (Newton solve). GRUNT corners finite-gain (896/144/36 Hz ≪ ideal-vg). All amplitude params (A0/satLo/satHi) NOMINAL → Phase-7 capture fit. Oversample+ADAA = Phase 6. | small-signal FR vs oracle + GRUNT corners + DC-step polarity + asymmetry + D1/D2-never-conduct (ctest 14/14) + **dsp-validator PASS (all 6 checks, 2026-07-21)** |
-| 6 — Oversampling wiring + delay compensation | Not started | — | — |
-| 7 — Full-chain integration + level calibration | Not started | — | — |
+| 6 — Oversampling wiring + delay compensation | **✅ DONE (2026-07-21)** | Full chain assembled (`PedalChain`/`PedalDSP`), wired into `processBlock`; OS region JFET→SK (FIR, 1×/2×/4×/8× + render factor); clean-tap `DelayLine` compensation; host `setLatencySamples`; JFET ADAA. AU auval PASS. | ctest 16/16 (+ PedalChainTest, OSValidationTest); delay comp factor-independent <0.1 dB LF; aliasing 2×−28→8×−34 dB |
+| 7 — Full-chain integration + level calibration | **Partially done** | chain assembled + wired (pulled forward in Phase 6). REMAINING: capture session, `kInputRef` anchor, output makeup, nonlinear-param fits, rail-clamp enable+calibration, bridged-T reshape, taper fits, `OfflineRender` exe | — |
 | 8 — Full UI (polish, VU gate, headless) | Not started | — | — |
 | 9 — HQ/Eco + final sweep | Not started | — | — |
 
@@ -302,6 +302,38 @@ polish budget here; just get controls on screen and wired.
 combos render finite and stable; dsp-validator pass on the stage.
 
 ## Phase 6 — Oversampling + ADAA (dsp.md rules)
+
+> **✅ DONE 2026-07-21.** Full chain assembled first (`src/dsp/PedalChain.h`, JUCE-free — all 14
+> stages in verified order incl. the C21 100n inter-stage HP; `PedalChainTest` = 4 stability/
+> polarity checks) then wrapped in `src/dsp/PedalDSP.h`: `juce::dsp::Oversampling<double>` FIR
+> half-band over the OD region (JFET→SK), one instance per 2×/4×/8× (alloc-free switching), 1× =
+> per-sample base rate. Clean-tap `juce::dsp::DelayLine` compensates the OS FIR latency (integer:
+> 49/60/64 base samples at 2×/4×/8×), re-sized on factor change. `processBlock` picks realtime vs
+> `render_oversampling` factor via `isNonRealtime()`, reports host latency via `setLatencySamples()`
+> on change. JFET waveshaper gets 1st-order ADAA (ln-cosh antiderivative). AU auval PASS.
+> **`OSValidationTest` (JUCE FFT console exe) is GATE 6:** BLEND=50% magnitude is factor-independent
+> at LF (≤0.04 dB @ 80/200 Hz → delay comp exact — a delay bug would comb here); the 600/1500 Hz
+> spread (≤0.43 dB) is the WANTED bilinear-warp accuracy gain (OD caps re-discretised at OS rate),
+> not a delay error; aliasing floor drops 2×=−28 → 4×=−32 → 8×=−34 dB (oversampling working).
+> **Deviations from the original plan below, all deliberate & documented in-code:**
+> - **Item 2 — AccurateOmega N/A.** There are no chowdsp DiodePairT/omega solves in the path (D1/D2
+>   are hard clamps that never conduct; both shapers are `std::tanh`). The omega4 gotcha / HQ lever
+>   it implies simply doesn't arise here. ADAA applied to the J201 (memoryless, clean antiderivative)
+>   only; the **CD4049 clipper VTC is inside an implicit RC-coupled Newton solve** → not a memoryless
+>   map, so Esqueda 1st-order ADAA doesn't apply (state-space ADAA is out of scope) — its
+>   antialiasing is carried by oversampling. See `PedalChain.h` "Anti-aliasing strategy".
+> - **Item 1 — prewarp not yet added** to the base-rate tone/master caps (their audible-HF warp is a
+>   flagged Phase-6/8 carry-forward from the EQ stages). Deferred with the low-OS top-octave restore
+>   (item 3 OSFidelity) to the Phase-8 UI/polish pass; base default is 2× where warp is already small.
+> - **Bypass delay-comp:** the processor bypass crossfade currently sums the pre-DSP dry copy against
+>   the wet chain WITHOUT delay-comp — acceptable only because bypass is a hard A/B (the ~5 ms
+>   crossfade is brief). If a click/comb shows on bypass toggle at high OS, route the dry copy through
+>   the same latency (reuse `PedalDSP`'s delay line or add one in the processor). Flagged, not done.
+> - **Items 3/5 partial:** aliasing measurement ✅ (OSValidationTest); PerfBenchmark CPU table,
+>   full-random-automation NaN soak, and the explicit bypass-transition null are NOT yet written —
+>   fold into the Phase 8/9 probe pass.
+>
+> **Original plan (for reference):**
 
 1. OS region = J201 → clipper → recovery/bridged-T → SK filters (nonlinear + downstream HF caps);
    `postFn` pattern; base-rate stages get prewarp on fixed HF corners.

@@ -137,3 +137,20 @@ add_test(NAME JfetStageTest COMMAND JfetStageTest)
 add_executable(ClipperTest tests/ClipperTest.cpp)
 target_compile_options(ClipperTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME ClipperTest COMMAND ClipperTest)
+
+add_executable(PedalChainTest tests/PedalChainTest.cpp)
+target_link_libraries(PedalChainTest PRIVATE chowdsp::chowdsp_wdf)
+target_compile_options(PedalChainTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME PedalChainTest COMMAND PedalChainTest)
+
+# Oversampling + delay-comp validation (needs JUCE dsp + FFT)
+juce_add_console_app(OSValidationTest)
+target_sources(OSValidationTest PRIVATE tests/OSValidationTest.cpp)
+target_link_libraries(OSValidationTest
+    PRIVATE
+        juce::juce_dsp
+        chowdsp::chowdsp_wdf
+        xsimd
+    PUBLIC
+        juce::juce_recommended_config_flags)
+add_test(NAME OSValidationTest COMMAND OSValidationTest)
