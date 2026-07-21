@@ -129,3 +129,7 @@ add_test(NAME EqPreGainTest COMMAND EqPreGainTest)
 add_executable(MasterOutTest tests/MasterOutTest.cpp)
 target_compile_options(MasterOutTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME MasterOutTest COMMAND MasterOutTest)
+
+add_executable(JfetStageTest tests/JfetStageTest.cpp)
+target_compile_options(JfetStageTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME JfetStageTest COMMAND JfetStageTest)

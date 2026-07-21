@@ -14,6 +14,7 @@
 | 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
 | 4 — Stage-by-stage linear DSP | **✅ COMPLETE (2026-07-21)** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓, SallenKeyLPF ✓, LevelBlend ✓ (2026-07-20), EQ block ✓ (EqPreGain + Baxandall + MidBand, 2026-07-21), **MasterOut ✓ (2026-07-21, last linear stage)** | per-stage FR + dsp-validator |
+| 4 (nonlinear #1) — J201 JFET stage | **✅ STRUCTURE DONE (2026-07-21)** | JfetStage ✓: linear shape (HP + HF-lift shelf) + inverting polarity + asym soft waveshaper. All amplitude constants (G0/gmR6/sat) NOMINAL → fit at Phase 7 capture. | linear FR vs oracle + DC-step polarity + nonlinearity sanity (ctest 13/13) + dsp-validator |
 | 4b — Functional UI pass | Not started | — | — |
 | 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
@@ -231,6 +232,24 @@ gain + soft waveshaper (nominal from Fairchild datasheet SPICE params; structure
 `docs/nonlinear-component-modeling.md` §2), with the C3/R6 source-bypass HF-gain rise and C4
 bootstrap behaviour captured by the fit. Sine + DC-step polarity test; expect mild asymmetric
 soft compression, NOT hard clipping.
+
+> ✅ **DONE — STRUCTURE (2026-07-21):** `src/dsp/JfetStage.h` + `tests/JfetStageTest.cpp` +
+> `jfet_stage_lin_tf` in `eq_reference.py` (dsp-validator run). Path-B Wiener-Hammerstein cascade:
+> input HP (C2 into R4+R5=1.1M, fc 144.7 Hz — the gate draws no current so R5/(R4+R5) folds into
+> G0) → HF-lift shelf (C3 bypassing R6: zero 219 Hz, pole 719 Hz, +10.3 dB lift = 1+gmR6) →
+> **inverting** mid-band gain (−G0) → per-polarity tanh soft waveshaper (satPos/satNeg asymmetric →
+> even harmonics; ADAA-ready antiderivative satN²·ln cosh). HP is a physical trapezoidal cap (same
+> convention as MasterOut); the shelf is a first-order bilinear IIR (== trapezoidal). All corners
+> sub-kHz → NO audible-band warp, matches the oracle ≤0.015 dB across the whole band 48/96k. **NET
+> INVERTING confirmed by the DC-step test** — resolves circuit.md's "JFET sign unconfirmed"
+> carry-forward (the OD path carries this inversion + the CD4049's into the BLEND node; end-to-end
+> BLEND DC-step still runs in Phase 6). **NO RailClamp** (JFET, not an op-amp output — the waveshaper
+> IS its soft limiting). **⚠ Phase-7 capture carry-forwards (all flagged in-code):** kG0 (mid-band
+> gain), kGmR6 (shelf strength / HF lift), and kSatPos/kSatNeg (saturation levels / H2-H3 balance)
+> are NOMINAL placeholders from the datasheet Shichman-Hodges self-bias point (Id≈0.12 mA, gm≈0.69
+> mS) — FIT all to the drive-min OD-path captures (§4 "J201 stage" extraction; ~5:1 J201 part spread
+> means nominal SPICE cannot match a specific unit). C4 bootstrap + R7 treble-net loading fold into
+> G0 (Phase-4 boundary: node G is an ideal source per TrebleAttack.h; revisit output Z at Phase 7).
 
 **Op-amp output-rail saturation (ALL op-amp stages — easy to forget because every stage above is
 labelled "linear"):** calibration doc §6 requires an asymmetric output clamp (~[1.2, 7.8] V on the

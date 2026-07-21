@@ -103,8 +103,30 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 4 (stage-by-stage linear DSP) — ✅ COMPLETE (2026-07-21). All linear stages done incl. MasterOut. NEXT: Step 5 — J201 nonlinear stage.**
+> **CURRENT: Step 5 IN PROGRESS — J201 JFET stage (nonlinear #1) STRUCTURE ✅ DONE (2026-07-21).
+> All linear stages (Step 4) ✅ COMPLETE incl. MasterOut. NEXT within Step 5: CD4049UBE clipper
+> (nonlinear #2) + GRUNT bank + switch topologies (build-plan Phase 5). Then Phase 4b functional UI.**
 > Phase completion tracking in `docs/build-plan.md` §"Where we are" — update both files.
+> **J201 JFET STAGE — STRUCTURE DONE (2026-07-21):** `src/dsp/JfetStage.h` + `tests/JfetStageTest.cpp`
+> + `jfet_stage_lin_tf` in `eq_reference.py`. Path-B (docs/nonlinear-component-modeling.md §2)
+> Wiener-Hammerstein cascade: input HP (C2 1n into R4+R5=1.1M, fc 144.7 Hz — J201 gate draws no
+> current so R5/(R4+R5) gate divider folds into G0) → HF-lift shelf (C3 220n bypassing R6 3k3: zero
+> 219 Hz / pole 719 Hz / +10.3 dB lift = 1+gmR6) → **inverting** mid-band gain (−G0) → per-polarity
+> tanh soft waveshaper (satPos/satNeg asymmetric → the required even harmonics; ADAA-ready
+> antiderivative). HP = physical trapezoidal cap (MasterOut convention); shelf = 1st-order bilinear
+> IIR (== trapezoidal). ALL corners sub-kHz → NO audible-band bilinear warp → matches oracle ≤0.015
+> dB across the whole band 48/96k (like MasterOut/InputBuffer; sits outside the OS region for LINEAR
+> purposes, but its WAVESHAPER is the aliaser → oversampled+ADAA'd in the full chain, Phase 5/6).
+> **NET INVERTING confirmed by the DC-step test → resolves circuit.md's "JFET output sign
+> unconfirmed" carry-forward.** The OD path carries THIS inversion + the CD4049's into BLEND (dsp.md
+> polarity note); end-to-end BLEND DC-step still runs in Phase 6. **NO RailClamp** (JFET drain, not a
+> TL07x op-amp output — the soft waveshaper IS its limiting, unlike the "every op-amp stage" GATE
+> item). ctest 13/13 PASS. **⚠ Phase-7 capture carry-forwards (all flagged in-code, one-line refit):**
+> kG0 (mid-band |gain|, nominal 15), kGmR6 (shelf strength, nominal 2.277 from Shichman-Hodges
+> self-bias Id≈0.12 mA / gm≈0.69 mS), kSatPos/kSatNeg (soft-sat levels / H2-H3 balance, nominal
+> 3.0/2.6) — FIT all to the drive-min OD-path captures (§4 "J201 stage"; ~5:1 J201 spread → nominal
+> SPICE can't match a specific unit). C4 bootstrap + R7 loading fold into G0 (Phase-4 boundary: node
+> G is an ideal source per TrebleAttack.h; revisit output Z at Phase 7).
 > **STEP-4 STAGES DONE SO FAR (each: FR test vs oracle in ctest + dsp-validator PASS):**
 > ✅ **InputBuffer (IC1_A)** — `src/dsp/InputBuffer.h` + `tests/InputBufferTest.cpp`. ~1.59 Hz HP
 >    (C1/R2), unity, non-inverting; matches analytic oracle ~0 dB at 44.1/48/96k. R1/R3 omitted from
@@ -235,12 +257,16 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: Step 5 — J201 nonlinear stage** (Q1 common-source + Q2 active load; build-plan Phase 5).
-> All linear stages (Step 4) are ✅ COMPLETE incl. MasterOut (see the Step-4 stages list above).
-> The J201 pair is one of only TWO non-WDF-native parts (with the CD4049UBE clipper); needs a fitted
-> gain+soft-waveshaper (~5:1 part spread → fit-to-capture, nominal SPICE won't match) — see
-> `docs/nonlinear-component-modeling.md` §2 + §4 capture plan. Confirm the JFET stage's output SIGN
-> with its own DC-step test (flagged unconfirmed in circuit.md — matters for BLEND polarity).
+> **J201 JFET stage (nonlinear #1) STRUCTURE ✅ DONE this session** (see the J201 block above) — sign
+> CONFIRMED inverting by its DC-step test (circuit.md carry-forward resolved). One of only TWO
+> non-WDF-native parts. **NEXT: CD4049UBE clipper (nonlinear #2) + GRUNT bank + switch topologies**
+> (build-plan Phase 5). The clipper is the heart of the distortion: model the unbuffered-inverter VTC
+> as a fitted asymmetric-tanh waveshaper inside the R16/R18∥C14 shunt-feedback decomposition, D1/D2 as
+> hard rail clamps at node W, R19-dropped/soft rail (ceiling fit to captures), and the GRUNT cap bank
+> + finite-4049-gain coupling for the three GRUNT corners — see `docs/nonlinear-component-modeling.md`
+> §1 (DAFx "Red Llama" params as the prior) + §4 capture plan. Then Phase 4b functional UI. NOTE: all
+> J201 amplitude constants are NOMINAL pending the Phase-7 capture session (same session fits the
+> clipper); only its filter corners + inverting polarity are final.
 
 ## Project-specific carry-forwards
 

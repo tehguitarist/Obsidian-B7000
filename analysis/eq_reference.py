@@ -241,6 +241,42 @@ def level_blend_tf(level, blend, vo=1.0, vc=0.0, p=1.43):
     return (1.0 - B) * vc + B * vw
 
 
+def jfet_stage_lin_tf(f, G0=15.0, gm_R6=2.277, R4=100e3, R5=1e6, C2=1e-9, R6=3.3e3, C3=220e-9):
+    """J201 JFET stage (Q1 CS + Q2 active load) — LINEAR small-signal TF.
+
+    Path-B model (docs/nonlinear-component-modeling.md §2): input HP (C2 into
+    R4+R5) -> HF-lift shelf (C3 bypassing the R6 source degeneration) -> inverting
+    mid-band gain G0 -> [static asymmetric soft-waveshaper, applied in the C++
+    stage]. This oracle is the LINEAR part only (small-signal, waveshaper ~ unity):
+
+      H(s) = -G0 * HP(s) * shelf(s)
+      HP(s)    = s(R4+R5)C2 / (1 + s(R4+R5)C2)             fc ~= 144.7 Hz  (passband 1)
+      shelf(s) = (1 + s R6 C3) / (1 + s R6 C3/(1+gm R6))   zero 219 Hz, pole ~719 Hz
+                 low-freq gain 1, high-freq gain (1+gm R6) = shelfRatio (~3.28, +10.3 dB)
+
+    The J201 gate draws no current, so the input HP sees C2 into R4+R5 (=1.1M) and
+    the R5/(R4+R5) gate divider folds into G0. C4 (Q2 gate->output bootstrap) and
+    the R7 treble-net loading fold into G0 as well (Phase-4 boundary: node G is an
+    ideal source, per TrebleAttack.h; revisit output Z at Phase 7).
+
+    ** ONLY the corner frequencies (from R/C) and the inverting sign are trustworthy
+    pre-capture. ** G0 (mid-band gain) and gm_R6 (shelf strength / HF lift) are
+    NOMINAL placeholders from the datasheet Shichman-Hodges operating point
+    (self-bias Id~=0.12 mA, Vgs~=-0.38 V, gm~=0.69 mS => gm*R6~=2.28). The J201 is
+    spread ~5:1 part-to-part, so BOTH must be FIT to the drive-min OD-path captures
+    at Phase 7 (docs/nonlinear-component-modeling.md §4 "J201 stage" extraction).
+
+    Referenced by tests/JfetStageTest.cpp as the analytic oracle for the linear part.
+    """
+    s = 2j * np.pi * f
+    tau_hp = (R4 + R5) * C2
+    hp = s * tau_hp / (1 + s * tau_hp)
+    tau_z = R6 * C3
+    tau_p = tau_z / (1 + gm_R6)
+    shelf = (1 + s * tau_z) / (1 + s * tau_p)
+    return -G0 * hp * shelf
+
+
 f = np.logspace(np.log10(10), np.log10(20000), 1200)
 
 print("=" * 72)
@@ -304,3 +340,14 @@ for A0 in [1e9, 30, 20, 10]:
         fc = 1 / (2 * np.pi * C * (R16 + zin))
         print(f"GRUNT {cname:>9} | 4049 open-loop gain {A0 if A0<1e8 else 'ideal':>5}: HPF corner {fc:7.1f} Hz")
     print()
+print("=" * 72)
+print("J201 JFET stage (Q1 CS + Q2 active load) — LINEAR small-signal corners")
+print("=" * 72)
+R4, R5, C2, R6, C3, gm_R6 = 100e3, 1e6, 1e-9, 3.3e3, 220e-9, 2.277
+print(f"input HP: C2(1n) into R4+R5(1.1M): corner {1/(2*np.pi*C2*(R4+R5)):.2f} Hz (gate draws no I)")
+print(f"HF-lift shelf (C3 bypasses R6): zero {1/(2*np.pi*R6*C3):.1f} Hz, pole {(1+gm_R6)/(2*np.pi*R6*C3):.1f} Hz")
+print(f"                shelf ratio 1+gm*R6 = {1+gm_R6:.3f} ({20*np.log10(1+gm_R6):+.2f} dB HF lift)  [NOMINAL - fit to capture]")
+g = 20 * np.log10(np.abs(jfet_stage_lin_tf(f)))
+for fq in [50, 100, 145, 250, 500, 1000, 2000, 5000, 10000, 20000]:
+    gi = g[np.argmin(np.abs(f - fq))]
+    print(f"        {fq:6d} Hz: {gi:+6.2f} dB  (G0=15 nominal, INVERTING) [G0 - fit to capture]")
