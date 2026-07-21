@@ -18,7 +18,7 @@
 | 4b — Functional UI pass | **✅ DONE (2026-07-21)** | data-driven pedal face bound to APVTS (commit 40451af) | interactive testability |
 | 5 — Nonlinear clipper + GRUNT + switch topologies | **✅ STRUCTURE DONE (2026-07-21)** | Clipper ✓: GRUNT bank + R16 + finite-gain 4049 VTC + R18∥C14 + D1/D2 as ONE coupled stage (Newton solve). GRUNT corners finite-gain (896/144/36 Hz ≪ ideal-vg). All amplitude params (A0/satLo/satHi) NOMINAL → Phase-7 capture fit. Oversample+ADAA = Phase 6. | small-signal FR vs oracle + GRUNT corners + DC-step polarity + asymmetry + D1/D2-never-conduct (ctest 14/14) + **dsp-validator PASS (all 6 checks, 2026-07-21)** |
 | 6 — Oversampling wiring + delay compensation | **✅ DONE (2026-07-21)** | Full chain assembled (`PedalChain`/`PedalDSP`), wired into `processBlock`; OS region JFET→SK (FIR, 1×/2×/4×/8× + render factor); clean-tap `DelayLine` compensation; host `setLatencySamples`; JFET ADAA. AU auval PASS. | ctest 16/16 (+ PedalChainTest, OSValidationTest); delay comp factor-independent <0.1 dB LF; aliasing 2×−28→8×−34 dB |
-| 7 — Full-chain integration + level calibration | **Pre-work in progress** — see `docs/phase7-handoff.md` | chain assembled + wired (Phase 6); **capture session DONE** (55 files, all parse) + gain-session correction (`ff5fc5f`); **`FitParams` runtime fit constants DONE** (`697339f`, ctest 16/16). REMAINING: **`OfflineRender` exe (the blocker)**, `render_args()`, then `kInputRef` anchor, nonlinear fits, bridged-T reshape, taper fits, output makeup, rail-clamp enable | — |
+| 7 — Full-chain integration + level calibration | **Pre-work ✅ COMPLETE (2026-07-22); calibration not started** — see `docs/phase7-handoff.md` | chain assembled + wired (Phase 6); **capture session DONE** (55 files, all parse) + gain-session correction (`ff5fc5f`); **`FitParams` runtime fit constants DONE** (`697339f`); **`OfflineRender` + `render_args()` DONE** (the ex-blocker) with `render_smoke_check.py` proving the CLI→DSP mapping. REMAINING = calibration proper, in the doc's order: `kInputRef` anchor, nonlinear fits, bridged-T reshape, taper fits, output makeup, rail-clamp enable | ctest 16/16; `render_smoke_check.py` all PASS (EQ knob direction, mid-freq mapping, bypass, align lag == reported latency) |
 | 8 — Full UI (polish, VU gate, headless) | Not started | — | — |
 | 9 — HQ/Eco + final sweep | Not started | — | — |
 
@@ -369,7 +369,10 @@ NOR an unexplained broadband/sign-mismatch null; no NaN/Inf anywhere in a full-r
 §4: two baselines + ~29 takes, `gen_test_signal.py` signal, `parse_capture()` filenames).
 Then:
 
-1. `OfflineRender` console exe mirroring `processBlock` exactly (analysis/ + build.md).
+1. ✅ **DONE (2026-07-22)** — `OfflineRender` console exe mirroring `processBlock` exactly
+   (`analysis/offline_render.cpp`, CMake target `OfflineRender`), plus `captures.py::render_args()`
+   against its CLI and `analysis/render_smoke_check.py` proving the CLI→DSP mapping (EQ knob
+   direction, mid-freq switch mapping, bypass, render/capture alignment).
 2. Calibrate in the documented order (calibration doc): `kInputRef` from the capture rig anchor;
    THEN fit the 4049 VTC/rail + J201 shaper to the driven captures (control-isolation +
    matched-pair diffs); reshape the bridged-T to the measured notch (or lack of one — it's

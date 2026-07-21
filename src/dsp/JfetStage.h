@@ -207,12 +207,14 @@ private:
 
     // 1st-order ADAA: y = (F(u) - F(uPrev)) / (u - uPrev); midpoint fallback when
     // the two are too close (avoids 0/0), which also keeps it exact at DC.
-    inline double adaaShape(double u, double uPrev) const noexcept
+    // The previous sample is a PARAMETER, not the `uPrev` member, so the caller
+    // controls the pairing — named `prev` so it doesn't shadow that member.
+    inline double adaaShape(double u, double prev) const noexcept
     {
-        const double du = u - uPrev;
+        const double du = u - prev;
         if (std::abs(du) < 1.0e-7)
-            return waveshape(0.5 * (u + uPrev));
-        return (waveshapeAD(u) - waveshapeAD(uPrev)) / du;
+            return waveshape(0.5 * (u + prev));
+        return (waveshapeAD(u) - waveshapeAD(prev)) / du;
     }
 
     // Phase-7 capture-fit amplitude params (FitParams.h), nominal-initialised.

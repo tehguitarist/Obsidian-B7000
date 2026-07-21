@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 
+#include "dsp/GainStaging.h"
 #include "dsp/PedalDSP.h"
 
 class ObsidianB7000AudioProcessor : public juce::AudioProcessor
@@ -61,8 +62,10 @@ public:
     float getInputLevel(int /*ch*/) const { return inputLevel.load(); }
     float getOutputLevel(int /*ch*/) const { return outputLevel.load(); }
 
-    static constexpr float kInputRef = 0.87f;
-    static constexpr float kOutputMakeup = 0.9f;
+    // Shared with analysis/offline_render.cpp via dsp/GainStaging.h — the fit
+    // that sets these must not be able to land in only one of the two.
+    static constexpr float kInputRef = (float) GainStaging::kInputRefNominal;
+    static constexpr float kOutputMakeup = (float) GainStaging::kOutputMakeupNominal;
 
 private:
     // Build the per-block chain param set from the cached APVTS pointers.

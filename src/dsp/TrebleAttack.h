@@ -63,8 +63,12 @@ public:
     static constexpr double kC7 = 100.0e-9;
     static constexpr double kC8 = 220.0e-12;
 
-    static constexpr int N = 5;             // node count
-    static constexpr int M = 0, P = 1, L1 = 2, L2 = 3, Q = 4;
+    // size_t (not int) so every array subscript below is already the right
+    // signedness — std::array::operator[] takes size_type, and an int index
+    // would make each of the ~35 subscripts in this file an implicit signed->
+    // unsigned conversion (-Wsign-conversion).
+    static constexpr size_t N = 5;             // node count
+    static constexpr size_t M = 0, P = 1, L1 = 2, L2 = 3, Q = 4;
 
     TrebleAttack() = default;
 
@@ -78,8 +82,8 @@ public:
         gc7 = kC7 * twoOverT;
         gc8 = kC8 * twoOverT;
 
-        for (int pos = 0; pos < 3; ++pos)
-            invert(buildY(static_cast<Attack>(pos)), yInv[pos]);
+        for (size_t pos = 0; pos < 3; ++pos)
+            invert(buildY(static_cast<Attack>((int) pos)), yInv[pos]);
 
         reset();
     }
@@ -123,12 +127,12 @@ public:
         }
 
         // ---- Solve v = Yinv * b ----
-        const auto& A = yInv[static_cast<int>(attack)];
+        const auto& A = yInv[static_cast<size_t>(attack)];
         std::array<double, N> v {};
-        for (int i = 0; i < N; ++i)
+        for (size_t i = 0; i < N; ++i)
         {
             double acc = 0.0;
-            for (int j = 0; j < N; ++j)
+            for (size_t j = 0; j < N; ++j)
                 acc += A[i][j] * b[j];
             v[i] = acc;
         }
@@ -187,15 +191,15 @@ private:
     static void invert(Mat src, Mat& dst)
     {
         Mat a = src;
-        for (int i = 0; i < N; ++i)
-            for (int j = 0; j < N; ++j)
+        for (size_t i = 0; i < N; ++i)
+            for (size_t j = 0; j < N; ++j)
                 dst[i][j] = (i == j) ? 1.0 : 0.0;
 
-        for (int col = 0; col < N; ++col)
+        for (size_t col = 0; col < N; ++col)
         {
-            int piv = col;
+            size_t piv = col;
             double best = std::abs(a[col][col]);
-            for (int r = col + 1; r < N; ++r)
+            for (size_t r = col + 1; r < N; ++r)
             {
                 const double v = std::abs(a[r][col]);
                 if (v > best) { best = v; piv = r; }
@@ -206,13 +210,13 @@ private:
                 std::swap(dst[piv], dst[col]);
             }
             const double d = a[col][col];
-            for (int j = 0; j < N; ++j) { a[col][j] /= d; dst[col][j] /= d; }
-            for (int r = 0; r < N; ++r)
+            for (size_t j = 0; j < N; ++j) { a[col][j] /= d; dst[col][j] /= d; }
+            for (size_t r = 0; r < N; ++r)
             {
                 if (r == col) continue;
                 const double f = a[r][col];
                 if (f == 0.0) continue;
-                for (int j = 0; j < N; ++j) { a[r][j] -= f * a[col][j]; dst[r][j] -= f * dst[col][j]; }
+                for (size_t j = 0; j < N; ++j) { a[r][j] -= f * a[col][j]; dst[r][j] -= f * dst[col][j]; }
             }
         }
     }

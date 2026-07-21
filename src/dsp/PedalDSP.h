@@ -77,6 +77,13 @@ public:
 
     void setParams(const PedalChain::Params& p) { chain.applyParams(p); }
 
+    // Phase-7 capture-fit constants (FitParams.h). CALIBRATION, not control —
+    // set once per render/instance, not per block. Safe either side of prepare()
+    // (stages re-derive from the stored values), and preserved across an
+    // OS-factor change because prepareOd() re-prepares from those same values.
+    void setFitParams(const FitParams& f) { chain.setFitParams(f); }
+    const FitParams& getFitParams() const noexcept { return chain.getFitParams(); }
+
     // Choose the oversampling factor for this block (order = log2 factor, 0..3).
     // Cheap when unchanged; re-prepares the OD region + delay length on a change.
     void setFactorOrder(int order)

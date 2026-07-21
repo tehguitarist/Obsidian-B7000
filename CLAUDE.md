@@ -103,7 +103,31 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 7 PRE-WORK (2026-07-22) — see `docs/phase7-handoff.md` for the full resume point.**
+> **CURRENT: Phase 7 PRE-WORK ✅ COMPLETE (2026-07-22) — CALIBRATION PROPER IS NEXT.
+> See `docs/phase7-handoff.md` "Phase 7 proper — START HERE" for the fixed calibration ORDER
+> (`docs/calibration-and-gain-staging.md` sets it; do not reorder it).**
+> **`OfflineRender` ✅ DONE (the ex-blocker):** `analysis/offline_render.cpp` + CMake target
+> `OfflineRender` (`juce_add_console_app`; juce_audio_formats + juce_dsp). Mirrors
+> `PluginProcessor::processBlock` step for step — **if that changes, change this too.** Takes
+> **knob-space** pots and applies `readParams()`'s `1-x` EQ inversion internally; renders
+> UNCOMPENSATED (analyze.py::align() removes the lag — don't double-compensate); seeds every
+> smoother with `setCurrentAndTargetValue()`; writes 32-bit FLOAT WAV; `--fit name=value` sets any
+> FitParams field and `--print-fit` dumps what a render actually used. Positional `<in> <out>` is
+> supported because the existing analysis/ orchestrators call it that way. New
+> **`src/dsp/GainStaging.h`** holds `kInputRefNominal`/`kOutputMakeupNominal` so the plugin and the
+> renderer can't diverge — committing a fitted `kInputRef` is a ONE-LINE edit there.
+> `PedalDSP` gained `setFitParams()`/`getFitParams()` passthroughs.
+> **`captures.py::render_args()` ✅ DONE** (all 55 filenames map; `bypass.wav` special-cased), and
+> **`analysis/render_smoke_check.py`** PROVES the CLI→DSP mapping rather than assuming it: EQ knob
+> direction monotonic CW=boost on all 4 bands (the check that catches a missing inversion), all 6
+> mid-freq switch positions peak at their labelled centre, bypass = input delayed by the reported
+> latency, and `align()` recovers exactly the reported 64-sample OS latency. All PASS; **ctest stays
+> 16/16**; it is a tool, not a ctest gate — re-run it after any `processBlock`/`readParams()`/APVTS-
+> order/CLI change. FYI the nominal ref-clean render sits ~5.3 dB below the capture (−37.47 vs
+> −32.18 dB RMS on `sweep_clean`) — EXPECTED with un-anchored constants; decompose per
+> `validation-and-capture.md` §4 before changing anything.
+>
+> **Pre-work history (2026-07-22):**
 > Capture session ✅ DONE: 55 files in `analysis/captures/` (gitignored — back them up, they are NOT
 > in the repo), 51/51 matrix filenames parse, disk↔matrix an exact set match. Mid-session the
 > interface's own input headroom clipped 14 MASTER/EQ-boost-max takes (all pinned at peak 0.98850) →
@@ -115,10 +139,6 @@ high, execute routine work cheap) is what should persist.
 > hopeless for a 3-D search like clipA0×satLo×satHi). Nothing re-tuned — each stage keeps its `kXxx`
 > constexpr as the nominal and initialises the member from it. `kInputRef`/`kOutputMakeup` are
 > deliberately NOT in FitParams (DAW-domain; calibration §1 needs kInputRef to cancel in the linear path).
-> **⛔ NEXT / BLOCKER: `OfflineRender` console exe does not exist yet** — no fit is possible without it.
-> CLI shape + 4 must-honour traps (EQ knob-space inversion mirroring `readParams()`, smoothing-ramp
-> artifact, latency vs `analyze.py::align()` double-compensation, `bypass.wav`'s settings-free parse)
-> are all written up in the handoff doc. Then `captures.py::render_args()` (still `NotImplementedError`).
 > Python on this machine: **`/opt/homebrew/bin/python3.11`** (plain `python3` is 3.13, no numpy).
 >
 > **Phase 6 (oversampling + ADAA + FULL-CHAIN ASSEMBLY) ✅ DONE (2026-07-21).**
@@ -401,9 +421,13 @@ high, execute routine work cheap) is what should persist.
   circuit.md's UI map) — corrected to `grunt-boost`/`grunt-flat` (baseline already covers `cut`).
   `python3 analysis/captures.py` (via `/opt/homebrew/bin/python3.11` — `python3` on this machine
   resolves to 3.13, which lacks numpy/scipy; pip installs against 3.11) self-validates all 49
-  documented filenames with no captures on disk yet: 49/49 PASS. `render_args()` (maps parsed
-  settings → `OfflineRender` CLI flags) is still NOT implemented — blocked on `OfflineRender` itself
-  not existing yet (see "NEXT: Phase 7"). Missing DC/rail values → take nominal from datasheets,
+  documented filenames with no captures on disk yet: 49/49 PASS. **`render_args()` ✅ IMPLEMENTED
+  2026-07-22** against the now-existing `OfflineRender` CLI — emits every control explicitly (never
+  leans on the binary's defaults), leaves `--in/--out/--os` to the orchestrators, special-cases
+  `bypass.wav`, appends `extra_args` verbatim (how a `--fit` sweep varies one constant across a
+  batch), and **does NOT pre-invert the EQ pots** (the dict is knob-space; OfflineRender applies
+  `readParams()`'s `1-x` itself — inverting in both places mirrors every EQ fit while looking
+  entirely plausible). Missing DC/rail values → take nominal from datasheets,
   calibrate the clip ceiling to the bypass+drive captures.
 - **Value discrepancies resolved:** C33 = 22n (primary+BOM; backup's 2200pF is a different rev).
   GRUNT C13 = 220n (primary; backup 22n). Using primary values throughout. Both re-confirmed against

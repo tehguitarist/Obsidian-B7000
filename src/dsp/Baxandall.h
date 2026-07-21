@@ -126,7 +126,7 @@ private:
     void setPos(double& slot, double v) noexcept
     {
         const double c = v < 1e-6 ? 1e-6 : (v > 1.0 - 1e-6 ? 1.0 - 1e-6 : v);
-        if (c != slot) { slot = c; dirty = true; }
+        if (mna::differs(c, slot)) { slot = c; dirty = true; }
     }
 
     void rebuild() noexcept

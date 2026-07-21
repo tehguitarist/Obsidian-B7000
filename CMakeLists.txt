@@ -143,6 +143,23 @@ target_link_libraries(PedalChainTest PRIVATE chowdsp::chowdsp_wdf)
 target_compile_options(PedalChainTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME PedalChainTest COMMAND PedalChainTest)
 
+# Phase-7 calibration harness: render a WAV through the real chain from the CLI.
+# Mirrors PluginProcessor::processBlock (see the header comment in the source);
+# needs juce_audio_formats for 32-bit-float WAV I/O and juce_dsp for the
+# oversampler. NOT registered with add_test() — it's a tool, not a pass/fail gate.
+juce_add_console_app(OfflineRender)
+target_sources(OfflineRender PRIVATE analysis/offline_render.cpp)
+target_link_libraries(OfflineRender
+    PRIVATE
+        juce::juce_audio_formats
+        juce::juce_dsp
+        chowdsp::chowdsp_wdf
+        xsimd
+    PUBLIC
+        juce::juce_recommended_config_flags)
+target_compile_definitions(OfflineRender PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_compile_options(OfflineRender PRIVATE ${PEDAL_WARNING_FLAGS})
+
 # Oversampling + delay-comp validation (needs JUCE dsp + FFT)
 juce_add_console_app(OSValidationTest)
 target_sources(OSValidationTest PRIVATE tests/OSValidationTest.cpp)

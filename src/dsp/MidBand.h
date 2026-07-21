@@ -95,13 +95,13 @@ public:
     void setPosition(double a) noexcept
     {
         const double clamped = a < 1e-6 ? 1e-6 : (a > 1.0 - 1e-6 ? 1.0 - 1e-6 : a);
-        if (clamped != posA) { posA = clamped; dirty = true; }
+        if (mna::differs(clamped, posA)) { posA = clamped; dirty = true; }
     }
 
     // 3-way mid switch: swap the series cap (see kLoMid*/kHiMid* above).
     void setSeriesCap(double c) noexcept
     {
-        if (c != cSeries) { cSeries = c; gc33 = cSeries * twoOverT; dirty = true; }
+        if (mna::differs(c, cSeries)) { cSeries = c; gc33 = cSeries * twoOverT; dirty = true; }
     }
 
     // Rail-clamp passthroughs (calibration §6) — applied to Vout (op-amp output).

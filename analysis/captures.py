@@ -32,12 +32,14 @@ identical to the tables in the doc. Run `python3 analysis/captures.py` with no c
 disk yet to self-validate every documented filename parses cleanly; this is the check that
 keeps the doc and the parser from silently drifting apart.
 
-You MUST still implement (pedal-specific, not yet done — needs OfflineRender's CLI, which
-doesn't exist yet either):
+Implemented below:
+  - parse_capture(filename) -> dict of settings, keyed by PedalChain::Params FIELD NAMES
+    but holding KNOB-SPACE (== APVTS) values. ⚠ The names match PedalChain::Params; the
+    four EQ VALUES (lo/loMid/hiMid/hi) do NOT — the DSP stages are boost-at-zero, so
+    PluginProcessor::readParams() inverts them (`p.lo = 1.0f - knob`) on the way in.
+    OfflineRender applies that same inversion internally, so these stay knob-space all
+    the way to the CLI. Inverting them here as well would mirror every EQ fit.
   - render_args(parsed, extra_args=None) -> list of CLI flags for OfflineRender
-
-Already implemented below:
-  - parse_capture(filename) -> dict of settings (PedalChain::Params field names)
   - find_captures(directory) -> [(path, parsed_dict), ...]
   - load_capture(path, expect_fs=48000) -> np.float64 mono audio
 """
@@ -313,16 +315,49 @@ def load_capture(path, expect_fs=48000):
     return np.asarray(x, dtype=np.float64)
 
 
+# parse_capture() field -> OfflineRender pot flag. The four EQ entries are the
+# reason this mapping is worth stating explicitly rather than deriving: the values
+# here are KNOB space (CW = higher, == APVTS), and OfflineRender applies the
+# `1 - x` inversion to the EQ pots internally, mirroring
+# PluginProcessor::readParams(). Do NOT pre-invert them here — that would invert
+# them twice and every EQ fit would come out mirrored while looking plausible.
+_POT_FLAGS = {
+    "master": "--master", "blend": "--blend", "level": "--level", "drive": "--drive",
+    "lo": "--lo", "loMid": "--lo-mid", "hiMid": "--hi-mid", "hi": "--hi",
+}
+_SWITCH_FLAGS = {
+    "attackIdx": "--attack", "gruntIdx": "--grunt",
+    "loMidFreq": "--lo-mid-freq", "hiMidFreq": "--hi-mid-freq",
+}
+
+
 def render_args(parsed, extra_args=None):
-    """Parsed settings -> flat list of CLI flags for your OfflineRender.
+    """Parsed settings -> flat list of CLI flags for OfflineRender.
 
-    Example: ["--rev", "V1", "--drive", "0.5000", "--tone", "0.7000"]
+    Emits every control explicitly (never relying on the binary's defaults matching
+    the capture baseline) so a render is fully determined by the filename it came
+    from. Deliberately does NOT emit --in/--out/--os: the orchestrators
+    (comprehensive_report.py, farina_validate.py, ...) build those themselves as
+    ``[BIN, in, out, "--os", N] + render_args(parsed)``.
 
-    Append extra_args (e.g. calibration overrides such as --sat-*) at the end.
+    ``bypass.wav`` is the one special case — parse_capture() returns {"bypass": True}
+    with no pot/switch keys at all, so it maps to a bare ``--bypass 1`` rather than
+    being indexed for settings that aren't there.
+
+    extra_args (e.g. ["--fit", "clipA0=27"]) is appended verbatim, which is how a
+    calibration sweep varies one FitParams value across a whole capture batch.
     """
-    raise NotImplementedError(
-        "Implement render_args() for your pedal's OfflineRender CLI"
-    )
+    if parsed.get("bypass"):
+        return ["--bypass", "1"] + list(extra_args or [])
+
+    args = []
+    for field, flag in _POT_FLAGS.items():
+        args += [flag, f"{float(parsed[field]):.6f}"]
+    for field, flag in _SWITCH_FLAGS.items():
+        args += [flag, str(int(parsed[field]))]
+    args += ["--dist-engage", "1" if parsed["distEngage"] else "0"]
+    args += ["--bypass", "0"]
+    return args + list(extra_args or [])
 
 
 def _selftest():

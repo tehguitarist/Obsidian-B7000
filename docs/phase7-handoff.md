@@ -5,16 +5,16 @@
 
 ## TL;DR
 
-The **capture session is done** (55 files on disk, all parse). Two of the four
-pre-work items are **committed and green**; the remaining blocker is that
-**`OfflineRender` does not exist yet** — nothing can be fitted without it.
+**Phase-7 PRE-WORK IS COMPLETE (2026-07-22).** The capture session is done (55
+files on disk, all parse), and all four pre-work items are green. Nothing blocks
+calibration proper now — start at "Then — Phase 7 proper" below, in that order.
 
 | # | Pre-work item | Status |
 |---|---|---|
 | 1 | Gain-session fix (`captures.py` + doc) | ✅ committed `ff5fc5f` |
 | 2 | Make fit constants runtime-settable (`FitParams`) | ✅ committed `697339f`, ctest 16/16 |
-| 3 | **Build `OfflineRender` console exe** | ❌ **NOT STARTED — the blocker** |
-| 4 | Implement `captures.py::render_args()` | ❌ blocked on #3 (needs its CLI) |
+| 3 | Build `OfflineRender` console exe | ✅ done — `analysis/offline_render.cpp` |
+| 4 | Implement `captures.py::render_args()` | ✅ done — against that CLI |
 
 ## What's already done
 
@@ -54,58 +54,101 @@ Fit knobs: `clipA0/clipSatLo/clipSatHi`, `jfetG0/jfetGmR6/jfetSatPos/jfetSatNeg`
 
 `kInputRef` / `kOutputMakeup` are deliberately **not** in `FitParams` — they're
 DAW-domain processor scalars and calibration §1 depends on `kInputRef`
-cancelling in the linear path. They get their own `OfflineRender` CLI flags.
+cancelling in the linear path. They get their own `OfflineRender` CLI flags
+(`--input-ref` / `--output-makeup`), defaulting to `src/dsp/GainStaging.h`.
 
-## What's next — item 3, `OfflineRender`
+### 3. `OfflineRender` (2026-07-22)
 
-A `juce_add_console_app` (needs `juce::dsp::Oversampling` + WAV I/O) that mirrors
-`PluginProcessor::processBlock` exactly. Design already worked out:
+`analysis/offline_render.cpp` + CMake target `OfflineRender`
+(`juce_add_console_app`, links `juce_audio_formats` + `juce_dsp` + chowdsp_wdf).
+Build with `cmake --build build --target OfflineRender`; the binary lands at
+`build/OfflineRender_artefacts/Release/OfflineRender`, which is what
+`captures.py::RENDER_BIN` already pointed at.
 
-**CLI shape**
+It mirrors `PluginProcessor::processBlock` step for step (each step is annotated
+in the source with the processBlock line it copies) — **if processBlock's gain
+staging changes, change this too**, or every measurement is of a chain the plugin
+doesn't run. The two shared scalars now live in `src/dsp/GainStaging.h`
+(`kInputRefNominal` / `kOutputMakeupNominal`) and are included by BOTH
+`PluginProcessor.h` and OfflineRender, so committing a fitted `kInputRef` is a
+one-line edit that cannot land in only one of the two. `PedalDSP` gained a
+`setFitParams()` / `getFitParams()` passthrough (its `chain` is private).
+
+**CLI as built** (`--help` prints it):
 ```
---in <wav> --out <wav>
---master --blend --level --drive --lo --lo-mid --hi-mid --hi   (0..1 KNOB space)
---attack --grunt --lo-mid-freq --hi-mid-freq                    (APVTS choice idx)
+OfflineRender <in.wav> <out.wav> [options]      # positional — what the analysis/ scripts use
+OfflineRender --in <wav> --out <wav> [options]  # equivalent
+OfflineRender --print-fit                       # no render; dump the resolved config
+
+--master --blend --level --drive --lo|--bass --lo-mid --hi-mid --hi|--treble  (0..1 KNOB space)
+--attack --grunt --lo-mid-freq --hi-mid-freq    (APVTS choice index OR label, e.g. `boost`, `1p5k`)
 --dist-engage 0|1   --bypass 0|1
 --input-trim <dB>   --output-trim <dB>
---os 1|2|4|8
+--os 1|2|4|8        --block <samples>
 --input-ref <V>     --output-makeup <g>
---fit name=value    (repeatable, any FitParams field)
---print-fit         (dump what the render actually used)
+--fit name=value    (repeatable, any FitParams field, case-insensitive)
+--print-fit         (dump fit params + the knob→DSP mapping actually used)
+--trim-latency      (opt-in only — see trap 3)
 ```
+Deviations from the sketch above, all deliberate: **positional in/out** is
+supported because the existing orchestrators (`comprehensive_report.py`,
+`farina_validate.py`, `hf_thd_flatness_check.py`) already call
+`[BIN, in, out, "--os", N] + render_args(...)`; switch flags accept labels as
+well as indices; `--bass`/`--treble` alias `--lo`/`--hi`. Output is always
+**32-bit float WAV** (validation-and-capture.md §2). A non-finite sample in the
+output is an exit-1 failure, so a parameter sweep records a blown-up candidate as
+rejected instead of scoring a file of NaNs.
 
-**Four traps to honour when writing it** (each is a real, silent-wrong-answer
-failure mode, not a nicety):
+**The four traps, and how each is handled:**
 
-1. **EQ pot inversion.** `PluginProcessor::readParams()` does
-   `p.lo = 1.0f - pLo->load()` for `lo/loMid/hiMid/hi` — the DSP stages are
-   boost-at-0 while the knob/APVTS is CW-is-boost. `captures.py` returns
-   **knob-space** values (matching APVTS). So `OfflineRender` must take
-   knob-space on the CLI and apply the same `1.0 -` inversion internally,
-   mirroring `readParams()`. Passing the parsed dict straight into
-   `PedalChain::Params` inverts every EQ fit, and it will look plausible.
-   ⚠ Note `captures.py`'s docstring claims its dict uses "PedalChain::Params
-   field names" — the NAMES match but the EQ VALUES are knob-space, not
-   DSP-space. Worth a clarifying comment there when writing `render_args()`.
-2. **Smoothing ramps.** `inputGain`/`outputGain` (20 ms) and `bypassMix` (5 ms)
-   ramp from the plugin's `prepareToPlay` defaults. For a static offline render
-   that's a start-of-file artifact — use `setCurrentAndTargetValue()` so the
-   render begins at its final gain.
-3. **Latency.** `analysis/analyze.py::align()` already cross-correlates and
-   removes lag (returns `lag`), so do **not** also trim `getLatencySamples()` by
-   default or the two compensations fight. Prefer leaving the render
-   uncompensated and letting `align()` do it; if a trim flag is added, make it
-   opt-in and document the interaction.
-4. **Bypass captures.** `parse_capture("bypass.wav")` returns `{"bypass": True}`
-   and *nothing else* — no pot/switch keys. `render_args()` must special-case it
-   rather than indexing the usual fields.
+1. **EQ pot inversion.** `readParams()` does `p.lo = 1.0f - pLo->load()` for
+   `lo/loMid/hiMid/hi` — stages are boost-at-0, the knob is CW-is-boost.
+   `captures.py` returns **knob-space** values. OfflineRender takes knob space and
+   applies the same `1.0 -` inversion internally (`toChainParams()`), and
+   `--print-fit` prints `knob_space -> dsp_space` for all eight pots so the
+   mapping is checkable. `render_args()` must NOT pre-invert. `captures.py`'s
+   docstring now says this explicitly (the names match `PedalChain::Params`; the
+   EQ **values** are knob-space, not DSP-space).
+2. **Smoothing ramps** — every smoother seeded with `setCurrentAndTargetValue()`.
+3. **Latency** — renders UNCOMPENSATED by default; `analyze.py::align()` removes
+   the lag. `--trim-latency` exists but is opt-in. Verified: `align()` recovers
+   exactly the latency the render reports (64 samples at 8×).
+4. **`bypass.wav`** — `render_args()` special-cases `{"bypass": True}` to a bare
+   `--bypass 1`; every other flag is optional on the CLI. Note a bypassed render
+   is the input **delayed by the OS latency**, not a bit-copy — the dry path is
+   delay-compensated to match the latency the plugin reports for PDC.
 
-Then **item 4**: implement `render_args(parsed, extra_args=None)` in
-`analysis/captures.py` (currently `raise NotImplementedError` at ~line 316)
-against that CLI, and point `RENDER_BIN` at the built binary
-(`build/OfflineRender_artefacts/Release/OfflineRender`).
+### 4. `render_args()` + the mapping proof (2026-07-22)
 
-## Then — Phase 7 proper (do NOT start before 3 & 4)
+`captures.py::render_args(parsed, extra_args=None)` emits every control
+explicitly (never leaning on the binary's defaults matching the capture
+baseline), skips `--in/--out/--os` (the orchestrators supply those), and appends
+`extra_args` verbatim — which is how a sweep varies one `--fit` value across a
+whole batch. All 55 matrix + secondary filenames map cleanly.
+
+**`analysis/render_smoke_check.py`** (run with `/opt/homebrew/bin/python3.11`) is
+the guard against the real risk here — a render that runs and produces finite
+audio while silently mis-mapping a knob, which no downstream fit can detect
+because it would just absorb the error into a constant. Four checks, all PASS:
+
+1. **EQ knob direction** — multitone through each band at knob 0.0/0.5/1.0;
+   asserts band gain rises monotonically with the knob (CW = boost) for all four,
+   span ≈ 29–36 dB. This is the check that would catch a missing inversion.
+2. **Mid-frequency switch mapping** — each selector position's boost peaks at its
+   labelled centre (250/500/1k, 750/1.5k/3k), all six exact.
+3. **Bypass** — reproduces the input exactly, delayed by the reported latency.
+4. **Alignment vs a real capture** — a full ref-clean render is finite,
+   length-matched, and `align()` recovers lag == the reported 64-sample latency.
+
+It is a tool, not a ctest gate (ctest stays 16/16). Re-run it after any change to
+`processBlock`, `readParams()`, the APVTS choice order, or the CLI.
+
+For context, that ref-clean render sits at −37.47 dB RMS on `sweep_clean` vs the
+capture's −32.18 dB. That ~5.3 dB deficit is **expected** — every constant is
+still nominal and `kInputRef`/`kOutputMakeup` are un-anchored. Decompose it per
+`validation-and-capture.md` §4 before changing anything.
+
+## Phase 7 proper — START HERE (pre-work 1–4 are all done)
 
 Calibration order is fixed by `docs/calibration-and-gain-staging.md`; don't
 reorder it:

@@ -25,6 +25,18 @@
 // =============================================================================
 namespace mna {
 
+// Bit-exact "has this value moved?" test for the stages' dirty flags.
+//
+// A dirty flag wants EXACT inequality: any change at all, however small, must
+// trigger a re-inversion, and an epsilon would silently ignore small pot moves.
+// But a literal `a != b` on doubles trips -Wfloat-equal, which exists to catch
+// approximate-comparison bugs this deliberately is not. Spelling it as two
+// relational tests says "ordering differs" instead of "floats are equal",
+// keeping the exact semantics (identical for all non-NaN inputs) without
+// suppressing the warning globally and going blind to a real misuse elsewhere.
+inline bool differs(double a, double b) noexcept { return (a < b) || (b < a); }
+
+
 template <int N>
 inline bool invert(const double src[N][N], double inv[N][N]) noexcept
 {
