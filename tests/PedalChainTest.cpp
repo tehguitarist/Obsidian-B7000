@@ -21,7 +21,7 @@ static void check(bool cond, const std::string& msg)
     }
 }
 
-static bool finite(double v) { return std::isfinite(v); }
+static bool isFiniteVal(double v) { return std::isfinite(v); }
 
 int main()
 {
@@ -59,7 +59,7 @@ int main()
                             {
                                 const double x = 0.5 * std::sin(2.0 * M_PI * 110.0 * n / fs);
                                 const double y = chain.processSample(x);
-                                if (!finite(y)) { ok = false; break; }
+                                if (!isFiniteVal(y)) { ok = false; break; }
                                 globalPeak = std::max(globalPeak, std::abs(y));
                             }
                             char buf[128];
@@ -124,7 +124,7 @@ int main()
             const double x = 0.5 * std::sin(2.0 * M_PI * 220.0 * n / fs);
             peak = std::max(peak, std::abs(chain.processSample(x)));
         }
-        check(finite(peak) && peak < 5.0,
+        check(isFiniteVal(peak) && peak < 5.0,
               "dist_engage=false routes clean tap only (no OD blow-up)");
     }
 

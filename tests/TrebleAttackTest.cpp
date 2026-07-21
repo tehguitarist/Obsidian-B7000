@@ -20,6 +20,7 @@
 
 #include "../src/dsp/TrebleAttack.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <vector>
