@@ -88,7 +88,16 @@ public:
     {
         // x ∈ [0,1], audio taper via power law: L = x^p.
         // L = 0 → wiper at VD (min OD), L = 1 → wiper at OD input (max OD).
-        L = pedal::taper::powerLawTaper(x, 1.0, kLevelTaperExp);
+        knob = x;
+        L = pedal::taper::powerLawTaper(x, 1.0, levelTaperExp);
+    }
+
+    // Phase-7 capture fit (FitParams.h): re-applies the CURRENT knob position
+    // through the new curve, so a taper refit doesn't leave a stale L behind.
+    void setTaperExp(double p) noexcept
+    {
+        levelTaperExp = p;
+        setLevel(knob);
     }
 
     void setBlend(double x) noexcept
@@ -145,6 +154,9 @@ private:
     double L = 1.0; // LEVEL taper-mapped position [0,1] (default = max OD)
     double B = 0.0; // BLEND position [0,1] (default = 100% clean)
     bool distEngage = true; // true = normal BLEND behaviour
+    // Phase-7 capture-fit taper shape + the knob position it was applied to.
+    double levelTaperExp = kLevelTaperExp;
+    double knob = 1.0;
 
     LevelBlend(const LevelBlend&) = delete;
     LevelBlend& operator=(const LevelBlend&) = delete;

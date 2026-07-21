@@ -101,7 +101,16 @@ public:
     {
         // x ∈ [0,1], A-taper via power law. divRatio = Rbot/Rp (wiper→GND tap):
         // x=1 (full CW) → 1.0 → unity; x=0 → 0.0 (wiper at VD, silent).
-        divRatio = pedal::taper::powerLawTaper(x, 1.0, kMasterTaperExp);
+        knob = x;
+        divRatio = pedal::taper::powerLawTaper(x, 1.0, masterTaperExp);
+    }
+
+    // Phase-7 capture fit (FitParams.h): re-applies the CURRENT knob position
+    // through the new curve, so a taper refit doesn't leave a stale divRatio.
+    void setTaperExp(double p) noexcept
+    {
+        masterTaperExp = p;
+        setMaster(knob);
     }
 
     // Rail-clamp passthroughs (calibration §6) — applied to the IC6_B output.
@@ -131,6 +140,9 @@ private:
     double gc36 = 0.0, gc37 = 0.0;    // companion conductances (set in prepare)
     double ieqC36 = 0.0, ieqC37 = 0.0; // capacitor history currents
     double divRatio = 1.0;             // MASTER wiper tap (default full CW = unity)
+    // Phase-7 capture-fit taper shape + the knob position it was applied to.
+    double masterTaperExp = kMasterTaperExp;
+    double knob = 1.0;
     RailClamp rail;
 
     MasterOut(const MasterOut&) = delete;

@@ -93,16 +93,32 @@ public:
     static constexpr double kC13 = 220.0e-9; // GRUNT: added in the "most" pos
 
     // ---- NOMINAL amplitude placeholders — FIT TO CAPTURE AT PHASE 7 ---------
+    // These stay as the documented NOMINAL values (and are what the per-stage
+    // test uses as its oracle); the live values are the settable members below,
+    // initialised from these. See FitParams.h for why they are runtime-settable.
     static constexpr double kA0 = 25.0;      // 4049 open-loop gain (voicing-critical)
     static constexpr double kSatLo = 3.15;   // output swing toward GND rail (= Vm)
     static constexpr double kSatHi = 3.85;   // output swing toward +VDD rail (asym)
 
-    // D1/D2 clamp window on node W, VD_eff-referenced (0 = trip point Vm = kSatLo
+    // D1/D2 clamp window on node W, VD_eff-referenced (0 = trip point Vm = satLo
     // above GND). D1: W_abs <= +9.6 -> w <= 9.6 - Vm ; D2: W_abs >= -0.6 -> w >=
     // -0.6 - Vm. Wide vs the ~+-0.3 V that the feedback-regulated node actually
     // reaches, so these essentially never fire (the test asserts it).
+    // NOTE these TRACK satLo — the clamp window is referenced to the trip point,
+    // so refitting the saturation levels moves the window with it (the absolute
+    // +9.6 / -0.6 V rail references are what stay fixed).
     static constexpr double kClampHi = 9.6 - kSatLo;  // +6.45 V
     static constexpr double kClampLo = -0.6 - kSatLo; // -3.75 V
+
+    // Phase-7 capture fit (FitParams.h). Recomputes the derived clamp window.
+    void setNonlinear(double A0, double sLo, double sHi) noexcept
+    {
+        a0 = A0;
+        satLo = sLo;
+        satHi = sHi;
+        clampHi = 9.6 - satLo;
+        clampLo = -0.6 - satLo;
+    }
 
     // GRUNT position -> coupling cap. ** UI map ASSUMED (circuit.md GRUNT note),
     // VERIFY against capture: up/Boost = 4n7||220n (MOST low end), mid/Cut = 4n7
@@ -179,10 +195,10 @@ public:
         }
 
         // ---- D1/D2 rail clamps at node W (normally inert) -------------------
-        if (w > kClampHi)
-            w = kClampHi;
-        else if (w < kClampLo)
-            w = kClampLo;
+        if (w > clampHi)
+            w = clampHi;
+        else if (w < clampLo)
+            w = clampLo;
 
         wPrev = w;
         const double y = vtc(w);
@@ -200,24 +216,27 @@ private:
     static constexpr int kNewtonIters = 6;
 
     // Inverter VTC (VD_eff-referenced, 0 = trip point). Inverting asymmetric
-    // sigmoid: slope -A0 at 0 (both sides -> C1-continuous), saturating to -kSatLo
-    // (output -> GND rail) for w>0 and +kSatHi (output -> +VDD rail) for w<0. The
-    // asymmetry (kSatLo != kSatHi) produces the required even harmonics.
-    static inline double vtc(double w) noexcept
+    // sigmoid: slope -a0 at 0 (both sides -> C1-continuous), saturating to -satLo
+    // (output -> GND rail) for w>0 and +satHi (output -> +VDD rail) for w<0. The
+    // asymmetry (satLo != satHi) produces the required even harmonics.
+    inline double vtc(double w) const noexcept
     {
         if (w >= 0.0)
-            return -kSatLo * std::tanh(kA0 * w / kSatLo);
-        return kSatHi * std::tanh(-kA0 * w / kSatHi);
+            return -satLo * std::tanh(a0 * w / satLo);
+        return satHi * std::tanh(-a0 * w / satHi);
     }
 
-    static inline double vtcDeriv(double w) noexcept
+    inline double vtcDeriv(double w) const noexcept
     {
-        const double t = (w >= 0.0) ? std::tanh(kA0 * w / kSatLo)
-                                    : std::tanh(-kA0 * w / kSatHi);
-        return -kA0 * (1.0 - t * t); // both sides negative (inverting), |.| <= A0
+        const double t = (w >= 0.0) ? std::tanh(a0 * w / satLo)
+                                    : std::tanh(-a0 * w / satHi);
+        return -a0 * (1.0 - t * t); // both sides negative (inverting), |.| <= A0
     }
 
     double fs = 48000.0;
+    // Phase-7 capture-fit amplitude params (FitParams.h), nominal-initialised.
+    double a0 = kA0, satLo = kSatLo, satHi = kSatHi;
+    double clampHi = kClampHi, clampLo = kClampLo; // derived from satLo
     // Feedback branch (R18 || C14).
     double gc14 = 0.0, gFb = 0.0, ieq14 = 0.0;
     // Input branch (Cg series R16), Norton-reduced.

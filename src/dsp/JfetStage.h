@@ -108,23 +108,27 @@ public:
 
     void prepare(double sampleRate)
     {
+        fs = sampleRate;
+
         // ---- Input HP: trapezoidal companion for C2 -------------------------
         gc2 = kC2 * 2.0 * sampleRate;
         gRin = 1.0 / (kR4 + kR5);
 
-        // ---- HF-lift shelf: bilinear (== trapezoidal) first-order IIR -------
-        // Analog:  shelf(s) = (1 + s*tauZ) / (1 + s*tauP),  tauZ=R6C3, tauP=tauZ/(1+gmR6)
-        // Bilinear s = c*(1 - z^-1)/(1 + z^-1),  c = 2*fs :
-        //   H(z) = ((1+c*tauZ) + (1-c*tauZ)z^-1) / ((1+c*tauP) + (1-c*tauP)z^-1)
-        const double c = 2.0 * sampleRate;
-        const double tauZ = kR6 * kC3;
-        const double tauP = tauZ / (1.0 + kGmR6);
-        const double a0 = 1.0 + c * tauP;
-        sb0 = (1.0 + c * tauZ) / a0;
-        sb1 = (1.0 - c * tauZ) / a0;
-        sa1 = (1.0 - c * tauP) / a0;
-
+        updateShelf();
         reset();
+    }
+
+    // Phase-7 capture fit (FitParams.h). gmR6 sets the shelf POLE, so changing it
+    // must re-derive the shelf coefficients — hence the stored fs and the
+    // updateShelf() call (calling this before prepare() is fine; prepare()
+    // recomputes from the stored values).
+    void setNonlinear(double G0, double GmR6, double satPos, double satNeg) noexcept
+    {
+        g0 = G0;
+        gmR6 = GmR6;
+        sPos = satPos;
+        sNeg = satNeg;
+        updateShelf();
     }
 
     void reset() noexcept
@@ -155,19 +159,34 @@ public:
         shelfY1 = vs;
 
         // ---- Inverting gain + asymmetric soft saturation --------------------
-        const double u = kG0 * vs;
+        const double u = g0 * vs;
         const double y = adaa ? adaaShape(u, uPrev) : waveshape(u);
         uPrev = u;
         return -y;
     }
 
 private:
+    // HF-lift shelf: bilinear (== trapezoidal) first-order IIR.
+    // Analog:  shelf(s) = (1 + s*tauZ) / (1 + s*tauP),  tauZ=R6C3, tauP=tauZ/(1+gmR6)
+    // Bilinear s = c*(1 - z^-1)/(1 + z^-1),  c = 2*fs :
+    //   H(z) = ((1+c*tauZ) + (1-c*tauZ)z^-1) / ((1+c*tauP) + (1-c*tauP)z^-1)
+    void updateShelf() noexcept
+    {
+        const double c = 2.0 * fs;
+        const double tauZ = kR6 * kC3;
+        const double tauP = tauZ / (1.0 + gmR6);
+        const double a0 = 1.0 + c * tauP;
+        sb0 = (1.0 + c * tauZ) / a0;
+        sb1 = (1.0 - c * tauZ) / a0;
+        sa1 = (1.0 - c * tauP) / a0;
+    }
+
     // Per-polarity tanh soft-clip: g(w) = sat * tanh(w/sat). C1-continuous at 0
     // (both sides -> slope 1), asymmetric sat levels -> even harmonics. Reduces to
     // ~identity for |w| << sat (mild).
-    static inline double waveshape(double w) noexcept
+    inline double waveshape(double w) const noexcept
     {
-        const double sat = (w >= 0.0) ? kSatPos : kSatNeg;
+        const double sat = (w >= 0.0) ? sPos : sNeg;
         return sat * std::tanh(w / sat);
     }
 
@@ -180,15 +199,15 @@ private:
 
     // Antiderivative of waveshape: F(w) = sat^2 * ln cosh(w/sat) (per polarity).
     // C1-continuous at 0 (both branches -> 0), so 1st-order ADAA is well-posed.
-    static inline double waveshapeAD(double w) noexcept
+    inline double waveshapeAD(double w) const noexcept
     {
-        const double sat = (w >= 0.0) ? kSatPos : kSatNeg;
+        const double sat = (w >= 0.0) ? sPos : sNeg;
         return sat * sat * lncosh(w / sat);
     }
 
     // 1st-order ADAA: y = (F(u) - F(uPrev)) / (u - uPrev); midpoint fallback when
     // the two are too close (avoids 0/0), which also keeps it exact at DC.
-    static inline double adaaShape(double u, double uPrev) noexcept
+    inline double adaaShape(double u, double uPrev) const noexcept
     {
         const double du = u - uPrev;
         if (std::abs(du) < 1.0e-7)
@@ -196,7 +215,11 @@ private:
         return (waveshapeAD(u) - waveshapeAD(uPrev)) / du;
     }
 
+    // Phase-7 capture-fit amplitude params (FitParams.h), nominal-initialised.
+    double g0 = kG0, gmR6 = kGmR6, sPos = kSatPos, sNeg = kSatNeg;
+
     // Input-HP companion (set in prepare()).
+    double fs = 48000.0;
     double gc2 = 0.0;
     double gRin = 1.0 / (kR4 + kR5);
     double ieqC2 = 0.0;

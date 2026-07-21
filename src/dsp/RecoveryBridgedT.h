@@ -65,25 +65,23 @@ public:
 
     void prepare(double sampleRate)
     {
-        const double twoOverT = 2.0 * sampleRate;
-        gc16 = kC16 * twoOverT; // trapezoidal companion conductances
-        gc17 = kC17 * twoOverT;
-
-        // Nodal matrix Y (unknowns [Nmid, Nout]); Vin (=buffer out) is the source.
-        //   Nmid: (1/R22 + 1/R23 + gc17) Nmid + (-1/R23) Nout = Vin/R22 + ieqC17
-        //   Nout: (-1/R23) Nmid + (1/R23 + gc16) Nout       = gc16*Vin - ieqC16
-        const double a = 1.0 / kR22 + 1.0 / kR23 + gc17;
-        const double b = -1.0 / kR23;
-        const double c = -1.0 / kR23;
-        const double d = 1.0 / kR23 + gc16;
-        const double det = a * d - b * c;
-        // Precomputed inverse of [[a,b],[c,d]].
-        yi00 = d / det;
-        yi01 = -b / det;
-        yi10 = -c / det;
-        yi11 = a / det;
-
+        fs = sampleRate;
+        rebuild();
         reset();
+    }
+
+    // Phase-7 capture fit (FitParams.h). ALL FOUR values are fit parameters, not
+    // just scaled: risk-register #1 is that the ideal-value ~-28 dB notch at
+    // ~717 Hz is far deeper than this pedal plausibly sounds, and notch DEPTH is
+    // extremely tolerance-sensitive while the FREQUENCY is not — so the reshape
+    // needs independent control of all four to land depth and frequency at once.
+    void setComponents(double R22, double R23, double C16, double C17) noexcept
+    {
+        r22 = R22;
+        r23 = R23;
+        c16 = C16;
+        c17 = C17;
+        rebuild();
     }
 
     void reset() noexcept { ieqC16 = ieqC17 = 0.0; }
@@ -100,7 +98,7 @@ public:
         // RHS: source contributions + capacitor history (Ieq).
         //   C17 (a=Nmid, b=GND): RHS[Nmid] += ieqC17
         //   C16 (a=Vin src, b=Nout): source -> RHS[Nout] += gc16*Vin ; RHS[Nout] -= ieqC16
-        const double rhs0 = vin / kR22 + ieqC17;
+        const double rhs0 = vin / r22 + ieqC17;
         const double rhs1 = gc16 * vin - ieqC16;
 
         const double nmid = yi00 * rhs0 + yi01 * rhs1;
@@ -114,6 +112,32 @@ public:
     }
 
 private:
+    // Rebuild the companion conductances + the precomputed nodal inverse from the
+    // current component values and sample rate.
+    void rebuild() noexcept
+    {
+        const double twoOverT = 2.0 * fs;
+        gc16 = c16 * twoOverT; // trapezoidal companion conductances
+        gc17 = c17 * twoOverT;
+
+        // Nodal matrix Y (unknowns [Nmid, Nout]); Vin (=buffer out) is the source.
+        //   Nmid: (1/R22 + 1/R23 + gc17) Nmid + (-1/R23) Nout = Vin/R22 + ieqC17
+        //   Nout: (-1/R23) Nmid + (1/R23 + gc16) Nout       = gc16*Vin - ieqC16
+        const double a = 1.0 / r22 + 1.0 / r23 + gc17;
+        const double b = -1.0 / r23;
+        const double c = -1.0 / r23;
+        const double d = 1.0 / r23 + gc16;
+        const double det = a * d - b * c;
+        // Precomputed inverse of [[a,b],[c,d]].
+        yi00 = d / det;
+        yi01 = -b / det;
+        yi10 = -c / det;
+        yi11 = a / det;
+    }
+
+    double fs = 48000.0;
+    // Phase-7 capture-fit component values (FitParams.h), nominal-initialised.
+    double r22 = kR22, r23 = kR23, c16 = kC16, c17 = kC17;
     double gc16 = 0.0, gc17 = 0.0;          // companion conductances (set in prepare)
     double yi00 = 0.0, yi01 = 0.0, yi10 = 0.0, yi11 = 0.0; // precomputed Y^-1
     double ieqC16 = 0.0, ieqC17 = 0.0;      // capacitor history currents

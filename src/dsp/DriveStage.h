@@ -77,13 +77,28 @@ public:
 
     // Map the DRIVE knob (0..1) through the C-taper to the gain-leg resistance.
     // Static so tests/oracle can share the exact curve. Anchored to 0 at x=1.
-    static double driveResistance(double x) noexcept
+    // Power law in (1-x): x=0 -> 100k (min gain), x=1 -> 0 (max gain).
+    static double driveResistance(double x, double p) noexcept
     {
-        // Power law in (1-x): x=0 -> 100k (min gain), x=1 -> 0 (max gain).
-        return pedal::taper::powerLawTaper(1.0 - x, kDrivePot, kTaperExp);
+        return pedal::taper::powerLawTaper(1.0 - x, kDrivePot, p);
+    }
+    // Nominal-taper overload (what the per-stage test uses as its oracle).
+    static double driveResistance(double x) noexcept { return driveResistance(x, kTaperExp); }
+
+    void setDrive(double x) noexcept
+    {
+        knob = x;
+        setDriveResistance(driveResistance(x, taperExp));
     }
 
-    void setDrive(double x) noexcept { setDriveResistance(driveResistance(x)); }
+    // Phase-7 capture fit (FitParams.h): re-applies the CURRENT knob position
+    // through the new curve, so a taper refit doesn't silently leave the stage on
+    // the resistance the old exponent produced.
+    void setTaperExp(double p) noexcept
+    {
+        taperExp = p;
+        setDrive(knob);
+    }
 
     // Set the DRIVE rheostat's ELECTRICAL resistance directly (used by the FR
     // test to drive oracle-matched values, decoupled from the taper curve).
@@ -106,6 +121,9 @@ public:
     }
 
 private:
+    // Phase-7 capture-fit taper shape + the knob position it was applied to.
+    double taperExp = kTaperExp;
+    double knob = 0.5;
     double gc10 = 0.0;   // C10 companion conductance (set in prepare)
     double gFB = 0.0;    // 1/R15 + gc10
     double ieqC10 = 0.0; // C10 history current

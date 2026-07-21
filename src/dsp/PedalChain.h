@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "FitParams.h"
 #include "InputBuffer.h"
 #include "JfetStage.h"
 #include "TrebleAttack.h"
@@ -185,6 +186,56 @@ public:
         masterOut.setMaster(p.master);
     }
 
+    // Apply the Phase-7 capture-fit constants (FitParams.h) to every stage that
+    // owns one. Independent of applyParams() — fit params are CALIBRATION (set
+    // once per render / once at load), knob params are CONTROL (set per block).
+    // Safe to call before or after prepare(): each stage's setter either stores a
+    // plain value or re-derives its own coefficients from the stored sample rate,
+    // and prepare() recomputes from whatever is stored.
+    //
+    // ⚠ The rail clamps are the one entry here that can INVALIDATE other fits if
+    // enabled at the wrong time — see FitParams.h (enable only after kInputRef is
+    // anchored, else every stage clips against an arbitrary reference).
+    void setFitParams(const FitParams& f)
+    {
+        fit = f;
+
+        clipper.setNonlinear(f.clipA0, f.clipSatLo, f.clipSatHi);
+        jfet.setNonlinear(f.jfetG0, f.jfetGmR6, f.jfetSatPos, f.jfetSatNeg);
+
+        drive.setTaperExp(f.driveTaperExp);
+        levelBlend.setTaperExp(f.levelTaperExp);
+        masterOut.setTaperExp(f.masterTaperExp);
+
+        c21.r = f.c21R;
+        recovery.setComponents(f.btR22, f.btR23, f.btC16, f.btC17);
+
+        // RailClamp on EVERY op-amp output (calibration §6 / GATE-4 item). The
+        // J201 and CD4049 are deliberately absent: neither is an op-amp, and
+        // their own soft saturation IS their limiting.
+        drive.setRailVoltages(f.railNeg, f.railPos);
+        recovery.setRailVoltages(f.railNeg, f.railPos);
+        skB.setRailVoltages(f.railNeg, f.railPos);
+        skA.setRailVoltages(f.railNeg, f.railPos);
+        eqPreGain.setRailVoltages(f.railNeg, f.railPos);
+        baxandall.setRailVoltages(f.railNeg, f.railPos);
+        loMid.setRailVoltages(f.railNeg, f.railPos);
+        hiMid.setRailVoltages(f.railNeg, f.railPos);
+        masterOut.setRailVoltages(f.railNeg, f.railPos);
+
+        drive.setRailClampEnabled(f.railEnabled);
+        recovery.setRailClampEnabled(f.railEnabled);
+        skB.setRailClampEnabled(f.railEnabled);
+        skA.setRailClampEnabled(f.railEnabled);
+        eqPreGain.setRailClampEnabled(f.railEnabled);
+        baxandall.setRailClampEnabled(f.railEnabled);
+        loMid.setRailClampEnabled(f.railEnabled);
+        hiMid.setRailClampEnabled(f.railEnabled);
+        masterOut.setRailClampEnabled(f.railEnabled);
+    }
+
+    const FitParams& getFitParams() const noexcept { return fit; }
+
     // ---- Split interface (PedalDSP inserts OS + clean-tap delay between) -----
 
     // Base-rate: IC1_A buffer output — the node that feeds BOTH the OD path and
@@ -250,11 +301,12 @@ private:
         // Node = cap source-side into R to GND; OUT is the AC-coupled node.
         inline double process(double x) noexcept
         {
-            const double v = (gc * x - ieq) / (gc + 1.0 / kR);
+            const double v = (gc * x - ieq) / (gc + 1.0 / r);
             ieq = 2.0 * gc * (x - v) - ieq; // v_ab = x - v
             return v;
         }
         double gc = 0.0, ieq = 0.0;
+        double r = kR; // Phase-7 capture fit (FitParams.h)
     };
 
     // APVTS choice index → stage enum / cap value.
@@ -317,6 +369,12 @@ private:
     MasterOut masterOut;       // 14 MASTER + IC6_B + output HP
 
     Params cur;
+    // Phase-7 capture-fit calibration (FitParams.h). Every stage that owns a fit
+    // constant keeps its own copy; this is the authoritative set applied to them,
+    // retained so getFitParams() can report what a render actually ran with.
+    // Stage prepare() calls re-derive coefficients from their STORED fit values,
+    // so an OS-factor change (prepareOd) preserves the calibration.
+    FitParams fit;
 
     PedalChain(const PedalChain&) = delete;
     PedalChain& operator=(const PedalChain&) = delete;

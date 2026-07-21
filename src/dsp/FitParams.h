@@ -1,0 +1,103 @@
+#pragma once
+
+// =============================================================================
+// FitParams — every Phase-7 CAPTURE-FIT constant, in one place
+// =============================================================================
+// The circuit's schematic-verified R/C values are NOT here — those are fixed
+// facts (circuit.md is their source of truth) and stay `static constexpr` in
+// their stages. What lives here is the much smaller set of constants that the
+// build deliberately left NOMINAL because they cannot be read off a schematic:
+// device-spread amplitude params (J201 ~5:1 part spread), the CD4049's finite
+// open-loop gain and R19-dropped rail, pot taper SHAPES, the tolerance-sensitive
+// bridged-T, and the op-amp rail ceilings. Each was flagged in-code as a
+// "Phase-7 capture carry-forward"; this struct is where they all converge.
+//
+// **Why runtime instead of constexpr.** Every field below started life as a
+// `static constexpr` in its stage. Fitting them that way costs a full rebuild
+// per candidate value, which is fine for a one-line sanity tweak and hopeless
+// for an actual fit: kA0 x kSatLo x kSatHi alone is a 3-D search, and the doc's
+// extraction plan (nonlinear-component-modeling.md §4) asks for several such
+// fits cross-checked against multiple captures. Making them settable lets
+// OfflineRender sweep hundreds of candidates per minute from Python.
+//
+// **The nominal defaults are unchanged.** Each stage keeps its original
+// `static constexpr kXxx` as the documented NOMINAL, and the matching field
+// here is initialised from it — so a default-constructed FitParams reproduces
+// the pre-refactor build exactly, and the per-stage tests (which reference the
+// `kXxx` constants as their oracle) keep testing the nominal path. Nothing is
+// re-tuned by this struct existing; it only makes the tuning possible.
+//
+// **Scope boundary.** These are all CHAIN-domain (real volts, inside
+// PedalChain). The two DAW-domain scalars — `kInputRef` (volts per full scale)
+// and `kOutputMakeup` — are processor-domain and deliberately NOT here; they
+// live in PluginProcessor and are set on OfflineRender's command line
+// separately. Keeping the two domains apart is the calibration doc's §1 rule
+// (kInputRef must cancel in the linear path); folding them into the chain would
+// blur exactly the boundary that rule depends on.
+// =============================================================================
+struct FitParams
+{
+    // ---- CD4049UBE clipper (Clipper.h) --------------------------------------
+    // clipA0 is the PRIMARY fit param: it sets BOTH the closed-loop gain AND the
+    // three GRUNT corner frequencies (the input-node impedance is R18/(1+A0)), so
+    // it is constrained by two independent measurements at once — fit it against
+    // the GRUNT voicing and the drive-sweep level together, not either alone.
+    // clipSatLo/clipSatHi are the per-side VTC ceilings; their SUM is the
+    // R19-dropped effective rail (nominal ~7 V, below the 8.6 V op-amp rail) and
+    // their DIFFERENCE is the even-harmonic asymmetry. Fit to the drive-sweep
+    // Farina THD(f) + low-frequency-tone H2/H3 balance.
+    double clipA0 = 25.0;
+    double clipSatLo = 3.15;
+    double clipSatHi = 3.85;
+
+    // ---- J201 JFET stage (JfetStage.h) --------------------------------------
+    // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;
+    // all four are capture-fit by definition (nonlinear doc §2/§4). jfetG0 also
+    // absorbs the R5/(R4+R5) gate divider, the C4-bootstrapped active-load
+    // impedance, and R7 treble-net loading. Fit to the drive-MIN OD captures,
+    // where the CD4049 downstream contributes least.
+    double jfetG0 = 15.0;
+    double jfetGmR6 = 2.277;
+    double jfetSatPos = 3.0;
+    double jfetSatNeg = 2.6;
+
+    // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
+    // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at
+    // least TWO knob points across the range (a wrong shape can match one
+    // position and flip sign at another). The capture matrix provides 4 points
+    // per pot for exactly this.
+    double driveTaperExp = 1.5;   // VR3 100k C-taper, in (1-x) — 0 ohm at full CW
+    double levelTaperExp = 1.43;  // VR2 100k A-taper
+    double masterTaperExp = 1.43; // VR8 100k A-taper [ENG]
+
+    // ---- C21 (100n) inter-stage coupling into the tone stack ----------------
+    // The 100n cap is schematic-verified; the resistance it works against is the
+    // tone stack's effective INPUT impedance, which is a nominal ~10k estimate,
+    // not a single schematic part. It sets a ~159 Hz highpass that audibly shapes
+    // bass, so it is a real fit knob (fit alongside the tone stack).
+    double c21R = 10.0e3;
+
+    // ---- Bridged-T recovery network (RecoveryBridgedT.h) -------------------
+    // Risk register #1. The ideal-value response is a ~-28 dB notch at ~717 Hz,
+    // which is surprisingly deep for this pedal, and the depth is highly
+    // tolerance-sensitive — so all four values are fit parameters rather than
+    // fixed, to be reshaped to whatever the capture actually shows (including
+    // "much shallower than ideal"). The NOTCH FREQUENCY is far more trustworthy
+    // than its depth; weight the fit accordingly.
+    double btR22 = 100.0e3;
+    double btR23 = 33.0e3;
+    double btC16 = 680.0e-12;
+    double btC17 = 22.0e-9;
+
+    // ---- TL07x op-amp output rails (RailClamp, shared by every op-amp stage) -
+    // calibration §6. DISABLED by default and deliberately so: enabling a rail
+    // clamp before kInputRef is anchored clips the signal against an arbitrary
+    // reference, which corrupts every other fit downstream of it. Enable only
+    // AFTER kInputRef is set from the bypass capture, then confirm the levels
+    // against a capture that actually drives a stage into its rails. The
+    // symmetric +-3.3 V default is a placeholder — the real TL07x is asymmetric
+    // around VD and the positive side is expected to clip first.
+    bool railEnabled = false;
+    double railNeg = -3.3;
+    double railPos = 3.3;
+};
