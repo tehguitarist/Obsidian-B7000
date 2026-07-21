@@ -113,3 +113,15 @@ add_test(NAME SallenKeyLPFTest COMMAND SallenKeyLPFTest)
 add_executable(LevelBlendTest tests/LevelBlendTest.cpp)
 target_compile_options(LevelBlendTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME LevelBlendTest COMMAND LevelBlendTest)
+
+add_executable(MidBandTest tests/MidBandTest.cpp)
+target_compile_options(MidBandTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME MidBandTest COMMAND MidBandTest)
+
+add_executable(BaxandallTest tests/BaxandallTest.cpp)
+target_compile_options(BaxandallTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME BaxandallTest COMMAND BaxandallTest)
+
+add_executable(EqPreGainTest tests/EqPreGainTest.cpp)
+target_compile_options(EqPreGainTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME EqPreGainTest COMMAND EqPreGainTest)

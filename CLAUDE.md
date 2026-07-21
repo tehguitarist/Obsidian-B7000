@@ -103,7 +103,7 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Step 4 (stage-by-stage linear DSP) — IN PROGRESS (2026-07-20).**
+> **CURRENT: Step 4 (stage-by-stage linear DSP) — IN PROGRESS (2026-07-21). EQ block DONE; MasterOut is the last linear stage.**
 > Phase completion tracking in `docs/build-plan.md` §"Where we are" — update both files.
 > **STEP-4 STAGES DONE SO FAR (each: FR test vs oracle in ctest + dsp-validator PASS):**
 > ✅ **InputBuffer (IC1_A)** — `src/dsp/InputBuffer.h` + `tests/InputBufferTest.cpp`. ~1.59 Hz HP
@@ -160,14 +160,47 @@ high, execute routine work cheap) is what should persist.
 >    taper ≈3.5 dB because power-law taper at noon gives L≈0.371). No RailClamp (passive stage —
 >    no op-amp output). ctest PASS (1/1). ⚠ BLEND crossfade wiring + dist_engage smoothing deferred
 >    to Phase 6 (needs delay-comp + end-to-end DC-step per build-plan risk #8).
+> ✅ **EQ BLOCK (IC5_A/B/C/D + IC6_A, stage #7) — DONE (2026-07-21, dsp-validator PASS all 3 stages).**
+>    Built as three headers sharing a new `src/dsp/MnaSolve.h` (templated NxN Gauss-Jordan inverse +
+>    matvec; the peaking stages' MNA matrix depends on pot splits, so it re-inverts ONLY on a dirty
+>    flag when a pot/switch moves — never per sample, allocation-free, RT-safe):
+>    • **EqPreGain (IC5_A buffer + IC5_B −2.2)** — `src/dsp/EqPreGain.h` + `tests/EqPreGainTest.cpp`.
+>      Frequency-flat scalar gain −R29/R28 = −2.2 (inverting), two RailClamps (IC5_A + IC5_B outputs).
+>    • **Baxandall BASS+TREBLE (IC5_C)** — `src/dsp/Baxandall.h` + `tests/BaxandallTest.cpp`. ONE coupled
+>      7-node MNA network (both wipers sum into the IC5_C virtual ground); 5 caps incl. C30 47p feedback.
+>      FR ≤0.095 dB through 2 kHz vs `baxandall_tf` (all boost/flat/cut); HF warp shrinks 48k→96k; DC
+>      gain −0.925926 (inverting, matches oracle exactly — the sub-unity magnitude is the bass-shelf DC
+>      droop, not a bug).
+>    • **MidBand (LO-MID IC5_D / HI-MID IC6_A)** — `src/dsp/MidBand.h` + `tests/MidBandTest.cpp`. ONE
+>      reusable 4-node MNA peaking stage, switchable series cap (C33/C35) via live matrix recompute (dsp.md
+>      "Fixed circuit variants" — cap VALUE changes, not shape, so NO setSMatrixData swap). Validated the
+>      FULL switch matrix: both bands × min/centre/max × all 3 caps (18 configs) vs `mid_stage_tf`, worst
+>      0.12 dB on a steep peak (shrinks with OS); DC gain −1 (inverting) at every position.
+>    Key stamping subtlety (dsp-validator confirmed correct): caps bridging to the op-amp virtual-ground
+>    node (MidBand C33, Baxandall C30) stamp the Vout-determining row with the oracle's sign-flipped
+>    "currents INTO node" convention → the cap history current lands as +ieq in BOTH the natural node row
+>    AND that row. RailClamp on every op-amp output (GATE item, disabled by default). 4-INVERSION NET
+>    POLARITY CONFIRMED by the per-stage DC-step tests: IC5_B(−2.2) + Baxandall(−) + LO-MID(−) +
+>    HI-MID(−) = 4 inversions → net non-inverting through the EQ. ctest 11/11 PASS.
+>    **⚠ Two Phase-6 carry-forwards (both flagged in-code):** (1) the EQ's audible-band HF caps (TREBLE
+>    ~5 kHz peak, HI-MID to 3 kHz) warp at base rate (~0.3 dB @10 kHz/48k) — must be covered by the
+>    Phase-6 oversampled-region span or prewarped; (2) **C21 (100n) + C31 (2u2) inter-stage coupling
+>    caps** are EXCLUDED from these stages (oracle boundary) — C21 into the ~10k stack input is a
+>    ~150 Hz HP that shapes bass audibly, so place it at the EqPreGain→Baxandall boundary during
+>    integration (don't forget it in the full chain).
+>    **↳ Oracle fix (2026-07-21):** `eq_reference.py`'s mid peak-scan PRINT loop was calling HI-MID with
+>    the default C32=22n instead of the real C34=6n8 → printed wrong peak centres (405 vs 728 Hz). Fixed
+>    (per-band across-lug cap); the print now reproduces circuit.md's validated HI-MID table
+>    (728/1552/3116 Hz) exactly. The `mid_stage_tf` FUNCTION was always correct (C32 is a param); only
+>    the diagnostic print was wrong. The C++ stage uses 6n8 for HI-MID throughout.
 > **⚠ ATTACK-SWITCH TOPOLOGY CORRECTED THIS SESSION** (found while building the oracle): circuit.md's
 >    "triple-checked" node graph had the switch **pole** wrong (named node M as common → implied a Cut
 >    MUTE). Verified from primary+backup schematics + schematic-checker: **pole = C8 bottom plate**;
 >    Boost→C8 bridges R8, Cut→C8 shunts P→GND (treble cut, no mute), Flat→open. circuit.md + this file's
 >    UI-map carry-forward corrected; `treble_attack_tf` in `eq_reference.py` implements the fix.
-> **STILL TODO in Step 4:** EQ block → MasterOut, THEN the J201 nonlinear
->    stage. RailClamp now exists — apply it to each remaining op-amp stage as built (calibration §6,
->    GATE item). (Build-plan Phase 4.)
+> **STILL TODO in Step 4:** MasterOut (VR8 MASTER divider + IC6_B buffer + C37/R47/R46 output HP),
+>    THEN the J201 nonlinear stage. RailClamp now exists — apply it to each remaining op-amp stage as
+>    built (calibration §6, GATE item). (Build-plan Phase 4.)
 > **LAST COMPLETED: Step 3 (chowdsp_wdf smoke test) — COMPLETE (2026-07-20).**
 > All three phases done: schematic ✓ → scaffold (20 params, AU+VST3, auval PASS) ✓ → WDF smoke test ✓.
 > `circuit.md` is fully verified: full chain traced IN→OUT, node-by-node + value-by-value cross-check
@@ -188,15 +221,13 @@ high, execute routine work cheap) is what should persist.
 > topology claims independently re-verified against the p.4 image (fresh-eyes agent, all CONFIRMED);
 > backup schematic corroborates the tone-stack/output redraws; p.3 measured tables ↔ nodal sim agree
 > ~3%/±2.5 dB; info.txt + dsp.md cross-checked. See circuit.md Validation notes ("TRIPLE-CHECK PASS").
-> **NEXT: EQ block** (build-plan Phase 4 item 7). Four bands: Baxandall (coupled BASS+TREBLE as one
-> network) + LO-MID + HI-MID (each inverting-unity + pot network with 3-position series-cap switch)
-> + the post-blend unity buffer IC5_A. Refer to `circuit.md` for node graphs (already verified) and
-> `analysis/eq_reference.py` for per-band oracle curves (already computed). Validate each band at
-> min/centre/max plus both mid switches at all 3 positions. RailClamp on EVERY op-amp output in the
-> block (IC5_A, IC5_B, IC5_C, IC5_D, IC6_A — GATE item). Check the 4-inversion net polarity (the
-> whole EQ inverts 4 times: IC5_B × −2.2 = 1, Baxandall is inverting = 2, LO-MID inverting = 3,
-> HI-MID inverting = 4 → net non-inverting = even). This is the most complex remaining Phase 4
-> task — coupled multiband network, 6 switch positions, 5+ op-amp stages. Apply RailClamp to each.
+> **NEXT: MasterOut** (build-plan Phase 4 item 8 — the LAST linear stage). [ENG] MASTER (VR8, 100k A)
+> post-EQ divider (top = HI-MID/IC6_A out via C36 2u2; bottom = VD; wiper → IC6_B) → IC6_B unity output
+> buffer → C37 (2u2) → R47 (1k series) → OUT, R46 (100k) output pulldown. A-taper (interim power-law,
+> fit at Phase 7); the divider is attenuation-only, unity at full CW; C36 gives a ~0.72 Hz HPF corner
+> (inaudible) and supplies IC6_B's DC bias (stock board floats it — see circuit.md MASTER note).
+> RailClamp on IC6_B output (GATE item). Then Step 5: the J201 nonlinear stage.
+> (EQ block ✅ done 2026-07-21 — see the Step-4 stages list above.)
 
 ## Project-specific carry-forwards
 

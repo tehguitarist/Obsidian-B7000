@@ -13,7 +13,7 @@
 | 1 — Schematic analysis | Complete | 2026-07-19 | — |
 | 2 — CMake scaffold | Complete | 2026-07-20 | auval PASSED, ctest 2/2 |
 | 3 — chowdsp_wdf smoke test | Complete | 2026-07-20 | −3 dB ±0.02 dB at 44.1/48/96k |
-| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓, SallenKeyLPF ✓, LevelBlend ✓ (2026-07-20) | per-stage FR + dsp-validator |
+| 4 — Stage-by-stage linear DSP | **IN PROGRESS** | InputBuffer ✓, TrebleAttack ✓, DriveStage ✓ + RailClamp util ✓, RecoveryBridgedT ✓, SallenKeyLPF ✓, LevelBlend ✓ (2026-07-20), EQ block ✓ (EqPreGain + Baxandall + MidBand, 2026-07-21) — **MasterOut is the last linear stage** | per-stage FR + dsp-validator |
 | 4b — Functional UI pass | Not started | — | — |
 | 5 — Nonlinear clipper (oversample + ADAA) | Not started | — | — |
 | 6 — Oversampling wiring + delay compensation | Not started | — | — |
@@ -204,12 +204,23 @@ levels; the capture anchor replaces it at Phase 7:
    BLEND node depends on J201's unconfirmed sign + clipper's known inversion — an end-to-end DC-step
    test from input to BLEND is required before trusting the crossfade. Do NOT wire the BLEND
    crossfade until Phase 6.
-7. **EQ block**: Baxandall (coupled BASS+TREBLE — ONE WDF/nodal network), LO-MID, HI-MID (each
-   an inverting-unity + pot network stage; series cap switchable via live ImpedanceCalculator).
-   Validate every band at min/centre/max + both mid switches at all 3 positions against
-   `analysis/eq_reference.py` (already checked against the schematic + p.3 tables). Check the
-   4-inversion net polarity with a DC step through the whole EQ.
-8. **MasterOut**: divider + buffer + C37/R47/R46 HP; A-taper.
+7. ✅ **EQ block**: Baxandall (coupled BASS+TREBLE — ONE nodal network), LO-MID, HI-MID (each an
+   inverting-unity + pot network stage; series cap switchable via live matrix recompute). **DONE
+   2026-07-21** (dsp-validator PASS all 3 stages): `src/dsp/EqPreGain.h` (IC5_A buffer + IC5_B −2.2),
+   `src/dsp/Baxandall.h` (IC5_C, 7-node MNA), `src/dsp/MidBand.h` (reusable IC5_D/IC6_A, 4-node MNA,
+   switchable cap), sharing `src/dsp/MnaSolve.h` (templated NxN inverse, re-inverted only on a pot/
+   switch dirty flag — never per sample, allocation-free). Validated every band at min/centre/max +
+   both mid switches at all 3 caps (18 mid configs) against `analysis/eq_reference.py`: Baxandall
+   ≤0.095 dB / MidBand ≤0.12 dB through 2 kHz; HF warp shrinks 48k→96k. 4-inversion net polarity
+   confirmed by per-stage DC-step (IC5_B −2.2, Baxandall −0.926, LO/HI-MID −1 → net non-inverting).
+   RailClamp on every op-amp output (GATE, disabled by default). ctest 11/11. ⚠ Phase-6 carry-forwards:
+   (a) EQ HF caps (TREBLE ~5 kHz, HI-MID to 3 kHz) warp at base rate → cover with the oversampled-
+   region span or prewarp; (b) C21(100n)/C31(2u2) inter-stage coupling caps excluded from the stages
+   (oracle boundary) — place C21 (~150 Hz HP into the 10k stack, shapes bass) at the EqPreGain→
+   Baxandall boundary at integration. Also fixed an `eq_reference.py` diagnostic-print bug (HI-MID
+   peak scan used C32=22n not C34=6n8 → printed 405 not 728 Hz; the oracle function was always correct).
+8. **MasterOut** (LAST linear stage): [ENG] MASTER divider (VR8 100k A) + IC6_B unity buffer +
+   C37/R47/R46 output HP; A-taper. RailClamp on IC6_B output.
 
 **J201 stage (nonlinear #1)** comes after the linear chain around it works: implement as fitted
 gain + soft waveshaper (nominal from Fairchild datasheet SPICE params; structure per

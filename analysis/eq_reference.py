@@ -223,14 +223,18 @@ print("=" * 72)
 print("MID STAGES — peak centre & gain vs C33/C35 (pot full boost a=0 -> check!)")
 print("=" * 72)
 # which pot extreme is boost? try both ends; magnitude peak
-for band, caps, targets in [
-    ("LO-MID (C33)", [("47n", 47e-9, 250), ("22n STOCK-board", 22e-9, None), ("10n", 10e-9, 500), ("2n2", 2.2e-9, 1000)], None),
-    ("HI-MID (C35)", [("15n", 15e-9, 750), ("3n3", 3.3e-9, 1500), ("820p", 820e-12, 3000), ("680p STOCK-board", 680e-12, None)], None),
+# NB: the across-lug cap differs per band — LO-MID C32=22n (the mid_stage_tf
+# default) but HI-MID C34=6n8 — so HI-MID rows MUST override C32=6.8e-9, else
+# the printed peak centres are wrong (~405 vs the correct 728 Hz for 15n). With
+# C34=6n8 the HI-MID peaks land at 728/1552/3116 Hz, matching circuit.md's table.
+for band, caps, targets, cAcross in [
+    ("LO-MID (C33)", [("47n", 47e-9, 250), ("22n STOCK-board", 22e-9, None), ("10n", 10e-9, 500), ("2n2", 2.2e-9, 1000)], None, 22e-9),
+    ("HI-MID (C35)", [("15n", 15e-9, 750), ("3n3", 3.3e-9, 1500), ("820p", 820e-12, 3000), ("680p STOCK-board", 680e-12, None)], None, 6.8e-9),
 ]:
     for name, C, tgt in caps:
-        g_end0 = mid_stage_tf(f, 0.0, C)
-        g_end1 = mid_stage_tf(f, 1.0, C)
-        g_mid = mid_stage_tf(f, 0.5, C)
+        g_end0 = mid_stage_tf(f, 0.0, C, C32=cAcross)
+        g_end1 = mid_stage_tf(f, 1.0, C, C32=cAcross)
+        g_mid = mid_stage_tf(f, 0.5, C, C32=cAcross)
         db0, db1, dbm = (20 * np.log10(np.abs(g)) for g in (g_end0, g_end1, g_mid))
         i0, i1 = np.argmax(db0), np.argmax(db1)
         # boost end = whichever end yields > flat gain peak
