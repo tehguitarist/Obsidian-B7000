@@ -26,6 +26,9 @@ private:
     static constexpr int kBaseW = 765;
     static constexpr int kBaseH = 475;
 
+    // Trim knob range, +/- dB. Must match the trim NormalisableRange in createParameterLayout().
+    static constexpr double kTrimRange = 18.0;
+
     ObsidianB7000AudioProcessor& audioProcessor;
     PedalLookAndFeel lnf;
     juce::ApplicationProperties appProps;
@@ -39,10 +42,20 @@ private:
     VUMeter inputVU, outputVU;
     std::unique_ptr<juce::SliderParameterAttachment> inputTrimAttach, outputTrimAttach;
 
+    // Applies the equal-and-opposite CHANGE to the other trim, preserving the pair's existing
+    // offset (delta-linked, so enabling the lock never snaps). No-op when off. `trimLinkBusy`
+    // breaks the A->B->A feedback loop the two parameter attachments would otherwise bounce through.
+    void mirrorTrim(bool sourceIsInput);
+    bool   trimLinkBusy   { false };
+    double lastInputTrim  { 0.0 };
+    double lastOutputTrim { 0.0 };
+
     juce::Label osLabel, osLiveLabel, osRenderLabel, osSizeLabel, osVersionLabel;
     juce::ComboBox osRealtimeBox, osRenderBox;
     juce::TextButton scaleBtn;
+    juce::TextButton trimLockButton { "TRIM LINK" };
     std::unique_ptr<juce::ComboBoxParameterAttachment> osRealtimeAttach, osRenderAttach;
+    std::unique_ptr<juce::ButtonParameterAttachment> trimLockAttach;
 
     std::unique_ptr<PedalFace> pedalFace;
     juce::Rectangle<int> pedalFaceArea, osStripArea;

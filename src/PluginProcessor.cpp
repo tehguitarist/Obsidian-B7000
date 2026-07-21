@@ -108,17 +108,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout ObsidianB7000AudioProcessor:
     params.add(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{"dist_engage", 1}, "Dist Engage", true));
     params.add(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{"trim_link", 1}, "Trim Link", false));
+        juce::ParameterID{"trim_link", 1}, "Trim Link", true));
     params.add(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{"hq", 1}, "HQ", true));
 
     // Trims
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"input_trim", 1}, "Input Trim",
-        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f));
+        juce::NormalisableRange<float>(-18.0f, 18.0f, 0.1f), 0.0f));
     params.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"output_trim", 1}, "Output Trim",
-        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f));
+        juce::NormalisableRange<float>(-18.0f, 18.0f, 0.1f), 0.0f));
 
     // Oversampling
     params.add(std::make_unique<juce::AudioParameterChoice>(

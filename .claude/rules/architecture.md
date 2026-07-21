@@ -57,7 +57,7 @@ taper in DSP (keeps host automation linear and the taper in one place):
 | pot controls (`gain`, `tone`, `volume`, …) | `AudioParameterFloat` 0..1 | taper applied in DSP |
 | mode switch | `AudioParameterChoice` | precomputed topologies |
 | `input_trim` / `output_trim` | `AudioParameterFloat` dB | distinct from pedal controls |
-| `trim_link` | `AudioParameterBool` default false | see "Input/output trim link" below |
+| `trim_link` | `AudioParameterBool` default true | see "Input/output trim link" below |
 | `oversampling` | `AudioParameterChoice` 1×/2×/4×/8× | realtime factor |
 | `render_oversampling` | `AudioParameterChoice` | offline-bounce factor (see below) |
 | `bypass` | `AudioParameterBool` | APVTS supports bool via this type |
@@ -103,30 +103,45 @@ const int wantFactor = isNonRealtime()
 
 ## Input/output trim link
 
-`trim_link` (bottom-bar "Trim Link" button, see `ui.md`) lets a player raise input trim to push
-the circuit harder without the overall loudness jumping: while linked, nudging one trim by `Δ dB`
-nudges the *other* trim by `−Δ dB`, clamped to its own `[-12, +12]` range. This is a UI/parameter
-convenience only — it does not change `processBlock`'s gain-staging math (input trim still scales
-`wet` pre-`kInputRef`, output trim still folds into `outputGain` exactly as before); it just keeps
-the two APVTS values moving in opposite lockstep.
+`trim_link` (bottom-bar "TRIM LINK" button, `"trim_link"` `AudioParameterBool`, default **true**,
+see `ui.md`) lets a player raise input trim to push the circuit harder without the overall loudness
+jumping: while linked, nudging one trim by `Δ dB` nudges the *other* trim by `−Δ dB`, clamped to its
+own `[-18, +18]` range (the trim range as of the trim-lock feature — was `[-12, +12]`). This is a
+UI/parameter convenience only — it does not change `processBlock`'s gain-staging math (input trim
+still scales `wet` pre-`kInputRef`, output trim still folds into `outputGain` exactly as before); it
+just keeps the two APVTS values moving in opposite lockstep.
 
-Implement it as a listener pair with a re-entrancy guard, not by computing one from the other in
-`processBlock` (that would fight the host's own automation/recall of both parameters):
+**Delta-linked, not listener-linked.** Implemented editor-side, hooked into each trim knob's
+existing `onValueChange` (which already drives the value-label text) rather than an
+`AudioProcessorValueTreeState::Listener::parameterChanged` override — that keeps the mirror tied
+to the exact slider `getValue()` the user is dragging, with no cross-thread dispatch to reason
+about. A `mirrorTrim(bool sourceIsInput)` method mirrors the **delta** (`newValue − lastValue`),
+applied to the *other* knob's **last** value — not `−source` — so the pair's existing offset is
+preserved and enabling the lock never snaps a knob:
 
 ```cpp
-void parameterChanged(const String& id, float newValue) override
+void Editor::mirrorTrim(bool sourceIsInput)
 {
-    if (isSyncingTrim || ! trimLinkParam->load()) return;
-    if (id != "input_trim" && id != "output_trim") return;
+    Slider& src = sourceIsInput ? inputTrim : outputTrim;
+    double& srcLast = sourceIsInput ? lastInputTrim : lastOutputTrim;
+    const double dstLast = sourceIsInput ? lastOutputTrim : lastInputTrim;
 
-    const float delta = newValue - lastTrimValue[id];
-    lastTrimValue[id] = newValue;
-    const auto* other = (id == "input_trim") ? outputTrimParam : inputTrimParam;
+    // Cache unconditionally, even when the lock is off or this is the echoed write — otherwise
+    // the first move after enabling the lock measures against a stale reference and jumps.
+    const double delta = src.getValue() - srcLast;
+    srcLast = src.getValue();
 
-    isSyncingTrim = true;
-    other->setValueNotifyingHost(other->convertTo0to1(
-        jlimit(-12.0f, 12.0f, other->get() - delta)));
-    isSyncingTrim = false;
+    if (trimLinkBusy || ! trimLockButton.getToggleState() || delta == 0.0)
+        return;
+
+    const auto target = (float) jlimit(-kTrimRange, kTrimRange, dstLast - delta);
+    if (auto* param = apvts.getParameter(sourceIsInput ? "output_trim" : "input_trim"))
+    {
+        const ScopedValueSetter<bool> guard(trimLinkBusy, true);   // breaks the A->B->A bounce
+        param->beginChangeGesture();
+        param->setValueNotifyingHost(param->convertTo0to1(target));
+        param->endChangeGesture();
+    }
 }
 ```
 

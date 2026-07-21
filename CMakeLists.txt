@@ -171,3 +171,20 @@ target_link_libraries(OSValidationTest
     PUBLIC
         juce::juce_recommended_config_flags)
 add_test(NAME OSValidationTest COMMAND OSValidationTest)
+
+# Headless editor snapshot tool (build.md "UI changes" testing pattern) — renders the real
+# editor off-screen at min/default/max UI scale to PNGs for visual review. NOT registered with
+# add_test() — it's a visual-inspection tool, not a pass/fail gate.
+juce_add_console_app(EditorSnapshot)
+target_sources(EditorSnapshot PRIVATE tests/EditorSnapshot.cpp)
+target_link_libraries(EditorSnapshot
+    PRIVATE
+        ObsidianB7000
+        juce::juce_gui_extra
+        juce::juce_dsp
+        chowdsp::chowdsp_wdf
+        xsimd
+    PUBLIC
+        juce::juce_recommended_config_flags)
+target_compile_definitions(EditorSnapshot PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_compile_options(EditorSnapshot PRIVATE ${PEDAL_WARNING_FLAGS})

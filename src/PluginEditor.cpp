@@ -85,14 +85,21 @@ ObsidianB7000AudioProcessorEditor::ObsidianB7000AudioProcessorEditor(ObsidianB70
     outputTrimAttach = std::make_unique<SliderParameterAttachment>(
         *audioProcessor.apvts.getParameter("output_trim"), outputTrim);
 
+    // Seed AFTER the attachments exist so a restored session with non-zero trims doesn't read
+    // as a jump on the first move.
+    lastInputTrim = inputTrim.getValue();
+    lastOutputTrim = outputTrim.getValue();
+
     auto formatTrim = [](double dB) { return String(dB, 1) + " dB"; };
     inputTrimValue.setText(formatTrim(inputTrim.getValue()), dontSendNotification);
     outputTrimValue.setText(formatTrim(outputTrim.getValue()), dontSendNotification);
     inputTrim.onValueChange = [this, formatTrim] {
         inputTrimValue.setText(formatTrim(inputTrim.getValue()), dontSendNotification);
+        mirrorTrim(true);
     };
     outputTrim.onValueChange = [this, formatTrim] {
         outputTrimValue.setText(formatTrim(outputTrim.getValue()), dontSendNotification);
+        mirrorTrim(false);
     };
 
     // ── Editable trim value labels ──
@@ -112,7 +119,7 @@ ObsidianB7000AudioProcessorEditor::ObsidianB7000AudioProcessorEditor(ObsidianB70
             auto text = valLabel.getText(true).trim().unquoted();
             if (text.isEmpty()) return;
             double dB = text.getDoubleValue();
-            dB = jlimit(-12.0, 12.0, dB);
+            dB = jlimit(-kTrimRange, kTrimRange, dB);
             s.setValue(dB, sendNotification);
         };
     };
@@ -149,6 +156,14 @@ ObsidianB7000AudioProcessorEditor::ObsidianB7000AudioProcessorEditor(ObsidianB70
     osRenderAttach = std::make_unique<ComboBoxParameterAttachment>(
         *audioProcessor.apvts.getParameter("render_oversampling"), osRenderBox);
 
+    trimLockButton.setComponentID("os");
+    trimLockButton.setClickingTogglesState(true);
+    trimLockButton.setTooltip("TRIM LINK: ties the input and output trims together - raising one "
+                              "lowers the other by the same amount.");
+    addAndMakeVisible(trimLockButton);
+    trimLockAttach = std::make_unique<ButtonParameterAttachment>(
+        *audioProcessor.apvts.getParameter("trim_link"), trimLockButton);
+
     scaleBtn.setComponentID("scale");
     scaleBtn.setColour(TextButton::buttonColourId, Colour(PedalLookAndFeel::cOSBtnActiveBg));
     scaleBtn.setColour(TextButton::textColourOffId, Colour(PedalLookAndFeel::cOSBtnActive));
@@ -174,6 +189,36 @@ ObsidianB7000AudioProcessorEditor::ObsidianB7000AudioProcessorEditor(ObsidianB70
 ObsidianB7000AudioProcessorEditor::~ObsidianB7000AudioProcessorEditor()
 {
     setLookAndFeel(nullptr);
+}
+
+void ObsidianB7000AudioProcessorEditor::mirrorTrim(bool sourceIsInput)
+{
+    Slider& src = sourceIsInput ? inputTrim : outputTrim;
+    double& srcLast = sourceIsInput ? lastInputTrim : lastOutputTrim;
+    const double dstLast = sourceIsInput ? lastOutputTrim : lastInputTrim;
+
+    // Cache the new source value FIRST and unconditionally — the delta must be measured against
+    // the previous position even when the lock is off, otherwise the first move after enabling it
+    // would be computed from a stale reference and jump the other knob.
+    const double delta = src.getValue() - srcLast;
+    srcLast = src.getValue();
+
+    // trimLinkBusy: this call is the echo of our own write to the other parameter — its slider's
+    // onValueChange has just refreshed that side's cache above, which is all this pass needs to do.
+    if (trimLinkBusy || ! trimLockButton.getToggleState() || delta == 0.0)
+        return;
+
+    // Equal and opposite CHANGE, relative to where the other knob already sits — so the pair's
+    // existing offset is preserved and the starting values don't matter. Clamped at the rails.
+    const auto target = (float) jlimit(-kTrimRange, kTrimRange, dstLast - delta);
+
+    if (auto* param = audioProcessor.apvts.getParameter(sourceIsInput ? "output_trim" : "input_trim"))
+    {
+        const ScopedValueSetter<bool> guard(trimLinkBusy, true);
+        param->beginChangeGesture();
+        param->setValueNotifyingHost(param->convertTo0to1(target));
+        param->endChangeGesture();
+    }
 }
 
 void ObsidianB7000AudioProcessorEditor::paint(Graphics& g)
@@ -259,6 +304,11 @@ void ObsidianB7000AudioProcessorEditor::resized()
     osRenderLabel.setBounds(os.removeFromLeft(i(40)));
     os.removeFromLeft(i(5));
     osRenderBox.setBounds(os.removeFromLeft(i(36)).reduced(0, boxVPad));
+    os.removeFromLeft(i(8));
+    // TRIM LINK's label is drawn at a fixed (non-scaled) 8 pt via the "os" LookAndFeel branch
+    // (ui-peripheral-spec.md), so its box must not shrink below what that fixed text needs, even
+    // though most of this strip's elements shrink proportionally with UI scale.
+    trimLockButton.setBounds(os.removeFromLeft(jmax(i(62), 50)).reduced(0, boxVPad));
     scaleBtn.setBounds(os.removeFromRight(i(48)).reduced(0, boxVPad));
     os.removeFromRight(i(5));
     osSizeLabel.setBounds(os.removeFromRight(i(42)));

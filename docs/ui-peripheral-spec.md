@@ -41,7 +41,7 @@ Each panel is identical in structure. The widths are your choice to suit the ped
 **Top-to-bottom within each panel:**
 
 1. **Section label** — "INPUT" / "OUTPUT". 8 pt, bold, letter-spacing ~0.20, colour `cTrimLabel`. Centred.
-2. **Halo trim knob** — 70×70 px at 1× scale. Rotary slider, `componentID = "trim"`. LookAndFeel draws it as: outer arc track (270° sweep, 5 px wide, `cTrimArcTrack`) + value arc (`cTrimArc`) + 36 px diameter cap with radial gradient (`cKnobHighlight` → `cKnobMid` → `cKnobShadow`) + 2.5 px indicator line (`cKnobIndicator`). Range −12 dB to +12 dB, default 0. `setTextBoxStyle(NoTextBox, ...)` — the value readout is the tooltip + value label below, not JUCE's built-in text box.
+2. **Halo trim knob** — 70×70 px at 1× scale. Rotary slider, `componentID = "trim"`. LookAndFeel draws it as: outer arc track (270° sweep, 5 px wide, `cTrimArcTrack`) + value arc (`cTrimArc`) + 36 px diameter cap with radial gradient (`cKnobHighlight` → `cKnobMid` → `cKnobShadow`) + 2.5 px indicator line (`cKnobIndicator`). Range −18 dB to +18 dB, default 0. `setTextBoxStyle(NoTextBox, ...)` — the value readout is the tooltip + value label below, not JUCE's built-in text box.
 3. **"TRIM" sub-label** — 7.5 pt, bold, `cTrimLabel` dimmed slightly. Centred below knob.
 4. **Trim value label** — 7 pt, bold, `cTrimLabel`, centred directly below the "TRIM" sub-label. Text is the current value to **two decimal places with an explicit sign and unit**, e.g. `"+3.00 dB"` / `"-12.00 dB"` / `"+0.00 dB"`. Update it in the same `onValueChange` callback that updates the knob's tooltip (see `ui.md` "Tooltips"):
    ```cpp
@@ -54,7 +54,13 @@ Each panel is identical in structure. The widths are your choice to suit the ped
    ```
 5. **VU bar** — fills all remaining height. See VU spec below.
 
-APVTS parameter IDs: `"input_trim"` and `"output_trim"` (`AudioParameterFloat`, −12 to +12 dB).
+APVTS parameter IDs: `"input_trim"` and `"output_trim"` (`AudioParameterFloat`, −18 to +18 dB).
+
+**Trim Lock** (`"trim_link"` `AudioParameterBool`, default **true**): while engaged, dragging either
+trim knob applies the equal-and-opposite CHANGE to the other (delta-linked — it mirrors the
+*movement*, preserving whatever offset the pair already had, so enabling it never snaps a knob).
+See the "Trim Link button" entry in the Oversampling Strip section below for its on-screen position,
+and `ui.md` "Trims" for the full behavioural contract.
 
 **Containment:** lay out this panel's elements against the panel's own `Rectangle<int>` column
 (the one `resized()` allocated for INPUT or OUTPUT), never against the full editor bounds — so the
