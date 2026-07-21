@@ -36,10 +36,15 @@ PedalChain::Params ObsidianB7000AudioProcessor::readParams() const
     p.blend = pBlend->load();
     p.level = pLevel->load();
     p.drive = pDrive->load();
-    p.lo = pLo->load();
-    p.loMid = pLoMid->load();
-    p.hiMid = pHiMid->load();
-    p.hi = pHi->load();
+    // EQ pot fraction is BOOST-AT-0 internally (Baxandall.h / MidBand.h: "ab/at/a
+    // ->0 = boost"), but the knob param itself must read CW=higher (0=CCW..1=CW)
+    // to match the physical control and its tooltip readout — invert here, at the
+    // single point where the UI-facing value becomes the DSP-facing one, so CW
+    // rotation maps to boost.
+    p.lo = 1.0f - pLo->load();
+    p.loMid = 1.0f - pLoMid->load();
+    p.hiMid = 1.0f - pHiMid->load();
+    p.hi = 1.0f - pHi->load();
     p.attackIdx = (int) pAttack->load();
     p.gruntIdx = (int) pGrunt->load();
     p.loMidFreq = (int) pLoMidFreq->load();
