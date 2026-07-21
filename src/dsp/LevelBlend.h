@@ -129,7 +129,15 @@ public:
             vw = (odIn * invRup + cleanIn) / invTotal;
         }
 
-        // BLEND wiper voltage = linear crossfade.
+        // BLEND wiper voltage = linear crossfade. Branch at the extremes instead of
+        // relying on (1-B)*cleanIn / B*vw to reach zero — 0.0*NaN/Inf is NOT zero
+        // under IEEE 754, so a non-finite sample on the side being "zeroed out"
+        // (e.g. odIn destabilising while BLEND is fully clean) would otherwise leak
+        // straight through the crossfade.
+        if (B <= 0.0)
+            return cleanIn;
+        if (B >= 1.0)
+            return vw;
         return (1.0 - B) * cleanIn + B * vw;
     }
 

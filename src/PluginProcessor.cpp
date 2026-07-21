@@ -261,7 +261,14 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             const float dry = dryDelayed[n];               // delay-compensated pre-DSP
             const float processed = (float) work[n] * outGain.getNextValue();
             const float mix = bMix.getNextValue();
-            const float out = processed * (1.0f - mix) + dry * mix;
+            // Branch instead of processed*(1-mix): at full bypass (mix==1) this must
+            // be immune to a non-finite `processed` (the chain keeps running even
+            // while bypassed, to stay warm for re-engage) — 0.0f * NaN/Inf is NOT
+            // zero under IEEE 754, so a naive crossfade can leak chain instability
+            // into an otherwise-silent bypass output.
+            const float out = mix >= 1.0f ? dry
+                             : mix <= 0.0f ? processed
+                             : processed * (1.0f - mix) + dry * mix;
             io[n] = out;
             peakOut = juce::jmax(peakOut, std::abs(out));
         }
