@@ -139,6 +139,7 @@ ObsidianB7000AudioProcessorEditor::ObsidianB7000AudioProcessorEditor(ObsidianB70
     setupOSLabel(osLabel, "OS", Justification::centredLeft);
     setupOSLabel(osLiveLabel, "LIVE", Justification::centredRight);
     setupOSLabel(osRenderLabel, "RENDER", Justification::centredRight);
+    setupOSLabel(trimLinkLabel, "Trim", Justification::centredRight);
     setupOSLabel(osSizeLabel, "UI SIZE", Justification::centredRight);
     setupOSLabel(osVersionLabel, "v" JucePlugin_VersionString, Justification::centred);
     osVersionLabel.setColour(Label::textColourId, Colour(PedalLookAndFeel::cOSLabel).withAlpha(0.55f));
@@ -242,6 +243,7 @@ void ObsidianB7000AudioProcessorEditor::refreshFonts(float sc)
     osLabel.setFont(bold(8.0f * sc));
     osLiveLabel.setFont(bold(7.0f * sc).withExtraKerningFactor(0.10f));
     osRenderLabel.setFont(bold(7.0f * sc).withExtraKerningFactor(0.10f));
+    trimLinkLabel.setFont(bold(7.0f * sc).withExtraKerningFactor(0.10f));
     osSizeLabel.setFont(bold(7.0f * sc).withExtraKerningFactor(0.10f));
     osVersionLabel.setFont(bold(7.0f * sc).withExtraKerningFactor(0.10f));
 }
@@ -305,10 +307,9 @@ void ObsidianB7000AudioProcessorEditor::resized()
     os.removeFromLeft(i(5));
     osRenderBox.setBounds(os.removeFromLeft(i(36)).reduced(0, boxVPad));
     os.removeFromLeft(i(8));
-    // TRIM LINK's label is drawn at a fixed (non-scaled) 8 pt via the "os" LookAndFeel branch
-    // (ui-peripheral-spec.md), so its box must not shrink below what that fixed text needs, even
-    // though most of this strip's elements shrink proportionally with UI scale.
-    trimLockButton.setBounds(os.removeFromLeft(jmax(i(62), 50)).reduced(0, boxVPad));
+    trimLinkLabel.setBounds(os.removeFromLeft(i(26)));
+    os.removeFromLeft(i(5));
+    trimLockButton.setBounds(os.removeFromLeft(jmax(i(36), 30)).reduced(0, boxVPad));
     scaleBtn.setBounds(os.removeFromRight(i(48)).reduced(0, boxVPad));
     os.removeFromRight(i(5));
     osSizeLabel.setBounds(os.removeFromRight(i(42)));

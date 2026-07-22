@@ -51,9 +51,10 @@ private:
     double lastOutputTrim { 0.0 };
 
     juce::Label osLabel, osLiveLabel, osRenderLabel, osSizeLabel, osVersionLabel;
+    juce::Label trimLinkLabel;
     juce::ComboBox osRealtimeBox, osRenderBox;
     juce::TextButton scaleBtn;
-    juce::TextButton trimLockButton { "TRIM LINK" };
+    juce::TextButton trimLockButton { "LINK" };
     std::unique_ptr<juce::ComboBoxParameterAttachment> osRealtimeAttach, osRenderAttach;
     std::unique_ptr<juce::ButtonParameterAttachment> trimLockAttach;
 
