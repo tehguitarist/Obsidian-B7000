@@ -13,7 +13,7 @@
 |---|---|
 | 1. `kInputRef` | ✅ **DONE** — anchored at 0.87 V/FS |
 | 0. J201 output impedance / loading | ✅ **DONE 2026-07-22 (session 3)** — see below |
-| 2. CD4049 + J201 fits | ⚠ reshape validated, fit set now correct, re-run DONE — **rejected: the J201 shaper has no ceiling** (see below). Constants NOT committed. |
+| 2. CD4049 + J201 fits | ⚠ ceiling added + re-fit #2 DONE, still rejected. **Session 6: rails eliminated as the cause; the real blocker is the even-harmonic LADDER — the shaper cannot make the capture's H2 without ~25 dB too much H4.** Constants NOT committed. |
 | 3. Bridged-T reshape | not started (was blocked; **now unblocked**) |
 | 4. Tapers (`level`/`master`/`drive`) | not started |
 | 5. Output makeup | not started |
@@ -62,11 +62,17 @@ order — but see "Still open" for two things that must not be forgotten.
 5. ✅ **RUN — step-2 re-fit WITH the ceiling** (`analysis/fit_logs/step2_ceiling.log`).
    **The ceiling worked and the fit is still rejected — but the binding constraint has
    MOVED to the clipper.** See "STEP 2 RE-FIT #2" below before doing anything else.
-6. **▶ NEXT: the CLIPPER, not the J201.** `clipSatLo` rests on its floor and the clip
-   ceilings total 0.80 V against a ~7 V physical rail — the chain is still too hot into
-   the 4049. First candidate is that `railEnabled` is still false, so IC2_A has no rail
-   clamp; `kInputRef` is now anchored, which was the only reason rails were deferred.
-7. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails proper).
+6. ✅ **DONE — rail clamps tested as the suspect, and ELIMINATED.** See "RAILS ARE NOT
+   THE ANSWER" below. Enabling them is **inert** at the fitted point (cost 428.6 →
+   428.6, identical) and worth −0.1 % at nominal. A **real latent bug** was found and
+   fixed on the way (`railNeg` was signed → an enabled clamp emitted DC; commit
+   `926c0cc`), so this had to be done regardless — but it does not unblock step 2.
+7. **▶ NEXT: the clipper is still the binding constraint, and the lever is NOT rails.**
+   The live candidates are now (2) `driveTaperExp` pinned at its 3.0 ceiling — a step-4
+   parameter doing step-2's work — and the deeper question raised below: the capture's
+   H2 is nearly **level-INDEPENDENT** across the whole drive sweep, which a square law
+   structurally cannot produce. Read "What the H2 shape is actually telling us".
+8. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails proper).
 
 ---
 
@@ -372,6 +378,126 @@ at nominal.
 
 **Do not commit any constant from this run.** Nothing from it is committed; the analysis
 scripts hold `jfetGm` at nominal and `jfetRo`/`jfetRq2` at nominal.
+
+---
+
+## ❌ RAILS ARE NOT THE ANSWER (2026-07-22, session 6) — suspect #1 eliminated
+
+The handover named `railEnabled = false` as the first candidate for the clipper
+starving itself. **Measured, and it is not.** Same objective, rails off vs on:
+
+| point | rails off | rails ON | H2 growth off → on |
+|---|---|---|---|
+| nominal | 6910.4 | 6906.3 (**−0.1 %**) | 17.5 → 15.7 dB |
+| step2_ceiling best | 428.6 | **428.6 (identical)** | 10.1 → 10.1 dB |
+
+At the fitted point the rails are **exactly inert** — `jfetGm` is so low there that no
+op-amp output gets near ±3.3 V, so a ±3.3 V clamp never engages. This is the
+quantitative version of dsp-validator's earlier warning that rails are "necessary but
+not sufficient": at the operating point the fitter actually chose, they are not even
+*active*. The null is trustworthy — the flag is verified plumbed (`--print-fit` reports
+`railEnabled=1`) and it **does** move the cost at nominal, so it is inert by operating
+point, not by mis-wiring.
+
+### ⚠ But a REAL BUG was found doing it — commit `926c0cc`
+`RailClamp` uses `railNeg` as a **magnitude** (`x < -(railNeg - h)`), while `FitParams`
+shipped `railNeg = -3.3`. Compiled probe against the real header:
+
+```
+   x     as-wired(-3.3)   intended(+3.3)
+-5.00           3.3000          -3.3000
+-1.00           3.3000          -1.0000     <- every sample below +2.95 V
+ 0.00           3.3000           0.0000        returned a CONSTANT +3.3 V
+ 1.00           3.3000           1.0000
+```
+
+**An enabled clamp emitted DC, not audio.** Invisible since Phase 4 because
+`railEnabled` defaults to false and **no test exercises the enabled path** — every
+stage test validates a linear oracle with rails off. It would have surfaced as a
+garbage step-2 re-fit the moment rails were switched on, i.e. exactly the next thing
+this handover told the next session to do. Fixed at the source (`railNeg = 3.3`) and
+`setRailVoltages` now takes `|v|` because `railNeg` is a `--fit` key and a sweep can
+still pass a signed value. **A `RailClampTest` covering the ENABLED path is still
+missing — that gap is the actual root cause and it is not yet closed.**
+
+---
+
+## ▶▶ THE NEXT STRUCTURAL GAP: the even-harmonic LADDER (H2 vs H4)
+
+This is the important finding of session 6 and it supersedes "the clipper is the next
+suspect" as the lead. **The binding problem is not level anywhere — it is the SHAPE of
+the J201's even-harmonic series.**
+
+### Why drive-min H2 is a near-direct measurement of the J201
+DRIVE (IC2_A) sits **after** the JFET/treble net, so **the J201 sees the same signal at
+every drive setting** — its harmonic contribution is CONSTANT across the sweep. At
+drive-min the capture's H3 is −59.2 (clipper barely working) while H2 is −36.0. So
+drive-min H2 is essentially all J201, nearly uncontaminated. That also explains the
+capture's whole profile: H2 moves only 6 dB across the sweep (a constant J201 floor)
+while H3 moves 30 dB (the clipper switching on). **The architecture is right.**
+
+### The J201 CAN reach the capture's H2 — but only by wrecking H4
+Grid over the feasible (s, a, ceilNeg) region, rendering drive-min only:
+
+```
+best reachable drive-min H2 = -37.5 dB  at s=0.1, a=20, ceilNeg=0.2   (capture -36.0)
+   and H3 there = -59.5                                               (capture -59.2)
+```
+
+Both harmonics land almost exactly — but `a = 20` is **outside `jfetSatNeg`'s (0, 10)
+box**, and the full 5-point cost at that point is **1279.5 vs the fitted 428.6**. The
+per-term breakdown shows the entire regression is H4:
+
+| drive | H4 capture | H4 @ fitted | H4 @ a=20 | err² @ a=20 |
+|---|---|---|---|---|
+| min | −69.9 | −63.6 | **−46.3** | 278.5 |
+| 9:30 | −71.6 | −57.8 | **−40.6** | 479.1 |
+| noon | −51.1 | −49.6 | **−33.0** | 162.9 |
+
+Those three terms alone are **920 of the 1279.5**. Every other term is equal or better —
+drive-min becomes near-perfect on H2/H3/THD (−37.4/−58.9/−36.7 vs −36.0/−59.2/−36.0)
+and drive-max lands within 1.8 dB on all three.
+
+### The measured ladder, and why it is a WALL not a bad fit
+
+| | H2 | H4 | **H2−H4** |
+|---|---|---|---|
+| capture (drive-min) | −36.0 | −69.9 | **33.9 dB** |
+| model, fitted a=5.5 | −43.3 | −63.6 | 20.3 dB |
+| model, a=20 | −37.4 | −46.3 | **8.9 dB** |
+
+A **true quadratic makes H2 and NOTHING else** (`x = A cos → x² = A²/2·(1+cos 2ωt)`, H4
+identically zero) — which is what a real JFET's `Id ∝ (Vgs−Vt)²` does. The shipped bump
+`(a·s²/2)·tanh²(w/s)` is quadratic only for `|w| ≪ s`; **its own saturation is what
+manufactures H4.** So suppressing H4 needs a LARGE knee `s`, while making H2 needs a
+LARGE `a` — and monotonicity caps the product `|a|·s`:
+
+```
+   a     s at |a|s=2.598    A/s at A=0.05 V
+  2.0            1.299             0.04      bump stays quadratic, but too little H2
+ 20.0            0.130             0.38      enough H2, knee now INSIDE the signal -> H4
+ 40.0            0.065             0.77      H4 worse still
+```
+
+**The two requirements are in direct conflict through the monotonicity constraint.** No
+parameter choice inside the current shape can give the capture's 33.9 dB H2/H4
+separation. This is the same class of finding as the original tanh→square-law reshape
+(there: "an odd map cannot make H2 without H3"; here: "a self-saturating even bump
+cannot make H2 without H4"), and it should be treated the same way — as a **shape**
+problem, not a fit problem.
+
+### ▶ Recommended next move (NOT yet done — needs sign-off, it is a DSP change)
+Make the even term a **true quadratic over the operating range** and let the *ceiling*
+provide the bound, instead of using a bump that saturates on its own:
+`g(w) = T(w) + (a/2)·w²`, with `T` the ceiling-limited core. H4 is then zero by
+construction and the ceiling — which is already fitted, already tested, and already has
+an antiderivative — does all the limiting. Before building it, confirm on the static map
+that the composite still passes the numeric monotonicity scan and that ADAA keeps its
+zero-H3 property (both are existing `JfetStageTest` Test 6 checks).
+
+**Do NOT re-run the step-2 fit before this is resolved** — every run so far has been the
+optimiser trading a structural shape error against level, which is what produced three
+successive uncommittable fits.
 
 ---
 
