@@ -105,8 +105,14 @@ def main():
     # Default = fit_nonlinear.py's run-2 best point. Override any of them with
     # `key=value` args to test a different (e.g. physically-nominal) clipper; bare
     # numeric args are the clipA0 values to sweep.
-    fitted = dict(jfetG0=4.583, jfetSatPos=10.585, jfetSatNeg=0.232,
-                  clipSatLo=0.773, clipSatHi=1.012, driveTaperExp=1.598)
+    # ** Reset to NOMINAL 2026-07-22. ** This used to default to fit_nonlinear.py's run-2 best
+    # point, which (a) passed `jfetG0`, a key the 2026-07-22 restructure DELETED — so every run
+    # of this script died in OfflineRender's arg parser — and (b) was a rejected fit point
+    # anyway (physically implausible, and a non-monotone fold-back at |a|*s = 2.456). Nominal is
+    # the honest default until step 2 is re-run on the restructured chain; override on the
+    # command line to test a candidate.
+    fitted = dict(jfetGm=0.69e-3, jfetRo=200e3, jfetRq2=1e6, jfetSatPos=0.5, jfetSatNeg=1.0,
+                  clipSatLo=3.15, clipSatHi=3.85, driveTaperExp=1.5)
     a0s = []
     for arg in sys.argv[1:]:
         if "=" in arg:

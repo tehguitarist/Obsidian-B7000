@@ -103,10 +103,20 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅; the OD-path LOADING BLOCKER ✅ RESOLVED
-> (2026-07-22 session 3); steps 2–6 now unblocked. ctest 16/16 ✅, tree clean (commit `b02b2f2`).
-> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST — all evidence + two
-> open items).**
+> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅; OD-path loading blocker ✅ RESOLVED
+> (session 3); J201 boundary params ✅ FITTED (session 4, 2026-07-22): `jfetGm ≈ 0.09 mS`,
+> shape error 7.53 → 1.56 dB, corroborated by an independent level check (+12.1 → −1.7 dB);
+> `jfetRo`/`jfetRq2` proved NOT identifiable (cost flat to ≤0.01 dB over 16×) → held nominal.
+> ctest 16/16 ✅ (session 4 touched analysis/docs only).
+> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST).
+> **▶ NEXT IS A CODE CHANGE, NOT A FIT: add an asymmetric soft ceiling to the J201 drain
+> current in `JfetStage.h`.** The step-2 re-fit was RUN and REJECTED
+> (`analysis/fit_logs/step2_refit.log`): the capture's H2 grows only +6 dB across the drive
+> sweep but the model's grows +21.9 dB (H3 tracks to ~1.4 dB — that part is right), because
+> the square-law shaper is UNBOUNDED and `railEnabled=false`, so nothing limits the J201
+> before the CD4049. The fitter pinned `|a|*s` to 1.9997 against the 2.0 monotonicity gate
+> trying to manufacture a ceiling, and dropped `clipA0` to its floor (3.0). Do NOT widen the
+> bounds and do NOT raise `|a|*s` — add the ceiling, then re-fit. No constants committed.**
 > **THE BLOCKER IS FIXED — it was structural, not a fit problem.** `JfetStage` was a VOLTAGE
 > stage feeding `TrebleAttack` as an IDEAL source. For a degenerated common-source stage
 > `Gm(s)=gm/k(s)` RISES while `Rout(s)=ro*k(s)` FALLS, so open-circuit gain `Gm*Rout = gm*ro`

@@ -13,7 +13,7 @@
 |---|---|
 | 1. `kInputRef` | ✅ **DONE** — anchored at 0.87 V/FS |
 | 0. J201 output impedance / loading | ✅ **DONE 2026-07-22 (session 3)** — see below |
-| 2. CD4049 + J201 fits | ⚠ reshape validated; constants NOT committed, and the fit set CHANGED |
+| 2. CD4049 + J201 fits | ⚠ reshape validated, fit set now correct, re-run DONE — **rejected: the J201 shaper has no ceiling** (see below). Constants NOT committed. |
 | 3. Bridged-T reshape | not started (was blocked; **now unblocked**) |
 | 4. Tapers (`level`/`master`/`drive`) | not started |
 | 5. Output makeup | not started |
@@ -37,21 +37,26 @@ order — but see "Still open" for two things that must not be forgotten.
 
 ## ▶ IMMEDIATE NEXT ACTION
 
-1. **Fit `jfetGm` / `jfetRo` / `jfetRq2` properly.** The coarse scan that reached
-   1.4 dB sat at the EDGE of its grid on all three (gm smallest, ro largest, Rq2
-   largest), so the real optimum is further out — extend the grid rather than
-   trusting `gm = 0.06 mS` as final. ⚠ That value is ~11× below the datasheet
-   0.69 mS; treat it as a number to be justified or bounded, not accepted (it
-   implies `gm*R6 = 0.198`, i.e. almost no source degeneration and almost no C3
-   shelf, which is a strong physical claim about this unit).
-2. **Add the J201 boundary params to `FIT_KEYS`** in `analysis/fit_nonlinear.py`:
-   `jfetGm`, `jfetRo`, `jfetRq2`. Remove `jfetG0`. (The old carry-forward "add
-   `jfetGmR6` to FIT_KEYS" is VOID — that parameter no longer exists; see below.)
-3. **Re-run the step-2 nonlinear fit** on the corrected chain, with the `|a|*s < 2`
-   gate, and re-check whether `clipA0` / `clipSat*` now land somewhere physical.
-   The old fit was biased by a chain carrying +23 dB of excess HF exactly where its
-   H3/H4/H5 objective reads, so its rejected values say nothing about the new chain.
-4. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails).
+1. ✅ **DONE — `jfetGm`/`jfetRo`/`jfetRq2` fitted** (`analysis/fit_jfet_boundary.py`,
+   new). Shape error **7.53 → 1.56 dB** at **`jfetGm` ≈ 0.09 mS**; `jfetRo`/`jfetRq2`
+   are **NOT identifiable** from this data and stay at nominal. See the section below
+   before using the number — the level cross-check is what makes it credible.
+2. ✅ **DONE — `FIT_KEYS` updated** in `analysis/fit_nonlinear.py`: `jfetG0` →
+   `jfetGm`, with `jfetRo`/`jfetRq2` moved to a new `HELD` dict (they are inert in a
+   harmonic objective and would only add flat directions). `NOMINAL`/`BOUNDS`/the
+   restart points were rescaled too — the old `jfetSat*` ranges were on the
+   pre-restructure voltage scale and are meaningless now that the shaper sees vgs.
+   `analysis/grunt_a0_check.py` was also passing the dead `jfetG0` key, so **every
+   run of it has been dying in the arg parser** — reset to nominal.
+3. ✅ **RUN — step-2 nonlinear re-fit** (`analysis/fit_logs/step2_refit.log`).
+   **It FAILS both acceptance tests, and the failure identifies a STRUCTURAL gap, not
+   a bad parameter value.** Do not re-run it as-is. See "Step 2 re-fit — the result"
+   below; the short version is that the J201 shaper has **no ceiling**, the fitter
+   tried to manufacture one and was stopped dead at the monotonicity gate.
+4. **▶ NEXT: add the asymmetric soft ceiling to the J201 drain current** (the
+   carry-forward already flagged in `JfetStage.h` and by dsp-validator). This is a
+   CODE change, not a fit — the first one Phase 7 has needed. Then re-run step 2.
+5. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails).
 
 ---
 
@@ -107,6 +112,169 @@ unconditionally AND drove the ladder from 0 Ω: the boost was counted twice.
 - **The "HF error must shrink 48k→96k" assert** now also passes when the 48 k
   error is ALREADY negligible — there is no warp left to shrink, and the
   rate-to-rate difference is measurement noise.
+
+---
+
+## ✅ J201 BOUNDARY FIT — `analysis/fit_jfet_boundary.py` (2026-07-22, session 4)
+
+Objective: the drive-min OD-path SHAPE (`drive-0700_base-od.wav`, segment
+`sweep_clean_-36`), mean-removed dB on a 1/12-oct log grid, 50 Hz–8 kHz. Shape-only
+is legitimate *now* because the pedal is provably linear at drive-min, and
+mean-removal makes the cost blind to makeup and to every unfit taper. Renders are
+trimmed to the first 22.6 s (both sweeps, identical segment offsets) → **1.4 s/eval**.
+
+```
+nominal (gm 0.69 mS)                        7.53 dB RMS
+coarse grid best (210 evals)                1.86
+Nelder-Mead refine                          1.58   gm 0.0911 mS
+1-D refit, ro/rq2 held at nominal           1.56   gm 0.090  mS   <- USE THIS
+```
+
+### What is and is NOT measured here
+
+- **`jfetGm` IS identified** — a clean interior minimum (0.05 mS → 2.16, 0.09 → 1.56,
+  0.20 → 3.73, 0.30 → 5.01 dB).
+- **`jfetRo` and `jfetRq2` are NOT.** The free fit ran both to their upper bounds
+  (10 MΩ / 94 MΩ) and the 1-D scans move the cost by **≤0.01 dB over a 16× range** —
+  that is the ideal-current-source limit, i.e. "large enough not to matter", not a
+  measurement. Holding them at nominal 200 k / 1 M costs 0.02 dB. **Do not commit
+  10 MΩ/94 MΩ as a finding**; they are a fit artefact of an inert direction. The full
+  grid does show a weak preference for ro ≳ 600 k (0.15 dB), which is the only real
+  content in them.
+
+### The cross-check that makes gm credible — ABSOLUTE LEVEL
+
+The objective is mean-removed, so it **cannot see level at all**. Level therefore
+tests the fit rather than being fitted by it, and it agrees:
+
+```
+                          drive-min sweep RMS vs capture
+  nominal gm 0.690 mS            +12.12 dB   (hot)
+  fitted  gm 0.091 mS             -1.73 dB
+  fitted gm, nominal ro/rq2       -1.91 dB
+```
+
+A 14 dB level error collapsing to ~2 dB — with makeup and both tapers still unfit —
+under a parameter chosen by a level-blind objective is strong corroboration. It also
+retro-explains the dsp-validator finding that the chain ran **3–10× too hot into the
+clipper**: same direction, same order of magnitude, one cause.
+
+### ⚠ The degeneracy you must know about before committing `kGm`
+
+**Shape alone cannot distinguish a 7.6× lower `gm` from a ~10× larger `C3`.** Checked
+analytically on the front-end oracle (`jfet_stage_lin_tf` × `jfet_source_z` ×
+`treble_attack_tf`, both of which take `C3` as a keyword):
+
+```
+  A  gm 0.069 mS, C3 220n     shape reference        level @1k  -19.4 dB
+  B  gm 0.690 mS, C3 2u2      0.63 dB from A                    +0.7 dB
+  C  gm 0.690 mS, C3 220n     2.99 dB from A (nominal)          -0.9 dB
+```
+
+A and B are 0.63 dB apart in SHAPE — inside this fit's own 1.56 dB residual — and
+**20 dB apart in LEVEL**. Both kill the C3 shelf; A does it by removing the
+degeneration (`k0 = 1+gm*R6 → 1`), B by moving the shelf zero below the audio band so
+it is a flat gain. Since `k0` is the only in-model handle on that shelf, a shape-only
+fit *had* to express it as gm. **It is the level column that chooses A** — B leaves
+the chain +12 dB hot. Worth knowing because a large-`C3` revision difference is
+exactly the kind of thing this schematic has already sprung twice (C33 22n vs 2200pF,
+C13 220n vs 22n), and if a later measurement ever contradicts the low gm, C3 is the
+first place to look — it would need `jfetC3` adding to `FitParams` to test in the
+full chain.
+
+### Is `gm = 0.09 mS` physically defensible?
+
+Partly, and it should NOT be committed on this evidence alone. Datasheet-nominal is
+0.69 mS. Working the J201 self-bias at the LOW corner of the part spread
+(IDSS 0.2 mA, |Vp| 1.5 V, R6 = 3k3) gives Id ≈ 0.11 mA and **gm ≈ 0.20 mS** — so the
+fit sits ~2× below the plausible low corner, not the ~11× the earlier coarse scan
+suggested. Combined with the level corroboration this is far stronger than any of the
+three rejected step-2 fits, but the honest position is: **hold it in the analysis
+scripts, let step 2 vote on gm independently from the harmonics, and commit
+`JfetStage::kGm` only if the two objectives agree.** They constrain gm in genuinely
+different directions — lowering gm cuts the drain current (less clipper drive) while
+*raising* vgs by `k0` (more J201 curvature), so the harmonic profile is not just a
+restatement of the level.
+
+---
+
+## ❌ STEP 2 RE-FIT — the result (2026-07-22 session 4). READ BEFORE RE-RUNNING IT.
+
+Full log: **`analysis/fit_logs/step2_refit.log`**. Cost 7553.9 → 677.3 (3 starts, best of
+677/940/984 — badly non-convex). Fitted point:
+
+```
+jfetGm 0.00055076 | jfetSatPos(s) 0.43262 | jfetSatNeg(a) 4.6223
+clipA0 3.0171 | clipSatLo 0.64385 | clipSatHi 1.8783 | driveTaperExp 1.6575
+held: jfetRo 200k, jfetRq2 1M
+```
+
+### Both acceptance tests FAIL
+
+- **A — `jfetGm` disagrees with the shape fit by 6.1×** (0.551 mS here vs 0.090 mS from
+  the drive-min shape). The over-determination test fired, exactly as it was set up to.
+- **B — the clipper is *less* physical than the last rejected run.** `clipA0` = **3.02**
+  vs circuit.md's 20–30 (the previous rejected fit said 7.3), and `clipSatLo+Hi` =
+  **2.52 V** vs the ~7 V R19-dropped rail.
+
+### THREE parameters are resting on constraints — so this is a box artefact
+
+```
+clipA0     3.0171   <- its LOWER BOUND is 3        (pinned)
+clipSatLo  0.64385  <- floor 0.4                   (near-pinned)
+|a| * s  = 1.99970  <- monotonicity gate is 2.0    (pinned to 4 decimals)
+```
+
+A param resting on a bound means the optimum is outside the box, so the value reported is
+a property of the box, not of the pedal. **Do NOT respond by widening the bounds** — that
+was tried at the last run and the fit simply walked further out. The gate is doing its job.
+
+### What the failure actually diagnoses — the J201 shaper has NO CEILING
+
+Compare how the harmonics GROW across the drive sweep, capture vs fitted model:
+
+| | drive-min | drive-max | growth |
+|---|---|---|---|
+| capture H2 | −36.0 | −30.0 | **+6.0 dB** |
+| model H2 | −37.8 | −15.9 | **+21.9 dB** |
+| capture H3 | −59.2 | −29.0 | +30.2 dB |
+| model H3 | −61.2 | −29.6 | +31.6 dB |
+
+**H3 tracks almost perfectly; H2 grows nearly 4× too fast in dB.** The real pedal's H2
+*saturates* — it is nearly flat across the whole drive sweep — while the model's grows
+without limit. That is precisely the signature of the flagged carry-forward: the
+square-law shaper is **unbounded** (`g(w) → w + a*s²`, slope 1, no ceiling) and
+`railEnabled = false`, so **nothing anywhere between the input jack and the CD4049 limits
+the J201's own output**. A real J201 drain on a 9 V rail swings at most ≈ ±4 V.
+
+The pinned `|a|*s = 1.9997` is the fitter *confessing this*: raising `|a|*s` is the only
+lever the current shape offers for bending the even term over, so the optimiser drove it
+straight into the monotonicity boundary trying to build a ceiling out of a shape that
+does not have one. It then dropped `clipA0` to its floor and the clip ceilings toward
+theirs — all three constraints binding at once — because the only other way to stop the
+runaway H2 is to make everything downstream weaker. **The fit is not wrong about the
+data; the model is missing a limiter.** This also explains the `gm` disagreement:
+harmonics-vs-drive is being distorted by the missing ceiling, so its `gm` is not
+trustworthy, and the shape fit's 0.09 mS (which is corroborated by absolute level) is
+still the better estimate.
+
+### ▶ What to do next (the fix, in order)
+
+1. **Add an explicit asymmetric soft ceiling on the J201 drain current** in
+   `JfetStage.h`, keeping `g` a clean linear+even core — do **NOT** try to get the bound
+   by raising `|a|*s` (breaks monotonicity, and re-introduces H3 which currently matches
+   almost perfectly and must not be disturbed). Asymmetric because the real drain clips
+   hard toward the rail one way and toward cutoff the other; that asymmetry is also where
+   the residual even content should come from once the shaper's own `a` stops carrying it.
+   New fit params + `FitParams` entries + `offline_render.cpp` map entry; update
+   `JfetStageTest` (the even/odd and monotonicity asserts still apply below the ceiling).
+2. **Then re-run step 2.** Expect `|a|*s` to come off the gate and `clipA0` to rise; if
+   `clipA0` still pins at 3, the clipper itself is the next suspect, not the J201.
+3. Only then judge `jfetGm` again — with the ceiling in place the two objectives are
+   finally measuring the same thing.
+
+**Do not commit any constant from this run.** Nothing from it is committed; the analysis
+scripts hold `jfetGm` at nominal and `jfetRo`/`jfetRq2` at nominal.
 
 ---
 
@@ -514,7 +682,9 @@ f, m = A.transfer(A.seg_of(x, SEG), A.seg_of(orig, SEG))   # x = aligned capture
   profile (THD + H2..H5) across the drive sweep; harmonic RATIOS are level-independent, so
   it is valid before makeup. Renders a short synthetic tone per eval (~20× faster than the
   full file). Bounds widened after run 1 hit a ceiling; `--start=a,b,c,...` refines from an
-  explicit point. ⚠ `jfetGmR6` is **missing from `FIT_KEYS`** — add it.
+  explicit point. ✅ `FIT_KEYS`/`NOMINAL`/`BOUNDS` updated for the restructure 2026-07-22
+  (session 4) — `jfetG0` → `jfetGm`, `jfetRo`/`jfetRq2` in `HELD`, sat ranges rescaled to
+  gate volts. (The old "add `jfetGmR6`" note here was VOID — that param no longer exists.)
 - **`analysis/grunt_a0_check.py`** (NEW) — matched-pair GRUNT cross-check on `clipA0`.
   Guards the sub-40 Hz measurement trap. `key=value` args override any held param; bare
   numeric args are the A0 values to sweep.
@@ -531,10 +701,13 @@ f, m = A.transfer(A.seg_of(x, SEG), A.seg_of(orig, SEG))   # x = aligned capture
 Order is set by `docs/calibration-and-gain-staging.md`, **amended twice** (both recorded
 above): `masterTaperExp` before makeup, and now the **HF/loading fix before everything**.
 
-0. **[NEW, BLOCKING] J201 output impedance → TrebleAttack boundary** (+ bridged-T load).
+0. ✅ **J201 output impedance → TrebleAttack boundary** — restructured AND fitted
+   (`gm ≈ 0.09 mS`, held in the analysis scripts, `kGm` not yet committed).
 1. ✅ `kInputRef` — done.
-2. Nonlinear fits — reshape done, constants pending the HF fix; add `jfetGmR6` to the fit
-   set and an OD-vs-clean level term (the latter needs step 4 first).
+2. Nonlinear fits — reshape done, fit set correct, re-run DONE and **rejected**: the
+   J201 shaper is unbounded, so H2 grows 22 dB across the drive sweep where the pedal's
+   grows 6. **Add the J201 drain-current ceiling first (a CODE change), then re-fit.**
+   Still wants an OD-vs-clean level term, which needs step 4 first.
 3. Bridged-T reshape to the measured notch (334 Hz @ −3.36 dB). Decompose the treble net's
    own −16.69 dB @ 300 Hz contribution first.
 4. Taper shapes (≥2 knob points/pot; the matrix has 4). Includes `masterTaperExp` and

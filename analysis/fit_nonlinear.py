@@ -27,16 +27,42 @@ CAP = "analysis/captures"
 # the fit match the drive extremes while leaving the mid-range too clean (observed). It is nominally
 # a step-4 taper param, but it cannot be separated from this fit; step 4 refines it if needed.
 # jfetSatPos = square-law knee `s`; jfetSatNeg = even/H2 strength `a` (JfetStage reshape 2026-07-22).
-FIT_KEYS = ["jfetG0", "jfetSatPos", "jfetSatNeg", "clipA0", "clipSatLo", "clipSatHi", "driveTaperExp"]
-NOMINAL  = [15.0, 3.0, 0.3, 25.0, 3.15, 3.85, 1.5]
+#
+# ** `jfetG0` is GONE (2026-07-22 restructure) — it was a lumped voltage gain that silently
+# absorbed the J201's output impedance and the treble net's loading. The stage is now a
+# transconductance, so the gain parameter is the device `jfetGm` (S). Passing the old key
+# makes OfflineRender fail loudly rather than fit something else; nothing here aliases it. **
+#
+# jfetGm is IN this fit, and jfetRo/jfetRq2 are NOT, on purpose — they are fit by different
+# data and it matters which:
+#   * gm sets the small-signal drain current, i.e. how hard the chain drives the clipper, and
+#     the harmonic profile below is directly sensitive to that. It ALSO sets the degeneration
+#     k0 = 1+gm*R6 (the C3 shelf), which analysis/fit_jfet_boundary.py measures from the
+#     drive-min SHAPE. So gm is OVER-determined by two independent objectives — that is a
+#     feature: if the two disagree, the model is wrong somewhere, and the disagreement is the
+#     finding. Cross-check them; do not quietly average them.
+#   * ro/rq2 only shape the loading, are near-inert in the harmonic profile, and would just
+#     add two flat directions to this search. Held at HELD below (fit_jfet_boundary.py).
+FIT_KEYS = ["jfetGm", "jfetSatPos", "jfetSatNeg", "clipA0", "clipSatLo", "clipSatHi", "driveTaperExp"]
+NOMINAL  = [0.69e-3, 0.5, 1.0, 25.0, 3.15, 3.85, 1.5]
+# Params held fixed at every eval, emitted explicitly so a render is never at the mercy of the
+# binary's defaults. ** Update from analysis/fit_jfet_boundary.py once its result is committed;
+# nominal until then. **
+HELD = {"jfetRo": 200.0e3, "jfetRq2": 1.0e6}
 # Bounds WIDENED 2026-07-22 after run 1 pinned jfetSatPos exactly at its old 6.0 ceiling and
 # pushed clipSatLo (1.317) down near its old 1.2 floor — a param resting ON a bound means the
 # optimum is outside the box, so the reported value is an artefact of the box, not a fit.
-# jfetSatPos is the square-law knee `s`; a large `s` with a small `a` is a legitimate solution
-# (the even bump stays mild, |a|*s is what must stay < 2.598 for monotonicity — asserted in
-# JfetStageTest). clipSat* floors dropped because the R19-dropped 4049 rail is fitting LOWER
-# than the nominal ~7 V sum.
-BOUNDS   = [(2, 16), (1, 20), (0.0, 1.0), (3, 30), (0.4, 6.5), (0.4, 7.5), (0.4, 3.0)]
+# clipSat* floors dropped because the R19-dropped 4049 rail is fitting LOWER than the nominal
+# ~7 V sum.
+#
+# ** RESCALED 2026-07-22 with the restructure — the old jfetSat* ranges are meaningless now. **
+# The shaper's argument is the effective vgs (REAL gate volts), not a post-gain voltage, so:
+#   jfetGm     siemens. Datasheet 0.69 mS; the documented ~5:1 J201 spread plus a decade below
+#              it, because the shape fit pushes that way and the box must not decide that.
+#   jfetSatPos knee `s` in gate volts — order |Vp| (0.3-1.5 V for a J201), room either side.
+#   jfetSatNeg even strength `a` (1/V). The real constraint is the PRODUCT |a|*s < 2
+#              (monotonicity), enforced by monotonic() below — a box cannot express it.
+BOUNDS   = [(1.0e-5, 5.0e-3), (0.05, 5.0), (0.0, 10.0), (3, 30), (0.4, 6.5), (0.4, 7.5), (0.4, 3.0)]
 # drive capture -> label
 DRIVE_CAPS = [
     ("drive-0700_base-od.wav", "min"),
@@ -89,6 +115,8 @@ def capture_targets():
 def render_profiles(params):
     """Render the short tone through the plug at each drive setting; return {label: profile}."""
     extra = []
+    for k, v in HELD.items():
+        extra += ["--fit", f"{k}={v:.9g}"]
     for k, v in zip(FIT_KEYS, params):
         extra += ["--fit", f"{k}={v}"]
     out = {}
@@ -154,10 +182,14 @@ def main():
     # best under WIDENED bounds — a param that came back resting on a bound must be re-fit,
     # not committed).
     best = None
+    # Starts RESCALED for the restructured stage (gm in siemens, s/a in gate volts). The three
+    # gm values deliberately straddle the open question: datasheet-nominal, the decade-lower
+    # value the drive-min SHAPE fit prefers (fit_jfet_boundary.py), and the midpoint — so this
+    # objective gets to vote on gm independently instead of inheriting the shape fit's answer.
     starts = [
-        [8, 3.0, 0.15, 25, 3.15, 3.85, 1.0],  # moderate gain, mild even, nominal clipper
-        [6, 2.5, 0.20, 20, 3.0, 3.6, 1.2],
-        [10, 3.5, 0.10, 15, 3.0, 4.0, 0.8],
+        [0.69e-3, 0.5, 1.0, 25, 3.15, 3.85, 1.0],
+        [0.07e-3, 0.5, 1.0, 20, 3.0, 3.6, 1.2],
+        [0.22e-3, 1.0, 0.5, 15, 3.0, 4.0, 0.8],
     ]
     for arg in sys.argv[1:]:
         if arg.startswith("--start="):
@@ -171,8 +203,10 @@ def main():
 
     print(f"\nBest cost = {best.fun:.1f}  (nominal {c0:.1f})")
     print("Fitted params:")
+    # %g, not %7.3f — jfetGm is ~7e-4 and a fixed-point format prints it as "0.001".
     for k, v, nom in zip(FIT_KEYS, best.x, NOMINAL):
-        print(f"  {k:12s} {v:7.3f}   (nominal {nom})")
+        print(f"  {k:12s} {v:12.5g}   (nominal {nom:g})")
+    print(f"  held: " + ", ".join(f"{k}={v:g}" for k, v in HELD.items()))
 
     _, prof = cost(best.x, targets, verbose=True)
     if prof is None:

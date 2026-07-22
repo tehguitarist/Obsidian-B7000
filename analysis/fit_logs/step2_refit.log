@@ -1,0 +1,36 @@
+Wed Jul 22 14:43:34 AEST 2026
+step-2 re-fit on the restructured chain (jfetGm free, jfetRo/jfetRq2 held nominal)
+
+Capture targets (tone_220, dB re fundamental):
+  min   THD= -36.0 H2= -36.0 H3= -59.2 H4= -69.9 H5= -86.4
+  9:30  THD= -34.4 H2= -34.4 H3= -55.3 H4= -71.6 H5= -83.5
+  noon  THD= -31.0 H2= -31.4 H3= -42.0 H4= -51.1 H5= -56.8
+  2:30  THD= -25.9 H2= -31.9 H3= -30.7 H4= -38.4 H5= -32.7
+  max   THD= -22.9 H2= -30.0 H3= -29.0 H4= -35.8 H5= -28.8
+
+Nominal cost = 7553.9
+  start [0.0, 0.5, 1.0, 25, 3.1, 3.9, 1.0] -> cost 677.3
+  start [0.0, 0.5, 1.0, 20, 3.0, 3.6, 1.2] -> cost 939.9
+  start [0.0, 1.0, 0.5, 15, 3.0, 4.0, 0.8] -> cost 983.8
+
+Best cost = 677.3  (nominal 7553.9)
+Fitted params:
+  jfetGm         0.00055076   (nominal 0.00069)
+  jfetSatPos        0.43262   (nominal 0.5)
+  jfetSatNeg         4.6223   (nominal 1)
+  clipA0             3.0171   (nominal 25)
+  clipSatLo         0.64385   (nominal 3.15)
+  clipSatHi          1.8783   (nominal 3.85)
+  driveTaperExp       1.6575   (nominal 1.5)
+  held: jfetRo=200000, jfetRq2=1e+06
+
+FITTED plug vs capture (tone_220, dB re fundamental):
+drive  |       THD c/p |        H2 c/p |        H3 c/p |        H4 c/p
+min    | -36.0/-37.8 | -36.0/-37.8 | -59.2/-61.2 | -69.9/-70.4
+9:30   | -34.4/-37.6 | -34.4/-37.7 | -55.3/-52.9 | -71.6/-62.1
+noon   | -31.0/-35.3 | -31.4/-36.5 | -42.0/-41.9 | -51.1/-53.3
+2:30   | -25.9/-19.0 | -31.9/-19.3 | -30.7/-32.9 | -38.4/-38.4
+max    | -22.9/-14.6 | -30.0/-15.9 | -29.0/-29.6 | -35.8/-25.1
+
+DONE
+Wed Jul 22 15:03:49 AEST 2026
