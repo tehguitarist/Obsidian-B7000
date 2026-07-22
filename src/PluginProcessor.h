@@ -55,6 +55,18 @@ public:
     std::array<juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None>, 2> bypassDelay;
     juce::AudioBuffer<float> dryDelayedBuffer;
 
+    // Per-block ramps for inputGain/outputGain/bypassMix. Filled ONCE per block
+    // (not once per channel) by actually stepping the SmoothedValue members —
+    // see processBlock: a per-channel *copy* of a SmoothedValue must never be the
+    // thing that calls getNextValue(), because the copy's advancement is thrown
+    // away at the end of the channel loop and the member's own currentValue never
+    // moves. With a stale currentValue, the next block's setTargetValue() (a
+    // no-op whenever the target hasn't changed) leaves the ramp re-starting from
+    // the same frozen point every block instead of continuing — an audible click
+    // train once bypassMix's target ever differs from 0, i.e. from the first
+    // bypass press onward.
+    std::vector<float> inGainRamp, outGainRamp, bypassMixRamp;
+
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
     std::atomic<bool> bypassed { false };

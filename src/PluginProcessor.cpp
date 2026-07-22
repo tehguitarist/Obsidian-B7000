@@ -151,6 +151,9 @@ void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPe
 {
     scratch.setSize(2, samplesPerBlock);
     dryDelayedBuffer.setSize(2, samplesPerBlock);
+    inGainRamp.resize((size_t) samplesPerBlock);
+    outGainRamp.resize((size_t) samplesPerBlock);
+    bypassMixRamp.resize((size_t) samplesPerBlock);
 
     const int startOrder = (int) pOversampling->load();
     for (auto& d : dsp)
@@ -227,20 +230,23 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     bypassMix.setTargetValue(bypassParam->get() ? 1.0f : 0.0f);
     bypassed.store(bypassParam->get());
 
-    // ---- Snapshot smoothed values so every channel steps identically --------
-    const auto inGainStart = inputGain;
-    const auto outGainStart = outputGain;
-    const auto bypassStart = bypassMix;
+    // ---- Advance the shared smoothers ONCE per sample, not once per channel --
+    // (see PluginProcessor.h comment on inGainRamp/outGainRamp/bypassMixRamp —
+    // a per-channel copy must never be what calls getNextValue(), or the ramp
+    // resets every block instead of continuing). Both channels then read the
+    // same precomputed ramp, so they still step identically.
+    for (int n = 0; n < numSamples; ++n)
+    {
+        inGainRamp[(size_t) n] = inputGain.getNextValue();
+        outGainRamp[(size_t) n] = outputGain.getNextValue();
+        bypassMixRamp[(size_t) n] = bypassMix.getNextValue();
+    }
 
     float peakIn = 0.0f, peakOut = 0.0f;
     const int numChans = juce::jmin(numIn, numOut, 2);
 
     for (int ch = 0; ch < numChans; ++ch)
     {
-        auto inGain = inGainStart;
-        auto outGain = outGainStart;
-        auto bMix = bypassStart;
-
         float* io = buffer.getWritePointer(ch);
         double* work = scratch.getWritePointer(ch);
         float* dryDelayed = dryDelayedBuffer.getWritePointer(ch);
@@ -249,7 +255,7 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         // dsp.md "Dry/wet phase alignment") → meter → chain volts.
         for (int n = 0; n < numSamples; ++n)
         {
-            const float wet = io[n] * inGain.getNextValue();
+            const float wet = io[n] * inGainRamp[(size_t) n];
             peakIn = juce::jmax(peakIn, std::abs(wet));
             work[n] = (double) wet * (double) kInputRef;
 
@@ -264,8 +270,8 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         for (int n = 0; n < numSamples; ++n)
         {
             const float dry = dryDelayed[n];               // delay-compensated pre-DSP
-            const float processed = (float) work[n] * outGain.getNextValue();
-            const float mix = bMix.getNextValue();
+            const float processed = (float) work[n] * outGainRamp[(size_t) n];
+            const float mix = bypassMixRamp[(size_t) n];
             // Branch instead of processed*(1-mix): at full bypass (mix==1) this must
             // be immune to a non-finite `processed` (the chain keeps running even
             // while bypassed, to stay warm for re-engage) — 0.0f * NaN/Inf is NOT

@@ -639,6 +639,24 @@ high, execute routine work cheap) is what should persist.
 > Record decisions, measured constants (kInputRef, rail voltages, makeup), and open questions here
 > as you go, so the next session resumes cleanly.
 
+- **BUG FIXED 2026-07-23: bypass-engage produced a constant click train, louder with more DRIVE.**
+  Root cause in `PluginProcessor::processBlock` (nothing DSP/circuit-related — a plugin-level
+  smoothing bug): `bypassMix`/`inputGain`/`outputGain` were copied into a per-channel local, and
+  only that **copy** ever called `.getNextValue()`; the processor's own member `currentValue` never
+  advanced. `SmoothedValue::setTargetValue()` no-ops once the target stops changing (true for every
+  block after the first following a bypass press, since the target then just sits at 0 or 1), so
+  the member stayed frozen at whatever `currentValue` it had when the target last changed — and
+  every following block re-ramped from that same stale point instead of continuing. That produced a
+  periodic partial wet/dry blend-in at every block boundary forever after the first bypass toggle
+  (not just during the ~5 ms transition) — the click, louder at higher DRIVE because the "wet" side
+  briefly blended in is the gain-boosted/distorted signal. **Fix:** step each smoother exactly once
+  per sample into a shared per-block ramp buffer (`inGainRamp`/`outGainRamp`/`bypassMixRamp`, sized
+  in `prepareToPlay`) and have both channels read that same array, instead of each channel owning
+  and advancing a throwaway copy. Preserves "both channels step identically"; the member's real
+  state now persists correctly across blocks. `src/PluginProcessor.{h,cpp}`; ctest still 16/16 (no
+  console test exercises the plugin-level `AudioProcessor::processBlock` path, which is why this
+  didn't trip a gate — worth keeping in mind for any future `SmoothedValue` usage in this file:
+  never let a per-channel/per-voice **copy** be the only thing that calls `getNextValue()`).
 - **Target = Darkglass B7K Ultra** (schematic is the original-B7K "Black Mirror VII" clone; Ultra
   extras engineered on top). **8 pots**: MASTER[ENG], BLEND, LEVEL, DRIVE, LO, HI, LO-MID, HI-MID.
   Plus 3-way ATTACK[ENG] + 3-way GRUNT switches, and 3-position Lo-Mid/Hi-Mid freq selectors[ENG].
