@@ -140,11 +140,30 @@ high, execute routine work cheap) is what should persist.
 > monotonicity boundary, and `jfetGm` 0.0274 mS vs the shape fit's 0.090 (was 6.1× above,
 > now 3.3× below — the two objectives now bracket it). Every one of those is a "make the
 > clipper see less" lever at its limit → something upstream is STILL too hot.
-> **▶ NEXT: the clipper. First candidate — `railEnabled` is still false so IC2_A has no
-> TL072 clamp (546 V measured at 0 dBFS/drive-max pre-ceiling), and `kInputRef` being
-> anchored discharges the only reason rails were deferred to step 6. Necessary but NOT
-> sufficient (rails alone do not fix the GRUNT flat→boost step — that needs ≲0.1 V at the
-> clipper). NO CONSTANTS COMMITTED; the ceilings ship at their physically-argued nominals.**
+> **RAILS ELIMINATED (session 6, 2026-07-22) — they were suspect #1 and they are NOT it.**
+> Enabling them is worth −0.1% at nominal and is EXACTLY inert at the fitted point (cost
+> 428.6 → 428.6): `jfetGm` is low enough there that nothing reaches ±3.3 V. Verified
+> plumbed (it does move the cost at nominal), so the null is by operating point, not
+> mis-wiring. **A REAL BUG was found doing it (`926c0cc`): `RailClamp` uses `railNeg` as a
+> MAGNITUDE but `FitParams` shipped `-3.3`, so an ENABLED clamp returned a constant +3.3 V
+> for every sample below +2.95 V — it emitted DC, not audio.** Invisible since Phase 4
+> because rails default off and **no test exercises the enabled path** (that gap is the
+> root cause and is still open — a `RailClampTest` is still missing).
+> **▶ NEXT — THE EVEN-HARMONIC LADDER, not the clipper and not level.** DRIVE sits AFTER
+> the JFET/treble net, so the J201 sees the same signal at every drive setting → its
+> harmonics are CONSTANT across the sweep (which is why the capture's H2 moves only 6 dB
+> while H3 moves 30). So drive-min H2 is a near-direct J201 measurement, and the model is
+> 7.3 dB short. It IS reachable — `s=0.1, a=20, ceilNeg=0.2` gives drive-min −37.4/−58.9/
+> −36.7 vs the capture's −36.0/−59.2/−36.0 — but the full cost goes 428.6 → 1279.5 and
+> **920 of that is three H4 terms**. Measured H2−H4 separation: capture **33.9 dB**, model
+> at a=20 **8.9 dB**. A TRUE quadratic makes H2 and nothing else (a real JFET's
+> `Id ∝ (Vgs−Vt)²`); the shipped `(a*s²/2)*tanh²(w/s)` is quadratic only for `|w| ≪ s` and
+> **its own saturation manufactures the H4** — so killing H4 wants large `s`, making H2
+> wants large `a`, and monotonicity caps `|a|*s`. Structurally the same finding as the
+> original tanh→square-law reshape, one harmonic up. **Recommended (NOT done, needs
+> sign-off): make the even term a true quadratic and let the already-fitted ceiling bound
+> it. DO NOT re-run the step-2 fit before this is resolved.**
+> NO CONSTANTS COMMITTED; the ceilings ship at their physically-argued nominals.
 > **THE BLOCKER IS FIXED — it was structural, not a fit problem.** `JfetStage` was a VOLTAGE
 > stage feeding `TrebleAttack` as an IDEAL source. For a degenerated common-source stage
 > `Gm(s)=gm/k(s)` RISES while `Rout(s)=ro*k(s)` FALLS, so open-circuit gain `Gm*Rout = gm*ro`
