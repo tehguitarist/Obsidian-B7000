@@ -2,9 +2,47 @@
 """Phase-7 step 2 — fit the CD4049 clipper + J201 shaper constants to the driven captures.
 
 Objective = the tone_220 harmonic profile (THD + H2..H5 dB re fundamental, calibration-and-
-gain-staging.md §6b) across the DRIVE sweep. Harmonic RATIOS are level-independent, so this is
-valid before makeup (step 5) is set. kInputRef is anchored (step 1); driveTaperExp is held at its
-nominal here (taper fit is step 4 — a coupled re-fit may follow).
+gain-staging.md §6b) across the DRIVE sweep. kInputRef is anchored (step 1); driveTaperExp is
+held at its nominal here (taper fit is step 4 — a coupled re-fit may follow).
+
+** ⚠ THIS OBJECTIVE IS NOT LEVEL-INDEPENDENT, AND THAT INVALIDATED THREE FITS. **
+This docstring used to claim "harmonic RATIOS are level-independent, so this is valid before
+makeup (step 5) is set". ** That is FALSE in this chain ** (found 2026-07-23, session 7;
+full write-up in docs/phase7-calibration-handover.md, "THE EVEN-HARMONIC LADDER WAS AN
+ARTEFACT"). At BLEND = max-OD the output is NOT 100% OD: LevelBlend::process() returns the
+LEVEL wiper voltage, which still contains cleanIn, because BLEND's 100k track runs
+pin1(clean) <-> pin3(LEVEL wiper) and the clean source feeds that node through the full 100k
+against the wiper's ~23.3k Thevenin. At LEVEL = noon the mix is 0.3009*od + 0.1892*clean --
+clean only 4.0 dB below OD. The clean tap carries NO harmonics, so it inflates H1 and
+suppresses every measured harmonic by however far the OD path sits below the clean tap:
++20.9 dB of dilution at jfetGm = 0.0274 mS, +12.9 at 0.090 mS, +5.9 at the nominal 0.69 mS.
+
+Consequence: this objective can BUY HARMONIC SCORE WITH LEVEL, and it did -- it drove jfetGm
+25x below nominal, then cranked jfetSatNeg (`a`) to claw H2 back, hit the monotonicity gate,
+and the bump's own saturation manufactured the excess H4 that was misdiagnosed as a
+structural flaw in the waveshaper. The shaper shape is FINE; do not reshape it.
+
+** DO NOT SIMPLY RE-RUN THIS. ** The agreed plan is in docs/phase7-calibration-handover.md,
+"THE PATH FORWARD FOR THE J201". Two things must happen first:
+
+1. SETTLE THE MIXER. Do not hold jfetGm at the shape fit's 0.090 mS either -- that number is
+   contaminated by the SAME bleed (at 0.090 mS the drive-min render is 0.0097 of OD against
+   0.0328 of clean, i.e. the "OD-path shape" fit_jfet_boundary.py matched is ~77% CLEAN by
+   amplitude, and its gm sensitivity is the MIX RATIO moving, not the OD path's shape). All
+   three gm estimates -- 0.551 / 0.090 / 0.0274 mS -- are really measurements of the OD/clean
+   mix ratio. Re-anchor gm from the corrected mixer first.
+2. CHANGE THE OBJECTIVE to harmonic-TO-HARMONIC ratios (H3/H2, H4/H2, H5/H2) rather than
+   ratios re the FUNDAMENTAL. The clean tap is linear and harmonic-free and everything after
+   BLEND is linear, so every harmonic at the output is alpha(blend) * OD_n while the
+   fundamental is alpha*OD_1 + beta*CLEAN_1. Harmonic-to-harmonic ratios therefore cancel
+   alpha EXACTLY -- immune to the bleed AND to makeup, levelTaperExp and masterTaperExp,
+   which is what this objective only ever CLAIMED to be. (levelTaperExp sets L and hence the
+   bleed coefficients, so under the CURRENT objective a step-4 taper param silently confounds
+   a step-2 harmonic fit.)
+
+Sanity anchor for the eventual re-fit: at s = 0.3 with nominal ceilings/clipper, a ~= 4 puts
+drive-min H2 within ~0.5 dB of the capture at EITHER gm candidate -- so expect a fitted `a`
+in single digits, not the 5.5-20 the rejected runs produced.
 
 Speed trick: the capture targets are precomputed CONSTANTS (measured once from the real captures),
 so each optimiser eval only renders a SHORT synthetic 220 Hz tone through the plug at each drive

@@ -149,7 +149,82 @@ high, execute routine work cheap) is what should persist.
 > for every sample below +2.95 V — it emitted DC, not audio.** Invisible since Phase 4
 > because rails default off and **no test exercises the enabled path** (that gap is the
 > root cause and is still open — a `RailClampTest` is still missing).
-> **▶ NEXT — THE EVEN-HARMONIC LADDER, not the clipper and not level.** DRIVE sits AFTER
+> **✅✅ SESSION 7 (2026-07-23) — THE EVEN-HARMONIC LADDER WAS AN ARTEFACT. NO CODE
+> CHANGED; DO NOT RESHAPE THE SHAPER.** The blocker is the FIT OBJECTIVE.
+> `fit_nonlinear.py`'s premise — "harmonic RATIOS are level-independent, so this is
+> valid before makeup" — is **FALSE in this chain**. `LevelBlend::process()` at
+> `B >= 1.0` returns `vw`, and `vw` still contains `cleanIn` (BLEND's 100k track runs
+> pin1-clean ↔ pin3-LEVEL-wiper, so at full-CW OD the clean source still feeds the node
+> through 100k against the wiper's ~23.3k Thevenin): at LEVEL=noon the mix is
+> `0.3009*od + 0.1892*clean`, i.e. clean only **4.0 dB** below OD. The clean tap has NO
+> harmonics, so it inflates H1 and suppresses every measured harmonic by however far the
+> OD path sits below the clean tap — **+20.9 dB of dilution at the fitted
+> `jfetGm = 0.0274 mS`**, +12.9 at 0.090, +5.9 at nominal 0.69. So the fitter bought
+> harmonic score with LEVEL: it drove gm 25× below nominal, then cranked `a` to claw H2
+> back, hit the monotonicity constraint, and the bump's own saturation manufactured the
+> H4. Every session-6 symptom is downstream of that one confound.
+> **The shipped `(a*s^2/2)*tanh^2(w/s)` shape is FINE**: rendered drive-min at `s=0.3`
+> with NOMINAL ceilings/clipper, `a = 4` gives H2 **−35.5** dB (capture −36.0) at
+> gm 0.69 mS, and **−36.6** at gm 0.090 mS — both with `a*A < 1` and `|a|*s < 2.598`,
+> and H4 4–9 dB BELOW target (safe direction; the clipper supplies the balance).
+> **The recommended reshape `g(w) = T(w) + (a/2)w^2` MUST NOT BE BUILT** — as written it
+> is unbounded AND non-monotone (slope `1 + a*w` < 0 for `w < -1/a`); a correct monotone
+> variant (`ln(cosh(a*w))/a`) buys only ~2 dB, and a hard-cutoff square law scores only
+> by degenerating into a half-wave rectifier (H3 −14 dB). **Keep this general bound:**
+> for ANY monotone map with a clean quadratic even part, `H2/H1 = a*A/4` and
+> monotonicity needs `a*A <= 1`, so `H2/H1 <= 1/4 = −12.04 dB` scale-invariantly — real,
+> but nowhere near binding once the bleed is accounted for.
+> **⚠ AND THE SHAPE FIT'S `jfetGm` = 0.090 mS IS CONTAMINATED BY THE SAME TERM — it is
+> NOT a safe anchor** (this supersedes an earlier session-7 note that said the gm
+> disagreement was "resolved in favour of the shape fit"). At 0.090 mS the drive-min
+> render is `0.3009*0.0321 = 0.0097` OD vs `0.1892*0.1733 = 0.0328` clean — the
+> "OD-path shape" `fit_jfet_boundary.py` matched is **~77% CLEAN by amplitude**, and its
+> gm sensitivity comes from the OD/clean MIX RATIO moving, not the OD path's shape. Its
+> absolute-level cross-check is contaminated too (total output FLOORS on the clean bleed
+> as gm falls, so level under-responds and the fit must go lower still).
+> **So all three gm estimates — 0.551 / 0.090 / 0.0274 mS — are really measurements of
+> the OD/clean MIX RATIO and inherit any error in the BLEND model.**
+> **▶ NEXT — THE J201 PLAN (agreed with the user 2026-07-23; full rationale in
+> `docs/phase7-calibration-handover.md` "THE PATH FORWARD FOR THE J201"). Do NOT start
+> at 2 or 3 — they are currently UNFALSIFIABLE, which is why three fits were rejected:**
+> **(1) SETTLE THE MIXER FIRST** — needs no new captures. The clean tap is linear and
+> harmonic-free and everything post-BLEND is linear, so at the output
+> `fundamental = alpha(b)*OD_1 + beta(b)*CLEAN_1` (contaminated) but
+> `H2,H3,H4 = alpha(b)*OD_n` (**bleed-free**). So absolute H2 vs blend measures
+> `alpha(b)` directly, and the fundamental then gives `beta(b)`. Use the 5 BLEND points
+> (`blend-0700/0930/1200/1430` + `ref-od`) AND, as an INDEPENDENT second route, the 5
+> LEVEL points (`level-0700/0930/1430/1700` + `ref-od`, since LEVEL moves OD only) —
+> they must agree. In parallel run `schematic-checker` on BLEND's pin1/pin3/wiper
+> mapping: `LevelBlend`'s arithmetic is self-consistent with the topology circuit.md
+> states, so a capture disagreement means the TOPOLOGY is wrong.
+> **(2) RE-ANCHOR `jfetGm`** from the corrected OD-vs-clean ratio (bleed-free by
+> construction), then re-run the drive-min shape fit with the fixed mixer. Prediction to
+> score: if the real bleed is much SMALLER than 4 dB, gm was pushed ~7× low to cancel a
+> spurious clean floor and the "0.090 is 2× below the J201 spread's low corner"
+> awkwardness resolves itself; if the bleed MATCHES, 0.090 mS survives.
+> **(3) FIX THE OBJECTIVE — use harmonic-TO-HARMONIC ratios (H3/H2, H4/H2, H5/H2)**:
+> `alpha` cancels EXACTLY, so they are immune to the bleed AND to makeup/`levelTaperExp`/
+> `masterTaperExp` — genuinely level-independent as the old objective only claimed to be.
+> Hold gm from (2), then fit `s`, `a`, ceilings, `clipA0`, `clipSat`. Expect `a` in
+> single digits (a≈4 at s=0.3 already lands H2 within 0.5 dB), not the 5.5–20 of the
+> rejected runs.
+> **(4) ACCEPT only on corroboration the objective could not see:** the deliberately
+> unconstrained square-law identity `2*a*jfetCeilNeg = 1`, absolute OD-vs-clean level,
+> `clipA0` inside circuit.md's 20–30, and no param resting on a bound.
+> **Localisation technique to re-use:** `PedalChain::runInputBuffer()/runOdSample()/
+> processPostBlend()` are PUBLIC, so a console probe can split the chain and measure
+> H2/H1 per boundary — that is what separated "8 dB lost in the OD region" from "18.4 dB
+> lost after BLEND". Cross-checks: JfetStage in isolation at the chain's own conditions
+> (384 kHz, ADAA on) gives exactly `H2 = a*A/4`; a 220+440 two-tone through the whole
+> chain gives 440/220 = **+1.71 dB** (so the linear path does NOT eat the harmonic —
+> the loss had to be H1 dilution); and the `s`-sweep KNEE independently measures the
+> shaper's drive (it depends only on A/s), confirming vgs = 126 mV.
+> **The `jfetGm` "over-determination disagreement" is RESOLVED in favour of the shape
+> fit** — the harmonic objective's gm was measuring the bleed, not the device. Stop
+> treating 0.551/0.0274 as bracketing 0.090.
+>
+> **~~▶ NEXT — THE EVEN-HARMONIC LADDER, not the clipper and not level.~~ SUPERSEDED —
+> see above; measurements reproduce, diagnosis was wrong.** DRIVE sits AFTER
 > the JFET/treble net, so the J201 sees the same signal at every drive setting → its
 > harmonics are CONSTANT across the sweep (which is why the capture's H2 moves only 6 dB
 > while H3 moves 30). So drive-min H2 is a near-direct J201 measurement, and the model is
@@ -160,9 +235,10 @@ high, execute routine work cheap) is what should persist.
 > `Id ∝ (Vgs−Vt)²`); the shipped `(a*s²/2)*tanh²(w/s)` is quadratic only for `|w| ≪ s` and
 > **its own saturation manufactures the H4** — so killing H4 wants large `s`, making H2
 > wants large `a`, and monotonicity caps `|a|*s`. Structurally the same finding as the
-> original tanh→square-law reshape, one harmonic up. **Recommended (NOT done, needs
+> original tanh→square-law reshape, one harmonic up. ~~**Recommended (NOT done, needs
 > sign-off): make the even term a true quadratic and let the already-fitted ceiling bound
-> it. DO NOT re-run the step-2 fit before this is resolved.**
+> it.**~~ **← REJECTED 2026-07-23 (session 7): unbounded + non-monotone as written, and
+> the premise was an artefact. See the session-7 block above.**
 > NO CONSTANTS COMMITTED; the ceilings ship at their physically-argued nominals.
 > **THE BLOCKER IS FIXED — it was structural, not a fit problem.** `JfetStage` was a VOLTAGE
 > stage feeding `TrebleAttack` as an IDEAL source. For a degenerated common-source stage
