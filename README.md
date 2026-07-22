@@ -2,8 +2,7 @@
 
 A circuit-accurate bass overdrive/DI preamp plugin (AU/VST3, JUCE 8) modelled directly from the
 schematic of a **Darkglass B7K Ultra** — solved as a Wave Digital Filter from real component
-values rather than approximated by ear. On the pedal face it ships under its own name,
-**TinyTubes B700 Ultra "Obsidian."**
+values rather than approximated by ear. No neural captures, so turning the knob isn't moving between captures, it's reacting like the real pedal.
 
 ![Obsidian B7000 plugin UI](image.png)
 
@@ -63,36 +62,6 @@ Three [ENG]-tagged features aren't on the schematic we traced (an original-B7K c
 **switchable mid frequencies** (computed cap values, nodal-sim-validated against the manufacturer's
 own published frequency table to within 8.5%). See `circuit.md`'s `[ENG]` tags for exactly which
 parts of the circuit are schematic-verified versus engineered-to-spec.
-
-## Where it stands
-
-The build follows a fixed, validate-before-proceeding sequence (`CLAUDE.md`); each step below is
-gated on the previous one passing:
-
-| Phase | Status |
-|---|---|
-| 1–3: Schematic capture, CMake scaffold, WDF smoke test | ✅ Done |
-| 4: Stage-by-stage linear DSP, validated vs. closed-form oracles | ✅ Done |
-| 4b: Functional UI (real knobs/switches bound to APVTS) | ✅ Done |
-| 5: CD4049UBE clipper structure | ✅ Done |
-| 6: Oversampling, ADAA, full-chain assembly — plugin is audible end-to-end | ✅ Done |
-| 7: **Calibration against real-pedal captures** | 🔶 In progress |
-| 8: UI polish | ⬜ Not started |
-| 9: Reference validation (FR / THD / null vs. hardware) | ⬜ Not started |
-| 10: Final control-sweep sanity pass | ⬜ Not started |
-
-A real B7K Ultra has been captured audio-only (55 files spanning every control and switch
-position) and the calibration harness (`analysis/`, `OfflineRender`) is built and working. The
-input-level anchor is set, and the J201 stage's waveshape has been fit and independently
-corroborated. **No fitted constants are committed yet** — everything ships at physically-argued
-nominal values until the fit is accepted.
-
-16 tests are registered with CTest (per-stage DSP correctness + oversampling/delay-compensation
-validation); all currently pass:
-
-```bash
-ctest --test-dir build --output-on-failure
-```
 
 ## Accuracy vs. the real pedal
 
@@ -198,18 +167,6 @@ docs/
                  node graph), DSP rules (dsp.md), plugin architecture (architecture.md), UI layout
                  (ui.md), and build setup (build.md)
 ```
-
-## Known limitations
-
-- **Not yet calibrated against the real pedal** — see [Where it stands](#where-it-stands). Levels,
-  clip character, and switch voicings are at physically-reasoned nominal values, not fitted.
-- **AU is macOS-only.** Windows and Linux builds are VST3 only.
-- **Rail clamps are disabled by default** pending confirmation of the real pedal's op-amp supply
-  rails from captures.
-- Three UI-facing features (Master volume, the 3-way Attack switch, the switchable mid
-  frequencies) are engineered to match the manufacturer's documented Ultra behaviour rather than
-  traced from this schematic (an original-B7K clone board) — see the `[ENG]` tags in `circuit.md`.
-- No signed/notarized release exists yet; build from source (see above).
 
 ## Thanks
 
