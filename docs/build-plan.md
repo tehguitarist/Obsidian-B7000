@@ -389,11 +389,7 @@ matrix, swept-THD tracks, null depth documented, knob-tracking pass/fail table g
 
 ## Phase 8 — UI
 
-> **Note (2026-07-20):** the *functional* pedal-face UI is built earlier in **Phase 4b** (see "UI
-> timing"). By the time Phase 8 opens, items 1–2 below are likely already done and bound — treat
-> this phase as **finishing + verifying** them (calibration-dependent bits, gate) plus the
-> peripheral chrome in item 3, not building the face from scratch. If Phase 4b was skipped or
-> deferred, Phase 8 builds the whole thing as originally written.
+✅ **DONE (2026-07-22)**
 
 1. **Centre pedal face from the provided base image + CSV** (positions/sizes; layout is
    data-driven, not hand-placed — see `ui.md` "Centre pedal face"). Confirm the CSV schema when it

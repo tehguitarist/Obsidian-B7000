@@ -43,8 +43,20 @@ CAP = "analysis/captures"
 #     finding. Cross-check them; do not quietly average them.
 #   * ro/rq2 only shape the loading, are near-inert in the harmonic profile, and would just
 #     add two flat directions to this search. Held at HELD below (fit_jfet_boundary.py).
-FIT_KEYS = ["jfetGm", "jfetSatPos", "jfetSatNeg", "clipA0", "clipSatLo", "clipSatHi", "driveTaperExp"]
-NOMINAL  = [0.69e-3, 0.5, 1.0, 25.0, 3.15, 3.85, 1.5]
+#
+# ** jfetCeilPos/jfetCeilNeg ADDED 2026-07-22 — the whole reason for this re-run. **
+# The previous run's failure was structural, not numerical: the J201 shaper had no
+# ceiling, so H2 grew +21.9 dB across the drive sweep where the capture's grows +6,
+# and the optimiser drove |a|*s into the monotonicity gate and clipA0 into its floor
+# trying to manufacture a bound out of a shape that had none. The ceiling is now an
+# explicit pair of params (gate-volt equivalent, x gm for amps; cutoff side and
+# load-line side). Judge THIS run by whether |a|*s comes off the gate and clipA0 comes
+# off its floor of 3 — if clipA0 still pins, the clipper is the next suspect, not the
+# J201. Also worth checking, and deliberately NOT constrained here so it stays an
+# independent corroboration: the square law ties the two together as 2*a*ceilNeg = 1.
+FIT_KEYS = ["jfetGm", "jfetSatPos", "jfetSatNeg", "jfetCeilPos", "jfetCeilNeg",
+            "clipA0", "clipSatLo", "clipSatHi", "driveTaperExp"]
+NOMINAL  = [0.69e-3, 0.3, 1.0, 1.0, 0.5, 25.0, 3.15, 3.85, 1.5]
 # Params held fixed at every eval, emitted explicitly so a render is never at the mercy of the
 # binary's defaults. ** Update from analysis/fit_jfet_boundary.py once its result is committed;
 # nominal until then. **
@@ -60,9 +72,14 @@ HELD = {"jfetRo": 200.0e3, "jfetRq2": 1.0e6}
 #   jfetGm     siemens. Datasheet 0.69 mS; the documented ~5:1 J201 spread plus a decade below
 #              it, because the shape fit pushes that way and the box must not decide that.
 #   jfetSatPos knee `s` in gate volts — order |Vp| (0.3-1.5 V for a J201), room either side.
-#   jfetSatNeg even strength `a` (1/V). The real constraint is the PRODUCT |a|*s < 2
-#              (monotonicity), enforced by monotonic() below — a box cannot express it.
-BOUNDS   = [(1.0e-5, 5.0e-3), (0.05, 5.0), (0.0, 10.0), (3, 30), (0.4, 6.5), (0.4, 7.5), (0.4, 3.0)]
+#   jfetSatNeg even strength `a` (1/V) = 1/Vov. The real constraint is a PRODUCT/COUPLING,
+#              not a box — enforced by monotonic() below.
+#   jfetCeilPos load-line ceiling, gate-volt equivalent. Estimated 0.2-0.9 V at the nominal
+#              gm and ~7.6x looser at the gm the shape fit prefers, so the box is wide.
+#   jfetCeilNeg cutoff ceiling = Vov/2. Physically ties to `a` as 1/(2a); left free so that
+#              identity stays an independent check on the result rather than an assumption.
+BOUNDS   = [(1.0e-5, 5.0e-3), (0.05, 5.0), (0.0, 10.0), (0.05, 20.0), (0.05, 10.0),
+            (3, 30), (0.4, 6.5), (0.4, 7.5), (0.4, 3.0)]
 # drive capture -> label
 DRIVE_CAPS = [
     ("drive-0700_base-od.wav", "min"),
@@ -132,20 +149,44 @@ def render_profiles(params):
     return out
 
 
-# JfetStage's square-law shaper g(w) = w + a*s^2*(1-sech(w/s)) has
-# g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and max|sech*tanh| = 1/2, so it is monotonic
-# **iff |a|*s < 2**. Outside that the map FOLDS BACK inside the signal range, which is
-# unphysical and produces a spuriously good H2 match. This is not hypothetical: the
-# 2026-07-22 run-2 best point (s=10.585, a=0.232 -> |a|*s = 2.456, min slope -0.21) was
-# exactly such a fold-back, and the bounds alone do not exclude it because it is a
-# PRODUCT constraint, not a box. Hence this explicit feasibility gate.
-MONO_LIMIT = 2.0
+# ---- Monotonicity feasibility gate -----------------------------------------------
+# A fold-back (negative slope) inside the signal range is unphysical AND scores
+# spuriously well on H2, so it must be excluded explicitly — the bounds cannot do it,
+# because the constraint is a coupling between parameters, not a box. This is not
+# hypothetical: the 2026-07-22 run-2 best point was exactly such a fold-back.
+#
+# ** The gate is now a NUMERIC SCAN, not a closed-form product bound. ** With the
+# drain-current ceiling in place (JfetStage.h, 2026-07-22) the shipped map is
+#     g(w)  = L*tanh(w/L) + (a*s^2/2)*tanh^2(w/s),   L = ceilPos (w>=0) / ceilNeg (w<0)
+#     g'(w) = sech^2(w/L) + a*s*tanh(w/s)*sech^2(w/s)
+# so the old |a|*s < C test is NECESSARY but no longer SUFFICIENT: the ceiling drags
+# the first term below 1 exactly where the second term is most negative, which couples
+# s, a AND the ceilings (roughly ceilNeg >~ s; below that the map folds back deep in
+# cutoff). For reference the ceiling-OFF closed form is |a|*s < 3*sqrt(3)/2 = 2.598,
+# from max|tanh*sech^2| = 2/(3*sqrt(3)) — that is this bump's extremum, NOT the 2.0
+# that belonged to the old sech bump. Verified numerically in C++: |a|*s = 2.5 gives
+# min slope +0.038, 2.7 gives -0.039.
+#
+# NOTE this is a REPLICA of JfetStage::waveshape()'s derivative. The C++ side is the
+# source of truth (JfetStageTest finite-differences the shipped map); if the shaper
+# changes shape again, this must change with it.
+# A saturating map's slope legitimately decays to zero far out in the tail, so the
+# test is "never NEGATIVE", not "always positive".
+_W = np.concatenate([np.linspace(-60, 60, 24001), np.linspace(-3, 3, 6001)])
+
+
+def min_slope(s, a, cp, cn):
+    L = np.where(_W >= 0.0, cp, cn)
+    ceil_slope = np.where(L >= 1.0e6, 1.0, 1.0 / np.cosh(np.clip(_W / L, -350, 350)) ** 2)
+    x = np.clip(_W / s, -350, 350)
+    bump_slope = a * s * np.tanh(x) / np.cosh(x) ** 2
+    return float(np.min(ceil_slope + bump_slope))
 
 
 def monotonic(params):
-    s = params[FIT_KEYS.index("jfetSatPos")]
-    a = params[FIT_KEYS.index("jfetSatNeg")]
-    return abs(a) * s < MONO_LIMIT
+    g = dict(zip(FIT_KEYS, params))
+    return min_slope(g["jfetSatPos"], g["jfetSatNeg"],
+                     g["jfetCeilPos"], g["jfetCeilNeg"]) > -1.0e-9
 
 
 def cost(params, targets, verbose=False):
@@ -186,10 +227,14 @@ def main():
     # gm values deliberately straddle the open question: datasheet-nominal, the decade-lower
     # value the drive-min SHAPE fit prefers (fit_jfet_boundary.py), and the midpoint — so this
     # objective gets to vote on gm independently instead of inheriting the shape fit's answer.
+    # Ceiling starts (cols 4/5) straddle "loose" and "biting": the whole question this
+    # run answers is whether the fit WANTS a tight J201 ceiling. Start 1 is nominal,
+    # start 2 pairs the low gm with a tight cutoff ceiling, start 3 starts nearly
+    # unbounded so the optimiser has to earn the ceiling rather than inherit it.
     starts = [
-        [0.69e-3, 0.5, 1.0, 25, 3.15, 3.85, 1.0],
-        [0.07e-3, 0.5, 1.0, 20, 3.0, 3.6, 1.2],
-        [0.22e-3, 1.0, 0.5, 15, 3.0, 4.0, 0.8],
+        [0.69e-3, 0.3, 1.0, 1.0, 0.5, 25, 3.15, 3.85, 1.0],
+        [0.09e-3, 0.2, 2.0, 0.5, 0.3, 20, 3.0, 3.6, 1.2],
+        [0.22e-3, 0.5, 0.8, 6.0, 3.0, 15, 3.0, 4.0, 0.8],
     ]
     for arg in sys.argv[1:]:
         if arg.startswith("--start="):
@@ -207,6 +252,32 @@ def main():
     for k, v, nom in zip(FIT_KEYS, best.x, NOMINAL):
         print(f"  {k:12s} {v:12.5g}   (nominal {nom:g})")
     print(f"  held: " + ", ".join(f"{k}={v:g}" for k, v in HELD.items()))
+
+    # ---- Acceptance diagnostics -------------------------------------------------
+    # The previous run was rejected by exactly these, so print them rather than
+    # leaving them to be re-derived by hand from the parameter dump.
+    g = dict(zip(FIT_KEYS, best.x))
+    print("\nAcceptance checks (phase7-calibration-handover.md, 'STEP 2 RE-FIT'):")
+    print(f"  |a|*s          = {abs(g['jfetSatNeg']) * g['jfetSatPos']:.4f}   "
+          f"(was PINNED at the 1.9997 gate -> must now be off it)")
+    print(f"  min slope      = {min_slope(g['jfetSatPos'], g['jfetSatNeg'], g['jfetCeilPos'], g['jfetCeilNeg']):+.3e}   "
+          f"(>= 0; a fold-back is infeasible)")
+    a0pin = " ** STILL PINNED -> suspect the CLIPPER, not the J201 **" if g["clipA0"] < 3.05 else ""
+    print(f"  clipA0         = {g['clipA0']:.3f}   (floor 3.0; circuit.md says 20-30){a0pin}")
+    print(f"  clipSatLo+Hi   = {g['clipSatLo'] + g['clipSatHi']:.3f} V   (R19-dropped rail ~7 V)")
+    print(f"  jfetGm         = {g['jfetGm'] * 1e3:.4f} mS   "
+          f"(drive-min SHAPE fit + level cross-check say ~0.090 mS)")
+    print(f"  2*a*ceilNeg    = {2 * g['jfetSatNeg'] * g['jfetCeilNeg']:.3f}   "
+          f"(square law says 1.0 — NOT constrained in the fit, so this is a real check)")
+    print(f"  ceilNeg / s    = {g['jfetCeilNeg'] / g['jfetSatPos']:.2f}   "
+          f"(monotonicity needs >~ 1; resting AT 1 means the ceiling is on a constraint)")
+    # 1% of the bound, not 0.1%: Nelder-Mead stops NEAR a bound it is pushing against
+    # rather than exactly on it (the 2026-07-22 ceiling run returned driveTaperExp
+    # 2.9938 against a ceiling of 3.0 — 0.2% off, and a 0.1% test missed it).
+    for k, v, (lo, hi) in zip(FIT_KEYS, best.x, BOUNDS):
+        if abs(v - lo) < 1e-2 * max(abs(lo), 1e-9) or abs(v - hi) < 1e-2 * abs(hi):
+            print(f"  ** {k} is RESTING ON ITS BOUND ({v:g} in [{lo:g}, {hi:g}]) — the optimum is "
+                  f"outside the box, so this value is a property of the box, not the pedal. **")
 
     _, prof = cost(best.x, targets, verbose=True)
     if prof is None:

@@ -109,14 +109,42 @@ high, execute routine work cheap) is what should persist.
 > `jfetRo`/`jfetRq2` proved NOT identifiable (cost flat to ≤0.01 dB over 16×) → held nominal.
 > ctest 16/16 ✅ (session 4 touched analysis/docs only).
 > ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST).
-> **▶ NEXT IS A CODE CHANGE, NOT A FIT: add an asymmetric soft ceiling to the J201 drain
-> current in `JfetStage.h`.** The step-2 re-fit was RUN and REJECTED
-> (`analysis/fit_logs/step2_refit.log`): the capture's H2 grows only +6 dB across the drive
-> sweep but the model's grows +21.9 dB (H3 tracks to ~1.4 dB — that part is right), because
-> the square-law shaper is UNBOUNDED and `railEnabled=false`, so nothing limits the J201
-> before the CD4049. The fitter pinned `|a|*s` to 1.9997 against the 2.0 monotonicity gate
-> trying to manufacture a ceiling, and dropped `clipA0` to its floor (3.0). Do NOT widen the
-> bounds and do NOT raise `|a|*s` — add the ceiling, then re-fit. No constants committed.**
+> **J201 DRAIN-CURRENT CEILING ✅ ADDED (2026-07-22, session 5) and step 2 RE-FIT #2 RUN.
+> The ceiling was the right diagnosis; the fit is still rejected; THE BINDING CONSTRAINT
+> HAS MOVED TO THE CLIPPER — that is the next suspect, not the J201.**
+> Code: `JfetStage.h` gained an asymmetric per-side soft limit on the drain current,
+> `T(w) = L*tanh(w/L)` with `L = kCeilPos` (load-line side, 1.0) / `kCeilNeg` (cutoff side,
+> 0.5), gate-volt equivalent (×gm → amps); `kCeilOff = 1e6` disables a side EXACTLY.
+> `FitParams::jfetCeilPos/jfetCeilNeg` + the `--fit` map + `PedalChain` plumbing; new
+> `JfetStageTest` Test 6 (bounded/asymmetric/monotone/`F'==g`/ADAA-zero-H3/off-is-exact);
+> `waveshape()`/`waveshapeAD()` are now PUBLIC so tests probe the SHIPPED map.
+> **The even bump ALSO changed shape — `a*s^2*(1-sech(w/s))` → `(a*s^2/2)*tanh^2(w/s)` —
+> and this is load-bearing, not cosmetic:** its slope tail now decays at the same
+> `exp(-2|w|/s)` rate as the ceiling's `sech^2`, so the monotone region is `ceilNeg > s`
+> instead of `> 2s`. Same leading term `a*w^2/2`, still exactly even (zero H3 from the
+> bump), elementary antiderivative (the Gudermannian is gone). `kSatPos` 0.5 → **0.3** so
+> the nominal set sits INSIDE the feasible region rather than on its edge.
+> **⚠ THE `|a|*s` BOUND MOVED AGAIN — 2.598 is now CORRECT** (`max|tanh*sech^2| =
+> 2/(3√3)`), and the "corrected to 2.0 / do not write 2.598" note from earlier the same
+> day applied ONLY to the sech bump. Both handover mentions are marked VOID. With a finite
+> ceiling NEITHER closed form is sufficient — it couples `s`, `a` and `ceilNeg` (as tight
+> as `|a|*s < 1` when `ceilNeg = s`), so `fit_nonlinear.py::monotonic` and the test both
+> scan the slope NUMERICALLY. **Lesson: derive the bound from the extremum of the shape
+> in the file; never carry a numeral across a reshape — the same numeral has been both
+> wrong and right within one day.**
+> **Fit result (`analysis/fit_logs/step2_ceiling.log`), cost 6910 → 428.6 (prev best 677):
+> H2 growth 21.9 → 10.1 dB (capture 6.0), `clipA0` 3.017-pinned → 17.2 free, `|a|*s`
+> 1.9997-pinned → 1.077 free, H3 undisturbed.** Still rejected: `clipSatLo` rests on its
+> 0.4 floor, `clipSatLo+Hi = 0.80 V` vs the ~7 V R19-dropped rail (WORSE than the last
+> run), `driveTaperExp` 2.9938 against a 3.0 ceiling, `ceilNeg/s = 1.01` on the
+> monotonicity boundary, and `jfetGm` 0.0274 mS vs the shape fit's 0.090 (was 6.1× above,
+> now 3.3× below — the two objectives now bracket it). Every one of those is a "make the
+> clipper see less" lever at its limit → something upstream is STILL too hot.
+> **▶ NEXT: the clipper. First candidate — `railEnabled` is still false so IC2_A has no
+> TL072 clamp (546 V measured at 0 dBFS/drive-max pre-ceiling), and `kInputRef` being
+> anchored discharges the only reason rails were deferred to step 6. Necessary but NOT
+> sufficient (rails alone do not fix the GRUNT flat→boost step — that needs ≲0.1 V at the
+> clipper). NO CONSTANTS COMMITTED; the ceilings ship at their physically-argued nominals.**
 > **THE BLOCKER IS FIXED — it was structural, not a fit problem.** `JfetStage` was a VOLTAGE
 > stage feeding `TrebleAttack` as an IDEAL source. For a degenerated common-source stage
 > `Gm(s)=gm/k(s)` RISES while `Rout(s)=ro*k(s)` FALLS, so open-circuit gain `Gm*Rout = gm*ro`

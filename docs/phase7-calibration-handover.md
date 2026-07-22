@@ -53,10 +53,20 @@ order — but see "Still open" for two things that must not be forgotten.
    a bad parameter value.** Do not re-run it as-is. See "Step 2 re-fit — the result"
    below; the short version is that the J201 shaper has **no ceiling**, the fitter
    tried to manufacture one and was stopped dead at the monotonicity gate.
-4. **▶ NEXT: add the asymmetric soft ceiling to the J201 drain current** (the
-   carry-forward already flagged in `JfetStage.h` and by dsp-validator). This is a
-   CODE change, not a fit — the first one Phase 7 has needed. Then re-run step 2.
-5. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails).
+4. ✅ **DONE — asymmetric soft ceiling on the J201 drain current** (`JfetStage.h`;
+   `jfetCeilPos`/`jfetCeilNeg` in `FitParams` + the `--fit` map; `JfetStageTest`
+   Test 6; numeric monotonicity gate in `fit_nonlinear.py`). ctest 16/16,
+   dsp-validator run. The even bump also changed shape (`1-sech` → `tanh^2`) so its
+   tail matches the ceiling's — see `JfetStage.h waveshape()`; that is what makes the
+   monotone region 2× wider, and it moves the ceiling-off `|a|*s` bound to 2.598.
+5. ✅ **RUN — step-2 re-fit WITH the ceiling** (`analysis/fit_logs/step2_ceiling.log`).
+   **The ceiling worked and the fit is still rejected — but the binding constraint has
+   MOVED to the clipper.** See "STEP 2 RE-FIT #2" below before doing anything else.
+6. **▶ NEXT: the CLIPPER, not the J201.** `clipSatLo` rests on its floor and the clip
+   ceilings total 0.80 V against a ~7 V physical rail — the chain is still too hot into
+   the 4049. First candidate is that `railEnabled` is still false, so IC2_A has no rail
+   clamp; `kInputRef` is now anchored, which was the only reason rails were deferred.
+7. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails proper).
 
 ---
 
@@ -258,7 +268,94 @@ harmonics-vs-drive is being distorted by the missing ceiling, so its `gm` is not
 trustworthy, and the shape fit's 0.09 mS (which is corroborated by absolute level) is
 still the better estimate.
 
-### ▶ What to do next (the fix, in order)
+---
+
+## ⚠ STEP 2 RE-FIT #2 — WITH the J201 ceiling (2026-07-22). Better, still not committable.
+
+The ceiling landed (`JfetStage.h`, see "the fix" below — all four sub-items done, ctest
+16/16, dsp-validator run). Re-fit log: **`analysis/fit_logs/step2_ceiling.log`**.
+Cost **6910.4 → 428.6** (vs the previous run's best of 677.3 from nominal 7553.9).
+
+```
+jfetGm 2.7373e-05 | jfetSatPos(s) 0.19433 | jfetSatNeg(a) 5.5398
+jfetCeilPos 0.25504 | jfetCeilNeg 0.1971
+clipA0 17.222 | clipSatLo 0.4 | clipSatHi 0.40171 | driveTaperExp 2.9938
+held: jfetRo 200k, jfetRq2 1M
+```
+
+### What the ceiling DID fix — it was the right diagnosis
+
+| | before (no ceiling) | after | capture |
+|---|---|---|---|
+| H2 growth, drive-min → max | **+21.9 dB** | **+10.1 dB** | **+6.0 dB** |
+| `clipA0` | 3.017 (**pinned** on its floor) | **17.222** (free, near circuit.md's 20–30) | — |
+| `\|a\|*s` | 1.9997 (**pinned** on the gate) | 1.077 (free) | — |
+| best cost | 677.3 | **428.6** | — |
+
+Two of the three binding constraints from the last run are gone, and the H2-growth error
+— the thing that identified the missing ceiling — closed by about two thirds. **The
+structural gap was real and the fix addresses it.** H3 also still tracks (drive-min
+−58.8 vs −59.2; max −26.3 vs −29.0), so the ceiling did not disturb it, which was the
+main risk.
+
+### Why it is STILL rejected — the constraints MOVED, they did not go away
+
+```
+clipSatLo    0.4      <- RESTING ON ITS FLOOR (0.4)
+clipSatLo+Hi 0.802 V  <- vs the ~7 V R19-dropped 4049 rail. WORSE than the last run's 2.52 V.
+driveTaperExp 2.9938  <- 0.2% off its 3.0 ceiling, i.e. pinned in all but name
+ceilNeg/s    1.01     <- resting on the MONOTONICITY boundary (needs >~ 1)
+jfetGm       0.0274 mS <- the shape fit + level cross-check say 0.090 mS
+```
+
+Read together these all point the same way: **every parameter that can make the signal
+reaching or leaving the clipper weaker has gone to its limit.** Lower gm, maximum drive
+taper exponent, minimum clip ceilings. That is the same signature as the last run, one
+stage further downstream — the fitter is still starving the chain to compensate for
+something upstream that is too hot, and it is now doing it through the clipper's rails
+rather than through the J201's shaper.
+
+Also note H2 is now ~7 dB LOW at drive-min (−43.3 vs −36.0) while nearly right at
+drive-max — the fit bought its improved *slope* partly by dropping the whole curve.
+
+### The gm disagreement narrowed but flipped sign
+
+`jfetGm` 0.551 mS (6.1× ABOVE the shape fit's 0.090) → **0.0274 mS (3.3× BELOW it)**. The
+over-determination test still fails, but by half as much and from the other side, so the
+two objectives now bracket 0.090 mS rather than agreeing on nothing. **Do not average
+them.** The shape fit's 0.090 mS remains the better-evidenced number (it is corroborated
+by an independent absolute-level check that its own objective could not see).
+
+### ▶ Verdict and next suspect
+
+Per the acceptance rule set for this run: `clipA0` came off its floor, so **the J201 is no
+longer the binding problem — the CLIPPER is.** Specifically `clipSatLo/clipSatHi`, which
+the fit wants at 0.80 V total against a physical rail of ~7 V (hard-bounded above by the
+8.6 V supply). A 9× discrepancy in a quantity that is bounded by a supply voltage is not a
+fit result, it is a signal that the level arriving at the clipper is still far too high.
+
+Candidates, in the order they should be checked:
+1. **`railEnabled` is still false**, so `DriveStage` has no TL072 clamp at all
+   (measured 546 V at 0 dBFS/drive-max pre-ceiling; the ceiling cuts the J201's
+   contribution but IC2_A's own ±3.3 V rail is still absent). circuit.md and build-plan
+   risk #9 both say IC2_A rails BEFORE the 4049 at high drive. Step 6 puts rails last for
+   a good reason (they must not clip against an unanchored reference), but `kInputRef` IS
+   anchored now — so the ordering constraint that deferred them is discharged, and
+   enabling them may be a prerequisite for step 2 rather than a successor to it.
+   ⚠ Note dsp-validator's earlier finding that rails ALONE will not fix the GRUNT
+   flat→boost anomaly (±3.3 V into the clipper still gives a 0.00 dB step; that needs
+   ≲0.1 V) — so treat this as necessary, not sufficient.
+2. `driveTaperExp` pinned at 3.0 says the drive taper cannot get quiet enough at the low
+   end either. That is a step-4 parameter being asked to do step-2 work.
+3. Only then re-examine the J201 ceiling values themselves.
+
+**Nothing from this run is committed.** `JfetStage::kCeilPos/kCeilNeg` ship at their
+NOMINAL 1.0/0.5 (physically argued, not fitted); the analysis scripts hold everything else
+at nominal.
+
+---
+
+### ▶ What to do next (the fix, in order) — ALL FOUR DONE 2026-07-22, see above
 
 1. **Add an explicit asymmetric soft ceiling on the J201 drain current** in
    `JfetStage.h`, keeping `g` a clean linear+even core — do **NOT** try to get the bound
@@ -383,6 +480,18 @@ The odd part is **purely linear → ZERO intrinsic H3**; the even bump makes H2/
 Slope at 0 is exactly 1 (so `-G0` remains the linear gain); monotonic while
 `|a|*s < 2.598` (max |sech·tanh| = 0.3849).
 
+> ⚠ **SUPERSEDED 2026-07-22 (ceiling commit) — this whole subsection describes a shape
+> that is no longer in the file, and its monotonicity numbers are now backwards.** The
+> even bump is now `(a*s^2/2)*tanh^2(w/s)` and `F` is elementary (no Gudermannian); the
+> `2.598` above was WRONG for the sech shape (the right bound was 2.0, see the
+> dsp-validator section) and is RIGHT for the tanh² shape now in the file. **Do not
+> follow the "constant corrected to 2.0 / do not write 2.598" instruction below** — it
+> was correct for the sech bump only. And with a finite ceiling NEITHER closed form is
+> sufficient: the constraint couples `s`, `a` and `ceilNeg` (as tight as `|a|*s < 1`
+> when `ceilNeg = s`), so the gate is a numeric slope scan in both
+> `fit_nonlinear.py::monotonic` and `JfetStageTest`. Derive the bound from the shape in
+> the file; never carry either numeral across a reshape.
+
 **Param slots are REUSED, not renamed** (to avoid plumbing churn across
 PedalChain/OfflineRender/fit_nonlinear.py): `kSatPos`/`jfetSatPos` = knee **`s`**;
 `kSatNeg`/`jfetSatNeg` = even strength **`a`** (SIGNED). Nominal `kSatNeg` 2.6 → **0.3**.
@@ -463,6 +572,16 @@ well on H2 alone).
 note, and `fit_nonlinear.py` now has an explicit `monotonic()` feasibility gate
 (`|a|*s < 2` → cost 1e6). The gate is necessary because this is a **PRODUCT** constraint,
 which box bounds cannot express. ctest still 16/16.
+
+> ⚠ **The "2.0 / do not write 2.598" instruction is VOID as of the ceiling commit
+> (later the same day).** It was correct for the `1-sech` bump, which is no longer the
+> shape in the file. For the `tanh^2` bump now shipping, `max|tanh*sech^2| = 2/(3*sqrt(3))`
+> → the ceiling-OFF bound genuinely is **2.598**, re-derived and re-verified numerically
+> (|a|*s = 2.5 → min slope +0.038, 2.7 → −0.039). The transferable lesson is the one this
+> bug taught in the first place: **derive the bound from the extremum of the shape
+> actually in the file, and never carry a numeral across a reshape** — the same numeral
+> has now been both wrong and right, for two different shapes, within one day. With a
+> finite ceiling no closed form is sufficient anyway; both gates scan numerically.
 
 ### JfetStage — everything else about the reshape verified correct
 - Even/odd split is **exact**: odd part ≡ `w` to 3.6e-15 over w ∈ [−30, 30]. Raw-map

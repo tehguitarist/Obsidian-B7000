@@ -209,6 +209,10 @@ static const FitField kFitFields[] = {
     {"jfetRq2", &FitParams::jfetRq2},
     {"jfetSatPos", &FitParams::jfetSatPos},
     {"jfetSatNeg", &FitParams::jfetSatNeg},
+    // Asymmetric drain-current ceiling (2026-07-22). Gate-volt equivalent, x gm
+    // for amps; >= 1e6 disables a side exactly (A/B against the pre-ceiling model).
+    {"jfetCeilPos", &FitParams::jfetCeilPos},
+    {"jfetCeilNeg", &FitParams::jfetCeilNeg},
     {"driveTaperExp", &FitParams::driveTaperExp},
     {"levelTaperExp", &FitParams::levelTaperExp},
     {"masterTaperExp", &FitParams::masterTaperExp},

@@ -1,0 +1,44 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:288: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+Capture targets (tone_220, dB re fundamental):
+  min   THD= -36.0 H2= -36.0 H3= -59.2 H4= -69.9 H5= -86.4
+  9:30  THD= -34.4 H2= -34.4 H3= -55.3 H4= -71.6 H5= -83.5
+  noon  THD= -31.0 H2= -31.4 H3= -42.0 H4= -51.1 H5= -56.8
+  2:30  THD= -25.9 H2= -31.9 H3= -30.7 H4= -38.4 H5= -32.7
+  max   THD= -22.9 H2= -30.0 H3= -29.0 H4= -35.8 H5= -28.8
+
+Nominal cost = 6910.4
+  start [0.0, 0.3, 1.0, 1.0, 0.5, 25, 3.1, 3.9, 1.0] -> cost 619.9
+  start [0.0, 0.2, 2.0, 0.5, 0.3, 20, 3.0, 3.6, 1.2] -> cost 428.6
+  start [0.0, 0.5, 0.8, 6.0, 3.0, 15, 3.0, 4.0, 0.8] -> cost 920.6
+
+Best cost = 428.6  (nominal 6910.4)
+Fitted params:
+  jfetGm         2.7373e-05   (nominal 0.00069)
+  jfetSatPos        0.19433   (nominal 0.3)
+  jfetSatNeg         5.5398   (nominal 1)
+  jfetCeilPos       0.25504   (nominal 1)
+  jfetCeilNeg        0.1971   (nominal 0.5)
+  clipA0             17.222   (nominal 25)
+  clipSatLo             0.4   (nominal 3.15)
+  clipSatHi         0.40171   (nominal 3.85)
+  driveTaperExp       2.9938   (nominal 1.5)
+  held: jfetRo=200000, jfetRq2=1e+06
+
+Acceptance checks (phase7-calibration-handover.md, 'STEP 2 RE-FIT'):
+  |a|*s          = 1.0766   (was PINNED at the 1.9997 gate -> must now be off it)
+  min slope      = +1.577e-264   (>= 0; a fold-back is infeasible)
+  clipA0         = 17.222   (floor 3.0; circuit.md says 20-30. Still pinned => suspect the CLIPPER, not the J201)
+  clipSatLo+Hi   = 0.802 V   (R19-dropped rail ~7 V)
+  jfetGm         = 0.0274 mS   (drive-min SHAPE fit + level cross-check say ~0.090 mS)
+  2*a*ceilNeg    = 2.184   (square law says 1.0 — NOT constrained in the fit, so this is a real check)
+  ceilNeg / s    = 1.01   (monotonicity needs >~ 1; resting AT 1 means the ceiling is on a constraint)
+  ** clipSatLo is RESTING ON ITS BOUND (0.4 in [0.4, 6.5]) — the optimum is outside the box, so this value is a property of the box, not the pedal. **
+
+FITTED plug vs capture (tone_220, dB re fundamental):
+drive  |       THD c/p |        H2 c/p |        H3 c/p |        H4 c/p
+min    | -36.0/-43.1 | -36.0/-43.3 | -59.2/-58.8 | -69.9/-63.6
+9:30   | -34.4/-37.4 | -34.4/-37.6 | -55.3/-53.1 | -71.6/-57.8
+noon   | -31.0/-29.9 | -31.4/-30.1 | -42.0/-46.4 | -51.1/-49.6
+2:30   | -25.9/-28.1 | -31.9/-30.5 | -30.7/-33.8 | -38.4/-38.6
+max    | -22.9/-23.3 | -30.0/-33.2 | -29.0/-26.3 | -35.8/-38.4

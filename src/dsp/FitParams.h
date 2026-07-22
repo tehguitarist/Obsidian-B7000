@@ -78,10 +78,49 @@ struct FitParams
     // and at JfetStage::waveshape(). A clean rename is deferred polish.
     // ** The SCALE of `s` changed with the 2026-07-22 restructure: the shaper now sees
     // the effective vgs (real gate volts, order |Vp|), not a post-gain voltage. Any
-    // s/a fitted before that date is meaningless — refit. Any fitter must also enforce
-    // the PRODUCT constraint |a|*s < 2 (monotonicity); box bounds cannot express it. **
-    double jfetSatPos = 0.5;   // s: square-law knee (gate volts)
+    // s/a fitted before that date is meaningless — refit. **
+    // ** The even bump's SHAPE also changed when the ceiling landed (same date):
+    // a*s^2*(1-sech(w/s)) -> (a*s^2/2)*tanh^2(w/s), so its tail matches the ceiling's
+    // and monotonicity has an interior (JfetStage.h waveshape()). `a` keeps its meaning
+    // (the square-law quadratic, a = 1/Vov); its asymptote halved, and the ceiling-off
+    // product bound moved from |a|*s < 2 to |a|*s < 2.598 — a DIFFERENT extremum of a
+    // DIFFERENT function, not a revert of the 2026-07-22 bug fix. With a finite ceiling
+    // NEITHER closed form is sufficient: the constraint couples s, a and jfetCeilNeg, so
+    // a fitter must scan the slope NUMERICALLY (fit_nonlinear.py does). **
+    double jfetSatPos = 0.3;   // s: square-law knee (gate volts)
     double jfetSatNeg = 1.0;   // a: even strength (signed)
+    // ---- Asymmetric drain-current CEILING (added 2026-07-22) ----------------
+    // The step-2 re-fit REJECTED its own result and diagnosed why: the capture's
+    // H2 grows +6 dB across the drive sweep and the unbounded model's grew
+    // +21.9 dB, so the fitter pinned |a|*s to the 2.0 monotonicity gate trying to
+    // manufacture a ceiling out of a shape that has none, and pushed clipA0 to its
+    // floor to weaken everything downstream (phase7-calibration-handover.md,
+    // "STEP 2 RE-FIT"). These two give the J201 its own explicit limit.
+    // Units: gate-volt equivalent — multiply by jfetGm for AMPS. Deliberately NOT
+    // in amps: the cutoff headroom is Idq/gm = Vov/2, a pinch-off-voltage property
+    // that should NOT move when the fitter moves gm.
+    //   jfetCeilNeg = the negative-swing (drain rising) side. Q1 CUTOFF puts a hard
+    //     device floor there at Idq/gm = Vov/2, and the same Vov sets the even
+    //     strength (a = 1/Vov), so IF cutoff is what binds, 2*jfetCeilNeg*jfetSatNeg
+    //     = 1 — the nominal 0.5 is exactly that identity at the nominal a = 1.
+    //     ** Treat that as a WEAK check, not a requirement. ** Q2's own compliance
+    //     limits the same swing at ~3 V/(gm*Zload) = 0.15 V at LF at nominal gm,
+    //     i.e. TIGHTER than cutoff, so the identity only holds in the low-gm regime
+    //     where cutoff wins. A fit that misses it is not automatically suspect; a
+    //     fit that hits it is corroborated. (It also assumes a = 1/Vov, which is
+    //     only the small-signal reading of `a` — see JfetStage.h waveshape().)
+    //   jfetCeilPos = LOAD-LINE side (drain swinging down), circuit-set and
+    //     band-dependent (~0.2 V at LF, ~0.9 V at 2 kHz into the node-G load at
+    //     NOMINAL gm, and ~7.7x looser again at the gm the drive-min shape fit
+    //     prefers) — a single memoryless number lumps that on purpose. Nominal
+    //     1.0 V. Which side BINDS depends on gm and so is still open: at nominal gm
+    //     the estimate above makes jfetCeilPos (0.2 V at LF) the tighter of the two;
+    //     only under the low-gm hypothesis does the cutoff side bind.
+    // The asymmetry between them is a SECOND source of even harmonics alongside
+    // jfetSatNeg, and reinforces it in the same direction; expect the fit to trade
+    // the two off. Passing >= 1e6 disables a side exactly (pre-ceiling model).
+    double jfetCeilPos = 1.0;
+    double jfetCeilNeg = 0.5;
 
     // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
     // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at

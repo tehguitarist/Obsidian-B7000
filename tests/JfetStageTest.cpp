@@ -14,19 +14,38 @@
 //            shoulder; corners at 219 Hz (zero) / ~719 Hz (pole).
 //   Test 3 — DC-step polarity: INVERTING (+in -> -out on the AC edge), AC-coupled
 //            (C2 HP) so it decays to ~0. Resolves circuit.md's JFET-sign carry-fwd.
-//   Test 4 — Nonlinearity: the SQUARE-LAW EVEN shaper (Phase-7 reshape, see
-//            JfetStage.h waveshape()). g(w) = w + a*s^2*(1 - sech(w/s)) is
-//            LINEAR + EVEN, so a driven tone must come out EVEN-DOMINANT:
-//            H2 well above the noise, H3 at the numerical floor (the odd part is
-//            purely linear -> ZERO intrinsic H3). Also: +/- output peaks differ
-//            (the even bump lands on one polarity), and the static curve is
-//            monotonic at the nominal params. This is the whole point of the
-//            reshape — a tanh could not separate H2 from H3 (captured drive-min
-//            is H2 -36 / H3 -59 dB), so THIS assert is the structural guard.
+//   Test 4 — Nonlinearity: the SQUARE-LAW EVEN core (Phase-7 reshape, see
+//            JfetStage.h waveshape()). g(w) = T(w) + (a*s^2/2)*tanh^2(w/s) has an
+//            odd part of exactly T, so with the CEILING DISABLED (T(w) = w) it is
+//            LINEAR + EVEN and a driven tone must come out EVEN-DOMINANT: H2 well
+//            above the noise, H3 at the numerical floor. Run with the ceiling off
+//            ON PURPOSE — that is what isolates the core's zero-H3 property, which
+//            is the structural guard the reshape exists for (a tanh could not
+//            separate H2 from H3, and the capture's drive-min is H2 -36 / H3 -59).
+//            Any H3 the shipped stage makes therefore comes from the ceiling, by
+//            construction, and Test 6 is where that is measured.
 //   Test 5 — Small-signal limit: at tiny drive the waveshaper is ~identity, so the
 //            1 kHz gain matches -G0*shelf (the mid/HF small-signal gain). Since
 //            g(w) ~ g'(0)*w for small w, this IS the "slope at 0 == 1" assert:
 //            any g'(0) != 1 would scale the measured gain off the oracle.
+//   Test 6 — The ASYMMETRIC DRAIN-CURRENT CEILING (added 2026-07-22). Asserts the
+//            four things the ceiling has to be right about, by exercising the
+//            SHIPPED map (waveshape/waveshapeAD are public for exactly this — a
+//            replica of a piecewise map in a test only tests the replica):
+//            (a) BOUNDED and asymmetric — g -> +cp + a*s^2/2 and -cn + a*s^2/2, so
+//                a 100x hotter drive barely raises the output. This is the whole
+//                point: before it, the J201 fed the CD4049 37.9 V at 0 dBFS.
+//            (b) MONOTONE — no NEGATIVE slope anywhere. Note slope -> 0 in the far
+//                tail is CORRECT (that is saturation/cutoff), so the assert is
+//                slope >= 0, not > 0. With a finite ceiling the closed-form
+//                |a|*s bound is necessary but NOT sufficient (it couples s, a and
+//                cn), which is why this is a numeric scan of the real map.
+//            (c) F' == g — the ADAA antiderivative, now piecewise, still integrates
+//                the shipped shape. A wrong branch here is silent: it would only
+//                show up as excess aliasing at low OS.
+//            (d) DISABLING the ceiling (>= kCeilOff) reproduces the plain linear
+//                core EXACTLY, so Test 4's isolation is real and an A/B against the
+//                pre-ceiling model is available to the fitter.
 //
 // NOTE (2026-07-22 restructure): the stage now outputs the drain NORTON CURRENT
 // (amps), not a voltage, and its output impedance is stamped into TrebleAttack —
@@ -34,8 +53,9 @@
 // dB re 1 siemens, and the shaper's argument is the effective vgs (real gate
 // volts), which is why Test 4's drive amplitude is much larger than it used to be.
 //
-// NOTE: kGm, kRo, kRq2, kSatPos (= knee s), kSatNeg (= even strength a) are NOMINAL
-// placeholders (fit to captures at Phase 7). These tests validate the STRUCTURE —
+// NOTE: kGm, kRo, kRq2, kSatPos (= knee s), kSatNeg (= even strength a), kCeilPos
+// and kCeilNeg are NOMINAL placeholders (fit to captures at Phase 7). These tests
+// validate the STRUCTURE —
 // filter shape, polarity, and the qualitative even-dominant nonlinearity — all of
 // which are invariant under a later amplitude refit; they do NOT assert an
 // absolute "correct" gain or harmonic level.
@@ -43,6 +63,7 @@
 
 #include "../src/dsp/JfetStage.h"
 
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <cstdio>
@@ -87,15 +108,39 @@ static double measureDb(double freq, double fs, double amp)
     return (peak > 0.0) ? 20.0 * std::log10(peak / amp) : -300.0;
 }
 
+// Set the nominal fit params but with the drain-current ceiling at an explicit
+// value — kCeilOff (or above) disables it exactly, which is how Test 4 isolates
+// the linear+even CORE from the ceiling's own (deliberate) odd content.
+static void setCeiling(JfetStage& stage, double ceilPos, double ceilNeg)
+{
+    stage.setNonlinear(JfetStage::kGm, JfetStage::kRo, JfetStage::kRq2,
+                       JfetStage::kSatPos, JfetStage::kSatNeg, ceilPos, ceilNeg);
+}
+
+// Worst slope of the SHIPPED static map over |w| <= wMax, by central difference.
+// A saturating map's slope legitimately decays to 0 in the tail, so callers assert
+// "never NEGATIVE" — with a tolerance for the difference quotient's own roundoff
+// (F/g values ~O(1) differenced over 2e-6 floors the resolution near 1e-10).
+static double minSlope(const JfetStage& stage, double wMax)
+{
+    const double h = 1.0e-6;
+    double worst = 1.0e9;
+    for (double w = -wMax; w <= wMax; w += 5.0e-4)
+        worst = std::min(worst, (stage.waveshape(w + h) - stage.waveshape(w - h)) / (2.0 * h));
+    return worst;
+}
+
 // Harmonic magnitudes of a steady tone driven through the stage, via an
 // exact-bin DFT: freq/fs is chosen so an INTEGER number of periods fills the
 // window, so a rectangular window leaks nothing and a genuinely-absent harmonic
 // reads at the numerical floor (~-150 dB) instead of a leakage-limited ~-60.
 // magOut[k] = magnitude of harmonic (k+1); magOut[0] = the fundamental.
-static void harmonics(double freq, double fs, double amp, int nHarm, double* magOut)
+static void harmonics(double freq, double fs, double amp, int nHarm, double* magOut,
+                      double ceilPos = JfetStage::kCeilOff, double ceilNeg = JfetStage::kCeilOff)
 {
     JfetStage stage;
     stage.prepare(fs);
+    setCeiling(stage, ceilPos, ceilNeg);
 
     const int perSamples = static_cast<int>(std::lround(fs / freq)); // exact by construction
     const int periods = 20;
@@ -191,19 +236,25 @@ int main()
             ++failures;
     }
 
-    // ---- Test 4: SQUARE-LAW even shaper — H2 >> H3, asymmetric, monotonic -----
-    std::printf("\n=== Nonlinearity: square-law EVEN shaper (H2 dominant, H3 ~ absent) ===\n");
+    // ---- Test 4: square-law even CORE — H2 >> H3, asymmetric (ceiling OFF) ----
+    std::printf("\n=== Nonlinearity: square-law EVEN core, ceiling DISABLED "
+                "(H2 dominant, H3 ~ absent) ===\n");
     {
         // 200 Hz (well above the 145 Hz input HP; 48000/200 = 240 samples/period
         // exactly, so the DFT bins line up). Amplitude picked so the waveshaper input
         // peak lands near the knee s. The shaper now sees the effective vgs, which is
         // ATTENUATED from the input (gate divider 0.909, shelf ~1.30 at 200 Hz, then
         // /(1+gm*R6) = /3.277) -> vgs ~ 0.29 * amp, so 1.5 V -> ~0.44 V against
-        // s = 0.5. Hence the much larger drive than the pre-restructure 0.2 V.
+        // s = 0.3. Hence the much larger drive than the pre-restructure 0.2 V.
+        // ** Ceiling DISABLED here (kCeilOff): the zero-H3 property belongs to the
+        // linear+even CORE, and the ceiling adds odd content by construction (any
+        // bounded map must — bounding is an odd-order operation). Testing the core in
+        // isolation is what keeps this a structural guard rather than a fit-dependent
+        // one; Test 6 asserts the ceiling's own behaviour. **
         const double fs = 48000.0, freq = 200.0, amp = 1.5;
 
         double mag[6] = { 0.0 };
-        harmonics(freq, fs, amp, 6, mag);
+        harmonics(freq, fs, amp, 6, mag, JfetStage::kCeilOff, JfetStage::kCeilOff);
         double hDb[6];
         for (int k = 0; k < 6; ++k)
             hDb[k] = 20.0 * std::log10(mag[k] / (mag[0] + 1e-300) + 1e-300);
@@ -225,10 +276,11 @@ int main()
         if (! (h2Present && evenDominant && h4OverH5))
             ++failures;
 
-        // Asymmetry: the even bump a*s^2*(1-sech) is >= 0 on BOTH half-cycles, and the
-        // stage inverts, so |negative output peak| > positive output peak.
+        // Asymmetry: the even bump (a*s^2/2)*tanh^2 is >= 0 on BOTH half-cycles, and
+        // the stage inverts, so |negative output peak| > positive output peak.
         JfetStage stage;
         stage.prepare(fs);
+        setCeiling(stage, JfetStage::kCeilOff, JfetStage::kCeilOff);
         double peakPos = 0.0, peakNeg = 0.0;
         const int settle = static_cast<int>(0.2 * fs);
         for (int n = 0; n < settle + static_cast<int>(4.0 * fs / freq); ++n)
@@ -247,26 +299,19 @@ int main()
         if (! asymmetric)
             ++failures;
 
-        // Monotonic static map at the nominal params. Inline replica of
-        // JfetStage::waveshape() from the PUBLIC constants (same no-drift convention
-        // as oracleDb above): g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and
-        // max|sech*tanh| = 1/2 (at tanh^2 = 1/2), so monotonicity <=> |a|*s < 2.
-        // (This said 2.598 until 2026-07-22 — that is 1/max(sech^2*tanh), the wrong
-        // extremum. The assert below is numeric so it was never actually wrong, but the
-        // stated bound was 30% too permissive; see JfetStage.h waveshape().)
+        // Monotonic CORE (ceiling off), where the closed-form product bound applies:
+        // g'(w) = 1 + a*s*tanh(w/s)*sech^2(w/s), and max|tanh*sech^2| = 2/(3*sqrt(3))
+        // = 0.38490 (at tanh^2 = 1/3), so monotonicity <=> |a|*s < 3*sqrt(3)/2 = 2.598.
+        // ** 2.598 is the RIGHT number for THIS bump and the WRONG one for the old
+        // sech bump (whose bound was 2, from max|sech*tanh| = 1/2, corrected here on
+        // 2026-07-22). Check which shape the header has before trusting either. The
+        // assert itself is numeric on the SHIPPED map, so it cannot be fooled by a
+        // stale constant in a comment. **
         const double s = JfetStage::kSatPos, a = JfetStage::kSatNeg;
-        bool mono = true;
-        double worstSlope = 1.0;
-        for (double w = -10.0 * s; w <= 10.0 * s; w += 0.01 * s)
-        {
-            const double t = std::tanh(w / s);
-            const double slope = 1.0 + a * s * (1.0 / std::cosh(w / s)) * t;
-            worstSlope = std::min(worstSlope, slope);
-            if (slope <= 0.0)
-                mono = false;
-        }
-        std::printf("  static map monotonic (min slope %.4f, |a|*s = %.2f < 2): %s\n",
-                    worstSlope, std::abs(a) * s, mono ? "PASS" : "FAIL");
+        const double coreSlope = minSlope(stage, 10.0 * s);
+        const bool mono = coreSlope > 0.0;
+        std::printf("  core map monotonic (min slope %.4f, |a|*s = %.2f < 2.598): %s\n",
+                    coreSlope, std::abs(a) * s, mono ? "PASS" : "FAIL");
         if (! mono)
             ++failures;
     }
@@ -280,6 +325,144 @@ int main()
         std::printf("  1 kHz meas %+.4f dB  oracle %+.4f dB  %s\n",
                     meas, ref, pass ? "PASS" : "FAIL");
         if (! pass)
+            ++failures;
+    }
+
+    // ---- Test 6: the asymmetric drain-current ceiling -------------------------
+    std::printf("\n=== Drain-current ceiling: bounded, asymmetric, monotone, F' == g ===\n");
+    {
+        const double s = JfetStage::kSatPos, a = JfetStage::kSatNeg;
+        const double cp = JfetStage::kCeilPos, cn = JfetStage::kCeilNeg;
+        // Asymptotes: the even bump saturates at a*s^2/2 on BOTH sides (a DC offset —
+        // rectification), so the swing is bounded by the two ceilings about it.
+        const double bump = 0.5 * a * s * s;
+        const double gTop = cp + bump, gBot = -cn + bump;
+
+        JfetStage stage;
+        stage.prepare(48000.0);
+
+        // (a) BOUNDED + asymmetric. 60*max(cp,cn), not 60*cp — a later fit may well
+        // produce cn >> cp, and scanning only to 60*cp would then never reach negative
+        // saturation and would fail for the wrong reason.
+        const double wSat = 60.0 * std::max(cp, cn);
+        double lo = 1.0e9, hi = -1.0e9;
+        for (double w = -wSat; w <= wSat; w += 1.0e-3)
+        {
+            lo = std::min(lo, stage.waveshape(w));
+            hi = std::max(hi, stage.waveshape(w));
+        }
+        const bool bounded = std::abs(hi - gTop) < 1.0e-6 && std::abs(lo - gBot) < 1.0e-6;
+        // Asymmetric about the bump offset: the two ceilings must genuinely differ,
+        // which is the "clips toward the rail one way, toward cutoff the other" claim.
+        const bool asym = std::abs((hi - bump) - (bump - lo)) > 0.01 * cp;
+        std::printf("  g in [%+.4f, %+.4f]  (expect [%+.4f, %+.4f]): %s | asymmetric: %s\n",
+                    lo, hi, gBot, gTop, bounded ? "PASS" : "FAIL", asym ? "PASS" : "FAIL");
+        if (! (bounded && asym))
+            ++failures;
+
+        // ... and it actually BITES: 100x more drive must not give 100x more output.
+        // (Before the ceiling the J201 handed the CD4049 37.9 V at 0 dBFS/1 kHz, and
+        // the DriveStage 546 V against a +-3.3 V TL072 rail.) Measured against what
+        // the UNBOUNDED core would have done over the same span, so the assert scales
+        // with the params instead of hardcoding a tolerance.
+        const double y1 = stage.waveshape(2.0 * cp), y2 = stage.waveshape(200.0 * cp);
+        const double unbounded = 198.0 * cp; // the old g(w) -> w
+        const bool saturates = (y2 - y1) < 1.0e-3 * unbounded;
+        std::printf("  g(2*cp) %+.4f -> g(200*cp) %+.4f  (100x drive: %+.4f, vs %+.1f "
+                    "unbounded = %.2f%%): %s\n",
+                    y1, y2, y2 - y1, unbounded, 100.0 * (y2 - y1) / unbounded,
+                    saturates ? "PASS" : "FAIL");
+        if (! saturates)
+            ++failures;
+
+        // (b) MONOTONE at the shipped params. Slope -> 0 in the tail is CORRECT
+        // (saturation), so assert never-NEGATIVE, with a tolerance for the difference
+        // quotient's own roundoff. The closed-form |a|*s bound is NOT sufficient once
+        // the ceiling is finite — it couples s, a and cn (roughly cn >~ s), so this
+        // has to be a numeric scan. Nominal is chosen INSIDE that region (cn/s = 1.67).
+        const double worst = minSlope(stage, wSat);
+        const bool mono = worst > -1.0e-9;
+        std::printf("  min slope %+.3e over |w| <= %.0f (>= 0 == no fold-back; cn/s = %.2f): %s\n",
+                    worst, wSat, cn / s, mono ? "PASS" : "FAIL");
+        if (! mono)
+            ++failures;
+
+        // (c) F' == g for the now-PIECEWISE antiderivative (ADAA correctness). The
+        // floor is the central difference's own roundoff, ~eps*|F|/h, not h^2.
+        double worstF = 0.0, atW = 0.0;
+        const double h = 1.0e-6;
+        for (double w = -20.0; w <= 20.0; w += 1.0e-3)
+        {
+            const double e = std::abs((stage.waveshapeAD(w + h) - stage.waveshapeAD(w - h)) / (2 * h)
+                                      - stage.waveshape(w));
+            if (e > worstF) { worstF = e; atW = w; }
+        }
+        const bool adOk = worstF < 1.0e-6;
+        std::printf("  max|F'(w) - g(w)| = %.2e @ w = %+.2f (roundoff floor): %s\n",
+                    worstF, atW, adOk ? "PASS" : "FAIL");
+        if (! adOk)
+            ++failures;
+
+        // Finite everywhere, including absurd drive (cosh/tanh must not produce NaN).
+        bool finite = true;
+        for (const double w : { 1.0e3, 1.0e12, -1.0e12 })
+            finite = finite && std::isfinite(stage.waveshape(w)) && std::isfinite(stage.waveshapeAD(w));
+        std::printf("  finite at |w| up to 1e12: %s\n", finite ? "PASS" : "FAIL");
+        if (! finite)
+            ++failures;
+
+        // ADAA must not break the core's zero-H3 property. This was verified by hand
+        // for the pre-ceiling shape; the antiderivative is now PIECEWISE, which is
+        // new, so gate it. Ceiling off (H3 belongs to the core), ADAA on, and the
+        // frequency is high enough that du is large — the regime where the difference
+        // quotient does real work rather than degenerating to the midpoint fallback.
+        {
+            const double fs = 48000.0, freq = 2400.0, amp = 1.5;
+            JfetStage ad;
+            ad.prepare(fs);
+            setCeiling(ad, JfetStage::kCeilOff, JfetStage::kCeilOff);
+            ad.setADAA(true);
+            const int per = static_cast<int>(std::lround(fs / freq)), nWin = per * 20;
+            const int settle = static_cast<int>(0.2 * fs);
+            double re[3] = { 0.0 }, im[3] = { 0.0 };
+            for (int n = 0; n < settle + nWin; ++n)
+            {
+                const double y = ad.process(amp * std::sin(2.0 * PI * freq * n / fs));
+                if (n < settle) continue;
+                for (int k = 0; k < 3; ++k)
+                {
+                    const double ang = 2.0 * PI * (k + 1) * 20.0 * (n - settle) / nWin;
+                    re[k] += y * std::cos(ang);
+                    im[k] -= y * std::sin(ang);
+                }
+            }
+            double m[3];
+            for (int k = 0; k < 3; ++k)
+                m[k] = std::hypot(re[k], im[k]);
+            const double h2 = 20.0 * std::log10(m[1] / m[0] + 1e-300);
+            const double h3 = 20.0 * std::log10(m[2] / m[0] + 1e-300);
+            const bool adaaEven = (h2 - h3) > 40.0;
+            std::printf("  ADAA on, ceiling off: H2 %+.1f  H3 %+.1f dB -> still even-dominant: %s\n",
+                        h2, h3, adaaEven ? "PASS" : "FAIL");
+            if (! adaaEven)
+                ++failures;
+        }
+
+        // (d) Disabling the ceiling reproduces the plain linear core EXACTLY, so
+        // Test 4's isolation is real and the fitter can A/B the pre-ceiling model.
+        JfetStage off;
+        off.prepare(48000.0);
+        setCeiling(off, JfetStage::kCeilOff, JfetStage::kCeilOff);
+        double worstOff = 0.0;
+        for (double w = -5.0; w <= 5.0; w += 1.0e-3)
+        {
+            const double th = std::tanh(w / s);
+            worstOff = std::max(worstOff, std::abs(off.waveshape(w) - (w + bump * th * th)));
+        }
+        const bool offOk = worstOff < 1.0e-12;
+        std::printf("  ceiling OFF == w + (a*s^2/2)*tanh^2(w/s), worst %.2e: %s\n",
+                    worstOff, offOk ? "PASS" : "FAIL");
+        if (! offOk)
             ++failures;
     }
 
