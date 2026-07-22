@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath> // std::abs (floating-point overload) in setRailVoltages
 
 // =============================================================================
 // RailClamp — op-amp output-rail saturation (shared across every op-amp stage)
@@ -33,11 +34,17 @@ class RailClamp
 public:
     RailClamp() = default;
 
-    // Clamp magnitudes relative to VD (signal ground = 0). Both positive.
+    // Clamp MAGNITUDES relative to VD (signal ground = 0) — the output saturates
+    // into [-vNeg, +vPos], so both are positive. |v| is taken defensively: a
+    // signed vNeg makes the negative branch below fire for every sample under
+    // +(|vNeg| - knee) and return a constant +|vNeg|, i.e. the clamp emits DC
+    // instead of audio. That is exactly what FitParams shipped (railNeg = -3.3)
+    // until 2026-07-22, undetected because railEnabled defaulted to false — and
+    // `railNeg` is a --fit key, so a signed value can still arrive from a sweep.
     void setRailVoltages(double vNeg, double vPos) noexcept
     {
-        railNeg = vNeg;
-        railPos = vPos;
+        railNeg = std::abs(vNeg);
+        railPos = std::abs(vPos);
     }
 
     void setKnee(double kneeVolts) noexcept { knee = kneeVolts; }

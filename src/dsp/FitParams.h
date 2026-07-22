@@ -158,7 +158,15 @@ struct FitParams
     // against a capture that actually drives a stage into its rails. The
     // symmetric +-3.3 V default is a placeholder — the real TL07x is asymmetric
     // around VD and the positive side is expected to clip first.
+    // ** BOTH ARE MAGNITUDES (positive), not signed limits: RailClamp saturates
+    // into [-railNeg, +railPos] and uses railNeg as a magnitude internally
+    // (x < -(railNeg - knee)). railNeg was -3.3 here until 2026-07-22, which made
+    // the negative branch fire for EVERY sample below +2.95 V and return a
+    // constant +3.3 V — the clamp emitted DC, not audio. It never showed because
+    // railEnabled has always been false; it would have surfaced as a garbage
+    // step-2 re-fit the moment rails were enabled. RailClamp::setRailVoltages now
+    // takes |v| defensively so a signed --fit railNeg cannot resurrect it. **
     bool railEnabled = false;
-    double railNeg = -3.3;
+    double railNeg = 3.3;
     double railPos = 3.3;
 };
