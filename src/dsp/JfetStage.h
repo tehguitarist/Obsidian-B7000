@@ -96,13 +96,14 @@ public:
     static constexpr double kGmR6 = 2.277;   // -> shelfRatio 3.277 (+10.3 dB)
     static constexpr double kG0 = 15.0;      // mid-band |gain| (INVERTING via -G0)
 
-    // Waveshaper: per-polarity soft-saturation levels (VD-referenced volts of drain
-    // swing). Asymmetric by design (n-/p-side + active-load asymmetry -> the even
-    // harmonics the doc requires). Mild nominal (soft, not a hard clip) — the
-    // CD4049 downstream does the heavy distorting. FIT satPos/satNeg (and hence the
-    // H2/H3 balance) to the drive-min low-frequency-tone captures at Phase 7.
-    static constexpr double kSatPos = 3.0;   // positive-drain-swing soft ceiling
-    static constexpr double kSatNeg = 2.6;   // negative-swing soft ceiling (asym)
+    // Waveshaper params for the SQUARE-LAW even-shaper (see waveshape() below — this
+    // REPLACED the old per-polarity tanh; the two slots are reused/reinterpreted to
+    // avoid a plumbing rename). kSatPos = s, the knee (volts); kSatNeg = a, the even
+    // (H2/H4) strength — SIGNED. Nominal is deliberately MILD and monotonic
+    // (|a|*s = 0.9 << 2.6); the CD4049 downstream does the heavy distorting. FIT both
+    // (and hence the low-drive H2 warmth) to the drive-min tone captures at Phase 7.
+    static constexpr double kSatPos = 3.0;   // s: square-law knee (volts)
+    static constexpr double kSatNeg = 0.3;   // a: even-harmonic strength (signed)
 
     JfetStage() = default;
 
@@ -181,28 +182,42 @@ private:
         sa1 = (1.0 - c * tauP) / a0;
     }
 
-    // Per-polarity tanh soft-clip: g(w) = sat * tanh(w/sat). C1-continuous at 0
-    // (both sides -> slope 1), asymmetric sat levels -> even harmonics. Reduces to
-    // ~identity for |w| << sat (mild).
+    // J201 SQUARE-LAW soft-shaper (Phase-7 capture finding, 2026-07-22): replaces the
+    // former per-polarity tanh. The real B7K's low-drive OD character is even-dominant
+    // (captured H2 ~= -36 dB, H3 ~= -59 dB @ drive-min: a ~23 dB even/odd separation) —
+    // the fingerprint of a JFET common-source SQUARE-LAW transfer (Id ~ (Vgs-Vt)^2 ->
+    // pure H2). A tanh is an ODD map: its w^3 term forces H3 whenever it makes H2, so it
+    // structurally cannot reach that separation (proven by fit — the tanh floored H3 at
+    // ~-50 dB while the capture sits at -59). This shape is LINEAR + EVEN:
+    //     g(w) = w + a * s^2 * (1 - sech(w/s))
+    // The odd part is PURELY LINEAR (w) -> ZERO intrinsic H3; the even bump
+    // a*s^2*(1 - sech(w/s)) generates H2/H4 only. Reinterpreted params (same slots as
+    // the old sat levels, kept to avoid a plumbing churn — see FitParams.h note):
+    //   sPos = s, the knee (volts). sNeg = a, the even/asymmetry strength, SIGNED (its
+    //   sign picks which half-cycle expands). Slope at 0 is exactly 1 (preserves g0 as
+    //   the linear gain); monotonic while |a|*s < ~2.6 (max of s*sech*tanh is ~0.385).
+    //   The CD4049 downstream still does the heavy, more symmetric (odd) limiting — this
+    //   stage carries only the mild even warmth.
     inline double waveshape(double w) const noexcept
     {
-        const double sat = (w >= 0.0) ? sPos : sNeg;
-        return sat * std::tanh(w / sat);
+        const double sech = 1.0 / std::cosh(w / sPos);
+        return w + sNeg * sPos * sPos * (1.0 - sech);
     }
 
-    // Numerically-stable ln(cosh(x)) = |x| + log1p(exp(-2|x|)) - ln2.
-    static inline double lncosh(double x) noexcept
+    // Gudermannian gd(x) = integral of sech = 2*atan(tanh(x/2)) — a bounded/stable form
+    // of atan(sinh(x)) (no sinh overflow). Odd, gd(0) = 0.
+    static inline double gd(double x) noexcept
     {
-        const double a = std::abs(x);
-        return a + std::log1p(std::exp(-2.0 * a)) - 0.6931471805599453;
+        return 2.0 * std::atan(std::tanh(0.5 * x));
     }
 
-    // Antiderivative of waveshape: F(w) = sat^2 * ln cosh(w/sat) (per polarity).
-    // C1-continuous at 0 (both branches -> 0), so 1st-order ADAA is well-posed.
+    // Antiderivative of waveshape (for 1st-order ADAA):
+    //   F(w) = w^2/2 + a*s^2 * (w - s*gd(w/s)),   d/dw[w - s*gd(w/s)] = 1 - sech(w/s).
+    // F(0) = 0 and F is C1, so 1st-order ADAA is well-posed (exact at DC).
     inline double waveshapeAD(double w) const noexcept
     {
-        const double sat = (w >= 0.0) ? sPos : sNeg;
-        return sat * sat * lncosh(w / sat);
+        const double s = sPos, a = sNeg;
+        return 0.5 * w * w + a * s * s * (w - s * gd(w / s));
     }
 
     // 1st-order ADAA: y = (F(u) - F(uPrev)) / (u - uPrev); midpoint fallback when

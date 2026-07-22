@@ -58,8 +58,13 @@ struct FitParams
     // where the CD4049 downstream contributes least.
     double jfetG0 = 15.0;
     double jfetGmR6 = 2.277;
-    double jfetSatPos = 3.0;
-    double jfetSatNeg = 2.6;
+    // jfetSatPos/Neg feed JfetStage's SQUARE-LAW even-shaper (JfetStage.h, Phase-7
+    // reshape 2026-07-22), NOT the old tanh sat levels: jfetSatPos = knee `s` (volts),
+    // jfetSatNeg = even-harmonic strength `a` (SIGNED). Names kept to avoid a rename
+    // churn across PedalChain/OfflineRender/fit_nonlinear.py; semantics documented here
+    // and at JfetStage::waveshape(). A clean rename is deferred polish.
+    double jfetSatPos = 3.0;   // s: square-law knee
+    double jfetSatNeg = 0.3;   // a: even strength (signed)
 
     // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
     // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at

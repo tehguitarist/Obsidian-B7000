@@ -103,9 +103,23 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 7 PRE-WORK ✅ COMPLETE (2026-07-22) — CALIBRATION PROPER IS NEXT.
-> See `docs/phase7-handoff.md` "Phase 7 proper — START HERE" for the fixed calibration ORDER
-> (`docs/calibration-and-gain-staging.md` sets it; do not reorder it).**
+> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅ DONE; step 2 (clipper/JFET fits) 🔄 IN PROGRESS.
+> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). ⚠ WORKING TREE UNCOMMITTED
+> + ctest BROKEN (`JfetStageTest.cpp` asserts the old J201 tanh — needs a rewrite for the new
+> square-law shape).** Immediate next action: run `analysis/fit_nonlinear.py` (the re-fit), commit
+> the fitted nominals, rewrite the test, restore ctest, run dsp-validator. Step-2 finding: the J201
+> waveshaper was reshaped tanh → SQUARE-LAW (JfetStage.h) because tanh structurally can't make the
+> real pedal's pure-even low-drive H2; the CD4049 clipper shape is fine (only `jfetG0=15` was too
+> high). See the handover for full evidence, the capture harmonic targets, and steps 3–6.
+> (`docs/calibration-and-gain-staging.md` sets the fixed ORDER; do not reorder it.)
+> **Step 1 result (see `src/dsp/GainStaging.h` + memory `phase7-kinputref-anchor`):** kInputRef
+> stays **0.87 V/FS**, now ANCHORED (not nominal). `bypass.wav` is unity round-trip (−0.012 dB), so
+> the capture domain == DAW domain 1:1. K is DEGENERATE with the clip ceiling under audio-only
+> captures (proven: ref-clean DIST-off render is −3.894 dB under the capture at every level step
+> −36..−3 dBFS, std=0.000 → K cancels in the linear path), so K is SET to the test-signal design
+> level (0.87), and the clip ceiling (step 2) is fit relative to it — user decision 2026-07-22.
+> ⚠ Also found: the clean deficit is Master-taper-dependent (real round-trip −19.6/−8.2/+0.95/
+> +10.7/+12.3 dB across master 0/¼/½/¾/max), so fit `masterTaperExp` (step 4) BEFORE makeup (step 5).
 > **`OfflineRender` ✅ DONE (the ex-blocker):** `analysis/offline_render.cpp` + CMake target
 > `OfflineRender` (`juce_add_console_app`; juce_audio_formats + juce_dsp). Mirrors
 > `PluginProcessor::processBlock` step for step — **if that changes, change this too.** Takes
