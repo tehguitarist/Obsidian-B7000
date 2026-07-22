@@ -15,7 +15,9 @@
 | 0. J201 output impedance / loading | ✅ **DONE 2026-07-22 (session 3)** — see below |
 | 2. CD4049 + J201 fits | ⚠ three fits rejected. **Session 7 (2026-07-23) found WHY: `fit_nonlinear.py`'s "harmonic ratios are level-independent" premise is FALSE — BLEND's clean bleed dilutes every harmonic by the OD-vs-clean level, so the fitter bought harmonic score with level and drove `jfetGm` 25× low.** The even-harmonic "ladder" was that artefact; the shaper shape is FINE and must NOT be reshaped. Fix the OBJECTIVE, then re-fit. Constants NOT committed. |
 | 1b. **Mixer (BLEND/LEVEL)** | ✅ **DONE 2026-07-23 (session 8).** Topology verified at pixel zoom; crossfade law confirmed; clean bleed measured REAL and larger than modelled, by TWO independent routes that now agree to 1.4–3.9 dB; LEVEL taper measured at **p ≈ 2.25** (36/36 estimates agree, shipped is 1.43). Two bad captures found+fixed along the way (see "STEP 1 — THE MIXER"). Prerequisite for step 2. |
-| 3. Bridged-T reshape | not started (was blocked; **now unblocked**) |
+| 2b. **Re-anchor `jfetGm`** | ✅ **DONE 2026-07-23 (session 9).** Bleed-aware OD/clean fundamental ratio through the corrected mixer → **gm ≈ 0.10 mS**, corroborates the old 0.090 bleed-FREE. `analysis/reanchor_gm.py`. Surfaced an OD-path LF-excess lead (→ `clipA0`/GRUNT coupling, step 3). |
+| 3. **Fix objective + fit shaper** | ◀ **NEXT.** Harmonic-TO-harmonic ratios in `fit_nonlinear.py`; hold gm=0.10 mS. NOT started. |
+| 3′. Bridged-T reshape | not started (was blocked; **now unblocked**) |
 | 4. Tapers (`level`/`master`/`drive`) | not started — but `levelTaperExp ≈ 2.25` is already measured (session 8, 36 agreeing estimates), commit it here not there |
 | 5. Output makeup | not started |
 | 6. Rail clamps | not started (must stay LAST) |
@@ -84,15 +86,16 @@ order — but see "Still open" for two things that must not be forgotten.
    and fixed two bad takes of `level-1430_base-od.wav` along the way (odd-harmonic
    contamination, then a BLEND-at-noon capture mistake) — both confirmed fixed by the data
    converging, not just by the explanation being plausible. Nothing committed to the DSP.
-9. **▶ NEXT — THE J201 PLAN, steps 2-4 (agreed with the user 2026-07-23). See
-   "THE PATH FORWARD FOR THE J201" below for the full rationale; summary:**
-   1. ✅ **Settle the MIXER first** — DONE, see above.
-   2. **Re-anchor `jfetGm`** from the corrected OD-vs-clean ratio, at DRIVE-MIN (the
-      mixer numbers above are at drive-noon; the law transfers, the level does not).
-   3. **Fix the harmonic objective** (harmonic-TO-HARMONIC ratios), then fit the shaper.
+9. **THE J201 PLAN, steps 2-4 (agreed with the user 2026-07-23). See
+   "THE PATH FORWARD FOR THE J201" below for the full rationale; status:**
+   1. ✅ **Settle the MIXER first** — DONE (session 8), see above.
+   2. ✅ **Re-anchor `jfetGm`** — DONE (session 9). **gm ≈ 0.10 mS** (bleed-free, corroborates
+      0.090). See "✅ STEP 2 DONE — `jfetGm` RE-ANCHORED". `analysis/reanchor_gm.py`.
+   3. **▶ NEXT — Fix the harmonic objective** (harmonic-TO-HARMONIC ratios in
+      `fit_nonlinear.py`), hold gm=0.10 mS, then fit the shaper. NOT started.
    4. **Accept only on corroboration the objective could not see.**
-   Step 1 is what made 2 and 3 falsifiable; do not skip its result when running them.
-9. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails proper).
+   Steps 1-2 are what make 3 falsifiable; do not skip their results when running it.
+10. Then step 3′ (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails proper).
 
 ---
 
@@ -700,6 +703,71 @@ across harmonics at 440 rather than trusting H2 alone.
 
 ---
 
+## ✅ STEP 2 DONE — `jfetGm` RE-ANCHORED against the corrected mixer (session 9, 2026-07-23)
+
+**Verdict: `gm ≈ 0.10 mS` survives.** The bleed-aware re-anchor corroborates the old 0.090 mS
+via an independent, bleed-FREE route (the old shape fit was bleed-contaminated), nudges it
+slightly toward the physical J201 low corner (0.20 mS), and scores step-1's recorded prediction
+("bleed matches → 0.090 survives") as CONFIRMED. **No capture needs redoing** — the one real
+problem surfaced (an OD-path LF frequency-response discrepancy) is consistent across every
+capture and both tapers, i.e. a MODEL-structure issue, not a bad take.
+
+Tool: **`analysis/reanchor_gm.py`** (new). Log: **`analysis/fit_logs/step2_reanchor_gm.log`**.
+Nothing committed to the DSP; `gm` is held in the analysis scripts only.
+
+### The measurement (bleed-aware, scale-free — this is the method to re-use)
+The clean tap (IC1_A) is gm-INDEPENDENT and everything after BLEND is linear, so for one tone
+at the OUTPUT: `|H1(drive OD cap)| / |H1(B=0 clean cap)| = |alpha(noon)*OD_1(gm)/CLEAN_1 + beta(noon)|`.
+The right side is a pure RATIO — makeup, masterTaperExp, kInputRef and interface gain all cancel
+because each side is normalised to ITS OWN B=0 clean reference. No cross-file complex subtraction:
+the phase of `alpha*OD + beta*CLEAN` is computed by the DSP itself when we RENDER the chain at a
+trial gm with the corrected taper (levelTaperExp=2.25, ro/rq2 nominal), and the B=0 clean render is
+gm-independent (once). Speed: the model side renders a compact 6-tone input (82–2000 Hz, −14 dBFS),
+NOT the full 84 s signal — a full OS-8 render is ~2 min, a tone render is <1 s. **⚠ Do not render the
+full signal in a fit loop; trim or use a synthetic tone, as fit_nonlinear/fit_jfet_boundary do.**
+
+### The data
+Capture OD/clean fundamental ratio (dB) — the anchor target:
+```
+          82Hz   110Hz  220Hz  440Hz  1000Hz 2000Hz
+  dmin   -17.4  -15.9  -13.9  -15.8  -15.9  -10.6
+  dnoon  -15.3  -12.0   -9.7  -13.6  -15.2   -9.8
+```
+**The OD path sits 11–17 dB BELOW the clean bleed at drive-min** — so drive-min captures are
+mostly clean bleed and the OD path is barely visible. That is the step-2 confound made concrete,
+and it is why gm is only anchored to ~2×, not tighter.
+
+Per-tone gm where the model OD/clean ratio matches the capture (corrected taper 2.25):
+```
+  dmin   82:none  110:none  220:0.53  440:0.17  1000:0.096  2000:0.067  mS
+  dnoon  82:none  110:0.046 220:0.57  440:0.24  1000:0.060  2000:0.036  mS
+```
+
+### Why the tones disagree, and why gm is still ~0.1 mS
+The per-tone gm spans 0.05–0.57 mS → the OD-path FREQUENCY SHAPE is wrong in the model. The
+error at fixed gm (relative to its mean) is +4 dB at 82, +2 at 110, −4 at 220, −1.5 at 440,
+~0 at 1000, +0.3 at 2000 — i.e. a **LOW-FREQUENCY EXCESS** (model OD rolls off ~3–5 dB LESS than
+the real pedal at 82–110 Hz), plus a smaller mid dip. This is NOT the parked ~322 Hz notch alone
+(that is only ~3 dB deep in the ASSEMBLED chain, not −28); the dominant feature is an LF
+roll-off discrepancy, most likely the **GRUNT/clipper-coupling HPF corners, which depend on the
+unfit `clipA0`** (circuit.md: 36–158 Hz at A0=25) — a step-3 parameter. So the low-freq anchor
+tones (82–220 Hz) are corrupted and the high-freq tones (440–1000 Hz), above the LF issue and
+both notches, are the trustworthy ones: **gm ≈ 0.06–0.24 mS, centre ~0.10–0.12 mS.**
+
+`gm = 0.526 mS` at 220 Hz is a red herring: the model's spurious mid attenuation there pulls the
+OD too quiet, so the fitter demands inflated gm to compensate. Correct the LF/notch shape and
+that estimate drops toward the high-freq ~0.1 mS.
+
+### Decision + what step 3 inherits
+- **Hold `gm = 0.10 mS`** for step 3 (plausible band 0.09–0.15). Re-check step 3 for gm
+  sensitivity within that band — harmonic-TO-harmonic ratios should be nearly gm-insensitive.
+- The LF anchor tones will clean up once `clipA0`/coupling is fit in step 3, so gm and clipA0
+  can be re-checked jointly afterward — the LF discrepancy is a step-3 lead, not a new blocker.
+- `levelTaperExp ≈ 2.25` (step 1) is IRRELEVANT to the step-3 harmonic-to-harmonic objective
+  (alpha cancels), but hold it anyway for a faithful render; commit it in step 4.
+
+---
+
 ## ▶▶ THE PATH FORWARD FOR THE J201 (agreed with the user 2026-07-23) — START HERE
 
 **Framing.** Three step-2 fits have now been rejected, and every one failed the same
@@ -736,23 +804,16 @@ topology circuit.md states, so if the captures disagree with the model, the erro
 the TOPOLOGY, and that is a pixel-zoom question. circuit.md's own gotcha list flags pot
 lug mapping as exactly this class of error.
 
-### Step 2 — RE-ANCHOR `jfetGm` from the corrected mix
+### Step 2 — RE-ANCHOR `jfetGm` from the corrected mix ✅ DONE (session 9)
 
-Once `alpha`/`beta` are known, the OD-vs-clean ratio **is** a direct measurement of the
-OD path's absolute gain — i.e. of `gm`, since the rest of the chain is linear and
-known. That is bleed-free by construction and is a far better anchor than either
-previous objective. Then re-run `fit_jfet_boundary.py`'s drive-min shape fit with the
-corrected mixer and see whether it still wants 0.090 mS or moves toward the datasheet
-spread (low corner 0.20 mS, nominal 0.69 mS).
+See "✅ STEP 2 DONE — `jfetGm` RE-ANCHORED" above for the full result. Summary: the
+bleed-aware OD-vs-clean fundamental ratio (rendered through the corrected mixer) gives
+**gm ≈ 0.10 mS** from the trustworthy high-freq tones (440–1000 Hz), corroborating 0.090
+via a bleed-FREE route. **The prediction fired as "bleed matches → 0.090 survives".** A
+new lead surfaced: an OD-path LF response excess at 82–110 Hz, most likely `clipA0`/GRUNT
+coupling — feeds into step 3. Hold `gm = 0.10 mS` for step 3.
 
-**Prediction worth recording, so the next session can score it:** if the real bleed is
-much SMALLER than the modelled 4 dB, then the capture's drive-min shape genuinely is
-the OD path, `gm` has been driven ~7x too low to compensate for a spurious clean floor,
-and the standing awkwardness that 0.090 mS sits ~2x BELOW the plausible low corner of
-the J201 spread resolves itself. If the real bleed MATCHES the model, then the shape
-fit was legitimately matching mix-to-mix and 0.090 mS survives.
-
-### Step 3 — FIX THE OBJECTIVE, then fit the shaper
+### Step 3 — FIX THE OBJECTIVE, then fit the shaper ◀ NEXT (not started)
 
 **The concrete fix: use harmonic-TO-HARMONIC ratios (H3/H2, H4/H2, H5/H2) instead of
 ratios re the fundamental.** `alpha` cancels EXACTLY in those, so they are immune to

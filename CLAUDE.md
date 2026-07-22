@@ -103,7 +103,20 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅; OD-path loading blocker ✅ RESOLVED
+> **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
+> **CURRENT (session 9, 2026-07-23): J201 PLAN step 2 (RE-ANCHOR `jfetGm`) ✅ DONE.** The
+> bleed-aware OD/clean fundamental ratio through the corrected mixer (`analysis/reanchor_gm.py`)
+> gives **`gm ≈ 0.10 mS`** (band 0.09–0.15), corroborating the old 0.090 via a bleed-FREE route
+> and confirming step-1's "bleed matches → 0.090 survives" prediction. NO capture needs redoing.
+> Surfaced a new lead: an OD-path LF-response EXCESS at 82–110 Hz (model ~3–5 dB too bass-heavy),
+> most likely the `clipA0`/GRUNT-coupling HPF corners — a **step-3** parameter, not a new blocker.
+> Nothing committed to the DSP; gm held in the analysis scripts only.
+> **▶ NEXT = step 3: change `fit_nonlinear.py`'s objective to harmonic-TO-HARMONIC ratios
+> (H3−H2, H4−H2, H5−H2 in dB — alpha cancels, bleed/makeup/taper-immune), move `jfetGm` to HELD
+> at 0.10 mS, and fit `s`,`a`,ceilings,`clipA0`,`clipSat`,`driveTaperExp`. Sanity anchor: expect
+> `a` ≈ single digits (a≈4 at s=0.3). Then step-4 acceptance. NOT started this session.**
+> ── prior history ──
+> Phase 7 CALIBRATION PROPER — step 1 ✅; OD-path loading blocker ✅ RESOLVED
 > (session 3); J201 boundary params ✅ FITTED (session 4, 2026-07-22): `jfetGm ≈ 0.09 mS`,
 > shape error 7.53 → 1.56 dB, corroborated by an independent level check (+12.1 → −1.7 dB);
 > `jfetRo`/`jfetRq2` proved NOT identifiable (cost flat to ≤0.01 dB over 16×) → held nominal.
