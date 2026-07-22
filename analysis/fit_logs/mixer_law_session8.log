@@ -1,0 +1,157 @@
+==============================================================================
+MIXER LAW — BLEND/LEVEL, measured from existing captures
+Topology verified at pixel zoom (session 8); see module docstring.
+==============================================================================
+
+##############################################################################
+# TONE 110 Hz
+##############################################################################
+
+--- BLEND sweep (LEVEL at noon) — tone_110 ---------------------------
+   knob    H1 dB    H2 dB    H3 dB    H4 dB  floor dB
+   0.00   -13.17   -83.09  -103.12  -114.41   -179.32
+   0.25   -14.88   -84.19   -89.48  -117.50   -180.80
+   0.50   -17.63   -70.20   -83.24  -107.55   -182.70
+   0.75   -21.11   -63.59   -79.58   -99.62   -186.97
+   1.00   -25.18   -59.72   -77.51   -95.04   -186.07
+
+  Affine-in-knob test  Hn(B) = F_n + B*G_n   (model: EXACT, no free shape)
+   n    |F| dB    |G| dB  resid dB  resid/|G|  verdict
+  H1    -13.07    -14.54    -52.62      0.012  AFFINE
+  H2    -81.57    -59.89    -79.32      0.107  marginal
+  H3   -102.13    -77.78   -100.64      0.072  marginal
+  H4   -107.57    -94.10   -113.42      0.108  marginal
+
+--- LEVEL sweep (BLEND at max-OD) — tone_110 -------------------------
+  [skip] level-0700_base-od.wav: L=0 null — residual is 40 dB down, ratios meaningless
+   knob    H1 dB    H2 dB    H3 dB  floor dB   H2 SNR
+   0.25   -34.04   -70.98   -85.17   -193.52    122.5
+   0.50   -25.18   -59.72   -77.51   -186.07    126.4
+   0.75   -16.46   -60.05   -77.96   -178.56    118.5
+   1.00   -13.83   -44.31   -64.14   -171.20    126.9
+
+  LEVEL taper from H2 (bleed-free): alpha = |Hn|/|Hn(max)|, L = alpha^-1
+   knob    alpha        L  p=lnL/lnk   (nominal p = 1.43)
+   0.25   0.0464   0.0485      2.183
+   0.50   0.1695   0.1963      2.349
+   0.75   0.1633   0.1882      5.806
+   1.00   1.0000   1.0000          —
+  => independent p estimates ['2.183', '2.349', '5.806'], spread 3.623  (agreement IS the test)
+
+  [bleed] Y = H1/H2 vs (1-L):   Y = A + B*(1-L)
+    knob 0.25  (1-L) 0.9515   |Y|     70.30   |fit|     95.31
+    knob 0.50  (1-L) 0.8037   |Y|     53.35   |fit|     84.46
+    knob 0.75  (1-L) 0.8118   |Y|    151.10   |fit|     85.05
+    knob 1.00  (1-L) 0.0000   |Y|     33.39   |fit|     35.37
+    |A| 35.370   |B| 78.620   fit residual 41.928 (118.5% of |A|)
+    => CLEAN_1/OD_1 = 2.2228  (+6.94 dB)  at the mixer inputs
+
+##############################################################################
+# TONE 220 Hz
+##############################################################################
+
+--- BLEND sweep (LEVEL at noon) — tone_220 ---------------------------
+   knob    H1 dB    H2 dB    H3 dB    H4 dB  floor dB
+   0.00   -12.99   -73.70  -108.91   -94.34   -181.94
+   0.25   -14.42   -71.94   -80.25   -85.30   -181.98
+   0.50   -16.56   -60.91   -74.08   -78.65   -183.67
+   0.75   -19.23   -56.75   -69.62   -75.31   -185.87
+   1.00   -22.68   -54.08   -65.32   -73.76   -187.73
+
+  Affine-in-knob test  Hn(B) = F_n + B*G_n   (model: EXACT, no free shape)
+   n    |F| dB    |G| dB  resid dB  resid/|G|  verdict
+  H1    -12.94    -16.31    -52.07      0.016  AFFINE
+  H2    -71.73    -53.08    -81.00      0.040  AFFINE
+  H3    -84.57    -65.54    -84.53      0.112  marginal
+  H4    -91.91    -74.33    -89.78      0.169  NOT AFFINE
+
+--- LEVEL sweep (BLEND at max-OD) — tone_220 -------------------------
+  [skip] level-0700_base-od.wav: L=0 null — residual is 40 dB down, ratios meaningless
+   knob    H1 dB    H2 dB    H3 dB  floor dB   H2 SNR
+   0.25   -31.46   -64.87   -72.07   -196.98    132.1
+   0.50   -22.68   -54.08   -65.32   -187.73    133.7
+   0.75   -14.70   -53.40   -64.91   -179.50    126.1
+   1.00   -12.66   -39.99   -48.90   -179.40    139.4
+
+  LEVEL taper from H2 (bleed-free): alpha = |Hn|/|Hn(max)|, L = alpha^-1
+   knob    alpha        L  p=lnL/lnk   (nominal p = 1.43)
+   0.25   0.0571   0.0603      2.026
+   0.50   0.1975   0.2328      2.103
+   0.75   0.2135   0.2540      4.763
+   1.00   1.0000   1.0000          —
+  => independent p estimates ['2.026', '2.103', '4.763'], spread 2.738  (agreement IS the test)
+
+  [bleed] Y = H1/H2 vs (1-L):   Y = A + B*(1-L)
+    knob 0.25  (1-L) 0.9397   |Y|     46.82   |fit|     59.39
+    knob 0.50  (1-L) 0.7672   |Y|     37.16   |fit|     53.46
+    knob 0.75  (1-L) 0.7460   |Y|     86.13   |fit|     52.73
+    knob 1.00  (1-L) 0.0000   |Y|     23.27   |fit|     27.16
+    |A| 27.159   |B| 34.440   fit residual 20.186 (74.3% of |A|)
+    => CLEAN_1/OD_1 = 1.2681  (+2.06 dB)  at the mixer inputs
+
+##############################################################################
+# TONE 440 Hz
+##############################################################################
+
+--- BLEND sweep (LEVEL at noon) — tone_440 ---------------------------
+   knob    H1 dB    H2 dB    H3 dB    H4 dB  floor dB
+   0.00   -12.91   -79.12   -89.71   -91.76   -183.54
+   0.25   -14.59   -77.50   -65.00   -69.95   -183.24
+   0.50   -17.31   -72.55   -57.36   -65.05   -188.78
+   0.75   -20.96   -69.67   -53.59   -62.22   -189.12
+   1.00   -26.50   -64.52   -51.41   -60.34   -194.35
+
+  Affine-in-knob test  Hn(B) = F_n + B*G_n   (model: EXACT, no free shape)
+   n    |F| dB    |G| dB  resid dB  resid/|G|  verdict
+  H1    -12.81    -14.61    -50.35      0.016  AFFINE
+  H2    -79.79    -64.50    -85.13      0.093  marginal
+  H3    -72.30    -51.41    -68.96      0.132  marginal
+  H4    -76.81    -60.87    -75.11      0.194  NOT AFFINE
+
+--- LEVEL sweep (BLEND at max-OD) — tone_440 -------------------------
+  [skip] level-0700_base-od.wav: L=0 null — residual is 40 dB down, ratios meaningless
+   knob    H1 dB    H2 dB    H3 dB  floor dB   H2 SNR
+   0.25   -34.84   -66.82   -64.25   -202.18    135.4
+   0.50   -26.50   -64.52   -51.41   -194.35    129.8
+   0.75   -16.24   -64.21   -50.17   -182.19    118.0
+   1.00   -19.77   -48.36   -36.30   -190.37    142.0
+
+  LEVEL taper from H2 (bleed-free): alpha = |Hn|/|Hn(max)|, L = alpha^-1
+   knob    alpha        L  p=lnL/lnk   (nominal p = 1.43)
+   0.25   0.1194   0.1332      1.454
+   0.50   0.1557   0.1785      2.486
+   0.75   0.1613   0.1857      5.852
+   1.00   1.0000   1.0000          —
+  => independent p estimates ['1.454', '2.486', '5.852'], spread 4.398  (agreement IS the test)
+
+  [bleed] Y = H1/H2 vs (1-L):   Y = A + B*(1-L)
+    knob 0.25  (1-L) 0.8668   |Y|     39.74   |fit|    124.67
+    knob 0.50  (1-L) 0.8215   |Y|     79.57   |fit|    119.70
+    knob 0.75  (1-L) 0.8143   |Y|    250.32   |fit|    118.92
+    knob 1.00  (1-L) 0.0000   |Y|     26.90   |fit|     32.27
+    |A| 32.272   |B| 110.540   fit residual 80.995 (251.0% of |A|)
+    => CLEAN_1/OD_1 = 3.4252  (+10.69 dB)  at the mixer inputs
+
+==============================================================================
+SUMMARY
+==============================================================================
+  bleed@ref-od = clean-vs-OD AMPLITUDE ratio actually present in the output at
+  BLEND max-OD / LEVEL noon / DRIVE noon. Negative = clean is quieter than OD.
+
+    tone   L(noon)  taper p  bleed (LEVEL rt)  bleed (BLEND rt)
+     110    0.1963    3.446            +5.04dB            -2.32dB
+     220    0.2328    2.964            -0.24dB            -1.03dB
+     440    0.1785    3.264            +8.99dB            +2.73dB
+
+  Sensitivity of the BLEND-route bleed to L(noon) — the only outside input:
+    L(noon)        110Hz        220Hz        440Hz
+     0.1500     -4.24dB     -5.33dB     +0.73dB
+     0.2000     -2.20dB     -2.51dB     +4.00dB
+     0.2300     -1.34dB     -1.14dB     +5.47dB
+     0.3000     -0.02dB     +1.35dB     +7.70dB
+     0.3711     +0.70dB     +3.06dB     +8.69dB  <- shipped p=1.43
+
+  For comparison, the SHIPPED model (kLevelTaperExp = 1.43) has
+  L(noon) = 0.3711, mixing 0.3009*od + 0.1892*clean, i.e. a coefficient
+  ratio of -4.03 dB — the handover's '-4.0 dB'. NOTE that figure is the
+  COEFFICIENT ratio only; the actual bleed also carries CLEAN_1/OD_1 (drive-dependent).

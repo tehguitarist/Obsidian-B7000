@@ -184,9 +184,60 @@ high, execute routine work cheap) is what should persist.
 > as gm falls, so level under-responds and the fit must go lower still).
 > **So all three gm estimates — 0.551 / 0.090 / 0.0274 mS — are really measurements of
 > the OD/clean MIX RATIO and inherit any error in the BLEND model.**
-> **▶ NEXT — THE J201 PLAN (agreed with the user 2026-07-23; full rationale in
-> `docs/phase7-calibration-handover.md` "THE PATH FORWARD FOR THE J201"). Do NOT start
-> at 2 or 3 — they are currently UNFALSIFIABLE, which is why three fits were rejected:**
+> **⚠ PLAN STEP 1 (THE MIXER) IS MOSTLY DONE, ONE ITEM PENDING — session 8, 2026-07-23.
+> `analysis/mixer_law.py`, log `analysis/fit_logs/mixer_law_session8.log`. NOTHING
+> COMMITTED TO THE DSP. A round-2 capture fix is in progress — see (6) below before
+> trusting the LEVEL route or any taper number.**
+> (1) **Topology VERIFIED at 600-dpi pixel zoom** — LEVEL pin3=IC4_A/pin1=VD/wiper→BLEND
+> pin3; BLEND pin1=clean straight off IC1_A, wiper→IC5_A(+) unloaded; BOTH long rails
+> scanned pixel-by-pixel end to end: bare wire, no series R, no junction dot, no shunt.
+> `LevelBlend.h` is FAITHFUL — the bleed is the drawn circuit, not a model bug.
+> (2) **The law is confirmed**: BLEND is linear-taper so every harmonic must be affine in
+> the knob with ZERO free shape params — measured residual/|G| = **0.016 (H1) / 0.040
+> (H2)** at 220 Hz over 5 points. (H3/H4 degrade only because they sit 20–40 dB lower.)
+> (3) **⚠ A PLAN PREMISE WAS WRONG: the LEVEL sweep is NOT an independent route.** With
+> the wiper unloaded, `alpha(L)=L/(1+L(1-L))`, `beta(L)=L(1-L)/(1+L(1-L))`, so
+> `beta/alpha = (1-L)` EXACTLY — LEVEL moves the clean bleed too. That makes it a
+> SHARPER test (no free param left but the taper), not a useless one.
+> (4) **LEVEL TAPER — 0.25/0.50 cluster at p ≈ 2.0–2.5 (interim estimate; shipped is
+> 1.43), but this is NOT settled — see (6).** Measured BLEED-FREE (harmonics carry no
+> clean, so `|Hn(L)|/|Hn(max)|` IS `alpha(L)`; invert it for L). Do NOT commit a taper
+> refit to `LevelBlend.h` yet.
+> (5) **HEADLINE — the bleed is REAL and BIGGER than modelled, via the trustworthy
+> route.** At BLEND max-OD / LEVEL noon / DRIVE noon the clean-vs-OD amplitude ratio is
+> **−1.0 dB (220 Hz) / −2.3 dB (110 Hz)** by the well-conditioned **5-point BLEND route**
+> (uses ONLY blend-*.wav, never touches level-*.wav, so it is immune to item (6) below) —
+> i.e. roughly HALF the "100 % OD" output is undistorted clean. **The recorded prediction
+> resolved in favour of "the bleed MATCHES", so `jfetGm ≈ 0.090 mS` is NOT obviously a
+> bleed artefact** — the confound that killed three step-2 fits is confirmed real, and
+> step 3's harmonic-TO-harmonic objective is REQUIRED. This conclusion is SOLID (BLEND
+> route only). ⚠ Scope: the `(1-L)` law is drive-independent; `CLEAN_1/OD_1` is a
+> DRIVE-NOON number — the J201 re-anchor needs `OD_1` at DRIVE-MIN.
+> (6) **⚠⚠ `level-1430_base-od.wav` — ROUND 2 FIX IN PROGRESS, do not trust the LEVEL
+> route or any taper-shape claim until it lands.** Round 1 (odd-harmonic contamination:
+> H3 −45.4/H5 −52.4 vs H2 −59.9/H4 −83.8 where every other take is even-dominant; its own
+> `gain-n12` twin was harmonic-free, 61 dB less H3 for a 9 dB level drop) is FIXED — user
+> re-captured it, now even-dominant and consistent with the set. But the fixed take then
+> introduced an anomalous 0.75 knob point (implied taper p ≈ 4.4–6.2 vs 0.25/0.50's
+> 2.0–2.5, consistent across all 12 tone×harmonic checks) — and the user caught, WHILE
+> THIS WAS BEING WRITTEN, that this recapture may have left **BLEND at noon instead of
+> the required max-OD**, which alone would fully explain the anomaly with no real taper
+> irregularity needed. **A round-2 re-capture with BLEND confirmed at max is in
+> progress.** Re-run `analysis/mixer_law.py` against it, then re-decide: if the
+> 0.25/0.50/0.75 cluster agrees under one exponent, the taper-shape claim was the
+> BLEND-position bug and should be struck; if 0.75 still disagrees with BLEND confirmed
+> at max, it's a real finding. `level-0700` stays excluded regardless (L=0 null).
+> Also: 440 Hz is the least trustworthy tone (its H2 = 880 Hz sits near the IC2_B
+> bridged-T notch, 12 dB below H3) — prefer 110/220, or use H3 at 440.
+> (7) **Two traps not to re-trip:** never estimate a noise floor by projecting at
+> half-harmonic frequencies (that measures the WINDOW's sidelobe rejection, ~−170 dB, not
+> the capture — the first version of the script reported 100+ dB SNR on buried harmonics);
+> and draw conclusions from ratios WITHIN one capture (alignment lags across this set span
+> 0–26 samples = up to 43° of phase error at 220 Hz).
+>
+> **▶ NEXT — THE J201 PLAN, STEPS 2-4 (agreed with the user 2026-07-23; full rationale in
+> `docs/phase7-calibration-handover.md` "THE PATH FORWARD FOR THE J201"). Step 1 is DONE
+> (above) and is what makes 2 and 3 falsifiable — do not run them without its result:**
 > **(1) SETTLE THE MIXER FIRST** — needs no new captures. The clean tap is linear and
 > harmonic-free and everything post-BLEND is linear, so at the output
 > `fundamental = alpha(b)*OD_1 + beta(b)*CLEAN_1` (contaminated) but
