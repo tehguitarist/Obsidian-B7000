@@ -657,6 +657,27 @@ high, execute routine work cheap) is what should persist.
   console test exercises the plugin-level `AudioProcessor::processBlock` path, which is why this
   didn't trip a gate — worth keeping in mind for any future `SmoothedValue` usage in this file:
   never let a per-channel/per-voice **copy** be the only thing that calls `getNextValue()`).
+- **FIXED 2026-07-23 (same session, user follow-up): rapid knob turns produced zipper clicks,
+  worst on DRIVE.** Not a bug like the above — `PedalChain::applyParams()` is deliberately called
+  once per block, not per sample (PedalChain.h: the MNA-based stages, Baxandall/MidBand, only
+  re-invert their matrix on a dirty flag; doing that per sample would be a real CPU regression). So
+  a fast knob sweep (or automation) could still jump the raw APVTS value a lot between one block and
+  the next, and every stage recomputed its coefficients from whatever value it got with zero
+  interpolation — audible as a step in signal amplitude at the block boundary, worst on DRIVE
+  because its gain range is 4x-78x. **Fix:** smooth the 8 continuous pots (master/blend/level/drive/
+  lo/loMid/hiMid/hi) at KNOB-VALUE level via `SmoothedValue::skip(numSamples)` called once per block
+  directly on the member (not a per-channel copy — see the bypass fix above; the member itself is
+  what advances this time, so the same bug class doesn't recur). This bounds how far a stage's
+  coefficients can move in one block without adding any per-sample cost or touching the "recompute
+  once per block" architecture — still exactly one MNA re-invert per block, just fed a value that
+  can't jump arbitrarily far. `~20 ms` smoothing time (`kPotSmoothingSeconds`), matching the existing
+  `inputGain`/`outputGain` constant. `readParams()` signature changed to take the 8 pre-smoothed pot
+  values as params (switches — attack/grunt/mid-freq/bypass/dist_engage — still read raw; they're
+  discrete topology swaps, not a smoothing gap). **Deliberately NOT fixed here:** clicks from
+  flipping ATTACK/GRUNT/mid-freq switches — those are a separate, already-flagged, harder problem
+  (glitch-free crossfade between two precomputed topologies, not a value-smoothing fix; see
+  circuit.md/TrebleAttack.h "Phase 5 adds the glitch-free crossfade on top of this" and the GRUNT
+  "deferred to Phase 6" note) — still open. `src/PluginProcessor.{h,cpp}`; ctest 16/16.
 - **Target = Darkglass B7K Ultra** (schematic is the original-B7K "Black Mirror VII" clone; Ultra
   extras engineered on top). **8 pots**: MASTER[ENG], BLEND, LEVEL, DRIVE, LO, HI, LO-MID, HI-MID.
   Plus 3-way ATTACK[ENG] + 3-way GRUNT switches, and 3-position Lo-Mid/Hi-Mid freq selectors[ENG].

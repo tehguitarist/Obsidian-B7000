@@ -29,22 +29,24 @@ ObsidianB7000AudioProcessor::ObsidianB7000AudioProcessor()
     pRenderOversampling = apvts.getRawParameterValue("render_oversampling");
 }
 
-PedalChain::Params ObsidianB7000AudioProcessor::readParams() const
+PedalChain::Params ObsidianB7000AudioProcessor::readParams(float master, float blend, float level,
+                                                            float drive, float lo, float loMid,
+                                                            float hiMid, float hi) const
 {
     PedalChain::Params p;
-    p.master = pMaster->load();
-    p.blend = pBlend->load();
-    p.level = pLevel->load();
-    p.drive = pDrive->load();
+    p.master = master;
+    p.blend = blend;
+    p.level = level;
+    p.drive = drive;
     // EQ pot fraction is BOOST-AT-0 internally (Baxandall.h / MidBand.h: "ab/at/a
     // ->0 = boost"), but the knob param itself must read CW=higher (0=CCW..1=CW)
     // to match the physical control and its tooltip readout — invert here, at the
     // single point where the UI-facing value becomes the DSP-facing one, so CW
     // rotation maps to boost.
-    p.lo = 1.0f - pLo->load();
-    p.loMid = 1.0f - pLoMid->load();
-    p.hiMid = 1.0f - pHiMid->load();
-    p.hi = 1.0f - pHi->load();
+    p.lo = 1.0f - lo;
+    p.loMid = 1.0f - loMid;
+    p.hiMid = 1.0f - hiMid;
+    p.hi = 1.0f - hi;
     p.attackIdx = (int) pAttack->load();
     p.gruntIdx = (int) pGrunt->load();
     p.loMidFreq = (int) pLoMidFreq->load();
@@ -181,6 +183,21 @@ void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPe
     outputGain.reset(sampleRate, 0.02);
     inputGain.setCurrentAndTargetValue(1.0f);
     outputGain.setCurrentAndTargetValue(1.0f);
+
+    // Pot smoothers (see PluginProcessor.h) — start already at the knob's actual
+    // current position so prepareToPlay (SR change, playback start) doesn't
+    // itself introduce a fade.
+    constexpr double kPotSmoothingSeconds = 0.02;
+    for (auto* s : { &smMaster, &smBlend, &smLevel, &smDrive, &smLo, &smLoMid, &smHiMid, &smHi })
+        s->reset(sampleRate, kPotSmoothingSeconds);
+    smMaster.setCurrentAndTargetValue(pMaster->load());
+    smBlend.setCurrentAndTargetValue(pBlend->load());
+    smLevel.setCurrentAndTargetValue(pLevel->load());
+    smDrive.setCurrentAndTargetValue(pDrive->load());
+    smLo.setCurrentAndTargetValue(pLo->load());
+    smLoMid.setCurrentAndTargetValue(pLoMid->load());
+    smHiMid.setCurrentAndTargetValue(pHiMid->load());
+    smHi.setCurrentAndTargetValue(pHi->load());
 }
 
 void ObsidianB7000AudioProcessor::releaseResources() {}
@@ -217,7 +234,23 @@ void ObsidianB7000AudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     // ---- Params + gain-staging targets (architecture.md processBlock) --------
-    const auto params = readParams();
+    // Advance the pot smoothers by one block (skip(), not per-sample — these
+    // feed a once-per-block coefficient recompute, see PluginProcessor.h) so a
+    // fast knob turn can't jump a stage's coefficients further than one block's
+    // worth of ramp, however far the raw APVTS value moved between blocks.
+    smMaster.setTargetValue(pMaster->load());
+    smBlend.setTargetValue(pBlend->load());
+    smLevel.setTargetValue(pLevel->load());
+    smDrive.setTargetValue(pDrive->load());
+    smLo.setTargetValue(pLo->load());
+    smLoMid.setTargetValue(pLoMid->load());
+    smHiMid.setTargetValue(pHiMid->load());
+    smHi.setTargetValue(pHi->load());
+
+    const auto params = readParams(smMaster.skip(numSamples), smBlend.skip(numSamples),
+                                    smLevel.skip(numSamples), smDrive.skip(numSamples),
+                                    smLo.skip(numSamples), smLoMid.skip(numSamples),
+                                    smHiMid.skip(numSamples), smHi.skip(numSamples));
     for (auto& d : dsp)
         d.setParams(params);
 

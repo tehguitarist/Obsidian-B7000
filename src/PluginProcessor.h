@@ -48,6 +48,25 @@ public:
     juce::SmoothedValue<float> bypassMix;
     juce::SmoothedValue<float> inputGain, outputGain;
 
+    // Block-rate smoothing for the 8 continuous pots. PedalChain::applyParams()
+    // is deliberately called once per block, not per sample (dsp.md/PedalChain.h:
+    // the MNA-based stages — Baxandall/MidBand — only re-invert their matrix on a
+    // dirty flag, and doing that per sample would be a real CPU regression). So a
+    // fast knob sweep (or automation) can still jump the raw APVTS value a lot
+    // between one block and the next, and every stage recomputes its coefficients
+    // from whatever value it's handed with no interpolation — an audible zipper
+    // click on a quick turn, worse the bigger the stage's gain/effect range
+    // (DRIVE's 4x-78x is the most audible). Smoothing the KNOB value itself
+    // (not per-sample, just via skip(numSamples) once per block, same pattern as
+    // bypassMix/inputGain) bounds how far it can move in one block regardless of
+    // how fast it's turned, without changing the "recompute once per block" cost
+    // structure. Switch params (attack/grunt/mid-freq/bypass) are deliberately
+    // NOT smoothed here — they're discrete topology swaps, not a smoothing gap;
+    // their own click-on-switch issue is a separate, already-flagged problem
+    // (circuit.md/TrebleAttack.h "glitch-free crossfade", deferred).
+    juce::SmoothedValue<float> smMaster, smBlend, smLevel, smDrive;
+    juce::SmoothedValue<float> smLo, smLoMid, smHiMid, smHi;
+
     // Bypass dry-path delay compensation (dsp.md "Dry/wet phase alignment across
     // the oversampled region") — same fix as PedalDSP's internal BLEND clean-tap
     // delay, applied at the plugin I/O so the bypass crossfade doesn't comb-filter
@@ -80,8 +99,11 @@ public:
     static constexpr float kOutputMakeup = (float) GainStaging::kOutputMakeupNominal;
 
 private:
-    // Build the per-block chain param set from the cached APVTS pointers.
-    PedalChain::Params readParams() const;
+    // Build the per-block chain param set. The 8 continuous pots come in
+    // pre-smoothed (already knob-space, pre-EQ-inversion); switches are read
+    // directly from the cached APVTS pointers.
+    PedalChain::Params readParams(float master, float blend, float level, float drive,
+                                   float lo, float loMid, float hiMid, float hi) const;
 
     std::array<PedalDSP, 2> dsp;
 
