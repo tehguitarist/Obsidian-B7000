@@ -14,16 +14,25 @@
 //            shoulder; corners at 219 Hz (zero) / ~719 Hz (pole).
 //   Test 3 — DC-step polarity: INVERTING (+in -> -out on the AC edge), AC-coupled
 //            (C2 HP) so it decays to ~0. Resolves circuit.md's JFET-sign carry-fwd.
-//   Test 4 — Nonlinearity: mild ASYMMETRIC soft saturation. A hot tone compresses
-//            (peak gain < small-signal gain) and the +/- output peaks differ
-//            (satPos != satNeg -> even harmonics); the static curve is monotonic.
+//   Test 4 — Nonlinearity: the SQUARE-LAW EVEN shaper (Phase-7 reshape, see
+//            JfetStage.h waveshape()). g(w) = w + a*s^2*(1 - sech(w/s)) is
+//            LINEAR + EVEN, so a driven tone must come out EVEN-DOMINANT:
+//            H2 well above the noise, H3 at the numerical floor (the odd part is
+//            purely linear -> ZERO intrinsic H3). Also: +/- output peaks differ
+//            (the even bump lands on one polarity), and the static curve is
+//            monotonic at the nominal params. This is the whole point of the
+//            reshape — a tanh could not separate H2 from H3 (captured drive-min
+//            is H2 -36 / H3 -59 dB), so THIS assert is the structural guard.
 //   Test 5 — Small-signal limit: at tiny drive the waveshaper is ~identity, so the
-//            1 kHz gain matches -G0*shelf (the mid/HF small-signal gain).
+//            1 kHz gain matches -G0*shelf (the mid/HF small-signal gain). Since
+//            g(w) ~ g'(0)*w for small w, this IS the "slope at 0 == 1" assert:
+//            any g'(0) != 1 would scale the measured gain off the oracle.
 //
-// NOTE: kG0, kGmR6, kSatPos, kSatNeg are NOMINAL placeholders (fit to captures at
-// Phase 7). These tests validate the STRUCTURE — filter shape, polarity, and the
-// qualitative nonlinearity — all of which are invariant under a later amplitude
-// refit; they do NOT assert an absolute "correct" gain (there is no capture yet).
+// NOTE: kG0, kGmR6, kSatPos (= knee s), kSatNeg (= even strength a) are NOMINAL
+// placeholders (fit to captures at Phase 7). These tests validate the STRUCTURE —
+// filter shape, polarity, and the qualitative even-dominant nonlinearity — all of
+// which are invariant under a later amplitude refit; they do NOT assert an
+// absolute "correct" gain or harmonic level.
 // =============================================================================
 
 #include "../src/dsp/JfetStage.h"
@@ -68,6 +77,45 @@ static double measureDb(double freq, double fs, double amp)
             peak = std::max(peak, std::abs(y));
     }
     return (peak > 0.0) ? 20.0 * std::log10(peak / amp) : -300.0;
+}
+
+// Harmonic magnitudes of a steady tone driven through the stage, via an
+// exact-bin DFT: freq/fs is chosen so an INTEGER number of periods fills the
+// window, so a rectangular window leaks nothing and a genuinely-absent harmonic
+// reads at the numerical floor (~-150 dB) instead of a leakage-limited ~-60.
+// magOut[k] = magnitude of harmonic (k+1); magOut[0] = the fundamental.
+static void harmonics(double freq, double fs, double amp, int nHarm, double* magOut)
+{
+    JfetStage stage;
+    stage.prepare(fs);
+
+    const int perSamples = static_cast<int>(std::lround(fs / freq)); // exact by construction
+    const int periods = 20;
+    const int nWin = perSamples * periods;
+    const int settle = static_cast<int>(0.2 * fs); // >> the 145 Hz input-HP tau (1.1 ms)
+
+    for (int k = 0; k < nHarm; ++k)
+        magOut[k] = 0.0;
+
+    double re[16] = { 0.0 };
+    double im[16] = { 0.0 };
+
+    for (int n = 0; n < settle + nWin; ++n)
+    {
+        const double x = amp * std::sin(2.0 * PI * freq * static_cast<double>(n) / fs);
+        const double y = stage.process(x);
+        if (n < settle)
+            continue;
+        const int m = n - settle;
+        for (int k = 0; k < nHarm; ++k)
+        {
+            const double w = 2.0 * PI * static_cast<double>((k + 1) * periods) * m / nWin;
+            re[k] += y * std::cos(w);
+            im[k] -= y * std::sin(w);
+        }
+    }
+    for (int k = 0; k < nHarm; ++k)
+        magOut[k] = 2.0 * std::hypot(re[k], im[k]) / nWin;
 }
 
 int main()
@@ -134,20 +182,44 @@ int main()
             ++failures;
     }
 
-    // ---- Test 4: nonlinearity — compression + asymmetry + monotonic -----------
-    std::printf("\n=== Nonlinearity: mild asymmetric soft saturation ===\n");
+    // ---- Test 4: SQUARE-LAW even shaper — H2 >> H3, asymmetric, monotonic -----
+    std::printf("\n=== Nonlinearity: square-law EVEN shaper (H2 dominant, H3 ~ absent) ===\n");
     {
-        // Hot 200 Hz tone (well above the input HP) driven hard into the shelf/gain
-        // so the waveshaper compresses. Small-signal gain reference from the oracle.
-        const double fs = 48000.0, freq = 200.0;
-        const double gSmallDb = measureDb(freq, fs, kSmall);
-        const double gSmall = std::pow(10.0, gSmallDb / 20.0);
+        // 200 Hz (well above the 145 Hz input HP; 48000/200 = 240 samples/period
+        // exactly, so the DFT bins line up). Amplitude picked so the waveshaper
+        // input peak lands near the knee s: |H(200 Hz)| ~ 15.8x, so 0.2 V -> ~3.2 V
+        // against s = 3.0 — the shaper is genuinely engaged, not a small-signal probe.
+        const double fs = 48000.0, freq = 200.0, amp = 0.2;
 
+        double mag[6] = { 0.0 };
+        harmonics(freq, fs, amp, 6, mag);
+        double hDb[6];
+        for (int k = 0; k < 6; ++k)
+            hDb[k] = 20.0 * std::log10(mag[k] / (mag[0] + 1e-300) + 1e-300);
+
+        std::printf("  drive %.2f V: H2 %+.1f  H3 %+.1f  H4 %+.1f  H5 %+.1f dB re fundamental\n",
+                    amp, hDb[1], hDb[2], hDb[3], hDb[4]);
+
+        // (a) H2 must be a real, audible-scale even harmonic (the warmth this shape exists for).
+        const bool h2Present = hDb[1] > -40.0;
+        // (b) H3 must be ~absent: the odd part of g is PURELY LINEAR, so H3 comes only
+        //     from arithmetic noise. The captured pedal separates them by ~23 dB at
+        //     drive-min; the shape itself must do far better than that on its own.
+        const bool evenDominant = (hDb[1] - hDb[2]) > 40.0;
+        // (c) H4 (even) must likewise outrun H5 (odd).
+        const bool h4OverH5 = (hDb[3] - hDb[4]) > 20.0;
+        std::printf("  H2 present: %s | H2-H3 = %+.1f dB (even-dominant): %s | H4-H5 = %+.1f dB: %s\n",
+                    h2Present ? "PASS" : "FAIL", hDb[1] - hDb[2], evenDominant ? "PASS" : "FAIL",
+                    hDb[3] - hDb[4], h4OverH5 ? "PASS" : "FAIL");
+        if (! (h2Present && evenDominant && h4OverH5))
+            ++failures;
+
+        // Asymmetry: the even bump a*s^2*(1-sech) is >= 0 on BOTH half-cycles, and the
+        // stage inverts, so |negative output peak| > positive output peak.
         JfetStage stage;
         stage.prepare(fs);
-        const double amp = 1.0; // hot: kG0*shelf*1V ~ tens of volts >> sat
         double peakPos = 0.0, peakNeg = 0.0;
-        const int settle = static_cast<int>(0.1 * fs);
+        const int settle = static_cast<int>(0.2 * fs);
         for (int n = 0; n < settle + static_cast<int>(4.0 * fs / freq); ++n)
         {
             const double x = amp * std::sin(2.0 * PI * freq * n / fs);
@@ -158,46 +230,29 @@ int main()
                 peakNeg = std::min(peakNeg, y);
             }
         }
-        const double bigGainPos = peakPos / amp;
-        const bool compresses = bigGainPos < 0.5 * gSmall; // heavy compression at 1 V drive
-        const bool asymmetric = std::abs(peakPos - std::abs(peakNeg)) > 1e-3 * peakPos; // satPos!=satNeg
-        // Bounded by the soft ceilings (inverting: +in-peak -> -out clips against
-        // satPos, -in-peak -> +out clips against satNeg). Assert both output peaks
-        // are inside [satNeg, satPos] + eps.
-        const double ceil = std::max(JfetStage::kSatPos, JfetStage::kSatNeg) + 1e-6;
-        const bool bounded = peakPos <= ceil && -peakNeg <= ceil;
-        std::printf("  1 V drive: out peaks [%+.4f, %+.4f] V; small-sig gain %.1fx -> big %.2fx\n",
-                    peakNeg, peakPos, gSmall, bigGainPos);
-        std::printf("  compresses: %s | asymmetric (satPos!=satNeg): %s | bounded by sat: %s\n",
-                    compresses ? "PASS" : "FAIL", asymmetric ? "PASS" : "FAIL",
-                    bounded ? "PASS" : "FAIL");
-        if (! (compresses && asymmetric && bounded))
+        const bool asymmetric = std::abs(peakPos - std::abs(peakNeg)) > 1e-3 * peakPos;
+        std::printf("  out peaks [%+.4f, %+.4f] V -> asymmetric (even bump): %s\n",
+                    peakNeg, peakPos, asymmetric ? "PASS" : "FAIL");
+        if (! asymmetric)
             ++failures;
 
-        // Static transfer must be monotonic (a valid waveshaper).
-        JfetStage s2;
-        s2.prepare(fs);
-        // DC won't pass the HP; probe the memoryless waveshaper via the exposed
-        // shape by feeding a slow ramp is unnecessary — instead verify monotonicity
-        // of tanh directly through the stage at HF where the HP passes (use a
-        // rising set of amplitudes and confirm the peak output is non-decreasing).
-        double prevPeak = -1.0; bool mono = true;
-        for (double a = 0.01; a <= 2.0; a *= 1.5)
+        // Monotonic static map at the nominal params. Inline replica of
+        // JfetStage::waveshape() from the PUBLIC constants (same no-drift convention
+        // as oracleDb above): g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and
+        // max|sech*tanh| = 0.3849, so monotonicity <=> |a|*s < 2.598.
+        const double s = JfetStage::kSatPos, a = JfetStage::kSatNeg;
+        bool mono = true;
+        double worstSlope = 1.0;
+        for (double w = -10.0 * s; w <= 10.0 * s; w += 0.01 * s)
         {
-            JfetStage sm;
-            sm.prepare(fs);
-            double pk = 0.0;
-            const int st = static_cast<int>(0.05 * fs);
-            for (int n = 0; n < st + static_cast<int>(4.0 * fs / freq); ++n)
-            {
-                const double x = a * std::sin(2.0 * PI * freq * n / fs);
-                const double y = sm.process(x);
-                if (n >= st) pk = std::max(pk, y);
-            }
-            if (pk < prevPeak - 1e-9) mono = false;
-            prevPeak = pk;
+            const double t = std::tanh(w / s);
+            const double slope = 1.0 + a * s * (1.0 / std::cosh(w / s)) * t;
+            worstSlope = std::min(worstSlope, slope);
+            if (slope <= 0.0)
+                mono = false;
         }
-        std::printf("  output peak monotonic in drive: %s\n", mono ? "PASS" : "FAIL");
+        std::printf("  static map monotonic (min slope %.4f, |a|*s = %.2f < 2.598): %s\n",
+                    worstSlope, std::abs(a) * s, mono ? "PASS" : "FAIL");
         if (! mono)
             ++failures;
     }

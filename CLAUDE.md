@@ -103,15 +103,20 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅ DONE; step 2 (clipper/JFET fits) 🔄 IN PROGRESS.
-> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). ⚠ WORKING TREE UNCOMMITTED
-> + ctest BROKEN (`JfetStageTest.cpp` asserts the old J201 tanh — needs a rewrite for the new
-> square-law shape).** Immediate next action: run `analysis/fit_nonlinear.py` (the re-fit), commit
-> the fitted nominals, rewrite the test, restore ctest, run dsp-validator. Step-2 finding: the J201
-> waveshaper was reshaped tanh → SQUARE-LAW (JfetStage.h) because tanh structurally can't make the
-> real pedal's pure-even low-drive H2; the CD4049 clipper shape is fine (only `jfetG0=15` was too
-> high). See the handover for full evidence, the capture harmonic targets, and steps 3–6.
-> (`docs/calibration-and-gain-staging.md` sets the fixed ORDER; do not reorder it.)
+> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅ DONE; step 2 ⏸ DEFERRED (reshape validated,
+> constants deliberately NOT committed); step 3 (bridged-T) 🔄 NEXT. ctest 16/16 ✅, tree committed.
+> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST).**
+> Step-2 finding: the J201 waveshaper was reshaped tanh → SQUARE-LAW (JfetStage.h) because tanh
+> structurally can't make the real pedal's pure-even low-drive H2. The reshape is CONFIRMED (fit cost
+> 3374.8 → 149.4, drive-min finally even-dominant) but the fitted VALUES are physically implausible
+> (`clipA0` 7.3 vs 20–30; clipper rail 1.79 V vs ~7 V) and NOT a bounds artefact, NOT a flat
+> degeneracy, and NOT contradictable by any capture (the GRUNT cross-check on A0 is inert — clipper
+> compression washes the corners out). Their absolute scale is CONFOUNDED with step 4's
+> `levelTaperExp` (render OD−clean runs +3.7…+5.2 dB hot, mostly a flat offset). **ORDER AMENDED with
+> the user 2026-07-22: do steps 3–4 first, then re-fit step 2 jointly with an OD-vs-clean level term
+> (the missing constraint, only valid once the tapers are known), then commit step-2 constants, then
+> steps 5–6.** Otherwise `docs/calibration-and-gain-staging.md` sets the fixed ORDER.
+> Also resolved this session: **GRUNT position→cap map VERIFIED against capture** (see below).
 > **Step 1 result (see `src/dsp/GainStaging.h` + memory `phase7-kinputref-anchor`):** kInputRef
 > stays **0.87 V/FS**, now ANCHORED (not nominal). `bypass.wav` is unity round-trip (−0.012 dB), so
 > the capture domain == DAW domain 1:1. K is DEGENERATE with the clip ceiling under audio-only
@@ -210,7 +215,8 @@ high, execute routine work cheap) is what should persist.
 > **⚠ Phase-7 capture carry-forwards (all flagged in-code, constants-only refit):** kA0 (open-loop
 > gain — fits BOTH the GRUNT-corner voicing AND the drive-sweep level, primary param), kSatLo/kSatHi
 > (per-side clip ceilings / H2-H3 asymmetry, fit to drive-sweep Farina THD + low-freq H2/H3). GRUNT
-> position→cap map is the ASSUMED UI map (Cut=4n7/Flat=4n7∥47n/Boost=4n7∥220n) — VERIFY at capture.
+> position→cap map (Cut=4n7/Flat=4n7∥47n/Boost=4n7∥220n) ✅ **VERIFIED at capture 2026-07-22**
+> (cut 0 < flat +5.43 < boost +6.81 dB, 50–300 Hz matched-pair; `analysis/grunt_a0_check.py`).
 > **⚠ GRUNT glitch-free swap deferred to Phase 6** (setGruntCap recomputes coefficients but keeps
 > the cap history → a bounded click on a live swap; crossfade alongside the BLEND work, like
 > TrebleAttack's deferred ATTACK crossfade). ATTACK + mid-freq switch topologies were already done
@@ -485,8 +491,8 @@ high, execute routine work cheap) is what should persist.
   a C8→GND *shunt* (treble rolloff), NOT "R7-R8 junc→GND" (that earlier reading grounded node M and
   MUTED the path — wrong pole assignment; see circuit.md "ATTACK-SWITCH CORRECTION"). No position
   mutes; UI up/mid/down order unchanged. **LO-MID** up=500Hz(10n)/mid=1k(2n2)/
-  down=250Hz(47n); **HI-MID** up=1.5k(3n3)/mid=3k(820pF)/down=750Hz(15n); **GRUNT** ⚠assumed, VERIFY
-  at capture: up/Boost=4n7∥220n(most)/mid/Cut=4n7 alone(least)/down/Flat=4n7∥47n(medium). That text: **font = Lexend Exa** (embed as binary data, this pedal's face text
+  down=250Hz(47n); **HI-MID** up=1.5k(3n3)/mid=3k(820pF)/down=750Hz(15n); **GRUNT** ✅VERIFIED at
+  capture 2026-07-22: up/Boost=4n7∥220n(most)/mid/Cut=4n7 alone(least)/down/Flat=4n7∥47n(medium). That text: **font = Lexend Exa** (embed as binary data, this pedal's face text
   ONLY — peripheral chrome keeps its existing font), **colour = white**, opaque when selected,
   semi-opaque when not — replaces `PedalLookAndFeel`'s current `cSWLabelActive`/`cSWLabelInactive`
   light-/dark-blue constants. Full spec in `ui.md` "Centre pedal face"; plan updated in

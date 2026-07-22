@@ -224,7 +224,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 ### GRUNT switch + coupling into clipper
 | Ref | Value | Function |
 |-----|-------|----------|
-| GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels). **UI position map (assumed 2026-07-20 — ⚠ VERIFY against capture): up/Boost = 4n7∥220n (MOST low end), mid/Cut = 4n7 alone (LEAST), down/Flat = 4n7∥47n (MEDIUM).** Semantics Cut<Flat<Boost. |
+| GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels). **UI position map ✅ VERIFIED against capture 2026-07-22 (was assumed 2026-07-20): up/Boost = 4n7∥220n (MOST low end), mid/Cut = 4n7 alone (LEAST), down/Flat = 4n7∥47n (MEDIUM).** Semantics Cut<Flat<Boost. Measured (matched-pair vs the cut baseline, 50–300 Hz of the driven sweep, `analysis/grunt_a0_check.py`): cut 0 dB < flat **+5.43 dB** < boost **+6.81 dB**, monotone bin-by-bin. |
 | C11 | 4n7 | always in forward path |
 | C12 | 47n | added in GRUNT pos 1 (via switch) |
 | C13 | 220n | added in GRUNT pos 3 (via switch) — **primary=220n; backup=22n (rev diff), see Validation** |

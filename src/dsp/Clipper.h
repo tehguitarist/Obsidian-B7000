@@ -120,9 +120,14 @@ public:
         clampLo = -0.6 - satLo;
     }
 
-    // GRUNT position -> coupling cap. ** UI map ASSUMED (circuit.md GRUNT note),
-    // VERIFY against capture: up/Boost = 4n7||220n (MOST low end), mid/Cut = 4n7
+    // GRUNT position -> coupling cap. ** UI map VERIFIED against capture 2026-07-22
+    // (was ASSUMED since Phase 5): up/Boost = 4n7||220n (MOST low end), mid/Cut = 4n7
     // alone (LEAST), down/Flat = 4n7||47n (MEDIUM). Semantics Cut < Flat < Boost. **
+    // Evidence (analysis/grunt_a0_check.py, matched-pair vs the cut baseline, 50-300 Hz
+    // of the driven sweep): cut 0 dB < flat +5.43 dB < boost +6.81 dB, monotone
+    // bin-by-bin. NOTE the enum's declaration order (Cut/Flat/Boost = 0/1/2) is NOT the
+    // APVTS index order (0=Boost, 1=Cut, 2=Flat) -- PedalChain::gruntEnum() does that
+    // remap deliberately; do not "simplify" it to a cast.
     enum class Grunt
     {
         Cut,   // 4n7 only            (least bass)

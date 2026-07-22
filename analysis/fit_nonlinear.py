@@ -29,7 +29,14 @@ CAP = "analysis/captures"
 # jfetSatPos = square-law knee `s`; jfetSatNeg = even/H2 strength `a` (JfetStage reshape 2026-07-22).
 FIT_KEYS = ["jfetG0", "jfetSatPos", "jfetSatNeg", "clipA0", "clipSatLo", "clipSatHi", "driveTaperExp"]
 NOMINAL  = [15.0, 3.0, 0.3, 25.0, 3.15, 3.85, 1.5]
-BOUNDS   = [(2, 16), (1, 6), (0.0, 1.0), (3, 30), (1.2, 6.5), (1.2, 7.5), (0.4, 3.0)]
+# Bounds WIDENED 2026-07-22 after run 1 pinned jfetSatPos exactly at its old 6.0 ceiling and
+# pushed clipSatLo (1.317) down near its old 1.2 floor — a param resting ON a bound means the
+# optimum is outside the box, so the reported value is an artefact of the box, not a fit.
+# jfetSatPos is the square-law knee `s`; a large `s` with a small `a` is a legitimate solution
+# (the even bump stays mild, |a|*s is what must stay < 2.598 for monotonicity — asserted in
+# JfetStageTest). clipSat* floors dropped because the R19-dropped 4049 rail is fitting LOWER
+# than the nominal ~7 V sum.
+BOUNDS   = [(2, 16), (1, 20), (0.0, 1.0), (3, 30), (0.4, 6.5), (0.4, 7.5), (0.4, 3.0)]
 # drive capture -> label
 DRIVE_CAPS = [
     ("drive-0700_base-od.wav", "min"),
@@ -122,13 +129,19 @@ def main():
     c0 = cost(NOMINAL, targets)
     print(f"\nNominal cost = {c0:.1f}")
 
-    # Nelder-Mead from nominal, then a light restart
+    # Nelder-Mead from nominal, then a light restart.
+    # `--start a,b,c,...` refines from ONE explicit point instead (used to re-run a previous
+    # best under WIDENED bounds — a param that came back resting on a bound must be re-fit,
+    # not committed).
     best = None
     starts = [
         [8, 3.0, 0.15, 25, 3.15, 3.85, 1.0],  # moderate gain, mild even, nominal clipper
         [6, 2.5, 0.20, 20, 3.0, 3.6, 1.2],
         [10, 3.5, 0.10, 15, 3.0, 4.0, 0.8],
     ]
+    for arg in sys.argv[1:]:
+        if arg.startswith("--start="):
+            starts = [[float(v) for v in arg.split("=", 1)[1].split(",")]]
     for start in starts:
         res = minimize(cost, start, args=(targets,), method="Nelder-Mead",
                        bounds=BOUNDS, options=dict(maxiter=400, xatol=0.02, fatol=0.3))

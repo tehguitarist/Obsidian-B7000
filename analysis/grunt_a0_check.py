@@ -1,0 +1,129 @@
+#!/usr/bin/env python3.11
+"""Phase-7 step 2 cross-check — is the fitted `clipA0` consistent with the GRUNT voicing?
+
+`clipA0` is the CD4049's finite open-loop gain, and circuit.md / Clipper.h flag it as
+constrained by TWO independent measurements at once:
+  (a) the drive-sweep LEVEL / harmonic profile  -> what fit_nonlinear.py fits, and
+  (b) the three GRUNT high-pass CORNERS, because the clipper's input-node impedance is
+      R18/(1+A0), which dominates the RC with the cap bank:
+          fc = 1 / (2*pi * Cg * (R16 + R18/(1+A0)))
+      A0 = 25 -> ~900/144/36 Hz;  a much lower A0 pushes all three corners UP.
+FitParams.h says explicitly: "fit it against the GRUNT voicing and the drive-sweep level
+together, not either alone." fit_nonlinear.py only exercises (a) — this script is (b).
+
+METHOD — matched-pair differencing (dsp.md "Isolate a coupled control with a MATCHED-PAIR
+capture"). GRUNT-flat and GRUNT-boost captures differ from the GRUNT-cut baseline in ONE
+knob only, so the difference FR cancels the (identical) clipping character and the whole
+rest of the chain, leaving just the cap-bank corner shift. We compute that same difference
+from renders at several candidate A0 values and pick the one that tracks the capture.
+
+Run: /opt/homebrew/bin/python3.11 analysis/grunt_a0_check.py [A0 ...]
+"""
+import sys, os, subprocess, numpy as np
+sys.path.insert(0, os.path.dirname(__file__))
+import analyze as A
+from captures import parse_capture, render_args, load_capture, RENDER_BIN
+
+ORIG = "analysis/test_signal_48k.wav"
+CAP = "analysis/captures"
+SEG = "sweep_drv_-18"          # driven sweep: the GRUNT corner is a pre-clipper HP, so it
+                               # must be measured through the drive path, not the clean one.
+# Band deliberately starts at 50 Hz, NOT 20: below ~40 Hz the driven-sweep captures are
+# measurement noise (the matched-pair diff swings -5..-11 dB there, non-monotonically, and
+# disagrees between adjacent bins). An earlier version of this script averaged from 20 Hz and
+# read that noise as a "flat position gives LESS bass than cut" result, which looked like the
+# GRUNT cap map being wrong — it was not. 50-300 Hz is where the flat/boost corners actually
+# live and where capture and render both have real signal.
+BAND = (50.0, 300.0)
+
+# (capture file, GRUNT position). ref-od is the baseline = GRUNT cut (C11 4n7 alone).
+POSITIONS = [
+    ("ref-od.wav",              "cut"),
+    ("grunt-flat_base-od.wav",  "flat"),
+    ("grunt-boost_base-od.wav", "boost"),
+]
+
+
+def fr(x, orig):
+    """1/6-oct-smoothed transfer of a segment vs the same segment of the source signal."""
+    f, mag = A.transfer(A.seg_of(x, SEG), A.seg_of(orig, SEG))
+    m = (f >= BAND[0]) & (f <= BAND[1])
+    return f[m], mag[m]
+
+
+def separation(f, diffs):
+    """Mean (boost - flat) across the band — the A0-SENSITIVE discriminator.
+
+    Both boost (4n7||220n) and flat (4n7||47n) sit above the cut baseline, so their
+    absolute shelf heights are set mostly by how hard the clipper compresses the extra
+    bass — nearly A0-independent. What A0 *does* control is whether the two corners are
+    resolved: A0 sets the clipper input impedance R18/(1+A0), so a LOW A0 drops both
+    corners below the band (boost and flat then look identical) while a higher A0 lifts
+    flat's corner into the band and pulls the two apart. The capture separates them, so
+    this number is the constraint the drive-sweep objective cannot supply."""
+    return float(np.mean(diffs["boost"] - diffs["flat"]))
+
+
+def capture_diffs(orig):
+    curves = {}
+    for fname, pos in POSITIONS:
+        c = load_capture(f"{CAP}/{fname}")
+        c, _lag = A.align(c, orig)
+        f, mag = fr(c, orig)
+        curves[pos] = mag
+    return f, {p: curves[p] - curves["cut"] for p in ("flat", "boost")}
+
+
+def render_diffs(orig, a0, fitted):
+    curves = {}
+    for fname, pos in POSITIONS:
+        parsed = parse_capture(fname)
+        extra = ["--fit", f"clipA0={a0}"]
+        for k, v in fitted.items():
+            extra += ["--fit", f"{k}={v}"]
+        out = f"/tmp/grunt_{pos}_{a0:g}.wav"
+        subprocess.run([RENDER_BIN, ORIG, out, "--os", "8"] + render_args(parsed, extra),
+                       check=True, capture_output=True)
+        r, _lag = A.align(A.load(out), orig)
+        f, mag = fr(r, orig)
+        curves[pos] = mag
+    return f, {p: curves[p] - curves["cut"] for p in ("flat", "boost")}
+
+
+def main():
+    # Default = fit_nonlinear.py's run-2 best point. Override any of them with
+    # `key=value` args to test a different (e.g. physically-nominal) clipper; bare
+    # numeric args are the clipA0 values to sweep.
+    fitted = dict(jfetG0=4.583, jfetSatPos=10.585, jfetSatNeg=0.232,
+                  clipSatLo=0.773, clipSatHi=1.012, driveTaperExp=1.598)
+    a0s = []
+    for arg in sys.argv[1:]:
+        if "=" in arg:
+            k, v = arg.split("=", 1)
+            fitted[k] = float(v)
+        else:
+            a0s.append(float(arg))
+    a0s = a0s or [9.4, 15.0, 20.0, 25.0]
+    print("clipper/JFET params held at: " + ", ".join(f"{k}={v:g}" for k, v in fitted.items()))
+
+    orig = A.load(ORIG)
+    fc, cdiff = capture_diffs(orig)
+    cap_sep = separation(fc, cdiff)
+    print(f"CAPTURE matched-pair diffs (vs GRUNT cut), {SEG}, {BAND[0]:.0f}-{BAND[1]:.0f} Hz:")
+    for p in ("flat", "boost"):
+        print(f"  {p:5s}: mean {np.mean(cdiff[p]):+6.2f} dB")
+    print(f"  boost-flat SEPARATION = {cap_sep:+.2f} dB   <- the A0 discriminator")
+
+    print(f"\n{'A0':>6s} | {'flat-cut':>9s} | {'boost-cut':>9s} | {'sep':>7s} | {'sep err':>8s} | {'RMS err':>8s}")
+    print(f"{'CAPTURE':>6s} | {np.mean(cdiff['flat']):+9.2f} | {np.mean(cdiff['boost']):+9.2f} | "
+          f"{cap_sep:+7.2f} | {'':>8s} | {'':>8s}")
+    for a0 in a0s:
+        f, rdiff = render_diffs(orig, a0, fitted)
+        sep = separation(f, rdiff)
+        err = np.sqrt(np.mean(np.concatenate([(rdiff[p] - cdiff[p]) ** 2 for p in ("flat", "boost")])))
+        print(f"{a0:6.1f} | {np.mean(rdiff['flat']):+9.2f} | {np.mean(rdiff['boost']):+9.2f} | "
+              f"{sep:+7.2f} | {sep - cap_sep:+8.2f} | {err:8.2f}")
+
+
+if __name__ == "__main__":
+    main()
