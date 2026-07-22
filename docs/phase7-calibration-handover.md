@@ -2,8 +2,8 @@
 
 > **Resume point for Phase-7 calibration. Read this first.** Supersedes
 > `phase7-handoff.md` (which documents the now-complete PRE-work).
-> `ctest` is 16/16 green. ⚠ Session 3's J201/TrebleAttack restructure is IN THE
-> WORKING TREE BUT NOT YET COMMITTED — commit it before starting new work.
+> `ctest` is 16/16 green and the tree is clean. Session 3's J201/TrebleAttack
+> restructure is committed as `b02b2f2`.
 
 ---
 

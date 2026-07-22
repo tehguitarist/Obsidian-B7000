@@ -104,8 +104,7 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅; the OD-path LOADING BLOCKER ✅ RESOLVED
-> (2026-07-22 session 3); steps 2–6 now unblocked. ctest 16/16 ✅. ⚠ Session-3 work is IN THE
-> WORKING TREE, NOT COMMITTED.
+> (2026-07-22 session 3); steps 2–6 now unblocked. ctest 16/16 ✅, tree clean (commit `b02b2f2`).
 > ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST — all evidence + two
 > open items).**
 > **THE BLOCKER IS FIXED — it was structural, not a fit problem.** `JfetStage` was a VOLTAGE
