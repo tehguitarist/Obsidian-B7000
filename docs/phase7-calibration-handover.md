@@ -188,6 +188,77 @@ max   -22.9  -30.0  -29.0  -35.8  -28.8
   clipper's ~×48 loop gain re-saturates even at sat=50). Reason about shapes analytically
   or drive the real stage; don't trust "linearize by huge-sat" renders.
 
+## ⚠⚠ Step 3 attempt found a BIGGER problem: the OD path has ~+25 dB of excess HF
+
+Attempting the bridged-T reshape surfaced a much larger issue that **blocks step 3 and
+probably corrupted the step-2 fit**. Evidence, in the order it was established:
+
+### 1. The error is confined to the OD chain (bisection)
+Measured shape re 200 Hz, `sweep_clean_-36` segment, drive-MIN capture vs render:
+```
+                 100    300    700   1200   2000   3000   5000   8000 Hz
+ref-clean  cap  -0.12  +0.04  +0.10  +0.14  +0.19  +0.21  +0.17  +0.11   <- FLAT (+-0.2 dB)
+ref-clean  mdl  -3.14  +1.11  +1.98  +2.14  +2.19  +2.20  +2.21  +2.21   RMS err 1.90 dB  OK
+drive-0700 cap  -2.41  -2.63  -2.19  +0.53  +6.03  +6.54  -4.59  -5.52
+drive-0700 mdl  -2.05  -7.80  +4.01 +21.90 +29.23 +31.00 +27.70 +19.98   RMS err 19.7 dB  ✗
+```
+The clean path matches within ~2 dB, and the clean CAPTURE is flat to +-0.2 dB — so the
+EQ, output stage, and the whole `transfer()` measurement pipeline are all validated. The
+error is **entirely inside the OD chain**.
+
+### 2. With the step-2 FITTED constants, 100-700 Hz matches within ~1 dB
+Error vs capture: 100 Hz −0.10, 300 Hz −0.96, 500 Hz −0.92, **700 Hz −0.00**, then
+900 Hz +6.22, 1200 +13.72, 2000 +17.11, 3000 +18.82. So the divergence is sharply
+confined to **>900 Hz**, and the fitted constants fix the low end (nominal RMS 19.71 →
+fitted 13.98 dB).
+
+### 3. It is NOT a C++ bug — the analytic oracle reproduces it
+Cascading `eq_reference.py`'s per-stage TFs (independent of the C++), dB re each stage's
+own 200 Hz value:
+```
+  Hz  |    J201  treble   drive clipper bridgedT  SK10k7  SK3k3 | TOTAL
+ 2000 |   +9.39  +14.62   -0.15   +9.17    -2.40   -0.39  -0.67 | +29.56
+ 3000 |   +9.65  +15.77   -0.33   +9.29    +1.31   -0.84  -2.39 | +32.46
+```
+The analytic TOTAL (+29.6 dB @ 2 kHz) tracks the rendered model (+23.1 dB; the ~6 dB gap
+is the clipper's nonlinear compression). **So the model faithfully implements the spec —
+the SPEC disagrees with the real pedal**, which shows only +6.03 dB at 2 kHz.
+
+### 4. Prime suspect: the deferred inter-stage LOADING carry-forwards
+Three stages contribute ~+33 dB of HF boost between them (treble net +14.6, J201 shelf
++9.4, clipper +9.2 @ 2 kHz). Each is modelled with **ideal-source-in / unloaded-out**
+boundaries — and those are explicitly flagged Phase-7 deferrals:
+- `TrebleAttack.h:24` — "Input node G (J201 drain) = IDEAL voltage source (source Z = 0)
+  for Phase 4; **revisit with an explicit J201 output impedance at Phase 7 capture**."
+  This is the big one: the treble ladder's HF path is C5/C9/C6 in series (22n each →
+  7.33n ≈ **7.2 kΩ at 3 kHz**). A real J201 drain / active-load output impedance of tens
+  of kΩ would form a divider against that and largely CANCEL the HF bypass of R7.
+- `RecoveryBridgedT` is modelled UNLOADED by design (circuit.md risk #1, R24→SK deferred).
+- `JfetStage` folds C4 bootstrap + R7 loading into `kG0` — a flat approximation of what
+  is really a frequency-dependent interaction.
+
+### 5. This probably BIASED the step-2 harmonic fit
+The tone_220 objective reads H2..H5 at **440/660/880/1100 Hz** — i.e. H3/H4/H5 sit right
+where the excess HF begins. The fit could only match the captured harmonic ratios by
+distorting the clipper, which is a plausible mechanism for the implausible `clipA0`=7.3 /
+rail=1.79 V it converged on. **Re-fit step 2 only after the loading is fixed.**
+
+### 6. The bridged-T notch itself is real and CLOSE (the actual step-3 target)
+Fine detail, fitted constants, shape re 200 Hz: **capture dip 334 Hz @ −3.36 dB**, model
+dip **375 Hz @ −6.46 dB**. So the real notch exists, is ~12% lower in frequency and about
+half as deep — exactly what circuit.md risk #1 predicted ("much shallower than ideal").
+Tractable, but do NOT fit it until the HF/loading issue is resolved: fitting a notch on
+top of a known +20 dB neighbouring error bakes in a compensating error (the calibration
+doc's "decompose the deficit before changing constants" rule).
+⚠ Also note the analytic treble net shows **−16.69 dB at 300 Hz** on its own — so part of
+the ~334 Hz dip may be the TREBLE network, not the bridged-T. Decompose before fitting.
+
+### Recommended next action
+Model the **J201 output impedance** into the TrebleAttack boundary (and the bridged-T
+load), re-check the OD FR, then re-fit step 2, then step 3/4. `jfetGmR6` should also join
+the fit set — it was NOT in `FIT_KEYS` and accounts for ~5 dB of the excess on its own
+(sweep: gmR6 2.277→0 moves the 3 kHz error 18.82→13.30 dB).
+
 ## Remaining calibration steps (order fixed by calibration-and-gain-staging.md)
 3. Bridged-T reshape to the measured notch (compare `drive-0700` OD path vs `ref-clean`).
 4. Taper shapes (≥2 knob points/pot; matrix has 4). **Includes `masterTaperExp`** — do
