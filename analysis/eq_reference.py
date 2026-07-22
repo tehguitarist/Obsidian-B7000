@@ -16,14 +16,23 @@ BAXANDALL (IC5_C):
 """
 import numpy as np
 
-def treble_attack_tf(f, position, R7=200e3, R8=470e3, R11=470e3, R12=6.8e3, R14=22e3, R13=1e6,
-                     C5=22e-9, C9=22e-9, C6=22e-9, C7=100e-9, C8=220e-12):
+def treble_attack_tf(f, position, Zs=None, R7=200e3, R8=470e3, R11=470e3, R12=6.8e3, R14=22e3,
+                     R13=1e6, C5=22e-9, C9=22e-9, C6=22e-9, C7=100e-9, C8=220e-12):
     """TrebleAttack stage (circuit.md "Treble network + ATTACK", node graph VERIFIED 2026-07-19).
 
-    Convention (build-plan Phase 4, user-confirmed 2026-07-20): the J201 drain (node G) is an
-    IDEAL voltage source (source Z = 0) — revisit with an explicit Rout at Phase 7 capture.
+    Zs = source impedance at node G (the J201 drain), as a scalar or a per-frequency array.
+    Zs=None (default) keeps the ORIGINAL Phase-4 convention — node G is an IDEAL voltage
+    source (source Z = 0). ** That convention was discharged on 2026-07-22: the real J201
+    drain impedance is comparable to the treble ladder's own input impedance (which falls
+    ~35k at 200 Hz -> ~6.5k at 2 kHz), so driving it ideally let the C5/C9/C6 HF bypass of
+    R7 through at full strength and cost ~+23 dB of excess HF in the OD path. Pass Zs (see
+    jfet_source_z) for the physical boundary; Zs=None is kept only so the pre-2026-07-22
+    numbers in this file's __main__ print stay reproducible. **
+
     Stage output = V(Q) = the voltage presented to IC2_A(+); the DRIVE stage multiplies it.
-    IC2_A(+) draws no current, so V(Q) is a clean stage boundary.
+    IC2_A(+) draws no current, so V(Q) is a clean stage boundary. With Zs given, the return
+    is V(Q)/Vth (Thevenin drive) — multiply by Zs to get the transimpedance V(Q)/I_norton,
+    which is what the C++ stage (a current-in stage) is validated against.
 
     Nodes (signal ground = VD = 0):
       G(=Vin) --R7--> M --R8--> P                          (top rail; M = R7/R8 junction)
@@ -41,28 +50,63 @@ def treble_attack_tf(f, position, R7=200e3, R8=470e3, R11=470e3, R12=6.8e3, R14=
     w = 2j * np.pi * f
     out = np.zeros(len(f), dtype=complex)
     pos = position.lower()
+    zs = None if Zs is None else np.broadcast_to(np.asarray(Zs, dtype=complex), (len(f),))
     for i, s in enumerate(w):
         yC5, yC9, yC6, yC7, yC8 = s * C5, s * C9, s * C6, s * C7, s * C8
         Vin = 1.0
-        # Unknowns: [M, P, L1, L2, Q]. Forward path M->R8->P intact in all positions.
-        # Boost: C8 couples M<->P. Cut: C8 shunts P->GND. Flat: C8 absent.
+        # Unknowns: [M, P, L1, L2, Q] (+ G when Zs is given). Forward path M->R8->P
+        # intact in all positions. Boost: C8 couples M<->P. Cut: C8 shunts P->GND.
         gMP = yC8 if pos == 'boost' else 0.0   # C8 as R8 bridge
         gPg = yC8 if pos == 'cut' else 0.0     # C8 as shunt at P
-        A = np.zeros((5, 5), dtype=complex); b = np.zeros(5, dtype=complex)
-        # M: (M-Vin)/R7 + (M-P)/R8 + (M-L2)*yC6 + (M-P)*gMP = 0
+        n = 5 if zs is None else 6
+        G = 5  # index of node G when present
+        A = np.zeros((n, n), dtype=complex); b = np.zeros(n, dtype=complex)
+        # M: (M-G)/R7 + (M-P)/R8 + (M-L2)*yC6 + (M-P)*gMP = 0
         A[0, 0] = 1 / R7 + 1 / R8 + yC6 + gMP; A[0, 1] = -(1 / R8 + gMP); A[0, 3] = -yC6
-        b[0] = Vin / R7
         # P: (P-M)/R8 + P/R11 + (P-Q)*yC7 + (P-M)*gMP + P*gPg = 0
         A[1, 1] = 1 / R8 + 1 / R11 + yC7 + gMP + gPg; A[1, 0] = -(1 / R8 + gMP); A[1, 4] = -yC7
-        # L1: (L1-Vin)*yC5 + (L1-L2)*yC9 + L1/R12 = 0
-        A[2, 2] = yC5 + yC9 + 1 / R12; A[2, 3] = -yC9; b[2] = yC5 * Vin
+        # L1: (L1-G)*yC5 + (L1-L2)*yC9 + L1/R12 = 0
+        A[2, 2] = yC5 + yC9 + 1 / R12; A[2, 3] = -yC9
         # L2: (L2-L1)*yC9 + (L2-M)*yC6 + L2/R14 = 0
         A[3, 3] = yC9 + yC6 + 1 / R14; A[3, 2] = -yC9; A[3, 0] = -yC6
         # Q: (Q-P)*yC7 + Q/R13 = 0
         A[4, 4] = yC7 + 1 / R13; A[4, 1] = -yC7
+        if zs is None:
+            # G is the known ideal source -> its terms move to the RHS.
+            b[0] = Vin / R7
+            b[2] = yC5 * Vin
+        else:
+            yS = 1.0 / zs[i]
+            A[0, G] = -1 / R7
+            A[2, G] = -yC5
+            # G: (G-Vth)*yS + (G-M)/R7 + (G-L1)*yC5 = 0
+            A[G, G] = yS + 1 / R7 + yC5; A[G, 0] = -1 / R7; A[G, 2] = -yC5
+            b[G] = yS * Vin
         x = np.linalg.solve(A, b)
         out[i] = x[4]
     return out
+
+
+def jfet_source_z(f, gm=0.69e-3, ro=200e3, Rq2=1e6, R6=3.3e3, C3=220e-9):
+    """J201 drain output impedance Zout(s) = [ro*k(s)] || Rq2,  k(s) = 1 + gm*(R6||C3).
+
+    This is the boundary TrebleAttack now stamps (TrebleAttack.h "Stage boundary"). It is
+    the SAME k(s) that shapes the transconductance in jfet_stage_lin_tf, in the OPPOSITE
+    direction — Gm*Rout = gm*ro is flat, so the C3 "HF lift" is not a gain at all, it is a
+    falling output impedance that only becomes a lift once something loads it.
+
+    ro*k(s) is exactly a series ro plus a parallel Rp||Cp, Rp = ro*gm*R6, Rp*Cp = R6*C3 —
+    which is how the C++ stage realises it as two extra nodes in the nodal matrix.
+    """
+    s = 2j * np.pi * f
+    k = 1 + gm * (R6 / (1 + s * R6 * C3))
+    return (ro * k * Rq2) / (ro * k + Rq2)
+
+
+def treble_attack_transimpedance(f, position, gm=0.69e-3, ro=200e3, Rq2=1e6, **kw):
+    """V(Q) / I_drain (ohms) — the oracle the current-in C++ TrebleAttack is validated on."""
+    Z = jfet_source_z(f, gm=gm, ro=ro, Rq2=Rq2)
+    return Z * treble_attack_tf(f, position, Zs=Z, **kw)
 
 def drive_stage_tf(f, Rdrive, R15=330e3, C10=47e-12, R17=3.3e3, R32=1e3):
     """DRIVE stage (IC2_A) — circuit.md "DRIVE gain stage (IC2_A)".
@@ -241,40 +285,42 @@ def level_blend_tf(level, blend, vo=1.0, vc=0.0, p=1.43):
     return (1.0 - B) * vc + B * vw
 
 
-def jfet_stage_lin_tf(f, G0=15.0, gm_R6=2.277, R4=100e3, R5=1e6, C2=1e-9, R6=3.3e3, C3=220e-9):
-    """J201 JFET stage (Q1 CS + Q2 active load) — LINEAR small-signal TF.
+def jfet_stage_lin_tf(f, gm=0.69e-3, R4=100e3, R5=1e6, C2=1e-9, R6=3.3e3, C3=220e-9):
+    """J201 JFET stage (Q1 CS + Q2 active load) — LINEAR small-signal TRANSCONDUCTANCE.
 
-    Path-B model (docs/nonlinear-component-modeling.md §2): input HP (C2 into
-    R4+R5) -> HF-lift shelf (C3 bypassing the R6 source degeneration) -> inverting
-    mid-band gain G0 -> [static asymmetric soft-waveshaper, applied in the C++
-    stage]. This oracle is the LINEAR part only (small-signal, waveshaper ~ unity):
+    ** RESTRUCTURED 2026-07-22: this returns the drain NORTON CURRENT per input volt
+    (siemens), not a voltage gain. ** The stage used to be modelled as a voltage source
+    (HP -> shelf -> *(-G0)) feeding an ideal-source treble net; that double-counted the
+    C3 shelf and cost ~+23 dB of excess HF in the OD path. See JfetStage.h's header for
+    the device algebra. The load-dependent part now lives in jfet_source_z(), which
+    TrebleAttack stamps.
 
-      H(s) = -G0 * HP(s) * shelf(s)
+      I(s)/Vin(s) = -[gm/(1+gm R6)] * (R5/(R4+R5)) * HP(s) * shelf(s)
       HP(s)    = s(R4+R5)C2 / (1 + s(R4+R5)C2)             fc ~= 144.7 Hz  (passband 1)
       shelf(s) = (1 + s R6 C3) / (1 + s R6 C3/(1+gm R6))   zero 219 Hz, pole ~719 Hz
-                 low-freq gain 1, high-freq gain (1+gm R6) = shelfRatio (~3.28, +10.3 dB)
+                 == k(0)/k(s), the degeneration factor — the SAME k(s) that makes
+                 jfet_source_z's output impedance FALL by the same ratio, so the
+                 open-circuit gain Gm*Rout = gm*ro is flat.
 
-    The J201 gate draws no current, so the input HP sees C2 into R4+R5 (=1.1M) and
-    the R5/(R4+R5) gate divider folds into G0. C4 (Q2 gate->output bootstrap) and
-    the R7 treble-net loading fold into G0 as well (Phase-4 boundary: node G is an
-    ideal source, per TrebleAttack.h; revisit output Z at Phase 7).
+    The J201 gate draws no current, so the input HP sees C2 into R4+R5 (=1.1M); the
+    R5/(R4+R5) gate divider is explicit here (it used to be folded into G0).
 
     ** ONLY the corner frequencies (from R/C) and the inverting sign are trustworthy
-    pre-capture. ** G0 (mid-band gain) and gm_R6 (shelf strength / HF lift) are
-    NOMINAL placeholders from the datasheet Shichman-Hodges operating point
-    (self-bias Id~=0.12 mA, Vgs~=-0.38 V, gm~=0.69 mS => gm*R6~=2.28). The J201 is
-    spread ~5:1 part-to-part, so BOTH must be FIT to the drive-min OD-path captures
-    at Phase 7 (docs/nonlinear-component-modeling.md §4 "J201 stage" extraction).
+    pre-capture. ** gm is a NOMINAL placeholder from the datasheet Shichman-Hodges
+    operating point (self-bias Id~=0.12 mA, Vgs~=-0.38 V => gm~=0.69 mS). The J201 is
+    spread ~5:1 part-to-part, so gm — and ro/Rq2 in jfet_source_z — must be FIT to the
+    drive-min OD-path captures (docs/nonlinear-component-modeling.md §4 "J201 stage").
 
     Referenced by tests/JfetStageTest.cpp as the analytic oracle for the linear part.
     """
     s = 2j * np.pi * f
     tau_hp = (R4 + R5) * C2
     hp = s * tau_hp / (1 + s * tau_hp)
+    gm_R6 = gm * R6
     tau_z = R6 * C3
     tau_p = tau_z / (1 + gm_R6)
     shelf = (1 + s * tau_z) / (1 + s * tau_p)
-    return -G0 * hp * shelf
+    return -(gm / (1 + gm_R6)) * (R5 / (R4 + R5)) * hp * shelf
 
 
 def clipper_smallsignal_tf(f, Cg, A0=25.0, R16=6.8e3, R18=330e3, C14=220e-12):
@@ -397,7 +443,15 @@ R4, R5, C2, R6, C3, gm_R6 = 100e3, 1e6, 1e-9, 3.3e3, 220e-9, 2.277
 print(f"input HP: C2(1n) into R4+R5(1.1M): corner {1/(2*np.pi*C2*(R4+R5)):.2f} Hz (gate draws no I)")
 print(f"HF-lift shelf (C3 bypasses R6): zero {1/(2*np.pi*R6*C3):.1f} Hz, pole {(1+gm_R6)/(2*np.pi*R6*C3):.1f} Hz")
 print(f"                shelf ratio 1+gm*R6 = {1+gm_R6:.3f} ({20*np.log10(1+gm_R6):+.2f} dB HF lift)  [NOMINAL - fit to capture]")
-g = 20 * np.log10(np.abs(jfet_stage_lin_tf(f)))
+print("  NOTE: the shelf above is NOT an unconditional gain lift — it is k(0)/k(s), and the")
+print("  drain output impedance FALLS by the same ratio, so open-circuit gain gm*ro is FLAT.")
+print("  It only becomes a lift once the treble net loads it (2026-07-22 restructure).")
+gS = 20 * np.log10(np.abs(jfet_stage_lin_tf(f)))                       # siemens
+zS = np.abs(jfet_source_z(f))                                          # ohms
+gOC = gS + 20 * np.log10(zS)                                           # open-circuit V/V
+gLoaded = 20 * np.log10(np.abs(treble_attack_transimpedance(f, 'flat'))
+                        * np.abs(jfet_stage_lin_tf(f)))                # into the real load, at Q
 for fq in [50, 100, 145, 250, 500, 1000, 2000, 5000, 10000, 20000]:
-    gi = g[np.argmin(np.abs(f - fq))]
-    print(f"        {fq:6d} Hz: {gi:+6.2f} dB  (G0=15 nominal, INVERTING) [G0 - fit to capture]")
+    i = np.argmin(np.abs(f - fq))
+    print(f"        {fq:6d} Hz: Gm {gS[i]:+7.2f} dBS | Zout {zS[i]/1e3:7.1f}k | open-circuit "
+          f"{gOC[i]:+6.2f} dB | at Q (loaded) {gLoaded[i]:+6.2f} dB   [gm/ro/Rq2 - fit to capture]")

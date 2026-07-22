@@ -6,74 +6,83 @@
 // Stage 2 — J201 JFET gain stage (Q1 common-source + Q2 active load)
 // =============================================================================
 // The FIRST nonlinear stage. circuit.md "JFET gain stage (Q1/Q2)". Sits between
-// the InputBuffer (IC1_A) and the TrebleAttack treble net: its output IS node G
-// (the J201 drain), which TrebleAttack takes as an ideal voltage source for
-// Phase 4 (revisit output Z at Phase 7 capture).
+// the InputBuffer (IC1_A) and the TrebleAttack treble net.
 //
 //   C2 = 1n    coupling from IC1_A into the drive path
 //   R4 = 100k  gate-stopper into Q1 gate      | gate draws ~no current, so the
 //   R5 = 1M    gate-leak bias to GND          | input HP sees C2 into R4+R5 = 1.1M
 //   Q1 = J201  common-source gain JFET (INVERTING)
 //   R6 = 3k3   Q1 source degeneration to GND
-//   C3 = 220n  || R6, bypasses the degeneration above ~219 Hz -> HF gain lift
+//   C3 = 220n  || R6, bypasses the degeneration above ~219 Hz
 //   Q2 = J201  active load (gate @ VD via R9/R10, drain @ +9V, source = output)
 //   C4 = 22n   Q2 gate->source(output) bootstrap -> raises the active-load Z
 //
-// ---- Model: Path B (docs/nonlinear-component-modeling.md §2, recommended) ----
-// The J201 is spread ~5:1 part-to-part (Vgs(off) -0.3..-1.5 V, IDSS 0.2..1.0 mA)
-// so a nominal SPICE device will NOT match a specific unit — we fit the whole
-// Q1/Q2 block to captures. The block is a Wiener-Hammerstein cascade:
+// ---- THIS STAGE IS A CURRENT SOURCE, NOT A VOLTAGE SOURCE -------------------
+// ** RESTRUCTURED 2026-07-22 (Phase-7 calibration). ** It used to be a voltage
+// stage — HP -> HF-lift shelf -> *(-G0) -> waveshaper — feeding TrebleAttack as
+// an IDEAL source. That was structurally wrong in a way that cost ~+23 dB of
+// excess HF in the OD path (docs/phase7-calibration-handover.md). Why:
 //
-//   x --[input HP]--[HF-lift shelf]--[ * -G0 ]--[asym soft waveshaper]--> out
-//        (C2,R4/R5)   (C3 / R6)      inverting    (JFET/active-load soft sat)
+//   For a common-source stage with degeneration Zs = R6||C3 and an active load,
+//       k(s)    = 1 + gm*Zs(s)            degeneration factor: 1+gm*R6 at DC -> 1 at HF
+//       Gm(s)   = gm / k(s)               transconductance RISES with frequency
+//       Rout(s) = ro * k(s)               drain output R FALLS with frequency
+//   so the OPEN-CIRCUIT voltage gain is Gm*Rout = gm*ro — **flat, independent of
+//   the degeneration**. The old "+10.3 dB HF-lift shelf" is therefore NOT an
+//   unconditional gain lift; it only appears to the extent the stage is LOADED.
+//   And the load — the treble ladder — has an input impedance that FALLS across
+//   the same band (~35 kOhm at 200 Hz -> ~6.5 kOhm at 2 kHz), which cancels most
+//   of it. Applying the shelf unconditionally AND then driving the ladder from an
+//   ideal source double-counts the boost.
 //
-//   * Linear filters carry the exact R/C SHAPE (corner frequencies).
-//   * -G0 carries the inverting mid-band small-signal gain magnitude.
-//   * the waveshaper carries the mild asymmetric soft saturation (even harmonics).
+// So the stage now outputs the drain NORTON CURRENT, and its output impedance is
+// stamped into TrebleAttack's nodal matrix (getSourceZ() / TrebleAttack::
+// setSourceZ) — that is the "revisit with an explicit J201 output impedance at
+// Phase 7" deferral, discharged. The shelf survives only as the shared k(s) that
+// shapes Gm and Rout in OPPOSITE directions, exactly as the device does.
 //
-// ** ONLY the filter corners (from R/C) and the INVERTING polarity are trustworthy
-//    pre-capture. ** Everything amplitude-related below (kG0, kGmR6, the waveshaper
-//    saturation levels) is a NOMINAL placeholder from the datasheet Shichman-Hodges
-//    operating point — see the "Phase-7 capture carry-forwards" note. The stage is
-//    structured so refitting them later is a one-line change and never disturbs the
-//    (already-correct) linear filter shape or the polarity.
+//   x --[input HP]--[gate div]--[1/k(s)]--[square-law shaper]--*(-gm)--> i_drain
+//        (C2,R4/R5)  R5/(R4+R5)  (C3/R6)     (vgs nonlinearity)
 //
-// ---- Linear transfer function (small signal) --------------------------------
-//   H(s) = -G0 * HP(s) * shelf(s)
-//   HP(s)    = s(R4+R5)C2 / (1 + s(R4+R5)C2)              fc = 144.7 Hz, passband 1
-//              (the fixed R5/(R4+R5) gate divider folds into G0)
-//   shelf(s) = (1 + s R6 C3) / (1 + s R6 C3/(1+gmR6))     zero 219 Hz, pole ~719 Hz
-//              low-freq gain 1, high-freq gain (1+gmR6) = shelfRatio (~3.28)
-// All three corners are well below 1 kHz, so — like MasterOut and InputBuffer —
-// there is NO audible-band bilinear top-octave warp here (unlike the EQ stages):
-// the trapezoidal/bilinear discretisation matches the analytic oracle tightly
-// across the WHOLE band. This stage therefore sits OUTSIDE the Phase-6 oversampled
-// region for LINEAR purposes, BUT its WAVESHAPER is the aliasing source, so in the
-// full chain the stage is oversampled + ADAA'd (build-plan Phase 5/6; the per-side
-// square-law shaper has a closed-form antiderivative — see waveshape()/waveshapeAD()).
+//   * The 1/k(s) filter is the SAME first-order shelf IIR as before, rescaled so
+//     its output is the effective vgs (DC gain 1/(1+gm*R6), HF gain 1). Driving
+//     the shaper with a true vgs means the knee `s` is in REAL gate volts (order
+//     |Vp| ~ 0.3-1.5 V for a J201), not an arbitrary post-gain scale.
+//   * Small-signal current is exactly -gm*vgs, so `gm` alone sets the gain and
+//     the shaper only adds curvature (its slope at 0 is exactly 1).
+//   * This is still a Wiener-Hammerstein approximation: the true degeneration is
+//     nonlinear feedback (vgs = vg - i_d*Zs, an implicit solve). Linearising the
+//     degeneration and putting the nonlinearity on vgs is the same modelling
+//     choice the stage always made, just applied at the physically right node.
 //
-// ---- Discretisation ---------------------------------------------------------
-//   Input HP: one physical trapezoidal-companion cap (C2) at a single node
-//     (identical convention to MasterOut's HPFs / RecoveryBridgedT).
-//   HF shelf: a first-order bilinear IIR from the analog shelf prototype. Bilinear
-//     == trapezoidal, so this is the SAME discretisation family as the caps and
-//     maps 1:1 onto the oracle's shelf(s) with the (negligible, sub-kHz) warp.
+// ** kGm/kRo/kRq2 and the shaper params are ALL capture-fit (J201 spread ~5:1);
+//    only the filter corners (from R/C) and the INVERTING polarity are
+//    trustworthy pre-capture. **
 //
-// ---- Polarity (circuit.md JFET carry-forward — RESOLVED to inverting) -------
-// A common-source stage INVERTS (drain falls as gate rises); Q2 is only an active
-// load, so the stage is net INVERTING. circuit.md flagged the sign "unconfirmed"
-// and asked for a DC-step test — done here (JfetStageTest: +in -> -out on the AC
-// edge). This is the sign the OD path carries into the BLEND node ALONGSIDE the
-// CD4049 clipper's inversion (dsp.md "Dry/wet phase alignment ... Polarity"); the
-// end-to-end DC-step at BLEND still gets run in Phase 6, but the JFET's own sign
-// is no longer an open unknown. (No PolarityInverterT games — the -G0 is the sign.)
+// ---- Linear transfer (small signal), for the oracle -------------------------
+//   i_drain(s)/Vin(s) = -gm/(1+gm*R6) * HP(s) * shelf(s) * R5/(R4+R5)
+//   HP(s)    = s(R4+R5)C2 / (1 + s(R4+R5)C2)              fc = 144.7 Hz
+//   shelf(s) = (1 + s R6 C3) / (1 + s R6 C3/(1+gm R6))    zero 219 Hz, pole ~719 Hz
+//   Zout(s)  = [ro * k(s)] || Rq2,  ro*k(s) = ro + (Rp || Cp),
+//              Rp = ro*gm*R6, Cp = R6*C3/Rp               (see getSourceZ)
+// All corners are sub-kHz, so there is NO audible-band bilinear warp here; the
+// stage matches the analytic oracle across the whole band. Its SHAPER is the
+// aliasing source, so the full chain oversamples + ADAA's it (Phase 5/6).
+//
+// ---- Polarity ---------------------------------------------------------------
+// A common-source stage INVERTS. The Norton current is -gm*shape(vgs), i.e. a
+// positive input pulls current OUT of the drain node, so V(G) falls: NET
+// INVERTING, unchanged by the restructure (DC-step asserted in JfetStageTest).
+// This is the sign the OD path carries into BLEND alongside the CD4049's
+// inversion (dsp.md "Dry/wet phase alignment ... Polarity").
 //
 // ---- Why NO RailClamp here --------------------------------------------------
-// RailClamp models a TL07x OP-AMP output hitting its supply rails (calibration §6,
-// the "every op-amp stage" GATE item). The J201 drain is NOT an op-amp output —
-// its soft limiting against the active load / +9V rail IS the waveshaper below, a
-// gentle asymmetric saturation, not the op-amp's dead-linear-then-hard-clamp knee.
-// So this stage carries the waveshaper, not a RailClamp.
+// RailClamp models a TL07x OP-AMP output hitting its supply rails. The J201
+// drain is not an op-amp output. NOTE (carry-forward): the square-law shaper is
+// still UNBOUNDED (g(w) -> w + a*s^2 asymptotically), so nothing here limits a
+// large drive; the explicit asymmetric drain-current ceiling is the next
+// calibration step. The explicit loading above does now bound the VOLTAGE gain
+// far more realistically than the old ideal-source boundary did.
 // =============================================================================
 class JfetStage
 {
@@ -87,23 +96,40 @@ public:
     static constexpr double kC3 = 220.0e-9;  // source-bypass (HF lift)
 
     // ---- NOMINAL amplitude placeholders — FIT TO CAPTURE AT PHASE 7 ---------
-    // kGmR6 = gm*R6, the source-bypass shelf strength (HF lift = 1+gmR6). From the
-    //   datasheet Shichman-Hodges self-bias point (Id~=0.12 mA, gm~=0.69 mS).
-    // kG0   = inverting mid-band small-signal gain magnitude. The R5/(R4+R5) gate
-    //   divider, the C4-bootstrapped active-load impedance, and R7 treble-net
-    //   loading all fold in here — genuinely capture-dependent (~5:1 part spread),
-    //   so this nominal is only a plausible starting value.
-    static constexpr double kGmR6 = 2.277;   // -> shelfRatio 3.277 (+10.3 dB)
-    static constexpr double kG0 = 15.0;      // mid-band |gain| (INVERTING via -G0)
+    // kGm  = Q1 transconductance. Datasheet Shichman-Hodges self-bias point
+    //        (Id ~= 0.12 mA -> gm ~= 0.69 mS). Sets BOTH the small-signal current
+    //        AND, through gm*R6, the degeneration factor k(s) — one parameter,
+    //        physically coupled. (The old separate `kGmR6` is GONE: R6 is a fixed
+    //        3k3, so gm*R6 was never independent of gm. Removing the redundancy
+    //        also resolves the "jfetGmR6 missing from FIT_KEYS" carry-forward —
+    //        it is no longer a free parameter at all.)
+    // kRo   = Q1 drain output resistance (1/gos). J201 gos is a few uS at this
+    //         bias, hence a few hundred kOhm — but it is spread like everything
+    //         else on this part, and it is now the main thing setting how much of
+    //         the C3 shelf survives into the treble net. FIT IT.
+    // kRq2  = Q2 active-load impedance at the drain, C4-bootstrapped (the
+    //         bootstrap corner is ~14.5 Hz into R9||R10 = 500k, so it is fully
+    //         active across the audio band -> this is high, not 1/gm). FIT IT.
+    static constexpr double kGm = 0.69e-3;   // S   (gm*R6 = 2.277 at nominal)
+    static constexpr double kRo = 200.0e3;   // ohm
+    static constexpr double kRq2 = 1.0e6;    // ohm
 
-    // Waveshaper params for the SQUARE-LAW even-shaper (see waveshape() below — this
-    // REPLACED the old per-polarity tanh; the two slots are reused/reinterpreted to
-    // avoid a plumbing rename). kSatPos = s, the knee (volts); kSatNeg = a, the even
-    // (H2/H4) strength — SIGNED. Nominal is deliberately MILD and monotonic
-    // (|a|*s = 0.9 << 2.6); the CD4049 downstream does the heavy distorting. FIT both
-    // (and hence the low-drive H2 warmth) to the drive-min tone captures at Phase 7.
-    static constexpr double kSatPos = 3.0;   // s: square-law knee (volts)
-    static constexpr double kSatNeg = 0.3;   // a: even-harmonic strength (signed)
+    // Waveshaper params for the SQUARE-LAW even-shaper (see waveshape()).
+    // kSatPos = s, the knee; kSatNeg = a, the even (H2/H4) strength, SIGNED.
+    // ** SCALE CHANGED with the 2026-07-22 restructure: the shaper now sees the
+    //    effective vgs (real gate volts, order |Vp|), NOT a post-gain voltage, so
+    //    any previously fitted s/a values are meaningless here — refit. **
+    // Nominal is deliberately mild and monotonic (|a|*s = 0.5 << 2); the CD4049
+    // downstream does the heavy distorting.
+    static constexpr double kSatPos = 0.5;   // s: square-law knee (gate volts)
+    static constexpr double kSatNeg = 1.0;   // a: even-harmonic strength (signed)
+
+    // Thevenin/Norton output network handed to TrebleAttack, which stamps it into
+    // its nodal matrix: Zout(s) = [ro + (Rp || Cp)] || Rq2, the exact ro*k(s)||Rq2.
+    struct SourceZ
+    {
+        double ro, rq2, rp, cp;
+    };
 
     JfetStage() = default;
 
@@ -119,17 +145,27 @@ public:
         reset();
     }
 
-    // Phase-7 capture fit (FitParams.h). gmR6 sets the shelf POLE, so changing it
-    // must re-derive the shelf coefficients — hence the stored fs and the
-    // updateShelf() call (calling this before prepare() is fine; prepare()
-    // recomputes from the stored values).
-    void setNonlinear(double G0, double GmR6, double satPos, double satNeg) noexcept
+    // Phase-7 capture fit (FitParams.h). gm sets the shelf POLE (via gm*R6) as
+    // well as the gain, so changing it must re-derive the shelf coefficients —
+    // hence the stored fs and the updateShelf() call. Calling this before
+    // prepare() is fine; prepare() recomputes from the stored values.
+    void setNonlinear(double Gm, double Ro, double Rq2, double satPos, double satNeg) noexcept
     {
-        g0 = G0;
-        gmR6 = GmR6;
+        gm = (Gm > 1.0e-9) ? Gm : 1.0e-9; // rp = ro*gm*R6 must stay non-degenerate
+        ro = Ro;
+        rq2 = Rq2;
         sPos = satPos;
         sNeg = satNeg;
         updateShelf();
+    }
+
+    // The drain-node output network (see SourceZ). TrebleAttack owns the actual
+    // stamping — this stage only reports the impedance its device presents.
+    SourceZ getSourceZ() const noexcept
+    {
+        const double gmR6 = gm * kR6;
+        const double rp = ro * gmR6;
+        return { ro, rq2, rp, (kR6 * kC3) / rp };
     }
 
     void reset() noexcept
@@ -140,13 +176,14 @@ public:
     }
 
     // 1st-order ADAA on the waveshaper (dsp.md "ADAA"). Off by default so the
-    // per-stage FR/DC-step oracle (JfetStageTest) validates the raw memoryless
-    // map; PedalChain turns it ON inside the oversampled region (ADAA is IN
-    // ADDITION to oversampling, not instead of it). Glitch-free to toggle —
-    // uPrev updates every sample regardless.
+    // per-stage oracle test validates the raw memoryless map; PedalChain turns it
+    // ON inside the oversampled region. Glitch-free to toggle — uPrev updates
+    // every sample regardless.
     void setADAA(bool e) noexcept { adaa = e; }
 
-    // Process one sample (real volts in/out, VD-referenced). NET INVERTING.
+    // Process one sample. IN: real volts from the input buffer.
+    // OUT: the drain NORTON CURRENT in AMPS, signed for injection into node G
+    // (TrebleAttack's source node). NET INVERTING: +v in -> negative current in.
     inline double process(double x) noexcept
     {
         // ---- Input HP node (C2 source-side, R4+R5 to GND) -------------------
@@ -154,19 +191,24 @@ public:
         const double vx = (gc2 * x - ieqC2) / (gc2 + gRin);
         ieqC2 = 2.0 * gc2 * (x - vx) - ieqC2; // v_ab = x - vx
 
-        // ---- HF-lift shelf (first-order bilinear IIR) -----------------------
-        const double vs = sb0 * vx + sb1 * shelfX1 - sa1 * shelfY1;
-        shelfX1 = vx;
+        // ---- Gate divider + degeneration -> effective vgs -------------------
+        // shelf() has DC gain 1 / HF gain (1+gm*R6); dividing by (1+gm*R6) makes
+        // this 1/k(s), i.e. the real gate-source voltage the device responds to.
+        const double vg = kDiv * vx;
+        const double vs = sb0 * vg + sb1 * shelfX1 - sa1 * shelfY1;
+        shelfX1 = vg;
         shelfY1 = vs;
+        const double vgs = vs / (1.0 + gm * kR6);
 
-        // ---- Inverting gain + asymmetric soft saturation --------------------
-        const double u = g0 * vs;
-        const double y = adaa ? adaaShape(u, uPrev) : waveshape(u);
-        uPrev = u;
-        return -y;
+        // ---- Square-law drain current (INVERTING) ---------------------------
+        const double y = adaa ? adaaShape(vgs, uPrev) : waveshape(vgs);
+        uPrev = vgs;
+        return -gm * y;
     }
 
 private:
+    static constexpr double kDiv = kR5 / (kR4 + kR5); // gate divider, folds in here now
+
     // HF-lift shelf: bilinear (== trapezoidal) first-order IIR.
     // Analog:  shelf(s) = (1 + s*tauZ) / (1 + s*tauP),  tauZ=R6C3, tauP=tauZ/(1+gmR6)
     // Bilinear s = c*(1 - z^-1)/(1 + z^-1),  c = 2*fs :
@@ -175,7 +217,7 @@ private:
     {
         const double c = 2.0 * fs;
         const double tauZ = kR6 * kC3;
-        const double tauP = tauZ / (1.0 + gmR6);
+        const double tauP = tauZ / (1.0 + gm * kR6);
         const double a0 = 1.0 + c * tauP;
         sb0 = (1.0 + c * tauZ) / a0;
         sb1 = (1.0 - c * tauZ) / a0;
@@ -191,18 +233,16 @@ private:
     // ~-50 dB while the capture sits at -59). This shape is LINEAR + EVEN:
     //     g(w) = w + a * s^2 * (1 - sech(w/s))
     // The odd part is PURELY LINEAR (w) -> ZERO intrinsic H3; the even bump
-    // a*s^2*(1 - sech(w/s)) generates H2/H4 only. Reinterpreted params (same slots as
-    // the old sat levels, kept to avoid a plumbing churn — see FitParams.h note):
-    //   sPos = s, the knee (volts). sNeg = a, the even/asymmetry strength, SIGNED (its
-    //   sign picks which half-cycle expands). Slope at 0 is exactly 1 (preserves g0 as
-    //   the linear gain); g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and max|sech*tanh| = 1/2
-    //   (at tanh^2 = 1/2), so it is monotonic iff **|a|*s < 2**. ** Do NOT write 2.598
-    //   here — that is 1/max(sech^2*tanh), a DIFFERENT extremum, and it was wrong in this
-    //   comment until 2026-07-22 (dsp-validator caught it). The error is not academic: the
-    //   step-2 run-2 fit candidate s=10.585/a=0.232 gives |a|*s = 2.456, min slope -0.21,
-    //   i.e. a FOLD-BACK inside the signal range. Any fitter must constrain |a|*s < 2. **
-    //   The CD4049 downstream still does the heavy, more symmetric (odd) limiting — this
-    //   stage carries only the mild even warmth.
+    // a*s^2*(1 - sech(w/s)) generates H2/H4 only. Slope at 0 is exactly 1 (so `gm`
+    // alone remains the small-signal transconductance); g'(w) = 1 + a*s*sech(w/s)*
+    // tanh(w/s), and max|sech*tanh| = 1/2 (at tanh^2 = 1/2), so it is monotonic iff
+    // **|a|*s < 2**. ** Do NOT write 2.598 here — that is 1/max(sech^2*tanh), a
+    // DIFFERENT extremum, and it was wrong in this comment until 2026-07-22
+    // (dsp-validator caught it). The error is not academic: the step-2 run-2 fit
+    // candidate s=10.585/a=0.232 gives |a|*s = 2.456, min slope -0.21, i.e. a FOLD-BACK
+    // inside the signal range. Any fitter must constrain |a|*s < 2. **
+    // NOTE the argument is now the effective vgs (real gate volts) — see the header
+    // note on the 2026-07-22 restructure; old fitted s/a values do not carry over.
     inline double waveshape(double w) const noexcept
     {
         const double sech = 1.0 / std::cosh(w / sPos);
@@ -232,13 +272,13 @@ private:
     inline double adaaShape(double u, double prev) const noexcept
     {
         const double du = u - prev;
-        if (std::abs(du) < 1.0e-7)
+        if (std::abs(du) < 1.0e-9)
             return waveshape(0.5 * (u + prev));
         return (waveshapeAD(u) - waveshapeAD(prev)) / du;
     }
 
     // Phase-7 capture-fit amplitude params (FitParams.h), nominal-initialised.
-    double g0 = kG0, gmR6 = kGmR6, sPos = kSatPos, sNeg = kSatNeg;
+    double gm = kGm, ro = kRo, rq2 = kRq2, sPos = kSatPos, sNeg = kSatNeg;
 
     // Input-HP companion (set in prepare()).
     double fs = 48000.0;

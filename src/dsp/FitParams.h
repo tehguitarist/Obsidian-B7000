@@ -52,19 +52,36 @@ struct FitParams
 
     // ---- J201 JFET stage (JfetStage.h) --------------------------------------
     // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;
-    // all four are capture-fit by definition (nonlinear doc §2/§4). jfetG0 also
-    // absorbs the R5/(R4+R5) gate divider, the C4-bootstrapped active-load
-    // impedance, and R7 treble-net loading. Fit to the drive-MIN OD captures,
-    // where the CD4049 downstream contributes least.
-    double jfetG0 = 15.0;
-    double jfetGmR6 = 2.277;
+    // all of these are capture-fit by definition (nonlinear doc §2/§4). Fit to
+    // the drive-MIN OD captures, where the CD4049 downstream contributes least.
+    //
+    // ** RESTRUCTURED 2026-07-22.** `jfetG0` (a lumped voltage gain that absorbed
+    // the gate divider, the active-load impedance AND the R7 treble-net loading)
+    // and `jfetGmR6` are both GONE. The stage is now a transconductance whose
+    // output impedance is stamped into TrebleAttack, so:
+    //   * jfetGm  replaces jfetG0 — the actual device gm. It also SETS the
+    //     degeneration factor via gm*R6 (R6 is a fixed 3k3), which is why the old
+    //     separate jfetGmR6 was redundant and is removed rather than renamed.
+    //   * jfetRo / jfetRq2 are the loading that used to be folded into jfetG0.
+    //     Together with gm they decide how much of the C3 shelf survives into the
+    //     treble net — the single biggest lever on the OD path's HF balance.
+    // Removing (not renaming) the old fields is deliberate: a stale
+    // `--fit jfetG0=...` now fails loudly in OfflineRender instead of silently
+    // setting something with different physical meaning.
+    double jfetGm = 0.69e-3;   // S   (gm*R6 = 2.277 at nominal)
+    double jfetRo = 200.0e3;   // ohm  Q1 drain output resistance (1/gos)
+    double jfetRq2 = 1.0e6;    // ohm  Q2 C4-bootstrapped active-load impedance
     // jfetSatPos/Neg feed JfetStage's SQUARE-LAW even-shaper (JfetStage.h, Phase-7
     // reshape 2026-07-22), NOT the old tanh sat levels: jfetSatPos = knee `s` (volts),
     // jfetSatNeg = even-harmonic strength `a` (SIGNED). Names kept to avoid a rename
     // churn across PedalChain/OfflineRender/fit_nonlinear.py; semantics documented here
     // and at JfetStage::waveshape(). A clean rename is deferred polish.
-    double jfetSatPos = 3.0;   // s: square-law knee
-    double jfetSatNeg = 0.3;   // a: even strength (signed)
+    // ** The SCALE of `s` changed with the 2026-07-22 restructure: the shaper now sees
+    // the effective vgs (real gate volts, order |Vp|), not a post-gain voltage. Any
+    // s/a fitted before that date is meaningless — refit. Any fitter must also enforce
+    // the PRODUCT constraint |a|*s < 2 (monotonicity); box bounds cannot express it. **
+    double jfetSatPos = 0.5;   // s: square-law knee (gate volts)
+    double jfetSatNeg = 1.0;   // a: even strength (signed)
 
     // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
     // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at

@@ -103,20 +103,48 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅ DONE; step 2 ⏸ DEFERRED (reshape validated,
-> constants deliberately NOT committed); step 3 🚫 BLOCKED. ctest 16/16 ✅, tree clean.
-> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST — it has all the evidence).**
-> **THE BLOCKER (found two independent ways): the OD chain runs far too hot / too bright into the
-> clipper.** (i) An FR measurement shows **~+25 dB excess HF above 900 Hz** in the OD path, and the
-> ANALYTIC oracle reproduces it — so the model implements the spec faithfully and the SPEC disagrees
-> with the pedal (clean path matches within 2 dB, so it is confined to the OD chain). (ii) Separately,
-> dsp-validator measured the model delivering **0.34–0.40 V into the clipper where ≲0.1 V is needed**
-> (3–10× hot), which alone explains the GRUNT flat→boost anomaly. Both point at the **deferred
-> inter-stage LOADING** — above all `TrebleAttack.h:24` ("node G = IDEAL voltage source for Phase 4;
-> revisit with an explicit J201 output impedance at Phase 7"). The treble ladder's HF path is only
-> ~7.2 kΩ at 3 kHz, so a real J201 drain impedance would divide against it and cancel most of the
-> +14.6 dB that stage contributes. **NEXT ACTION: model the J201 output Z into the TrebleAttack
-> boundary + add a soft ceiling to the (currently UNBOUNDED) JFET output; then re-fit.**
+> **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅; the OD-path LOADING BLOCKER ✅ RESOLVED
+> (2026-07-22 session 3); steps 2–6 now unblocked. ctest 16/16 ✅. ⚠ Session-3 work is IN THE
+> WORKING TREE, NOT COMMITTED.
+> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST — all evidence + two
+> open items).**
+> **THE BLOCKER IS FIXED — it was structural, not a fit problem.** `JfetStage` was a VOLTAGE
+> stage feeding `TrebleAttack` as an IDEAL source. For a degenerated common-source stage
+> `Gm(s)=gm/k(s)` RISES while `Rout(s)=ro*k(s)` FALLS, so open-circuit gain `Gm*Rout = gm*ro`
+> is FLAT: **C3's "+10.3 dB HF lift" is not a gain at all**, it is a falling output impedance
+> that only becomes a lift once loaded — and the treble ladder's input Z falls over the same
+> band (35k@200Hz → 6.5k@2kHz), cancelling most of it. The old model applied the shelf
+> unconditionally AND drove the ladder from 0 Ω: the boost was counted TWICE.
+> **Fix (all in tree):** `JfetStage` now outputs the drain **Norton current** + `getSourceZ()`;
+> `TrebleAttack` grew nodes G and H (N=5→7) and stamps `Zout(s)=[ro+Rp||Cp]||Rq2` (= `ro*k(s)||Rq2`,
+> `Rp=ro*gm*R6`, `Rp*Cp=R6*C3`), so its transfer is a **transimpedance**. `FitParams`: `jfetG0`
+> and `jfetGmR6` **REMOVED** (not renamed — `gmR6` was never independent of `gm`, R6 is a fixed
+> 3k3) → **`jfetGm` / `jfetRo` / `jfetRq2`**; a stale `--fit jfetG0=` now fails loudly. Oracle:
+> `treble_attack_tf(..., Zs=)`, `jfet_source_z()`, `treble_attack_transimpedance()`;
+> `jfet_stage_lin_tf` returns siemens; `Zs=None` still reproduces the old numbers.
+> **Result — OD-path shape error vs capture (mean-removed RMS, 50 Hz–8 kHz, drive-min):
+> 14.2 dB → 6.9 dB at nominal → 1.4 dB on a coarse gm scan.** Also the model is now
+> LEVEL-INDEPENDENT like the pedal (it used to swing 30 dB across sweep levels).
+> **NEXT: fit `jfetGm`/`jfetRo`/`jfetRq2` properly** (the coarse scan sat at its grid EDGE on
+> all three — extend it; `gm=0.06 mS` is ~11× below datasheet, justify or bound it), **update
+> `FIT_KEYS`** (drop `jfetG0`, add the three; the old "add `jfetGmR6`" note is VOID — that param
+> is gone), then RE-RUN the step-2 nonlinear fit on the corrected chain, then steps 3–6.
+> **Key measurement technique to re-use (cheap, no new captures):** the capture's OD-path shape
+> is IDENTICAL across the −36/−18 dBFS sweeps (±0.15 dB) → the pedal is LINEAR at drive-min, so
+> that shape is a hard small-signal target. Comparing a model's level-dependence to the pedal's
+> is the fastest way to separate "wrong filter" from "wrong operating point". Cross-checked
+> against the harmonic-immune fixed-tone segments (agree ~1 dB), so the swept-sine FR is sound
+> here — though the GRUNT cut matched pair may still be contaminated (still open).
+> **⚠ TWO OPEN ITEMS (both in the handover doc):** (1) the treble ladder's ~322 Hz two-path
+> cancellation notch is −28 dB in BOTH schematics but −3.4 dB in the capture; topology
+> re-verified at pixel zoom, and Monte Carlo (400 draws, ±20% caps/±5% R) never gets shallower
+> than −23 dB, so tolerance cannot explain it — PARKED by user decision, revisit after the gm/ro
+> fit (it is much shallower in the assembled chain, ~−5.6 dB, than in isolation). (2) an 8×
+> oversampling anomaly at one clipper drive where 8× is WORSE than 2× — **pre-existing, NOT
+> caused by the restructure** (the old build has it too, at a different input amp, because it ran
+> ~22 dB hotter; both break at the same clipper drive). The OD region itself is clean at 384 kHz
+> and improves with rate; `OSValidationTest` now gates at amp 0.2 and prints the whole amp×order
+> sweep so the bad zone stays visible.
 > Step-2 finding: the J201 waveshaper was reshaped tanh → SQUARE-LAW (JfetStage.h) because tanh
 > structurally can't make the real pedal's pure-even low-drive H2. The reshape is CONFIRMED (fit cost
 > 3374.8 → 149.4, drive-min finally even-dominant; dsp-validator verified the math exactly — odd part

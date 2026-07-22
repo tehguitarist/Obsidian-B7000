@@ -207,7 +207,14 @@ public:
         fit = f;
 
         clipper.setNonlinear(f.clipA0, f.clipSatLo, f.clipSatHi);
-        jfet.setNonlinear(f.jfetG0, f.jfetGmR6, f.jfetSatPos, f.jfetSatNeg);
+        jfet.setNonlinear(f.jfetGm, f.jfetRo, f.jfetRq2, f.jfetSatPos, f.jfetSatNeg);
+        // The J201 drain's output impedance is stamped into the treble net's nodal
+        // matrix (TrebleAttack.h "Stage boundary"), so it has to follow every gm/ro
+        // change. setSourceZ() early-outs when nothing moved — no per-block rebuild.
+        {
+            const auto z = jfet.getSourceZ();
+            treble.setSourceZ(z.ro, z.rq2, z.rp, z.cp);
+        }
 
         drive.setTaperExp(f.driveTaperExp);
         levelBlend.setTaperExp(f.levelTaperExp);

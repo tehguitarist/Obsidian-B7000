@@ -28,7 +28,13 @@
 //            g(w) ~ g'(0)*w for small w, this IS the "slope at 0 == 1" assert:
 //            any g'(0) != 1 would scale the measured gain off the oracle.
 //
-// NOTE: kG0, kGmR6, kSatPos (= knee s), kSatNeg (= even strength a) are NOMINAL
+// NOTE (2026-07-22 restructure): the stage now outputs the drain NORTON CURRENT
+// (amps), not a voltage, and its output impedance is stamped into TrebleAttack —
+// see JfetStage.h "THIS STAGE IS A CURRENT SOURCE". So every level below is in
+// dB re 1 siemens, and the shaper's argument is the effective vgs (real gate
+// volts), which is why Test 4's drive amplitude is much larger than it used to be.
+//
+// NOTE: kGm, kRo, kRq2, kSatPos (= knee s), kSatNeg (= even strength a) are NOMINAL
 // placeholders (fit to captures at Phase 7). These tests validate the STRUCTURE —
 // filter shape, polarity, and the qualitative even-dominant nonlinearity — all of
 // which are invariant under a later amplitude refit; they do NOT assert an
@@ -43,16 +49,18 @@
 
 static constexpr double PI = 3.14159265358979323846;
 
-// Analytic small-signal oracle: H(f) = -G0 * HP(s) * shelf(s).
+// Analytic small-signal oracle (siemens): I/Vin = -[gm/(1+gm*R6)] * div * HP * shelf.
 static double oracleDb(double freq)
 {
     const std::complex<double> s(0.0, 2.0 * PI * freq);
     const double tauHp = (JfetStage::kR4 + JfetStage::kR5) * JfetStage::kC2;
     const std::complex<double> hp = s * tauHp / (1.0 + s * tauHp);
     const double tauZ = JfetStage::kR6 * JfetStage::kC3;
-    const double tauP = tauZ / (1.0 + JfetStage::kGmR6);
+    const double gmR6 = JfetStage::kGm * JfetStage::kR6;
+    const double tauP = tauZ / (1.0 + gmR6);
     const std::complex<double> shelf = (1.0 + s * tauZ) / (1.0 + s * tauP);
-    const double mag = JfetStage::kG0 * std::abs(hp * shelf);
+    const double div = JfetStage::kR5 / (JfetStage::kR4 + JfetStage::kR5);
+    const double mag = (JfetStage::kGm / (1.0 + gmR6)) * div * std::abs(hp * shelf);
     return (mag > 0.0) ? 20.0 * std::log10(mag) : -300.0;
 }
 
@@ -151,7 +159,8 @@ int main()
         const double gLo = measureDb(220.0, 48000.0, kSmall);  // just above HP, at the shelf zero
         const double gHi = measureDb(8000.0, 48000.0, kSmall); // HF plateau
         const double lift = gHi - gLo;
-        const double expectMax = 20.0 * std::log10(1.0 + JfetStage::kGmR6); // full shelf ratio
+        const double expectMax =
+            20.0 * std::log10(1.0 + JfetStage::kGm * JfetStage::kR6); // full shelf ratio
         // gLo is measured AT the zero corner (already part-way up), so the measured
         // lift is a fraction of the full ratio — just assert it's a real HF boost
         // in the right ballpark and below the analytic ceiling.
@@ -186,10 +195,12 @@ int main()
     std::printf("\n=== Nonlinearity: square-law EVEN shaper (H2 dominant, H3 ~ absent) ===\n");
     {
         // 200 Hz (well above the 145 Hz input HP; 48000/200 = 240 samples/period
-        // exactly, so the DFT bins line up). Amplitude picked so the waveshaper
-        // input peak lands near the knee s: |H(200 Hz)| ~ 15.8x, so 0.2 V -> ~3.2 V
-        // against s = 3.0 — the shaper is genuinely engaged, not a small-signal probe.
-        const double fs = 48000.0, freq = 200.0, amp = 0.2;
+        // exactly, so the DFT bins line up). Amplitude picked so the waveshaper input
+        // peak lands near the knee s. The shaper now sees the effective vgs, which is
+        // ATTENUATED from the input (gate divider 0.909, shelf ~1.30 at 200 Hz, then
+        // /(1+gm*R6) = /3.277) -> vgs ~ 0.29 * amp, so 1.5 V -> ~0.44 V against
+        // s = 0.5. Hence the much larger drive than the pre-restructure 0.2 V.
+        const double fs = 48000.0, freq = 200.0, amp = 1.5;
 
         double mag[6] = { 0.0 };
         harmonics(freq, fs, amp, 6, mag);
@@ -260,7 +271,7 @@ int main()
             ++failures;
     }
 
-    // ---- Test 5: small-signal limit matches -G0*shelf at 1 kHz ----------------
+    // ---- Test 5: small-signal limit matches -gm*shelf at 1 kHz ----------------
     std::printf("\n=== Small-signal 1 kHz gain matches the linear oracle ===\n");
     {
         const double meas = measureDb(1000.0, 48000.0, kSmall);

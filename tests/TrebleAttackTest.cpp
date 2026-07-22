@@ -27,19 +27,24 @@
 
 static constexpr double PI = 3.14159265358979323846;
 
-// Oracle reference (dB) from analysis/eq_reference.py at these frequencies.
-// Regenerate if component values change (single source of truth = the oracle).
+// Oracle reference from analysis/eq_reference.py :: treble_attack_transimpedance
+// at these frequencies, in dB re 1 ohm — the stage takes the J201 drain's NORTON
+// CURRENT now, so its transfer is a TRANSIMPEDANCE V(Q)/I, not a voltage gain
+// (TrebleAttack.h "Stage boundary", 2026-07-22). The oracle is evaluated at
+// JfetStage's NOMINAL gm/ro/Rq2, which is what a default-constructed stage uses.
+// Regenerate if component values or those nominals change (single source of
+// truth = the oracle).
 struct Ref { double f; double boost, flat, cut; };
 static const std::vector<Ref> kRef = {
     //  f Hz     boost       flat        cut
-    {    50.0, -13.7468,  -13.7352,  -13.7436 },
-    {   100.0, -17.8995,  -17.8916,  -17.9058 },
-    {   200.0, -24.8881,  -24.9179,  -24.9447 },
-    {   500.0, -23.2228,  -23.5393,  -23.6349 },
-    {  1000.0, -13.1894,  -14.3695,  -14.6876 },
-    {  2000.0,  -7.0329,  -10.1982,  -11.2912 },
-    {  5000.0,  -2.0760,   -8.3017,  -12.6813 },
-    { 10000.0,  -0.6145,   -7.9694,  -16.9625 },
+    {     50.0,   85.6449,   85.6596,   85.6498 },
+    {    100.0,   77.3194,   77.3275,   77.3132 },
+    {    200.0,   65.5089,   65.4789,   65.4522 },
+    {    500.0,   60.5204,   60.2031,   60.1079 },
+    {   1000.0,   65.9664,   64.7786,   64.4641 },
+    {   2000.0,   68.9722,   65.7957,   64.7078 },
+    {   5000.0,   72.2762,   66.0806,   61.6870 },
+    {  10000.0,   73.4138,   66.1214,   57.0993 },
 };
 
 static double refFor(const Ref& r, TrebleAttack::Attack a)
@@ -53,7 +58,8 @@ static double refFor(const Ref& r, TrebleAttack::Attack a)
     return 0.0;
 }
 
-// Steady-state peak magnitude (dB). Settles then measures the peak over 2 periods.
+// Steady-state peak magnitude (dB re 1 ohm, i.e. volts out per amp in — the stage
+// is driven by the J201's Norton current). Settles then measures over 2 periods.
 static double measureDb(double freq, double fs, TrebleAttack::Attack a)
 {
     TrebleAttack stage;
@@ -61,7 +67,11 @@ static double measureDb(double freq, double fs, TrebleAttack::Attack a)
     stage.setAttack(a);
 
     const double period = fs / freq;
-    const int settle = static_cast<int>(std::max(0.25 * fs, 8.0 * period));
+    // 2 s, not the old 0.25 s: with the J201 source network stamped in (2026-07-22),
+    // node G floats on ~396 kOhm against the 22 nF ladder, adding a time constant slow
+    // enough that 0.25 s left a ~0.4 dB settling error at 200 Hz — which looks exactly
+    // like a model error but is not (at 2 s the agreement is <= 0.005 dB below 1 kHz).
+    const int settle = static_cast<int>(std::max(2.0 * fs, 8.0 * period));
     const int measure = static_cast<int>(std::ceil(2.0 * period)) + 1;
 
     double peak = 0.0;
@@ -113,7 +123,12 @@ int main()
             const double ref = refFor(r, positions[pi]);
             const double e48 = std::abs(measureDb(r.f, 48000.0, positions[pi]) - ref);
             const double e96 = std::abs(measureDb(r.f, 96000.0, positions[pi]) - ref);
-            const bool shrinks = e96 < e48 + 1e-9;
+            // "Shrinks with rate" is the signature of bilinear warp. But when the 48 k
+            // error is ALREADY negligible there is no warp to shrink, and the
+            // rate-to-rate difference is just measurement noise — so an already-tiny
+            // e96 passes on its own. (Flat sits at ~0.005 dB at both rates: that is a
+            // stronger result than "shrinks", not a weaker one.)
+            const bool shrinks = e96 < e48 + 1e-9 || e96 <= 0.05;
             const bool small96 = e96 <= 0.30;
             const bool pass = shrinks && small96;
             std::printf("  %-5s f=%8.1f  err48=%.3f  err96=%.3f  %s\n",
@@ -129,7 +144,8 @@ int main()
     for (int pi = 0; pi < 3; ++pi)
     {
         const double meas = measureDb(1000.0, 48000.0, positions[pi]);
-        const bool pass = meas > -60.0; // real level is ~ -13..-15 dB; mute would be < -200
+        // Real transimpedance here is ~ +64..+66 dB re 1 ohm; a mute reads < -200.
+        const bool pass = meas > 0.0;
         std::printf("  %-5s @1kHz = %.2f dB  %s\n", names[pi], meas,
                     pass ? "PASS (signal present)" : "FAIL (MUTED!)");
         if (! pass)

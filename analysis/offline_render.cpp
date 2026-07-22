@@ -202,8 +202,11 @@ static const FitField kFitFields[] = {
     {"clipA0", &FitParams::clipA0},
     {"clipSatLo", &FitParams::clipSatLo},
     {"clipSatHi", &FitParams::clipSatHi},
-    {"jfetG0", &FitParams::jfetG0},
-    {"jfetGmR6", &FitParams::jfetGmR6},
+    // jfetG0/jfetGmR6 were REMOVED by the 2026-07-22 restructure (FitParams.h) —
+    // deliberately not aliased, so a stale --fit jfetG0=... fails loudly.
+    {"jfetGm", &FitParams::jfetGm},
+    {"jfetRo", &FitParams::jfetRo},
+    {"jfetRq2", &FitParams::jfetRq2},
     {"jfetSatPos", &FitParams::jfetSatPos},
     {"jfetSatNeg", &FitParams::jfetSatNeg},
     {"driveTaperExp", &FitParams::driveTaperExp},
