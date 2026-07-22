@@ -95,20 +95,22 @@ LEVEL_CAPS = [(0.00, "level-0700_base-od.wav"), (0.25, "level-0930_base-od.wav")
 # ⚠ EXCLUSIONS — each needs a reason that is independent of the model being tested, or this
 # degenerates into discarding whatever disagrees.
 #
-# level-1430_base-od: RE-CAPTURED 2026-07-23 (session 8) after the original take was found
-#   ODD-dominant (H3 -45.4, H5 -52.4, vs H2 -59.9, H4 -83.8) while every other capture in the
-#   session is EVEN-dominant — a passive divider cannot create odd harmonics, and the original
-#   take's own gain-n12 twin was essentially harmonic-free, 61 dB less H3 for a 9 dB level drop.
-#   The new take is even-dominant (H2 -53.4, H3 -64.9 at tone_220) — consistent with the set, so
-#   that specific defect is fixed. No longer excluded on THAT basis.
-#   ⚠ BUT a SECOND, separate issue is suspected and a round-2 re-capture is in progress as of
-#   2026-07-23: this file may have been captured with BLEND left at noon instead of the required
-#   max-OD (every level-*.wav file needs BLEND pinned at full-CW per the _REF_OD baseline in
-#   captures.py). If so, its alpha/beta mix does not match what level_route()/bleed_from_level_
-#   sweep() assume, and that alone explains the taper-shape anomaly this file introduces at
-#   knob=0.75 (see docs/phase7-calibration-handover.md 1d/1f) with no real taper irregularity
-#   required. DO NOT treat 1d's "taper is not a single power law" conclusion as settled until a
-#   confirmed-BLEND=max recapture lands and this script is re-run against it.
+# level-1430_base-od: RE-CAPTURED TWICE 2026-07-23 (session 8), both times fixing a real
+#   capture defect, both confirmed by the data converging afterward — not just by the
+#   explanation being plausible.
+#   Round 1: the original take was ODD-dominant (H3 -45.4, H5 -52.4, vs H2 -59.9, H4 -83.8)
+#   while every other capture in the session is EVEN-dominant — a passive divider cannot create
+#   odd harmonics, and the original take's own gain-n12 twin was essentially harmonic-free,
+#   61 dB less H3 for a 9 dB level drop. Re-taken; the round-1 take was even-dominant, consistent
+#   with the set, but introduced a NEW anomaly: its implied LEVEL taper (p ~ 4.4-6.2) disagreed
+#   sharply with the 0.25/0.50 cluster (p ~ 2.0-2.5), self-consistently across its own
+#   harmonics/tones — exactly the signature of BLEND being left at noon instead of the required
+#   max-OD for that one file (every level-*.wav needs BLEND pinned at full-CW per the _REF_OD
+#   baseline in captures.py).
+#   Round 2: re-captured with BLEND confirmed at max. The taper anomaly resolved — 36/36
+#   tone x harmonic x knob estimates now agree under one exponent (p median 2.25), where 12/36
+#   disagreed sharply before. See docs/phase7-calibration-handover.md 1d/1f/1g for the full
+#   write-up. No longer excluded.
 # level-0700_base-od: L = 0 is a deep NULL by construction (the wiper sits on VD), so the
 #   residual is 40 dB down and whatever leaks through is not the OD path's spectrum. Ratios
 #   measured in a null are meaningless. Excluded on principle, not on disagreement.
