@@ -417,8 +417,12 @@ stage test validates a linear oracle with rails off. It would have surfaced as a
 garbage step-2 re-fit the moment rails were switched on, i.e. exactly the next thing
 this handover told the next session to do. Fixed at the source (`railNeg = 3.3`) and
 `setRailVoltages` now takes `|v|` because `railNeg` is a `--fit` key and a sweep can
-still pass a signed value. **A `RailClampTest` covering the ENABLED path is still
-missing — that gap is the actual root cause and it is not yet closed.**
+still pass a signed value. **`tests/RailClampTest.cpp` now covers the ENABLED path
+(2026-07-22, ctest 16→17) — the actual root cause is closed.** It's the only test that
+turns the clamp on: dead-linear identity, mirror symmetry, boundedness, knee
+C1-continuity + monotonicity, exact hard clamp, independent asymmetric rails, and a
+regression guard (`setRailVoltages(-3.3, 3.3)` bit-identical to `(3.3, 3.3)`,
+`process(-1.0) == -1.0` not `+3.3`) verified by mutation-reverting the `std::abs` fix.
 
 ---
 

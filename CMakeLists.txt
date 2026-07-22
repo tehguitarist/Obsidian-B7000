@@ -134,6 +134,13 @@ add_executable(JfetStageTest tests/JfetStageTest.cpp)
 target_compile_options(JfetStageTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME JfetStageTest COMMAND JfetStageTest)
 
+# The only test that ENABLES the rail clamp — every stage test runs it off (the
+# default) against a linear oracle, which is how the signed-railNeg DC bug
+# (926c0cc) survived from Phase 4 unnoticed.
+add_executable(RailClampTest tests/RailClampTest.cpp)
+target_compile_options(RailClampTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME RailClampTest COMMAND RailClampTest)
+
 add_executable(ClipperTest tests/ClipperTest.cpp)
 target_compile_options(ClipperTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME ClipperTest COMMAND ClipperTest)
