@@ -52,15 +52,26 @@ def fr(x, orig):
 
 
 def separation(f, diffs):
-    """Mean (boost - flat) across the band — the A0-SENSITIVE discriminator.
+    """Mean (boost - flat) across the band.
 
-    Both boost (4n7||220n) and flat (4n7||47n) sit above the cut baseline, so their
-    absolute shelf heights are set mostly by how hard the clipper compresses the extra
-    bass — nearly A0-independent. What A0 *does* control is whether the two corners are
-    resolved: A0 sets the clipper input impedance R18/(1+A0), so a LOW A0 drops both
-    corners below the band (boost and flat then look identical) while a higher A0 lifts
-    flat's corner into the band and pulls the two apart. The capture separates them, so
-    this number is the constraint the drive-sweep objective cannot supply."""
+    ⚠ **This is a PRE-CLIPPER LEVEL METER, not an A0 discriminator.** An earlier version
+    of this docstring claimed it constrained A0; that is WRONG and cost real time.
+    Measured (dsp-validator, 2026-07-22), the flat->boost separation vs the amplitude
+    arriving at the clipper, at 100 Hz:
+
+        Vin at clipper   A0=25, sat 3.15/3.85   A0=7.28, sat 0.773/1.012
+        <= 0.01 V              +4.93 dB                +1.58 dB
+           0.1  V              +4.71                   +1.19
+           0.3  V              +2.94                   +0.22
+           1.0  V              +0.07                   +0.01
+        >= 3    V               0.00                   +0.06
+
+    So the quantity collapses with DRIVE LEVEL and is far more sensitive to upstream gain
+    (kG0 x drive taper x kInputRef) than to A0 — which is why sweeping A0 from 7.3 to 90
+    moves it by only 0.14 dB. The chain currently delivers 0.34/0.40/0.31/0.10 V at
+    50/100/200/300 Hz, squarely in the collapse knee, i.e. the model runs 3-10x too hot
+    into the clipper. Fitting A0 against this will drive A0 to a wrong value while the
+    real error is upstream. Use it to diagnose LEVEL, not A0."""
     return float(np.mean(diffs["boost"] - diffs["flat"]))
 
 

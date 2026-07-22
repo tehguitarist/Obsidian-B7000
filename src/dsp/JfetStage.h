@@ -50,7 +50,7 @@
 // across the WHOLE band. This stage therefore sits OUTSIDE the Phase-6 oversampled
 // region for LINEAR purposes, BUT its WAVESHAPER is the aliasing source, so in the
 // full chain the stage is oversampled + ADAA'd (build-plan Phase 5/6; the per-side
-// tanh has a closed-form antiderivative satN^2 * ln cosh(w/satN) for cheap ADAA).
+// square-law shaper has a closed-form antiderivative — see waveshape()/waveshapeAD()).
 //
 // ---- Discretisation ---------------------------------------------------------
 //   Input HP: one physical trapezoidal-companion cap (C2) at a single node
@@ -195,7 +195,12 @@ private:
     // the old sat levels, kept to avoid a plumbing churn — see FitParams.h note):
     //   sPos = s, the knee (volts). sNeg = a, the even/asymmetry strength, SIGNED (its
     //   sign picks which half-cycle expands). Slope at 0 is exactly 1 (preserves g0 as
-    //   the linear gain); monotonic while |a|*s < ~2.6 (max of s*sech*tanh is ~0.385).
+    //   the linear gain); g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and max|sech*tanh| = 1/2
+    //   (at tanh^2 = 1/2), so it is monotonic iff **|a|*s < 2**. ** Do NOT write 2.598
+    //   here — that is 1/max(sech^2*tanh), a DIFFERENT extremum, and it was wrong in this
+    //   comment until 2026-07-22 (dsp-validator caught it). The error is not academic: the
+    //   step-2 run-2 fit candidate s=10.585/a=0.232 gives |a|*s = 2.456, min slope -0.21,
+    //   i.e. a FOLD-BACK inside the signal range. Any fitter must constrain |a|*s < 2. **
     //   The CD4049 downstream still does the heavy, more symmetric (odd) limiting — this
     //   stage carries only the mild even warmth.
     inline double waveshape(double w) const noexcept

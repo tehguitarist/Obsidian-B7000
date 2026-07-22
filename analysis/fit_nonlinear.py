@@ -104,7 +104,27 @@ def render_profiles(params):
     return out
 
 
+# JfetStage's square-law shaper g(w) = w + a*s^2*(1-sech(w/s)) has
+# g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and max|sech*tanh| = 1/2, so it is monotonic
+# **iff |a|*s < 2**. Outside that the map FOLDS BACK inside the signal range, which is
+# unphysical and produces a spuriously good H2 match. This is not hypothetical: the
+# 2026-07-22 run-2 best point (s=10.585, a=0.232 -> |a|*s = 2.456, min slope -0.21) was
+# exactly such a fold-back, and the bounds alone do not exclude it because it is a
+# PRODUCT constraint, not a box. Hence this explicit feasibility gate.
+MONO_LIMIT = 2.0
+
+
+def monotonic(params):
+    s = params[FIT_KEYS.index("jfetSatPos")]
+    a = params[FIT_KEYS.index("jfetSatNeg")]
+    return abs(a) * s < MONO_LIMIT
+
+
 def cost(params, targets, verbose=False):
+    if not monotonic(params):
+        # infeasible: non-monotone (fold-back) waveshaper. Keep the return SHAPE
+        # consistent so a verbose call on an infeasible point can't TypeError.
+        return (1e6, None) if verbose else 1e6
     try:
         prof = render_profiles(params)
     except subprocess.CalledProcessError:
@@ -155,6 +175,9 @@ def main():
         print(f"  {k:12s} {v:7.3f}   (nominal {nom})")
 
     _, prof = cost(best.x, targets, verbose=True)
+    if prof is None:
+        print("\n** every start was INFEASIBLE (|a|*s >= 2, fold-back shaper) — no profile **")
+        return
     print("\nFITTED plug vs capture (tone_220, dB re fundamental):")
     print(f"{'drive':6s} | {'THD c/p':>13s} | {'H2 c/p':>13s} | {'H3 c/p':>13s} | {'H4 c/p':>13s}")
     for lbl in targets:

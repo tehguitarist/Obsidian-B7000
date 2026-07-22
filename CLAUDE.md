@@ -104,18 +104,38 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **CURRENT: Phase 7 CALIBRATION PROPER — step 1 ✅ DONE; step 2 ⏸ DEFERRED (reshape validated,
-> constants deliberately NOT committed); step 3 (bridged-T) 🔄 NEXT. ctest 16/16 ✅, tree committed.
-> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST).**
+> constants deliberately NOT committed); step 3 🚫 BLOCKED. ctest 16/16 ✅, tree clean.
+> ⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST — it has all the evidence).**
+> **THE BLOCKER (found two independent ways): the OD chain runs far too hot / too bright into the
+> clipper.** (i) An FR measurement shows **~+25 dB excess HF above 900 Hz** in the OD path, and the
+> ANALYTIC oracle reproduces it — so the model implements the spec faithfully and the SPEC disagrees
+> with the pedal (clean path matches within 2 dB, so it is confined to the OD chain). (ii) Separately,
+> dsp-validator measured the model delivering **0.34–0.40 V into the clipper where ≲0.1 V is needed**
+> (3–10× hot), which alone explains the GRUNT flat→boost anomaly. Both point at the **deferred
+> inter-stage LOADING** — above all `TrebleAttack.h:24` ("node G = IDEAL voltage source for Phase 4;
+> revisit with an explicit J201 output impedance at Phase 7"). The treble ladder's HF path is only
+> ~7.2 kΩ at 3 kHz, so a real J201 drain impedance would divide against it and cancel most of the
+> +14.6 dB that stage contributes. **NEXT ACTION: model the J201 output Z into the TrebleAttack
+> boundary + add a soft ceiling to the (currently UNBOUNDED) JFET output; then re-fit.**
 > Step-2 finding: the J201 waveshaper was reshaped tanh → SQUARE-LAW (JfetStage.h) because tanh
 > structurally can't make the real pedal's pure-even low-drive H2. The reshape is CONFIRMED (fit cost
-> 3374.8 → 149.4, drive-min finally even-dominant) but the fitted VALUES are physically implausible
-> (`clipA0` 7.3 vs 20–30; clipper rail 1.79 V vs ~7 V) and NOT a bounds artefact, NOT a flat
-> degeneracy, and NOT contradictable by any capture (the GRUNT cross-check on A0 is inert — clipper
-> compression washes the corners out). Their absolute scale is CONFOUNDED with step 4's
-> `levelTaperExp` (render OD−clean runs +3.7…+5.2 dB hot, mostly a flat offset). **ORDER AMENDED with
-> the user 2026-07-22: do steps 3–4 first, then re-fit step 2 jointly with an OD-vs-clean level term
-> (the missing constraint, only valid once the tapers are known), then commit step-2 constants, then
-> steps 5–6.** Otherwise `docs/calibration-and-gain-staging.md` sets the fixed ORDER.
+> 3374.8 → 149.4, drive-min finally even-dominant; dsp-validator verified the math exactly — odd part
+> ≡ w to 3.6e-15, H3 at the FP floor, exact antiderivative, ADAA preserves zero-H3). But the fitted
+> VALUES are rejected for THREE independent reasons: physically implausible (`clipA0` 7.3 vs 20–30;
+> clipper rail 1.79 V vs ~7 V); NOT a bounds artefact and NOT a flat degeneracy (scaling test has a
+> real minimum) yet not contradictable by any capture (the GRUNT A0 cross-check is inert); and the
+> run-2 point is a **non-monotone FOLD-BACK** (|a|·s = 2.456). **ORDER AMENDED with the user
+> 2026-07-22: fix the loading/level blocker FIRST, then re-fit step 2, then steps 3–6.** Otherwise
+> `docs/calibration-and-gain-staging.md` sets the fixed ORDER.
+> **⚠ BUG FIXED 2026-07-22:** the shaper's monotonicity bound was documented as `|a|·s < 2.598` —
+> that is `1/max(sech²·tanh)`, the WRONG extremum. `max(sech·tanh) = 1/2`, so the bound is
+> **`|a|·s < 2`**. Corrected in `JfetStage.h` + `JfetStageTest.cpp`, and `fit_nonlinear.py` now has an
+> explicit `monotonic()` feasibility gate (a PRODUCT constraint, which box bounds cannot express).
+> **⚠ Two more dsp-validator carry-forwards:** (1) because the shaper's odd part is exactly linear,
+> ADAA1 degenerates to a 2-point average over the WHOLE linear region → −2.0 dB @10 kHz at OS=1×
+> (negligible at the 4× default) — fold into the Phase-8 low-OS shelf, consider gating ADAA off at
+> order 0. (2) Do NOT fit `clipA0` from the GRUNT **cut** corner — C14's 2.19 kHz pole contaminates
+> it and biases A0 low by ~2×; use flat/boost only.
 > Also resolved this session: **GRUNT position→cap map VERIFIED against capture** (see below).
 > **Step 1 result (see `src/dsp/GainStaging.h` + memory `phase7-kinputref-anchor`):** kInputRef
 > stays **0.87 V/FS**, now ANCHORED (not nominal). `bypass.wav` is unity round-trip (−0.012 dB), so

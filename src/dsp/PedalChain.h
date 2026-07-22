@@ -64,9 +64,15 @@
 // ---- Anti-aliasing strategy (Phase 6) ---------------------------------------
 // Two nonlinearities, handled differently (dsp.md "Apply ADAA where the hardest
 // nonlinearity is"):
-//  • **J201 waveshaper** — a MEMORYLESS per-polarity tanh with a closed-form
-//    ln-cosh antiderivative → gets 1st-order ADAA (jfet.setADAA above) on top of
+//  • **J201 waveshaper** — a MEMORYLESS SQUARE-LAW even-shaper (reshaped from the
+//    former per-polarity tanh, 2026-07-22) with a closed-form Gudermannian
+//    antiderivative → gets 1st-order ADAA (jfet.setADAA above) on top of
 //    oversampling. Cheap, exact, glitch-free.
+//    ⚠ Because its odd part is EXACTLY linear, ADAA1 degenerates to a 2-point
+//    average (|H| = cos(pi*f/fs)) over the whole linear region — negligible at the
+//    4x default (-0.12 dB @10 kHz) but -2.0 dB @10 kHz / -12 dB @20 kHz at OS=1x.
+//    Account for this when fitting the Phase-8 low-OS top-octave shelf; consider
+//    gating ADAA off at order 0. (dsp-validator finding, 2026-07-22.)
 //  • **CD4049 clipper VTC** — the harder aliaser, but it lives INSIDE an implicit
 //    RC-coupled shunt-feedback loop solved per-sample by Newton on node W (it is
 //    NOT a memoryless function of one input), so the Esqueda 1st-order ADAA form
@@ -129,9 +135,9 @@ public:
     void prepareOd(double osRate)
     {
         jfet.prepare(osRate);
-        jfet.setADAA(true); // 1st-order ADAA on the J201 soft-shaper (in addition
-                            // to oversampling — dsp.md "ADAA"); memoryless map w/
-                            // closed-form ln-cosh antiderivative.
+        jfet.setADAA(true); // 1st-order ADAA on the J201 square-law shaper (in
+                            // addition to oversampling — dsp.md "ADAA"); memoryless
+                            // map w/ closed-form Gudermannian antiderivative.
         treble.prepare(osRate);
         drive.prepare(osRate);
         clipper.prepare(osRate);

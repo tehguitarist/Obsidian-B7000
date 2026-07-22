@@ -1,171 +1,395 @@
-# Phase 7 CALIBRATION PROPER — session handover (2026-07-22)
+# Phase 7 CALIBRATION PROPER — session handover (updated 2026-07-22, session 2)
 
-> Resume point for Phase-7 calibration. Supersedes `phase7-handoff.md` as the live
-> state (that file documents the now-complete PRE-work). Read this first.
+> **Resume point for Phase-7 calibration. Read this first.** Supersedes
+> `phase7-handoff.md` (which documents the now-complete PRE-work).
+> Everything below is committed; `ctest` is 16/16 green and the tree is clean.
 
-## TL;DR
+---
 
-- **Step 1 (kInputRef) ✅ DONE** — anchored at 0.87 V/FS, documented, no ctest impact.
-- **Step 2 (CD4049 + J201 fits) ⏸ DEFERRED — the reshape is VALIDATED, the fitted
-  CONSTANTS ARE DELIBERATELY NOT COMMITTED.** The J201 square-law reshape is confirmed
-  correct (fit cost 3374.8 → 149.4; drive-min finally even-dominant). But the fit
-  converges on a physically implausible clipper that no available capture can
-  contradict, AND its absolute scale is confounded with step 4's LEVEL taper — so the
-  constants stay at nominal until steps 3–4 land. **User decision 2026-07-22.** Full
-  evidence in "Step 2 — why the constants are NOT committed" below.
-- **ctest 16/16 ✅ GREEN**, working tree committed. `JfetStageTest.cpp` rewritten for the
-  square-law shape.
-- **GRUNT position→cap map ✅ VERIFIED against capture** (was circuit.md's longest-standing
-  ASSUMED carry-forward) — see "GRUNT map" below. Not a bug; map is correct.
-- Steps 3–6 (bridged-T, tapers incl. `masterTaperExp`, makeup, rails) next.
+## TL;DR — where we actually are
 
-## Immediate next action (start here)
+| Step | State |
+|---|---|
+| 1. `kInputRef` | ✅ **DONE** — anchored at 0.87 V/FS |
+| 2. CD4049 + J201 fits | ⚠ **RESHAPE VALIDATED, CONSTANTS DELIBERATELY NOT COMMITTED** |
+| 3. Bridged-T reshape | 🚫 **BLOCKED** — see the OD-path HF problem below |
+| 4. Tapers (`level`/`master`/`drive`) | not started |
+| 5. Output makeup | not started |
+| 6. Rail clamps | not started (must stay LAST) |
 
-**Step 3 — bridged-T reshape**, then **step 4 — tapers** (`levelTaperExp`,
-`masterTaperExp`, re-touch `driveTaperExp`). THEN return to step 2 and re-fit the
-nonlinear constants jointly, now that the tapers make the **OD-vs-clean level** a valid
-constraint (see below — that is the missing constraint the harmonic-only objective
-lacks). Only then commit step-2 constants, then step 5 (makeup), step 6 (rails).
+**The headline finding of session 2 — and it converged from two independent directions:
+the OD chain runs far too hot / too bright into the clipper.**
+- An FR measurement found **~+25 dB of excess HF above 900 Hz**, reproduced by the
+  analytic oracle (so it is NOT a coding bug).
+- Independently, the dsp-validator measured the model delivering **0.34–0.40 V into the
+  clipper where ≲0.1 V is needed** — 3–10× too hot — which by itself explains the GRUNT
+  flat→boost anomaly.
 
-## Step 2 — why the constants are NOT committed (2026-07-22)
+Both point at the same place: **the deferred inter-stage loading / upstream gain.**
+Nothing further should be fitted until it is resolved.
 
-The reshape works. The **values it produces do not survive a physics check**, and four
-separate attempts to break the ambiguity all failed. Do not re-derive these:
+Also this session: **GRUNT position→cap map VERIFIED** (a Phase-5 carry-forward);
+`JfetStageTest.cpp` rewritten for the square-law shape; and **a real bug found and fixed**
+— the shaper's monotonicity bound was 30 % too permissive, and the run-2 fit candidate was
+a non-monotone fold-back (see the dsp-validator section).
+
+---
+
+## ▶ IMMEDIATE NEXT ACTION
+
+**Fix the OD chain's operating point.** Two things, in this order:
+
+**(a) Model the J201 output impedance into the TrebleAttack stage boundary.** Prime
+suspect for the excess HF, the single largest contributor, and an already-flagged
+deferral — `src/dsp/TrebleAttack.h:24`:
+> "Input node G (J201 drain) = IDEAL voltage source (source Z = 0) for Phase 4;
+> **revisit with an explicit J201 output impedance at Phase 7 capture.**"
+
+**(b) Add an explicit asymmetric soft ceiling to the JFET output** (the square-law shape
+is unbounded — measured 37.9 V at the drain vs a physical ±4 V), and plan to enable the
+rail clamps. Keep `g` a clean linear+even core; do NOT get the bound by raising `|a|*s`.
+
+Then, in order:
+1. Re-measure the OD-path FR (recipe in "How to reproduce" below) AND the clipper input
+   level; confirm the >900 Hz excess has closed and the clipper sees ≲0.1 V in 50–300 Hz.
+2. Add **`jfetGmR6` to `FIT_KEYS`** in `analysis/fit_nonlinear.py` — never in the fit set
+   despite setting the J201 HF shelf; worth ~5 dB of the excess alone.
+3. **Resolve the GRUNT capture inconsistency** (cut→flat measures +5.43 dB where theory
+   says 15.6–19.3 dB, and that cannot be compression — see the dsp-validator section)
+   before spending more search on that objective.
+4. Re-run the step-2 fit (now with the `|a|*s < 2` feasibility gate) and re-check whether
+   `clipA0` / `clipSat*` land in physically plausible territory. Only then commit step-2
+   constants.
+5. Then step 3 (bridged-T), step 4 (tapers), step 5 (makeup), step 6 (rails).
+
+⚠ **Do not fit the bridged-T, the tapers, or the makeup before the above is closed.**
+Fitting any of them on top of a known +20 dB neighbouring error bakes in a compensating
+error — the calibration doc's "decompose the deficit before changing constants" rule.
+
+---
+
+## 🚫 THE BLOCKER — the OD path has ~+25 dB of excess HF
+
+Found while attempting step 3 (the bridged-T needs a valid OD-path FR to fit against).
+
+### 1. Bisection: the error is entirely inside the OD chain
+Shape re 200 Hz, `sweep_clean_-36` segment, capture vs render:
+```
+                 100    300    700   1200   2000   3000   5000   8000 Hz
+ref-clean  cap  -0.12  +0.04  +0.10  +0.14  +0.19  +0.21  +0.17  +0.11   <- FLAT (+-0.2 dB)
+ref-clean  mdl  -3.14  +1.11  +1.98  +2.14  +2.19  +2.20  +2.21  +2.21   RMS err  1.90 dB  OK
+drive-0700 cap  -2.41  -2.63  -2.19  +0.53  +6.03  +6.54  -4.59  -5.52
+drive-0700 mdl  -2.05  -7.80  +4.01 +21.90 +29.23 +31.00 +27.70 +19.98   RMS err 19.71 dB  ✗
+```
+The clean path matches within ~2 dB, and the clean CAPTURE is flat to ±0.2 dB — which
+independently **validates the EQ, the output stage, and the whole `transfer()`
+measurement pipeline**. The error is confined to the OD chain.
+
+### 2. With the step-2 FITTED constants, 100–700 Hz matches within ~1 dB
+Error vs capture: 100 Hz −0.10, 300 Hz −0.96, 500 Hz −0.92, **700 Hz −0.00**, then
+900 Hz **+6.22**, 1200 **+13.72**, 2000 **+17.11**, 3000 **+18.82**.
+So the divergence is sharply confined to **>900 Hz** (overall RMS: nominal 19.71 →
+fitted 13.98 dB).
+
+### 3. It is NOT a C++ bug — the analytic oracle reproduces it
+Cascading `eq_reference.py`'s per-stage transfer functions (pure Python, independent of
+the C++ implementation), dB re each stage's own 200 Hz value:
+```
+  Hz  |    J201  treble   drive clipper bridgedT  SK10k7  SK3k3 | TOTAL
+ 2000 |   +9.39  +14.62   -0.15   +9.17    -2.40   -0.39  -0.67 | +29.56
+ 3000 |   +9.65  +15.77   -0.33   +9.29    +1.31   -0.84  -2.39 | +32.46
+```
+Analytic TOTAL +29.56 dB @ 2 kHz vs the rendered model's +23.14 dB (the ~6 dB gap is the
+clipper's nonlinear compression, expected). **The model faithfully implements the spec;
+the SPEC disagrees with the real pedal**, which shows only +6.03 dB at 2 kHz.
+
+### 4. Prime suspect: the deferred inter-stage LOADING carry-forwards
+Three stages contribute ~+33 dB of HF boost between them (treble net **+14.6**, J201
+shelf **+9.4**, clipper **+9.2** dB @ 2 kHz). All three are modelled with
+**ideal-source-in / unloaded-out** stage boundaries, and each is an explicit Phase-7
+deferral:
+- **`TrebleAttack.h:24`** — J201 drain treated as an ideal source. **This is the big
+  one.** The treble ladder's HF path is C5/C9/C6 in series (22n each → 7.33n), i.e. only
+  **~7.2 kΩ at 3 kHz**. A real J201 drain / active-load output impedance of tens of kΩ
+  forms a divider against that and would largely CANCEL the HF bypass of R7.
+- **`RecoveryBridgedT`** — modelled UNLOADED by design (circuit.md risk #1; the R24→SK
+  load was deferred). Note the SK's DC input impedance is infinite (no DC current through
+  R24), so the load is frequency-dependent, not a simple divider.
+- **`JfetStage`** — folds the C4 bootstrap + R7 loading into the scalar `kG0`, a flat
+  approximation of what is really a frequency-dependent interaction.
+
+### 5. This probably BIASED the step-2 harmonic fit
+The `tone_220` objective reads H2..H5 at **440 / 660 / 880 / 1100 Hz** — H3/H4/H5 sit
+exactly where the excess HF begins. The fit could only match the captured harmonic ratios
+by distorting the clipper, a credible mechanism for the implausible `clipA0`=7.3 and
+1.79 V rail it converged on (see step 2 below). **Re-fit only after the loading is fixed.**
+
+### 6. The bridged-T notch is real and close (the actual step-3 target, once unblocked)
+Fine detail, fitted constants, shape re 200 Hz:
+**capture dip 334 Hz @ −3.36 dB** vs **model dip 375 Hz @ −6.46 dB**.
+So the real notch exists, ~12% lower in frequency and about half as deep — exactly what
+circuit.md risk #1 predicted ("much shallower than ideal", tolerance-sensitive).
+⚠ But the analytic **treble network alone shows −16.69 dB at 300 Hz**, so part of the
+~334 Hz dip may be the TREBLE net rather than the bridged-T. **Decompose before fitting.**
+
+---
+
+## Step 2 — reshape VALIDATED, constants NOT committed
+
+### What changed (committed, `f9d41d0` + `ccfc931`)
+`src/dsp/JfetStage.h` — the waveshaper was **structurally wrong** and has been replaced.
+Was per-polarity `sat*tanh(w/sat)`; now a **square-law even-shaper**:
+```
+g(w)  = w + a*s^2*(1 - sech(w/s))                      <- linear + EVEN
+F(w)  = w^2/2 + a*s^2*(w - s*gd(w/s)),  gd(x)=2*atan(tanh(x/2))   <- antiderivative, for ADAA
+```
+The odd part is **purely linear → ZERO intrinsic H3**; the even bump makes H2/H4 only.
+Slope at 0 is exactly 1 (so `-G0` remains the linear gain); monotonic while
+`|a|*s < 2.598` (max |sech·tanh| = 0.3849).
+
+**Param slots are REUSED, not renamed** (to avoid plumbing churn across
+PedalChain/OfflineRender/fit_nonlinear.py): `kSatPos`/`jfetSatPos` = knee **`s`**;
+`kSatNeg`/`jfetSatNeg` = even strength **`a`** (SIGNED). Nominal `kSatNeg` 2.6 → **0.3**.
+A clean rename is deferred polish. Documented at `JfetStage::waveshape()` and in
+`FitParams.h`.
+
+**Why:** the real pedal's low-drive OD is even-dominant (captured H2 −36 / H3 −59 dB at
+drive-min = 23 dB separation) — a JFET square-law fingerprint. `tanh` is an odd map whose
+w³ term forces H3 whenever it makes H2, so it structurally cannot reach that separation
+(proven by fit: no parameter combination got drive-min H3 below −50 dB). The new shape
+measures H2 −15.9 / **H3 −308 dB** in the unit test — the wall is gone.
 
 ### The fit result (best cost 149.4, from nominal 3374.8)
 ```
 jfetG0 4.583 | jfetSatPos(s) 10.585 | jfetSatNeg(a) 0.232
 clipA0 7.275 | clipSatLo 0.773 | clipSatHi 1.012 | driveTaperExp 1.598
 ```
-Harmonic match is good (drive-min H2 −35.6 vs capture −36.0; H3 −64.8 vs −59.2) and
-**drive-min is genuinely even-dominant now** — the structural win the reshape was for.
+Harmonic match is good (drive-min H2 −35.6 vs capture −36.0) and **drive-min is finally
+even-dominant** — the structural win the reshape was for.
 
-### Why these values are not trustworthy
-1. **`clipA0` = 7.3 vs circuit.md's community-measured 20–30**, and **`clipSatLo+Hi` =
-   1.79 V vs the ~7 V R19-dropped 4049 rail** (hard-bounded above by the 8.6 V supply).
-   `jfetG0` 4.58 vs nominal 15.
-2. **NOT a bounds artefact.** Run 1 pinned `jfetSatPos` at exactly its 6.0 ceiling;
-   bounds were widened (now in `fit_nonlinear.py` with the reasoning) and run 2 moved
-   FURTHER out, not back.
-3. **NOT a flat degeneracy** — this was the obvious hypothesis and it is WRONG. Scaling
+### Why the values are NOT trustworthy (four checks, do not re-derive)
+1. **Physically implausible.** `clipA0` 7.3 vs circuit.md's community-measured **20–30**;
+   `clipSatLo+Hi` = **1.79 V** vs the ~7 V R19-dropped 4049 rail (hard-bounded above by
+   the 8.6 V supply); `jfetG0` 4.58 vs nominal 15.
+2. **NOT a bounds artefact.** Run 1 pinned `jfetSatPos` at exactly its 6.0 ceiling; the
+   bounds were widened (reasoning recorded in `fit_nonlinear.py`) and run 2 moved
+   **further out**, not back.
+3. **NOT a flat degeneracy** — the obvious hypothesis, and it is WRONG. Scaling
    `g0·k, a/k, clipSat·k` (which preserves both the clipper drive ratio and J201's
    H2/H1 ∝ a·g0) gives a REAL minimum at k=1:
    `k=0.6→288.7, 0.8→168.3, 1.0→149.4, 1.5→186.5, 2.5→293.5, 4.0→447.7`.
    The objective actively REJECTS the physically-nominal combination (k=4 → 448).
-4. **The doc-mandated second constraint on `clipA0` is INERT.** `FitParams.h` says A0
-   must be fit against the GRUNT voicing AND the drive sweep, "not either alone",
-   because A0 sets the clipper input impedance `R18/(1+A0)` and hence the GRUNT corners.
-   Built that check (`analysis/grunt_a0_check.py`). **Result: the boost−flat separation
-   is A0-INDEPENDENT** (−0.13 → −0.27 dB across A0 = 7.3…90) — clipper compression
-   washes the corners out. RMS only weakly prefers A0≈25 (1.43) over 7.3 (1.74). So A0
-   has **no independent physical anchor in these captures**.
-5. **The absolute-level constraint is confounded with STEP 4.** OD-vs-clean level is
-   makeup-independent (both paths share the output chain) and would pin the scale — but
-   the fitted point runs **+3.7…+5.2 dB hot**, and that is mostly a FLAT offset at a
-   fixed LEVEL=noon, i.e. the un-fit `levelTaperExp`. Only the ~1.5 dB drive-dependent
-   part belongs to step 2.
-   ```
-   drive   min    9:30   noon   2:30   max
-   err   +4.08  +4.14  +3.65  +5.13  +5.16   (render OD−clean minus capture OD−clean)
-   ```
+4. **The doc-mandated second constraint on `clipA0` is INERT.** `FitParams.h` requires A0
+   to be fit against the GRUNT voicing AND the drive sweep "not either alone", because A0
+   sets the clipper input impedance `R18/(1+A0)` and hence the GRUNT corners. Built that
+   check (`analysis/grunt_a0_check.py`). **Result: the boost−flat separation is
+   A0-INDEPENDENT** (−0.13 → −0.27 dB across A0 = 7.3…90) — clipper compression washes
+   the corners out. RMS only weakly prefers A0≈25 (1.43) over 7.3 (1.74). So **A0 has no
+   independent physical anchor in these captures.**
 
-### Therefore
-**Do steps 3–4 first, then re-fit step 2 jointly with an added OD-vs-clean level term.**
-That term is the missing constraint; it only becomes valid once `levelTaperExp` is known.
+### Plus: the absolute-level constraint is confounded with STEP 4
+OD-vs-clean level is makeup-independent (both paths share the output chain) and would pin
+the nonlinear scale — but the fitted point runs **+3.7…+5.2 dB hot**:
+```
+drive   min    9:30   noon   2:30   max
+err   +4.08  +4.14  +3.65  +5.13  +5.16    (render OD-clean minus capture OD-clean)
+```
+That is mostly a FLAT offset at a fixed LEVEL=noon, i.e. the un-fit `levelTaperExp`. Only
+the ~1.5 dB drive-dependent part belongs to step 2. **So this constraint only becomes
+usable after step 4** — add an OD-vs-clean level term to the objective then.
 
-## GRUNT map — ✅ VERIFIED against capture (resolves a circuit.md carry-forward)
+**User decision 2026-07-22:** defer the step-2 commit. (Since amended — the HF blocker
+above now takes priority over steps 3–4 as well.)
 
-circuit.md/Clipper.h carried "GRUNT position→cap map is the ASSUMED UI map — VERIFY at
-capture" since Phase 5. **It is correct.** Measured, 50–300 Hz, matched-pair vs the cut
-baseline: **cut 0 dB (4n7) < flat +5.43 dB (4n7∥47n) < boost +6.81 dB (4n7∥220n)**,
-monotone bin-by-bin (63 Hz +9.77/+14.83; 100 Hz +8.11/+10.39; 160 Hz +5.17/+6.03).
-Index mapping is right end-to-end too: `PedalChain::gruntEnum()` deliberately does NOT
-pass the index through to `Clipper::Grunt` (whose declaration order is Cut/Flat/Boost =
-0/1/2), so the off-by-one trap is already handled; `offline_render.cpp` parses
-`--grunt {boost,cut,flat}` = 0/1/2 to match.
+---
 
-The uneven spacing (+5.43 then only +1.38) is physically expected, not suspicious: at
-A0=25 the cut corner is ~1.7 kHz (above the band → heavily rolled off in-band), flat
-~158 Hz (in band), boost ~36 Hz (already below the band). Once a corner drops under the
-band, extra capacitance buys almost nothing.
+## 🔬 dsp-validator report (2026-07-22) — JfetStage FAIL (fixed), Clipper PASS
 
-⚠ **Open carry-forward (belongs to step 2, not the cap map):** the model reproduces the
-cut→flat step but **flattens the flat→boost step to ~0 dB vs the capture's +1.38 dB**, at
-EVERY A0 (7.3…90) and at BOTH the fitted and the physically-nominal clipper ceilings
-(sat 3.15/3.85 gave +0.14, and made RMS worse: 2.74 vs 1.43). So it is not the sat
-ceiling and not A0 — the model's clipper compresses away a level difference the real
-pedal preserves. Revisit with the step-2 joint re-fit.
-Suggestive: the ANALYTIC pre-clipper separation at A0=7.28 is **+1.41 dB**, nearly
-exactly the captured +1.38 — consistent with the real clipper barely compressing here,
-while the model's compresses it to zero regardless of parameters.
+Run per project policy after the reshape. It found a **real bug** plus several results
+that corroborate and sharpen the blocker above. All numbers below were verified by the
+agent with compiled probes against the real headers, and the headline math was
+independently re-checked before acting.
 
-⚠ **Measurement trap (cost real time, now guarded in the script):** below ~40 Hz the
-driven-sweep captures are noise (the matched-pair diff swings −5…−11 dB
-non-monotonically). Averaging a "LF plateau" from 20 Hz reads that noise as
-"flat gives LESS bass than cut" and looks exactly like a wrong cap map. Use 50–300 Hz.
+### ❗ BUG FOUND AND FIXED — the monotonicity bound was wrong
+`JfetStage.h` and `JfetStageTest.cpp` documented "monotonic while `|a|*s < 2.598`,
+because max `sech*tanh` ≈ 0.385". **That conflates two different extrema:**
+```
+max sech(x)tanh(x)  = 0.5000   -> correct bound |a|*s < 2
+max sech^2(x)tanh(x)= 0.3849   -> 1/0.3849 = 2.598   (what was written — WRONG)
+```
+**Consequence, not academic:** the step-2 run-2 fit point `s=10.585, a=0.232` gives
+`|a|*s = 2.456`, **min slope −0.21** → the waveshaper FOLDS BACK inside the signal range.
+That is a **third independent reason** those constants must not be committed, and it
+plausibly explains part of why the fit drifted somewhere strange (a fold-back can score
+well on H2 alone).
 
-### Step 1 — committed to files (not git), no behaviour change
-- `src/dsp/GainStaging.h` — `kInputRefNominal = 0.87` now documented as ANCHORED (was
-  "⚠ NOMINAL"). Value unchanged.
-- `CLAUDE.md` — Current-step block updated (step 1 done, step 2 next, master-taper note).
-- Memory: `phase7-kinputref-anchor.md` (+ MEMORY.md index line).
+**Fixed 2026-07-22:** constant corrected to 2.0 in both files with a "do not write 2.598"
+note, and `fit_nonlinear.py` now has an explicit `monotonic()` feasibility gate
+(`|a|*s < 2` → cost 1e6). The gate is necessary because this is a **PRODUCT** constraint,
+which box bounds cannot express. ctest still 16/16.
 
-### Step 2 — J201 square-law reshape (code done, NOT fitted, test BROKEN)
-- **`src/dsp/JfetStage.h`** — `waveshape()` + antiderivative REPLACED. Was per-polarity
-  `sat*tanh(w/sat)`; now `g(w) = w + a*s^2*(1 - sech(w/s))` (linear + EVEN → pure H2, zero
-  intrinsic H3). Antiderivative `F(w)=w^2/2 + a*s^2*(w - s*gd(w/s))`, `gd=2*atan(tanh(x/2))`
-  (for ADAA). **Param slots reused/reinterpreted** (no rename, to avoid churn): `sPos` = knee
-  `s`, `sNeg` = even strength `a` (SIGNED). Nominal `kSatNeg` changed 2.6 → **0.3** (old value
-  = a is non-monotonic; 0.3 is mild/monotonic, |a|*s=0.9). `kSatPos=3.0` kept as `s`.
-- **`src/dsp/FitParams.h`** — `jfetSatNeg` default 2.6 → 0.3; both jfet-sat fields
-  re-documented as (knee s / even strength a). No signature change.
-- **`analysis/fit_nonlinear.py`** (NEW) — the fitter. Bounds/nominal/starts updated for
-  the new semantics (`jfetSatNeg` ∈ [0,1] is now `a`, not a sat level). Short-tone
-  objective (renders ~20× faster than the full file; verified to reproduce the full-file
-  harmonics exactly).
-- **`OfflineRender` REBUILT** with the new shape (`cmake --build build --target OfflineRender`).
-- **NOT done:** re-fit not run; fitted constants not committed; `Clipper.h` unchanged
-  (its shape is CORRECT — see findings); `dsp.md`/`circuit.md` J201 notes still say "tanh".
+### JfetStage — everything else about the reshape verified correct
+- Even/odd split is **exact**: odd part ≡ `w` to 3.6e-15 over w ∈ [−30, 30]. Raw-map
+  harmonics at 8 V drive: H2 −18.1, **H3 −121.9** (FP floor), H4 −28.0, H5 −128.1 dB.
+- **ADAA preserves the zero-H3 property** (this was worth confirming): `F` splits into an
+  even part `w²/2` whose ADAA quotient is `(u+p)/2`, and an odd part invariant under
+  `(u,p)→(−u,−p)`. Measured with ADAA on: H2 −18.1, **H3 −122.0** — identical.
+- Antiderivative exact: `max|F'(w) − g(w)| = 1.0e-7`, precisely the `h²` truncation of the
+  central difference at `h=1e-6`. `gd'(x) = 1/cosh(x)` confirmed analytically.
+- `g'(0) = 1` exactly; `g(0) = 0`. Corners unchanged: HP **144.7 Hz**, shelf zero
+  **219.2 Hz** / pole **718.4 Hz** — all match circuit.md.
+- Numerics safe: `cosh` overflow → `sech→0` → degrades to `g(w)=w+a*s²`, no NaN; the
+  Gudermannian form correctly avoids `atan(sinh)` overflow.
 
-### ⚠ Broken test — `tests/JfetStageTest.cpp`
-Asserts the old tanh: output peaks bounded by `[kSatNeg, kSatPos]` (Test's `ceil` logic
-~line 167) and asymmetry via `satPos!=satNeg`. The square-law shape does NOT saturate the
-fundamental (odd part is linear) and is not bounded by the sat levels, so those asserts are
-now wrong. **Rewrite** to assert: (a) small-signal ≈ identity·(−g0) [unchanged];
-(b) even-dominant harmonics (H2 present, H3 ≈ 0) when `a`>0 — the whole point;
-(c) slope-at-0 = 1; (d) monotonic for the nominal params. Until then **ctest is not 16/16**.
+### ⚠ NEW: ADAA imposes a linear-region lowpass (matters for Phase 8)
+Because the odd part is *exactly* linear, ADAA1 degenerates to a 2-point average
+(`|H| = cos(pi f/fs)`) over the whole linear region — i.e. for essentially the entire
+signal, not just where it distorts:
 
-## Key findings (evidence, so they aren't re-derived)
+| OD-region rate | 5 kHz | 10 kHz | 20 kHz |
+|---|---|---|---|
+| 48 kHz (**OS = 1×**) | −0.49 dB | **−2.02 dB** | **−12.02 dB** |
+| 96 kHz (2×) | −0.12 | −0.46 | −2.06 |
+| 192 kHz (4×) | −0.03 | −0.12 | −0.47 |
 
-### kInputRef degeneracy (step 1)
-`bypass.wav` cal_1k returns at −0.012 dB vs the test signal → **unity round-trip** rig; the
-capture domain == DAW domain 1:1. `kInputRef` is **degenerate with the clip ceiling** under
-audio-only captures (proven: ref-clean DIST-off render is −3.894 dB under the capture at
-EVERY level step −36..−3 dBFS, **std = 0.000** → K cancels in the linear path). So K is SET,
-not measured; 0.87 is the test-signal design anchor. User decision 2026-07-22.
+`PedalChain::prepareOd` enables ADAA unconditionally and `PedalDSP` calls it at base rate
+for order 0, so at **OS = 1× this droop is live and is LARGER than the bilinear warp** the
+dsp.md "low-OS top-octave restore" is designed to fix. Harmless at the 4× default. Noted
+in `PedalChain.h`. **Action for Phase 8: account for it in the low-OS shelf fit, and
+consider gating ADAA off at order 0.**
 
-### The clean deficit is Master-taper-dependent (feeds steps 4/5)
-`ref-clean` (DIST off, pure linear) plug−capture = **−3.894 dB, flat across all levels**.
-But across the MASTER sweep the real round-trip gain runs (gain-n12 corrected):
-`master 0/¼/½/¾/max → −19.6 / −8.2 / +0.95 / +10.7 / +12.3 dB`. So the −3.9 dB at noon is
-NOT pure flat makeup — **fit `masterTaperExp` (step 4) BEFORE committing makeup (step 5)**.
-(Master min renders as a full mute in the plugin — taper x=0 → 0; real is ~−40 dB floor.
-Check the master taper floor when fitting.)
+### ⚠ NEW: the shaper is unbounded AND nothing limits before the clipper
+`g(w) → w + a*s²` asymptotically — slope 1, no ceiling. Measured J201 output
+(kInputRef 0.87, nominal G0=15, ATTACK flat):
 
-### Step 2 — the two errors, both pinned
-1. **`jfetG0=15` far too high** — slams the clipper even at drive-min. At `jfetG0≈4–8` the
-   drive-MAX harmonic profile matches the capture well (THD 6.7–9.7% vs 7.2%; H2/H4 ~1 dB).
-2. **J201 tanh → square-law (structural).** Real low-drive OD is even-dominant
-   (H2 −36, H3 −59 @ drive-min: +23 dB even/odd separation) — a JFET square-law fingerprint.
-   `tanh` is odd; its w³ term forces H3 whenever it makes H2 (proven: no scalar combo got
-   drive-min H3 below −50 while the capture is −59). The new square-law shape produces
-   H2−H3 separations of **+48…+60 dB** (verified) — the wall is gone.
-3. **CD4049 clipper shape is FINE** (user asked to check). Isolated with moderate gain it is
-   correctly near-silent at drive-min (THD −78) and H3-dominant at max; its earlier
-   over-activity was purely the `jfetG0` gain error. The J201's (now correct) even H2
-   balances the clipper's odd H3 to the real "balanced at max" (H2≈H3). Leave Clipper.h.
+| input | 100 Hz | 1 kHz |
+|---|---|---|
+| −20 dBFS | 0.90 V | **4.69 V** |
+| −12 dBFS | 2.55 V | **11.25 V** |
+| 0 dBFS | **10.41 V** | **37.88 V** |
 
-### Capture harmonic TARGETS (tone_220, dB re fundamental) — the fit objective
+A real J201 drain on a 9 V rail swings at most ≈ ±4 V, so the model leaves the physical
+envelope from about **−20 dBFS at 1 kHz** — ordinary bass-player input, not an edge case.
+And because `railEnabled = false`, there is currently **no limiter anywhere between the
+input jack and the clipper**: measured DriveStage output **89.7 V @ 100 Hz** and **546 V
+@ 1 kHz** at 0 dBFS/drive-max, against a TL072 ceiling of ±3.3 V. circuit.md and
+build-plan risk #9 both say IC2_A rails *before* the 4049 at high drive — that behaviour
+is entirely absent today.
+
+Verdict: relying on the CD4049 for all limiting is defensible for *stability* (the output
+is always bounded, no NaN) but **not for level calibration**, and **not for low-drive
+character** — the regime the even-shaper was fit for, where the real pedal's dominant
+nonlinearity may be the J201 hitting its own rails. **Fix by adding an explicit asymmetric
+soft ceiling on the JFET output** (keeping `g` a clean linear+even core). **Do NOT try to
+get a bound by raising `|a|*s`** — that breaks monotonicity and re-introduces H3.
+
+### Clipper.h — PASS, no structural fault
+Norton reduction of the (Cg+R16) branch re-derived by hand and **exact** (`i_in =
+gIn(x−w) − ic`, `gIn = 1/(R16 + 1/gcG)`); trapezoidal companion convention consistent with
+the other stages; `F'(w) = −gIn + gFb(vtc'(w) − 1)` is the exact derivative and is
+strictly negative, so **Newton is globally convergent** from any warm start (no
+divide-by-zero, no damping needed); VTC is C1 at `w=0`. `R18/(1+A0)` confirmed — measured
+corners **899.1 / 144.4 / 35.8 Hz** reproduce CLAUDE.md's documented 896/144/36 exactly.
+GRUNT mapping verified against `PluginProcessor.cpp`'s `{"Boost","Cut","Flat"}`.
+
+### ⚠ NEW: do NOT fit A0 from the CUT-position corner
+The cut (4n7) analytic corner is 1737 Hz but its measured −3 dB is 899 Hz, because
+R18·C14's pole (2.19 kHz) is barely an octave above — the 4n7 response never reaches a
+plateau, so "−3 dB from peak" is dragged down by C14, not the RC. **Inverting the
+single-pole formula on the cut corner biases A0 low by ~2×.** Use flat/boost only.
+
+### ⚠⚠ Root cause of the GRUNT flat→boost anomaly: EXCESS PRE-CLIPPER LEVEL
+This independently corroborates the HF/loading blocker. The model *does* preserve the
+step — but only below a clipper input level the chain currently exceeds. Separation vs
+amplitude at the clipper, 100 Hz:
+
+| Vin at clipper | A0=25, sat 3.15/3.85 | A0=7.28, sat 0.773/1.012 |
+|---|---|---|
+| ≤ 0.01 V | +4.93 dB | **+1.58 dB** |
+| 0.1 V | +4.71 | +1.19 |
+| 0.3 V | +2.94 | +0.22 |
+| 1.0 V | **+0.07** | **+0.01** |
+
+The small-signal value at A0=7.28 (**+1.58 dB**) is essentially the capture's **+1.38 dB**
+— *the coupling model is right, the operating point is not.* Measured actual clipper input
+at the check's operating point: **0.342 / 0.396 / 0.305 / 0.100 V** at 50/100/200/300 Hz —
+squarely in the collapse knee. **The model runs 3–10× too hot into the clipper in the
+50–300 Hz band.** Why cut→flat survives while flat→boost dies: cut sits 15–19 dB below
+flat, so cut stays under the knee while flat and boost are both pressed against the same
+ceiling — the gap nearest the ceiling vanishes first.
+
+Note this also means **enabling `railEnabled` alone will not fix it**: ±3.3 V into the
+clipper still gives a 0.00 dB step; the needed input is ≲0.1 V, an order of magnitude
+below the TL072 rail. The excess is in `kG0`/taper/loading.
+
+### ⚠⚠ NEW, UNRESOLVED: the two GRUNT capture numbers may be mutually inconsistent
+Capture cut→flat is **+5.43 dB**, but every small-signal prediction is **15.6 dB**
+(A0=7.28) / **19.3 dB** (A0=25). No memoryless saturator at one operating point can
+compress a 15.6 dB gap to 5.4 while leaving a 1.58 dB gap at 1.38 — **compression is
+monotone in level, so the upper gap must shrink at least as much.** Something is lifting
+the cut curve in the capture. `blend=1.0` is genuinely 100 % OD, so the clean path is not
+it. Most likely **harmonic contamination of the swept-sine transfer**: in the cut position
+the in-band fundamental is ~20 dB down, so H2/H3 from the 25–150 Hz part of the sweep
+landing in the 50–300 Hz window is a proportionally much larger share of band energy than
+for flat/boost. **Resolve this (Farina harmonic-window separation, or a fixed-tone matched
+pair instead of a sweep) BEFORE spending more search on this objective.**
+
+---
+
+## ✅ GRUNT position→cap map — VERIFIED against capture
+
+Resolves circuit.md / `Clipper.h`'s longest-standing ASSUMED carry-forward (since Phase 5).
+**The map is correct.** Measured 50–300 Hz, matched-pair vs the cut baseline:
+
+| position | cap | measured |
+|---|---|---|
+| cut (`ref-od`, idx 1) | 4n7 | 0 dB (baseline) |
+| flat (`grunt-flat`, idx 2) | 4n7∥47n = 51.7n | **+5.43 dB** |
+| boost (`grunt-boost`, idx 0) | 4n7∥220n = 224.7n | **+6.81 dB** |
+
+Monotone bin-by-bin (63 Hz +9.77/+14.83; 100 Hz +8.11/+10.39; 160 Hz +5.17/+6.03;
+200 Hz +3.84/+4.37). Index mapping is correct end-to-end: **`PedalChain::gruntEnum()`
+deliberately does NOT cast the index to the enum** (whose declaration order is
+Cut/Flat/Boost = 0/1/2) — it remaps 0=Boost, 1=Cut, 2=Flat; `offline_render.cpp` parses
+`--grunt {boost,cut,flat}` to match. Do not "simplify" that remap.
+
+The uneven spacing (+5.43 then only +1.38) is physically expected: at A0=25 the cut corner
+is ~1.7 kHz (above the band → heavily rolled off), flat ~158 Hz (in band), boost ~36 Hz
+(already below the band). Once a corner drops under the band, extra capacitance buys
+almost nothing.
+
+⚠ **Open sub-anomaly (belongs to step 2, not the cap map):** the model reproduces the
+cut→flat step but **flattens the flat→boost step to ~0 dB vs the capture's +1.38 dB** — at
+EVERY A0 (7.3…90) AND at both the fitted and physically-nominal clipper ceilings (sat
+3.15/3.85 gave +0.14 and made RMS *worse*: 2.74 vs 1.43). So it is neither the sat ceiling
+nor A0; the model's clipper compresses away a level difference the real pedal preserves.
+Suggestive: the ANALYTIC pre-clipper separation at A0=7.28 is **+1.41 dB**, nearly exactly
+the captured +1.38 — consistent with the real clipper barely compressing here. Plausibly
+another symptom of the HF/loading blocker. Revisit at the step-2 re-fit.
+
+⚠ **Measurement trap (cost real time; now guarded in the script):** below ~40 Hz the
+driven-sweep captures are noise — the matched-pair diff swings −5…−11 dB
+non-monotonically. Averaging an "LF plateau" from 20 Hz reads that noise as "flat gives
+LESS bass than cut" and looks *exactly* like a wrong cap map. **Use 50–300 Hz.**
+
+---
+
+## ✅ Step 1 — `kInputRef` anchored (unchanged this session)
+
+`kInputRef` stays **0.87 V/FS**, now ANCHORED rather than nominal (`src/dsp/GainStaging.h`).
+`bypass.wav` cal_1k returns at −0.012 dB vs the test signal → **unity round-trip rig**, so
+the capture domain == DAW domain 1:1.
+
+`kInputRef` is **degenerate with the clip ceiling** under audio-only captures: the
+ref-clean DIST-off render is −3.894 dB under the capture at EVERY level step −36…−3 dBFS,
+**std = 0.000** → K cancels in the linear path. So K is **SET, not measured**; 0.87 is the
+test-signal design anchor. User decision 2026-07-22. Memory: `phase7-kinputref-anchor`.
+
+---
+
+## Reference data (measured — don't re-derive)
+
+### Capture harmonic targets (`tone_220`, dB re fundamental) — the step-2 fit objective
 ```
 drive  THD    H2     H3     H4     H5
 min   -36.0  -36.0  -59.2  -69.9  -86.4
@@ -175,96 +399,79 @@ noon  -31.0  -31.4  -42.0  -51.1  -56.8
 max   -22.9  -30.0  -29.0  -35.8  -28.8
 ```
 
-## Tooling notes / gotchas (cost real time)
+### The clean deficit is MASTER-taper-dependent (feeds steps 4/5)
+`ref-clean` (DIST off, pure linear) plug−capture = **−3.894 dB, flat across all levels**.
+But across the MASTER sweep the real round-trip gain runs (gain-n12 corrected):
+`master 0 / ¼ / ½ / ¾ / max → −19.6 / −8.2 / +0.95 / +10.7 / +12.3 dB`.
+So the −3.9 dB at noon is NOT pure flat makeup — **fit `masterTaperExp` (step 4) BEFORE
+committing makeup (step 5)**. Note master-min renders as a full mute in the plugin (taper
+x=0 → 0) while the real floor is ~−40 dB — check the master taper floor when fitting.
+
+---
+
+## Tooling / gotchas (each of these cost real time)
+
 - Python: **`/opt/homebrew/bin/python3.11`** (plain `python3` = 3.13, no numpy/scipy).
 - **`analyze.py::align(render, orig)` returns a TUPLE `(render, lag)`** — unpack it.
 - `captures.py::load_capture()` resamples rate-mislabeled files via the cal tone; use it
   (not `analyze.load`) for captures. Warns on non-`data` WAV chunks — harmless.
-- **gain-n12 captures need +12.071 dB** to reach the base-gain frame (exact on the
-  ref-clean anchor pair; `captures.py::gain_correction_db`). Direction: ADD to the capture.
+- **gain-n12 captures need +12.071 dB** to reach the base-gain frame (`gain_correction_db`;
+  exact on the ref-clean anchor pair). Direction: ADD to the capture.
 - Render CLI: `OfflineRender <in> <out> --os 8 <render_args...> [--fit key=val ...]`.
-  EQ pots are KNOB-space in `render_args`; OfflineRender applies the `1-x` inversion.
-- Isolating one nonlinearity by setting the OTHER's sat huge is UNRELIABLE (the linearized
-  clipper's ~×48 loop gain re-saturates even at sat=50). Reason about shapes analytically
-  or drive the real stage; don't trust "linearize by huge-sat" renders.
+  EQ pots are KNOB-space in `render_args`; OfflineRender applies the `1-x` inversion —
+  do NOT pre-invert.
+- `--fit` accepts **any** `FitParams` field, so stages can be swept without a rebuild.
+- A **full 84 s render is only ~6 s**, so full-signal A/B is cheap — don't assume it isn't.
+- **Isolating one nonlinearity by setting the OTHER's sat huge is UNRELIABLE** (the
+  linearised clipper's ~×48 loop gain re-saturates even at sat=50). Reason analytically or
+  drive the real stage instead.
+- **Setting `btC16` to ~0 does NOT "remove the notch"** — it turns the bridged-T into a
+  72 Hz lowpass, so a nominal-vs-no-C16 difference is not a notch-depth measurement.
+- When comparing FR, **normalise each curve to its own value at a reference frequency**
+  (200 Hz here) and compare SHAPE. Median-normalising a curve with a deep notch shifts the
+  whole thing and invents errors.
 
-## ⚠⚠ Step 3 attempt found a BIGGER problem: the OD path has ~+25 dB of excess HF
-
-Attempting the bridged-T reshape surfaced a much larger issue that **blocks step 3 and
-probably corrupted the step-2 fit**. Evidence, in the order it was established:
-
-### 1. The error is confined to the OD chain (bisection)
-Measured shape re 200 Hz, `sweep_clean_-36` segment, drive-MIN capture vs render:
+### How to reproduce the OD-path FR measurement
+```python
+orig = A.load('analysis/test_signal_48k.wav'); SEG = 'sweep_clean_-36'
+f, m = A.transfer(A.seg_of(x, SEG), A.seg_of(orig, SEG))   # x = aligned capture or render
+# normalise to 200 Hz, compare shapes; use drive-0700_base-od.wav (drive MIN => most linear)
 ```
-                 100    300    700   1200   2000   3000   5000   8000 Hz
-ref-clean  cap  -0.12  +0.04  +0.10  +0.14  +0.19  +0.21  +0.17  +0.11   <- FLAT (+-0.2 dB)
-ref-clean  mdl  -3.14  +1.11  +1.98  +2.14  +2.19  +2.20  +2.21  +2.21   RMS err 1.90 dB  OK
-drive-0700 cap  -2.41  -2.63  -2.19  +0.53  +6.03  +6.54  -4.59  -5.52
-drive-0700 mdl  -2.05  -7.80  +4.01 +21.90 +29.23 +31.00 +27.70 +19.98   RMS err 19.7 dB  ✗
-```
-The clean path matches within ~2 dB, and the clean CAPTURE is flat to +-0.2 dB — so the
-EQ, output stage, and the whole `transfer()` measurement pipeline are all validated. The
-error is **entirely inside the OD chain**.
 
-### 2. With the step-2 FITTED constants, 100-700 Hz matches within ~1 dB
-Error vs capture: 100 Hz −0.10, 300 Hz −0.96, 500 Hz −0.92, **700 Hz −0.00**, then
-900 Hz +6.22, 1200 +13.72, 2000 +17.11, 3000 +18.82. So the divergence is sharply
-confined to **>900 Hz**, and the fitted constants fix the low end (nominal RMS 19.71 →
-fitted 13.98 dB).
+---
 
-### 3. It is NOT a C++ bug — the analytic oracle reproduces it
-Cascading `eq_reference.py`'s per-stage TFs (independent of the C++), dB re each stage's
-own 200 Hz value:
-```
-  Hz  |    J201  treble   drive clipper bridgedT  SK10k7  SK3k3 | TOTAL
- 2000 |   +9.39  +14.62   -0.15   +9.17    -2.40   -0.39  -0.67 | +29.56
- 3000 |   +9.65  +15.77   -0.33   +9.29    +1.31   -0.84  -2.39 | +32.46
-```
-The analytic TOTAL (+29.6 dB @ 2 kHz) tracks the rendered model (+23.1 dB; the ~6 dB gap
-is the clipper's nonlinear compression). **So the model faithfully implements the spec —
-the SPEC disagrees with the real pedal**, which shows only +6.03 dB at 2 kHz.
+## Analysis tooling added this session
 
-### 4. Prime suspect: the deferred inter-stage LOADING carry-forwards
-Three stages contribute ~+33 dB of HF boost between them (treble net +14.6, J201 shelf
-+9.4, clipper +9.2 @ 2 kHz). Each is modelled with **ideal-source-in / unloaded-out**
-boundaries — and those are explicitly flagged Phase-7 deferrals:
-- `TrebleAttack.h:24` — "Input node G (J201 drain) = IDEAL voltage source (source Z = 0)
-  for Phase 4; **revisit with an explicit J201 output impedance at Phase 7 capture**."
-  This is the big one: the treble ladder's HF path is C5/C9/C6 in series (22n each →
-  7.33n ≈ **7.2 kΩ at 3 kHz**). A real J201 drain / active-load output impedance of tens
-  of kΩ would form a divider against that and largely CANCEL the HF bypass of R7.
-- `RecoveryBridgedT` is modelled UNLOADED by design (circuit.md risk #1, R24→SK deferred).
-- `JfetStage` folds C4 bootstrap + R7 loading into `kG0` — a flat approximation of what
-  is really a frequency-dependent interaction.
+- **`analysis/fit_nonlinear.py`** — the step-2 fitter. Objective = the `tone_220` harmonic
+  profile (THD + H2..H5) across the drive sweep; harmonic RATIOS are level-independent, so
+  it is valid before makeup. Renders a short synthetic tone per eval (~20× faster than the
+  full file). Bounds widened after run 1 hit a ceiling; `--start=a,b,c,...` refines from an
+  explicit point. ⚠ `jfetGmR6` is **missing from `FIT_KEYS`** — add it.
+- **`analysis/grunt_a0_check.py`** (NEW) — matched-pair GRUNT cross-check on `clipA0`.
+  Guards the sub-40 Hz measurement trap. `key=value` args override any held param; bare
+  numeric args are the A0 values to sweep.
+- **`tests/JfetStageTest.cpp`** — rewritten for the square-law shape. Test 4 now uses an
+  exact-bin DFT (200 Hz, 240 samples/period, 20 periods → zero leakage, so an absent
+  harmonic reads at the numerical floor instead of a leakage-limited −60 dB) and asserts
+  even-dominance; monotonicity is an analytic check on the static map; Test 5 is documented
+  as the slope-at-0 == 1 assert.
 
-### 5. This probably BIASED the step-2 harmonic fit
-The tone_220 objective reads H2..H5 at **440/660/880/1100 Hz** — i.e. H3/H4/H5 sit right
-where the excess HF begins. The fit could only match the captured harmonic ratios by
-distorting the clipper, which is a plausible mechanism for the implausible `clipA0`=7.3 /
-rail=1.79 V it converged on. **Re-fit step 2 only after the loading is fixed.**
+---
 
-### 6. The bridged-T notch itself is real and CLOSE (the actual step-3 target)
-Fine detail, fitted constants, shape re 200 Hz: **capture dip 334 Hz @ −3.36 dB**, model
-dip **375 Hz @ −6.46 dB**. So the real notch exists, is ~12% lower in frequency and about
-half as deep — exactly what circuit.md risk #1 predicted ("much shallower than ideal").
-Tractable, but do NOT fit it until the HF/loading issue is resolved: fitting a notch on
-top of a known +20 dB neighbouring error bakes in a compensating error (the calibration
-doc's "decompose the deficit before changing constants" rule).
-⚠ Also note the analytic treble net shows **−16.69 dB at 300 Hz** on its own — so part of
-the ~334 Hz dip may be the TREBLE network, not the bridged-T. Decompose before fitting.
+## Remaining calibration steps
 
-### Recommended next action
-Model the **J201 output impedance** into the TrebleAttack boundary (and the bridged-T
-load), re-check the OD FR, then re-fit step 2, then step 3/4. `jfetGmR6` should also join
-the fit set — it was NOT in `FIT_KEYS` and accounts for ~5 dB of the excess on its own
-(sweep: gmR6 2.277→0 moves the 3 kHz error 18.82→13.30 dB).
+Order is set by `docs/calibration-and-gain-staging.md`, **amended twice** (both recorded
+above): `masterTaperExp` before makeup, and now the **HF/loading fix before everything**.
 
-## Remaining calibration steps (order fixed by calibration-and-gain-staging.md)
-3. Bridged-T reshape to the measured notch (compare `drive-0700` OD path vs `ref-clean`).
-4. Taper shapes (≥2 knob points/pot; matrix has 4). **Includes `masterTaperExp`** — do
-   before makeup (see finding above). `driveTaperExp` is already being fit in step 2
-   (coupled); it may want a light re-touch here.
+0. **[NEW, BLOCKING] J201 output impedance → TrebleAttack boundary** (+ bridged-T load).
+1. ✅ `kInputRef` — done.
+2. Nonlinear fits — reshape done, constants pending the HF fix; add `jfetGmR6` to the fit
+   set and an OD-vs-clean level term (the latter needs step 4 first).
+3. Bridged-T reshape to the measured notch (334 Hz @ −3.36 dB). Decompose the treble net's
+   own −16.69 dB @ 300 Hz contribution first.
+4. Taper shapes (≥2 knob points/pot; the matrix has 4). Includes `masterTaperExp` and
+   `levelTaperExp`; `driveTaperExp` is coupled into the step-2 fit and may want a re-touch.
 5. Output makeup = level-match to captures (may exceed 1.0; no headroom pad). Decompose the
-   deficit per validation-and-capture.md §4 first.
-6. Rail clamps LAST — enable only after kInputRef anchored (done) so stages don't clip
+   deficit per `validation-and-capture.md` §4 first.
+6. Rail clamps LAST — enable only after `kInputRef` is anchored (done) so stages don't clip
    against an arbitrary reference and corrupt the fits above.

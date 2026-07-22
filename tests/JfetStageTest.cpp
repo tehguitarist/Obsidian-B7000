@@ -239,7 +239,10 @@ int main()
         // Monotonic static map at the nominal params. Inline replica of
         // JfetStage::waveshape() from the PUBLIC constants (same no-drift convention
         // as oracleDb above): g'(w) = 1 + a*s*sech(w/s)*tanh(w/s), and
-        // max|sech*tanh| = 0.3849, so monotonicity <=> |a|*s < 2.598.
+        // max|sech*tanh| = 1/2 (at tanh^2 = 1/2), so monotonicity <=> |a|*s < 2.
+        // (This said 2.598 until 2026-07-22 — that is 1/max(sech^2*tanh), the wrong
+        // extremum. The assert below is numeric so it was never actually wrong, but the
+        // stated bound was 30% too permissive; see JfetStage.h waveshape().)
         const double s = JfetStage::kSatPos, a = JfetStage::kSatNeg;
         bool mono = true;
         double worstSlope = 1.0;
@@ -251,7 +254,7 @@ int main()
             if (slope <= 0.0)
                 mono = false;
         }
-        std::printf("  static map monotonic (min slope %.4f, |a|*s = %.2f < 2.598): %s\n",
+        std::printf("  static map monotonic (min slope %.4f, |a|*s = %.2f < 2): %s\n",
                     worstSlope, std::abs(a) * s, mono ? "PASS" : "FAIL");
         if (! mono)
             ++failures;
