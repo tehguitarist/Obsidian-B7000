@@ -19,9 +19,10 @@
 //   Test 4 — Sine clipping: soft asymmetric saturation. A hot tone compresses,
 //            output bounded by the per-side VTC ceilings, and the +/- peaks differ
 //            (kSatLo != kSatHi -> even harmonics — the doc's required asymmetry).
-//   Test 5 — D1/D2 never conduct: even at max drive, node W stays well inside the
-//            clamp window [kClampLo, kClampHi] -> the hard-clamp simplification of
-//            the 1N4148 clamps is justified (they only guard huge transients).
+//   Test 5 — D1/D2 inert at the rail-limited realistic max drive (~3.5 V — the
+//            hottest signal IC2_A can deliver), and BOUNDING beyond it (8 V).
+//            ** Session-11 correction: the old "max|W| = 1.1 V at 8 V" claim was
+//            an atanh-recovery artifact — see the in-test note. **
 //   Test 6 — 3 GRUNT x 3 drive snapshot grid: all finite, monotone in drive.
 //
 // NOTE: kA0, kSatLo, kSatHi are NOMINAL placeholders (fit to captures at Phase 7).
@@ -225,46 +226,68 @@ int main()
             ++failures;
     }
 
-    // ---- Test 5: D1/D2 never conduct even at max drive ------------------------
-    std::printf("\n=== D1/D2 clamps: node W stays well inside the clamp window ===\n");
+    // ---- Test 5: D1/D2 inert at realistic max drive; bounding at absurd drive -
+    std::printf("\n=== D1/D2 clamps: inert at rail-limited max drive; bound W beyond it ===\n");
     {
-        // Reconstruct node W externally is awkward; instead drive very hot through
-        // every GRUNT position and confirm the OUTPUT never pins to a clamp-implied
-        // level, and that W (inferred from Y via the invertible VTC) stays inside.
-        // We reproduce the solve's clamp check by asserting |Y| < the saturation
-        // ceilings + a margin (if W hit a clamp, Y would freeze at VTC(clamp),
-        // which is essentially +-full-rail — distinguishable from the soft ceiling).
-        double maxAbsW = 0.0;
-        for (const auto& gc : kGrunts)
-        {
-            Clipper stage;
-            stage.prepare(48000.0);
-            stage.setGruntCap(gc.cg);
-            const double freq = 100.0, amp = 8.0; // absurdly hot
-            for (int n = 0; n < 20000; ++n)
+        // W is recovered from Y through the VTC's exact inverse: per side
+        // y = -+sat * f_k(a0*w/sat), f_k(u) = u/(1+u^k)^(1/k), so
+        // u = t/(1-t^k)^(1/k) with t = |y|/sat. Unlike the old tanh VTC this
+        // inverse is usable over the whole range — the sigmoid's POLYNOMIAL tail
+        // keeps y distinguishable at large w, where tanh's exponential tail made
+        // every w >~ 1 V produce y within 1e-9 of -satLo.
+        //
+        // ** SESSION-11 CORRECTION: the original version of this test claimed
+        // "max|W| = 1.1 V at amp = 8 V" — that number was an ARTIFACT of the
+        // atanh recovery saturating, not the real excursion. A ground-truth
+        // replica of the Newton solve (clamps disabled) shows W reaches ~8 V at
+        // amp = 8 V with EITHER VTC shape (tanh and k=2 sigmoid agree to
+        // < 0.1 V), i.e. the D1/D2 clamps DO engage ~50% of samples at that
+        // absurd direct drive — in the tanh build too; the old test simply could
+        // not see it. What is actually true (and what this test now asserts):
+        //   (a) at the HOTTEST input the chain can physically deliver (IC2_A is
+        //       rail-limited to ~+-3.3 V; probe at 3.5 V) the clamps NEVER
+        //       engage — max|W| ~= 3.56 V vs the [-3.75, +6.45] window, so the
+        //       hard-clamp simplification of the 1N4148s is justified in-chain;
+        //   (b) beyond that (amp = 8 V) the clamps BOUND W at the window edge —
+        //       they guard huge transients, exactly circuit.md's description.
+        const double kk = Clipper::kHardness;
+        auto sigInv = [kk](double t) {
+            t = std::min(0.999999, t);
+            return t * std::pow(1.0 - std::pow(t, kk), -1.0 / kk);
+        };
+        auto recoverW = [&](double y) {
+            if (y <= 0.0) // came from w >= 0
+                return (Clipper::kSatLo / Clipper::kA0) * sigInv(-y / Clipper::kSatLo);
+            return -(Clipper::kSatHi / Clipper::kA0) * sigInv(y / Clipper::kSatHi);
+        };
+        auto maxW = [&](double amp, double& wPos, double& wNeg) {
+            wPos = 0.0; wNeg = 0.0;
+            for (const auto& gc : kGrunts)
             {
-                const double x = amp * std::sin(2.0 * PI * freq * n / 48000.0);
-                const double y = stage.process(x);
-                // Invert the VTC to recover W: y = -satLo*tanh(A0 w/satLo) (w>=0) etc.
-                double w;
-                if (y <= 0.0) // came from w >= 0
+                Clipper stage;
+                stage.prepare(48000.0);
+                stage.setGruntCap(gc.cg);
+                for (int n = 0; n < 20000; ++n)
                 {
-                    const double t = std::min(0.999999, -y / Clipper::kSatLo);
-                    w = (Clipper::kSatLo / Clipper::kA0) * std::atanh(t);
+                    const double x = amp * std::sin(2.0 * PI * 100.0 * n / 48000.0);
+                    const double w = recoverW(stage.process(x));
+                    wPos = std::max(wPos, w);
+                    wNeg = std::min(wNeg, w);
                 }
-                else
-                {
-                    const double t = std::min(0.999999, y / Clipper::kSatHi);
-                    w = -(Clipper::kSatHi / Clipper::kA0) * std::atanh(t);
-                }
-                maxAbsW = std::max(maxAbsW, std::abs(w));
             }
-        }
-        const double window = std::min(Clipper::kClampHi, -Clipper::kClampLo);
-        const bool pass = maxAbsW < 0.5 * window; // comfortably inside
-        std::printf("  max |W| over all GRUNT @ amp=8V: %.4f V  (clamp window +-%.2f V)  %s\n",
-                    maxAbsW, window, pass ? "PASS" : "FAIL");
-        if (! pass)
+        };
+        double wPos = 0.0, wNeg = 0.0;
+        maxW(3.5, wPos, wNeg); // rail-limited realistic ceiling
+        const double eps = 1e-6;
+        const bool inert = wPos < Clipper::kClampHi - eps && wNeg > Clipper::kClampLo + eps;
+        std::printf("  amp=3.5V (rail-limited max): W in [%+.4f, %+.4f] V  (window [%+.2f, %+.2f])  %s\n",
+                    wNeg, wPos, Clipper::kClampLo, Clipper::kClampHi, inert ? "PASS" : "FAIL");
+        double wPos8 = 0.0, wNeg8 = 0.0;
+        maxW(8.0, wPos8, wNeg8); // absurd drive: clamps must bound W at the window
+        const bool bounded = wPos8 <= Clipper::kClampHi + eps && wNeg8 >= Clipper::kClampLo - eps;
+        std::printf("  amp=8.0V (absurd):           W in [%+.4f, %+.4f] V  bounded-at-window:%s\n",
+                    wNeg8, wPos8, bounded ? "PASS" : "FAIL");
+        if (! (inert && bounded))
             ++failures;
     }
 

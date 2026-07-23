@@ -1,0 +1,27 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:288: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+Capture targets (tone_220, dB):
+  drive    H3-H2
+  min      -23.2
+  9:30     -21.0
+  noon     -10.6
+  2:30       1.3
+  max        1.0
+
+Full-chain H3-H2 (dB) vs clipK — HELD as in the fit; sweep point:
+  jfetSatPos=0.24601, jfetSatNeg=2.6099, jfetCeilPos=0.48727, jfetCeilNeg=0.27357, clipA0=29.937, clipSatLo=1.2328, clipSatHi=1.5779
+      k |    min |   9:30 |   noon |   2:30 |    max
+   4.00 |  -17.7 |  -17.7 |  -17.8 |    0.8 |    2.2
+   3.00 |  -17.7 |  -17.7 |  -18.1 |    2.7 |    2.2
+   2.50 |  -17.7 |  -17.8 |  -18.4 |    4.5 |    2.3
+   2.00 |  -17.8 |  -18.0 |  -19.1 |    7.9 |    2.6
+   1.75 |  -17.9 |  -18.1 |  -19.8 |   10.8 |    2.9
+   1.50 |  -18.0 |  -18.5 |  -21.1 |   15.3 |    3.4
+   1.25 |  -18.3 |  -19.1 |  -23.5 |   21.1 |    4.1
+   1.00 |  -19.1 |  -20.5 |  -26.3 |   17.0 |    5.3
+
+Pivot verdict:
+  noon rise (k=4 -> 1) : -8.5 dB (monotone-with-tol: NO)
+  min  span over sweep        : 1.4 dB
+  max  span over sweep        : 3.1 dB
+  PIVOT ** NOT CONFIRMED — STOP, diagnosis wrong **: noon moves the wrong way or max moves with it

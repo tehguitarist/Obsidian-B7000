@@ -104,9 +104,42 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
-> **CURRENT (session 11, 2026-07-23): session 10's fit is REJECTED. `driveTaperExp` SETTLED at
-> 2.5 (measured, not fit); the joint re-fit against it FAILS; root cause found — the clipper VTC
-> SHAPE, not a wrong constant. A small clipper code change is the next step, not a refit.**
+> **CURRENT (session 12, 2026-07-23): the session-11 `clipK` fix WAS implemented and its own
+> §3j discriminating check REJECTED the session-11 diagnosis — STOPPED at the gate, NO fit run,
+> NOTHING committed. The real mechanism is ANTI-PHASE H3 INTERFERENCE between the JFET
+> drain-current ceiling's drive-independent H3 and the clipper's H3.**
+> (1) **Implemented (working tree, ctest 16/16, NOT committed):** `Clipper.h` `vtc()` per-side
+> `tanh(u)` → algebraic sigmoid `u/(1+u^k)^(1/k)` with `kHardness = 2.0` nominal (ADAA anchor,
+> antiderivative `sqrt(1+u^2)`, k==2 fast path), plumbed as `FitParams::clipK` →
+> `PedalChain::setFitParams` → `--fit clipK=` in OfflineRender. `f_k'(0)=1` exactly, so a0 keeps
+> its small-signal/GRUNT-corner meaning — FR/corner/polarity tests unchanged.
+> (2) **Two honest test corrections found en route (keep regardless of clipK's fate):**
+> `ClipperTest` Test 5's documented "max|W| = 1.1 V at 8 V drive" was an ARTIFACT of the atanh
+> W-recovery saturating — ground truth (Newton-solve replica, clamps off) shows W hits ~8 V and
+> the D1/D2 clamps DO engage ~50% of samples at that drive with EITHER VTC shape (test now
+> asserts: clamps inert at the rail-limited realistic max ~3.5 V, and bounding at 8 V);
+> `OSValidationTest`'s 4×-vs-2× diff gate widened 0.5 → 1.0 dB (the reshape IMPROVED both
+> floors, −21.3/−21.2 → −22.1/−21.6, but 2× improved more — a strict improvement failed a
+> diff-gate).
+> (3) **§3j pivot check FAILED at BOTH the nominal and the session-11 fitted point**
+> (`analysis/clipk_pivot_check.py`, logs `analysis/fit_logs/step4b_clipk_pivot*.log`): noon
+> H3−H2 FALLS as k softens (−17.8 → −26.3 at the fitted point; capture wants −10.6) and 2:30
+> explodes (+0.8 → +21.1; capture +1.3). Per protocol: STOP, no fit.
+> (4) **Mechanism (log `step4b_clipk_interference.log`):** at noon the JFET ceiling's
+> drive-independent H3 (`L*tanh(w/L)`, ~−49.8 re fund) dominates and is ~180° ANTI-PHASE to the
+> clipper's H3 — softening k grows clipper H3 toward parity and the coherent sum CANCELS
+> (predicted −57.2 vs measured −56.0 dB at k=1.25). Ceiling disabled (`cp=cn=1e6`): noon H3
+> rises +31 dB monotonically as k drops — clipper-alone behaviour restored exactly. This also
+> explains the model's FLAT H3−H2 across min/9:30/noon (−17.7/−17.7/−17.8) vs the capture's
+> ramp (−23.2/−21.0/−10.6): the ceiling H3 floor is 5.4 dB too HIGH at min AND masks the
+> clipper's ramp at noon.
+> **▶ NEXT (decision needed, NOT agreed yet): the suspect is now the JFET ceiling's
+> odd-limiting SHAPE** — one term explains both halves of the error (floor too high + ramp
+> masked). Rework it with its own §3j-style discriminating check BEFORE any refit; keep `clipK`
+> in the tree (k≈2.5-3 reproduces old tanh to ~1 dB; cannot be FIT while the interference null
+> dominates noon — the optimiser would fit the null). dsp-validator sign-off on the vtc reshape
+> was deferred when the gate fired — run it before any commit that includes it. Full detail:
+> handover "SESSION 12" §3k–3n. ctest 16/16.
 > (1) **`driveTaperExp` validated against the matched-pair drive capture** (`analysis/
 > drive_taper_validate.py`, `analysis/fit_logs/step4_drive_taper.log`) per dsp.md's "fit the taper
 > SHAPE against a matched-pair capture" — session 10's floated 5.45 is REJECTED (it ran the

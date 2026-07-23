@@ -49,6 +49,16 @@ struct FitParams
     double clipA0 = 25.0;
     double clipSatLo = 3.15;
     double clipSatHi = 3.85;
+    // clipK = the VTC knee HARDNESS (session-11 reshape 2026-07-23, Clipper.h
+    // vtc()): the per-side sigmoid is u/(1+u^k)^(1/k). A single tanh could not
+    // decouple knee hardness from the small-signal gain a0 — the step-3/4 fits
+    // pinned clipA0 on its ceiling and still fell ~8 dB short of the capture's
+    // H3-H2 at DRIVE-noon (handover §3h-3j). tanh behaved like k~=2.5-3; the
+    // capture wants softer. k = 2 is the shipped anchor (elementary ADAA
+    // antiderivative sqrt(1+u^2); k=1 also closed-form) — do NOT commit an
+    // arbitrary fitted k as the default without checking its antiderivative
+    // stays closed-form (same trap class as the JfetStage sech->tanh reshape).
+    double clipK = 2.0;
 
     // ---- J201 JFET stage (JfetStage.h) --------------------------------------
     // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;

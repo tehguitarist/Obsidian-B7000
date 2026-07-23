@@ -206,7 +206,7 @@ public:
     {
         fit = f;
 
-        clipper.setNonlinear(f.clipA0, f.clipSatLo, f.clipSatHi);
+        clipper.setNonlinear(f.clipA0, f.clipSatLo, f.clipSatHi, f.clipK);
         jfet.setNonlinear(f.jfetGm, f.jfetRo, f.jfetRq2, f.jfetSatPos, f.jfetSatNeg,
                           f.jfetCeilPos, f.jfetCeilNeg);
         // The J201 drain's output impedance is stamped into the treble net's nodal

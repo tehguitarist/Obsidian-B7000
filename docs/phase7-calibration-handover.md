@@ -1,9 +1,19 @@
-# Phase 7 CALIBRATION PROPER — session handover (updated 2026-07-23, session 11)
+# Phase 7 CALIBRATION PROPER — session handover (updated 2026-07-23, session 12)
 
 > **Resume point for Phase-7 calibration. Read this first.** Supersedes
 > `phase7-handoff.md` (which documents the now-complete PRE-work).
-> `ctest` is 16/16 green and the tree is clean. Session 3's J201/TrebleAttack
-> restructure is committed as `b02b2f2`.
+> `ctest` is 16/16 green. Session 3's J201/TrebleAttack restructure is committed
+> as `b02b2f2`.
+>
+> **⚠⚠ SESSION 12 (2026-07-23) — the clipper-hardness `k` WAS implemented, and the §3j
+> discriminating check REJECTED the session-11 diagnosis.** The pivot signature FAILED in
+> the full chain (noon H3−H2 moves the WRONG way as `k` softens, at BOTH the nominal and
+> the session-11 fitted point), and the follow-up probes found the real mechanism the
+> clipper-alone probe could not see: **anti-phase H3 interference between the JFET
+> drain-current ceiling's drive-independent H3 and the clipper's H3.** STOPPED at the
+> gate per protocol — NO fit run, NOTHING committed as a DSP default. The `clipK` code
+> (Clipper.h sigmoid VTC + FitParams/PedalChain/OfflineRender plumbing) is in the tree
+> as an uncommitted working-tree change awaiting a decision. See "SESSION 12" below.
 >
 > **⚠⚠ SESSION 11 (2026-07-23) FINDING — a clipper CODE change is now required, not just a
 > refit.** `driveTaperExp` is SETTLED at **2.5** (matched-pair level capture, frequency-flat,
@@ -34,7 +44,7 @@
 | 3. **Fix objective + fit shaper** | ⚠ Session 10's fit (cost 47, driveTaperExp=5.45 floating) is **REJECTED** — see session 11. The harmonic-to-harmonic OBJECTIVE itself is still the right tool and stays. |
 | 3′. Bridged-T reshape | not started (was blocked; **now unblocked**) |
 | 4. Tapers (`level`/`master`/`drive`) | **`driveTaperExp` = 2.5, MEASURED AND SETTLED (session 11)** — confirmed by a matched-pair LEVEL capture at both 220 Hz and 1 kHz (frequency-flat), independent of the harmonic fit. `levelTaperExp ≈ 2.25` (session 8) also measured. `masterTaperExp` still not started. |
-| 3+4 joint re-fit | ❌ **REJECTED 2026-07-23 (session 11)** — pinning driveTaperExp=2.5 and re-fitting the clipper/JFET set could NOT reach the harmonic targets (cost 47→289, clipA0 pins at its ceiling of 30). Root cause found: **the clipper VTC (single per-side `tanh`) is the wrong SHAPE, not a wrong constant** — see "SESSION 11" below. A clipper code change (add a knee-hardness param `k`) is required before the set can be fit and committed. |
+| 3+4 joint re-fit | ❌ **REJECTED 2026-07-23 (session 11)** — pinning driveTaperExp=2.5 and re-fitting the clipper/JFET set could NOT reach the harmonic targets (cost 47→289, clipA0 pins at its ceiling of 30). Session 11 blamed the clipper VTC's knee hardness; **session 12 implemented that fix (`clipK`) and the §3j discriminating check REJECTED the diagnosis** — the real mechanism is anti-phase H3 interference between the JFET ceiling's H3 and the clipper's H3 (see "SESSION 12" below). The fit stays blocked pending a re-diagnosis of which shape (now most likely the JFET ceiling's `L*tanh(w/L)`) is wrong. |
 | 5. Output makeup | not started |
 | 6. Rail clamps | not started (must stay LAST) |
 
@@ -1018,6 +1028,109 @@ that can't be decoupled from the saturation knee.
 **Scope note:** this is a genuine (small) model change, not a constants-only refit — it needs the
 same sign-off/care as the JfetStage sech→tanh reshape did (dsp-validator PASS on the odd-part
 identity, ADAA-preserving antiderivative, monotonicity check) before landing in `Clipper.h`.
+
+> ⚠ **SUPERSEDED BY SESSION 12 (below): the `k` fix was implemented and the §3j
+> discriminating check REJECTED this diagnosis.** The §3i topology/Newton/probe findings
+> stand (they were verified independently); the CONCLUSION drawn from the clipper-alone
+> probe does not survive the full chain. Kept for the record.
+
+---
+
+## SESSION 12 (2026-07-23) — `clipK` implemented; §3j pivot check FAILED; real mechanism = H3 interference
+
+### 3k. What was implemented (in the working tree, ctest 16/16 — NOT committed)
+
+Per §3j: `Clipper.h`'s `vtc()` per-side `tanh(u)` → the algebraic sigmoid
+`f_k(u) = u/(1+u^k)^(1/k)`, `u = a0*w/sat` per side, with a new runtime hardness param:
+`Clipper::kHardness = 2.0` nominal (the ADAA anchor — antiderivative `sqrt(1+u^2)`; a `k==2`
+fast path avoids `pow` in production), `setNonlinear(A0, sLo, sHi, k)`, `FitParams::clipK`,
+`PedalChain::setFitParams` pass-through, and `--fit clipK=` in `OfflineRender`. `f_k'(0) = 1`
+exactly so `a0` keeps its small-signal/GRUNT-corner meaning (FR/corner/polarity tests pass
+unchanged); `f_k' > 0` strictly so the Newton solve keeps its monotone-F global-convergence
+property.
+
+**Two test corrections fell out (both are honest fixes, independent of whether `clipK` stays):**
+- **`ClipperTest` Test 5's old claim "max|W| = 1.1 V at 8 V drive" was FALSE all along** — an
+  artifact of recovering W from Y through `atanh`: tanh's exponential tail makes every
+  `w >~ 1 V` produce `y` within 1e-9 of −satLo, so the recovery SATURATED at ~1.1 V. A
+  ground-truth replica of the Newton solve (clamps disabled) shows W reaches **~8 V at 8 V
+  drive with EITHER shape** (tanh and k=2 sigmoid agree < 0.1 V everywhere) and the D1/D2
+  clamps engage ~50% of samples there — in the tanh build too. What IS true (and what the
+  test now asserts): at the rail-limited realistic max input (~3.5 V, the hottest IC2_A can
+  deliver) the clamps NEVER engage (max W ∈ [−3.53, +3.55] vs window [−3.75, +6.45]) — the
+  hard-clamp simplification stays justified in-chain — and at 8 V the clamps BOUND W at the
+  window edge. Note the negative-side margin is only ~0.2 V at nominal `satLo`; a refit that
+  shrinks `satLo` tightens `clampLo = −0.6 − satLo` further (the clamps conducting on big
+  excursions is faithful hardware behaviour, but know it moved).
+- **`OSValidationTest`'s 4×-vs-2× gate tolerance 0.5 → 1.0 dB.** At the amp-0.2 probe the 2×
+  and 4× alias floors sit within a fraction of a dB of each other in every build; the reshape
+  moved them −21.3/−21.2 → **−22.1/−21.6 (both IMPROVED)**, but 2× improved more, pushing the
+  diff from +0.1 to +0.5 dB — a strict improvement failing a diff-gate. 1.0 dB expresses the
+  actual intent ("4× not materially worse than 2×").
+
+### 3l. The §3j discriminating check — pivot NOT confirmed (twice)
+
+`analysis/clipk_pivot_check.py` (new, takes `--point=`), logs
+`analysis/fit_logs/step4b_clipk_pivot.log` (nominal) and `..._fittedpoint.log` (session-11
+fitted point — the operating point where the noon deficit was actually diagnosed).
+Full-chain H3−H2 (dB) vs `k` at the fitted point:
+
+```
+    k  |   min |  9:30 |  noon |  2:30 |   max      capture: -23.2 / -21.0 / -10.6 / +1.3 / +1.0
+  4.00 | -17.7 | -17.7 | -17.8 |  +0.8 |  +2.2      (k=4 ~ the old tanh: matches §3h's fit)
+  2.00 | -17.8 | -18.0 | -19.1 |  +7.9 |  +2.6
+  1.25 | -18.3 | -19.1 | -23.5 | +21.1 |  +4.1
+  1.00 | -19.1 | -20.5 | -26.3 | +17.0 |  +5.3
+```
+
+**Noon FALLS as `k` softens — the OPPOSITE of the predicted pivot — and 2:30 explodes**
+(+0.8 → +21.1; capture wants +1.3). Same failure at the nominal point. Per the §3j protocol
+("if softening k moves noon the wrong way / no pivot, the diagnosis is wrong — STOP"), the
+fit was NOT run and nothing was committed.
+
+### 3m. The real mechanism — anti-phase H3 interference (log `step4b_clipk_interference.log`)
+
+Probe 1 (absolute harmonics at noon, fitted point): H2 is ~static vs `k` (−32.0 → −32.5) but
+**total H3 FALLS** (−49.8 → −56.0) as `k` softens — while the §3i clipper-ALONE probe shows the
+clipper's own H3 RISING. Probe 2 (same sweep, JFET ceiling DISABLED via `cp=cn=1e6`): noon H3
+now **rises monotonically +31 dB** (−85.9 → −54.6) as `k` drops — the clipper-alone behaviour
+restored exactly. So in the assembled chain at noon:
+
+- The **JFET drain-current ceiling** (`T(w) = L*tanh(w/L)`, `JfetStage.h`) is the DOMINANT H3
+  source (~−49.8 dB re fund at the fitted point) and is **drive-INDEPENDENT** (the JFET sits
+  before DRIVE) — which is exactly why the model's H3−H2 is FLAT (−17.7/−17.7/−17.8) across
+  min/9:30/noon while the capture RAMPS (−23.2 → −21.0 → −10.6).
+- The **clipper's H3 is ANTI-PHASE to it**: as softening `k` grows the clipper's H3 toward
+  parity, the coherent sum CANCELS. Quantitative check at `k=1.25`:
+  `|10^(−49.8/20) − 10^(−54.6/20)|` → −57.2 dB predicted vs −56.0 measured (~180° phase).
+  Past parity (2:30) the clipper dominates and the ratio explodes upward — matching the
+  observed 2:30 blow-up and the wandering cancellation dip in the nominal-point sweep.
+
+**A clipper-alone probe structurally could not see this** — the §3j check existed precisely to
+catch it, and did.
+
+### 3n. Where this leaves the model (re-diagnosis, NOT yet agreed — decide next session)
+
+The capture's profile needs: an H3−H2 floor at drive-min of −23.2 (the model's JFET-ceiling H3
+floor is ~5.4 dB TOO HIGH at −17.7) AND a smooth ramp to −10.6 by noon (the model is FLAT there,
+then bursts through at 2:30). Two observations point the same way:
+
+1. **The suspect has moved to the JFET ceiling's SHAPE** (`L*tanh(w/L)` odd-limiting): its H3
+   is simultaneously (a) too LARGE at drive-min (floor 5.4 dB high) and (b) anti-phase to the
+   clipper's H3, so it MASKS the clipper's mid-drive ramp — both halves of the observed error
+   from one term. The 2:30/max points fit because there the clipper has already blown past it.
+2. `clipK` itself is NOT exonerated as a useful degree of freedom — `k=4` reproduces the old
+   tanh behaviour to ~1 dB and the ceiling-off sweep shows `k` works exactly as designed on the
+   clipper's own H3 — but it CANNOT be fit while the interfering ceiling H3 dominates noon
+   (the optimiser would be fitting the interference null, the same class of unfalsifiable
+   trade the step-2 fits kept falling into).
+
+**Decision needed before any further fitting:** rework the JFET ceiling's odd-limiting shape
+(or its phase/strength) with the same §3j-style discriminating check against the ceiling, THEN
+revisit the joint fit with `clipK` in the set. The `clipK` working-tree change is worth keeping
+regardless (superset of tanh: `k≈2.5-3` ≈ old behaviour; ADAA-anchored at `k=2`) but must not
+ship as a default until the whole set passes acceptance — and it still needs the dsp-validator
+sign-off pass (deferred when the gate fired; run it before any commit that includes the reshape).
 
 ---
 
