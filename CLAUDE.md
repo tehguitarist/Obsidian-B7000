@@ -104,6 +104,62 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
+> **CURRENT (session 13, 2026-07-23): the two §3o measurements are IN — result LEANS STATIC.
+> Analysis-only (no DSP code, no new captures). New tools `analysis/phase_harmonics.py`,
+> `analysis/static_vs_dynamic.py`; logs `analysis/fit_logs/step5_phase_harmonics.log`,
+> `..._static_vs_dynamic.log`. ctest untouched (16/16 — standalone analysis scripts only).**
+> (1) **Step 1 — phase-aware harmonics: AMBIGUOUS (frequency-dependent).** ψn = φn − n·φ1
+> shift-invariance is EXACT (self-test, incl. session-8's 26-sample lag). The model's ceiling-H3
+> and clipper-H3 come out ~180° apart (coherent complex subtraction), re-deriving session-12's
+> interference from PHASE. Verdict on the ceiling SIGN is frequency-dependent: the one clean tone
+> (1 kHz, capSNR 47, notch-free) says the ceiling odd term is BACKWARDS (capture matches the
+> clipper 8°, opposes the ceiling 161°), but 220/440 lean the other way and 220's H3 (660 Hz)
+> sits on the mismodelled 717 Hz notch (KNOWN linear error). Mandate regardless: COMPLEX
+> (phase-aware) fit targets.
+> (2) **⚠ TRAP #1 (in the plan's own §3o step 1): "ceiling-only via high clipSat" is INVALID.**
+> The D1/D2 clamp window TRACKS satLo (`Clipper.h`: clampHi = 9.6 − satLo), so clipSat ≳ 10
+> FREEZES node W into a DC source and the residual output is just the harmonic-free clean BLEND
+> bleed. You cannot linearise this clipper via sat. Used coherent complex subtraction of valid
+> renders instead.
+> (3) **Step 2 — static-vs-dynamic: NO DYNAMIC SIGNATURE → STATIC CONFIRMED (dense).** The
+> confound-free DIFFERENTIAL `cap_slope − mdl_slope` (per frequency, same chain → Gpost/treble/
+> clipper cancel) is ~0 at every tone. **The user then RECORDED a FULL DRIVE-SWEEP of dense ladders**
+> (`analysis/gen_jfet_ladder.py` stimulus + `read_jfet_ladder.py`, captures
+> `analysis/captures/jfet_ladder_drive-{min,0930,noon,1430,max}.wav`, gitignored, 110/220/440 Hz,
+> −6…−60 dBFS): at drive-min, over the whole clean-JFET range (>30 dB) `cap−mdl` slope ~0,
+> below-corner 110 Hz mean |dev| **0.03** (14 clean slopes), NOT anomalous vs above-corner 0.05 —
+> thinness caveat GONE. At 0930/noon/1430/max the mean `|cap−mdl|` grows with drive (0.02→0.17→0.36)
+> = the clipper/ceiling-interference error vs level/freq/drive, i.e. the reshape's TARGET data.
+> (Reader tooling note: use `A.load`, NOT `captures.load_capture()`, on ladder captures — its
+> rate-mislabel guard assumes a 1 kHz cal tone this stimulus lacks; and align on the sweep anchor
+> before fixed-offset segment reads.)
+> (4) **⚠ TRAP #2: raw A_eff-collapse (Gpre only) is CONFOUNDED** — the treble net + clipper
+> after the JFET make effective drive frequency-dependent too, and the STATIC model shares them;
+> raw non-collapse is not a dynamic signature. The differential-vs-static-model is the real test.
+> (5) **Steps 1 & 2 are CONSISTENT: the static FAMILY is adequate, but the current ceiling
+> ODD-TERM SHAPE (magnitude + likely SIGN) is wrong.** A static real nonlinearity's H3 is
+> intrinsic 0/180° × downstream linear phase, so the capture being ~180° off at 1 kHz = a STATIC
+> sign fix; step 1's cross-frequency inconsistency is linear-model (717 notch) error, not genuine
+> frequency-dependence.
+> **▶ NEXT — BRANCH DECIDED + RECIPE WRITTEN (handover §3s): reshape the JFET ceiling with its own
+> HARDNESS param `jfetCeilK` (nominal 2), algebraic sigmoid `T(w)=w/(1+|w/L|^k)^(1/k)` replacing
+> `L*tanh(w/L)` in `JfetStage.h::coreLimit` — EXACTLY parallel to the validated `clipK` reshape.**
+> `T'(0)=1` (gm/linear untouched), bounded (still a ceiling), odd-per-side (even-bump zero-H3 kept);
+> harder knee (higher k) cuts the drive-min ceiling-H3 excess AND unmasks the clipper ramp in one
+> lever; ADAA anchor k=2 has elementary antiderivative `L*sqrt(L^2+w^2)-L^2`. **SEQUENCE (do in
+> order, all in §3s):** (a) implement the shape in JfetStage.h + FitParams/PedalChain/offline_render
+> plumbing; (b) **run `analysis/ceilk_pivot_check.py`** (stub written this session, detects the
+> not-yet-implemented case) — the §3j gate: as k RISES, drive-min H3−H2 must FALL toward −23.2 AND
+> noon RISE toward −10.6 *together*; if not, STOP; (c) add COMPLEX ψ3/ψ2 targets to
+> `fit_nonlinear.py` (use `phase_harmonics.py`'s LS extractor on all 5 ladders + drive-sweep tones,
+> down-weight 220's notch-corrupted H3); (d) dsp-validator (Opus, high) sign-off on JfetStage.h
+> (T'(0)=1, numeric monotonicity, ADAA F'=T C1 seam, even-bump zero-H3, DC-step, k==2 fast path) —
+> AND clear clipK's still-deferred dsp-validator pass in the same sitting; (e) accept only on
+> `2*a*ceilNeg≈1` unconstrained + clipA0∈20-30 + no bound-resting param + gm-scan flat + small phase
+> residual at 110/440; (f) then masterTaperExp (from existing master-* captures) + makeup, commit
+> the whole set. HELD: driveTaperExp 2.5, jfetGm 0.10 mS, levelTaperExp 2.25. Do NOT take the
+> coupled-Newton JFET rewrite. Full detail: handover "SESSION 13" §3p–3s + "✅ RECORDED + ANALYSED".
+> ── prior history ──
 > **CURRENT (session 12, 2026-07-23): the session-11 `clipK` fix WAS implemented and its own
 > §3j discriminating check REJECTED the session-11 diagnosis — STOPPED at the gate, NO fit run,
 > NOTHING committed. The real mechanism is ANTI-PHASE H3 INTERFERENCE between the JFET

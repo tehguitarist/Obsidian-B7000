@@ -1,0 +1,156 @@
+Session 13 step 2 — STATIC-vs-DYNAMIC test (drive-min, no new captures).
+H2 re fundamental (dB) vs input level and tone frequency; collapse of the local
+slope p = dlog|H2|/dlogA vs the EFFECTIVE gate drive A_eff = |Gpre(f)|*A_in.
+
+Gpre(f) — model small-signal input->vgs (dB), the shelf that defines A_eff:
+      110 Hz :  -7.27 dB   (BELOW the 219 Hz corner)
+      220 Hz :  -3.80 dB   (ABOVE the 219 Hz corner)
+      440 Hz :  -1.89 dB   (ABOVE the 219 Hz corner)
+     1000 Hz :  -1.07 dB   (ABOVE the 219 Hz corner)
+   -> above-corner tones see +6.20 dB more drive than 110 Hz at the same input.
+
+====================================================================================
+1 kHz LEVEL LADDER (dense) — capture vs static model. clip = clipper-only H2 (the
+contamination floor). A_eff column = input dBFS + Gpre(1000).
+====================================================================================
+   A_in  A_eff |  cap H2 capSNR |  mdl H2 | clip H2 | cap-clip | clean?
+    -36  -37.1 |   -38.6     55 |   -38.2 |   -87.1 |     48.5 | yes
+    -33  -34.1 |   -35.6     58 |   -35.2 |   -81.1 |     45.5 | yes
+    -30  -31.1 |   -32.6     61 |   -32.2 |   -75.1 |     42.5 | yes
+    -27  -28.1 |   -29.6     58 |   -29.1 |   -69.0 |     39.4 | yes
+    -24  -25.1 |   -26.6     63 |   -26.2 |   -62.9 |     36.3 | yes
+    -21  -22.1 |   -23.6     61 |   -23.3 |   -56.7 |     33.1 | yes
+    -18  -19.1 |   -20.9     54 |   -20.6 |   -50.2 |     29.3 | yes
+    -15  -16.1 |   -18.9     47 |   -18.3 |   -43.3 |     24.4 | yes
+    -12  -13.1 |   -17.8     41 |   -16.8 |   -35.7 |     17.9 | yes
+     -9  -10.1 |   -16.9     30 |   -16.8 |   -27.9 |     11.0 | yes
+     -6   -7.1 |   -16.7     28 |   -18.3 |   -23.0 |      6.3 | no
+     -3   -4.1 |   -17.8     26 |   -20.6 |   -22.7 |      4.9 | no
+
+====================================================================================
+DRIVEN SWEEPS (Farina) — H2(f) re fund at 3 input levels, per tone. A_eff = A_in+Gpre(f).
+====================================================================================
+  tone 110 Hz (Gpre -7.27):
+     A_in  A_eff |  cap H2 |  mdl H2 | clip H2 | clean?
+      -18  -25.3 |   -44.3 |   -46.0 |   -97.6 | yes
+      -12  -19.3 |   -38.3 |   -40.1 |   -85.3 | yes
+       -6  -13.3 |   -32.6 |   -35.1 |   -72.2 | yes
+  tone 220 Hz (Gpre -3.80):
+     A_in  A_eff |  cap H2 |  mdl H2 | clip H2 | clean?
+      -18  -21.8 |   -40.1 |   -44.7 |  -108.8 | yes
+      -12  -15.8 |   -33.8 |   -39.3 |   -96.7 | yes
+       -6   -9.8 |   -31.0 |   -35.9 |   -84.2 | yes
+  tone 440 Hz (Gpre -1.89):
+     A_in  A_eff |  cap H2 |  mdl H2 | clip H2 | clean?
+      -18  -19.9 |   -39.4 |   -36.8 |  -103.5 | yes
+      -12  -13.9 |   -33.9 |   -31.9 |   -91.3 | yes
+       -6   -7.9 |   -31.5 |   -29.7 |   -78.6 | yes
+  tone 1000 Hz (Gpre -1.07):
+     A_in  A_eff |  cap H2 |  mdl H2 | clip H2 | clean?
+      -18  -19.1 |   -20.9 |   -20.5 |   -50.2 | yes
+      -12  -13.1 |   -17.8 |   -16.8 |   -35.7 | yes
+       -6   -7.1 |   -16.7 |   -18.3 |   -23.0 | no
+
+  discrete tones @ -14 dBFS (one more point/frequency):
+     tone  A_eff |  cap H2 capSNR |  mdl H2 | clean?
+      110  -21.3 |   -40.3     45 |   -42.2 | yes
+      220  -17.8 |   -36.0     48 |   -41.0 | yes
+      440  -15.9 |   -35.7     49 |   -33.4 | yes
+     1000  -15.1 |   -18.5     47 |   -17.7 | yes
+
+====================================================================================
+COLLAPSE TEST — local slope p = d log|H2| / d log(A_in) vs A_eff (Gpost-immune, so
+the mismodelled 717 Hz notch does NOT corrupt it). For a STATIC nonlinearity all tones
+fall on ONE p(A_eff) curve. A point is 'dirty' if capture H2 is within 6 dB of the
+TRUE clipper-H2 floor (clipper contamination); shown but excluded from the verdict.
+====================================================================================
+    tone corner | slope samples  A_eff -> p  [* = clipper-dirty]
+     110  below | -23.3->0.99   -20.3->0.99   -16.3->0.95 
+     220  above | -19.8->1.02   -16.8->1.09   -12.8->0.46 
+     440  above | -17.9->0.92   -14.9->0.89   -10.9->0.40 
+    1000  above | -35.6->1.00   -32.6->1.00   -29.6->1.00   -26.6->1.00   -23.6->0.98   -20.6->0.91   -17.6->0.66   -15.6->0.42   -14.1->0.32   -11.6->0.30    -8.6->0.07    -5.6->-0.36*
+
+====================================================================================
+DECISIVE TEST — capture slope MINUS static-model slope, per frequency (same chain
+=> Gpost/treble/clipper all cancel). ~0 => capture's JFET is STATIC like the model.
+A 110 Hz (below-corner) anomaly vs 220/440/1000 => C3 degeneration is DYNAMIC.
+====================================================================================
+    tone corner | A_eff -> (cap_slope - mdl_slope)   [clean only]
+     110  below | -23.3->+0.03  -20.3->-0.05  -16.3->+0.12
+     220  above | -19.8->+0.09  -16.8->+0.25  -12.8->-0.09
+     440  above | -17.9->+0.05  -14.9->+0.14  -10.9->+0.03
+    1000  above | -35.6->-0.01  -32.6->-0.01  -29.6->-0.01  -26.6->+0.00  -23.6->+0.02  -20.6->+0.01  -17.6->-0.09  -15.6->-0.18  -14.1->-0.10  -11.6->+0.30   -8.6->+0.56
+
+====================================================================================
+READING
+====================================================================================
+       110 Hz (below corner): 4 clean levels, 3 clean slopes
+       220 Hz (above corner): 4 clean levels, 3 clean slopes
+       440 Hz (above corner): 4 clean levels, 3 clean slopes
+      1000 Hz (above corner): 15 clean levels, 11 clean slopes
+
+  |cap-mdl slope| : below-corner(110) mean +0.07 (n=3), above(220/440/1000) mean +0.11 (n=17)
+  below-corner NOT anomalous vs above-corner: YES
+
+  Interpretation:
+   * cap-mdl ~0 at ALL frequencies AND 110 (below) no worse than 220/440/1000 (above)
+     => capture's JFET H2-vs-level is STATIC-consistent, NO C3-corner dynamic signature
+     => STATIC family holds => branch = reshape the ceiling's odd term, phase-aware fit.
+   * 110 Hz cap-mdl systematically LARGE / opposite-signed vs the above-corner tones,
+     robust to noise => C3 degeneration is DYNAMIC => static family dead => branch =
+     the coupled-Newton JFET clipper treatment (Q1/Q2 Shichman-Hodges).
+
+  CAVEAT: below-corner coverage is ONE frequency (110 Hz), 3 slope samples from
+  4 levels — thin. The dense evidence (1 kHz ladder: static model tracks capture to
+  ~0.5 dB over 30 dB) and the differential (no corner anomaly) LEAN STATIC, but to
+  CONFIRM before the expensive branch commit, the pre-authorised ONE capture is:
+     drive-min level ladder at 110 AND 220 Hz, 3 dB steps, extending BELOW -36 dBFS
+  (dense clipper-free slope curves at a below- and an on-corner frequency to overlay
+   against the 1 kHz ladder). It is cheap and de-risks the static-vs-dynamic call.
+
+==============================================================================
+STEP-2 RESULT + SESSION-13 SYNTHESIS
+==============================================================================
+STEP 2 (static-vs-dynamic): NO DYNAMIC SIGNATURE. The confound-free differential
+(capture slope - static-model slope, same chain so Gpost/treble/clipper cancel) is
+~0 at every tone, and the below-corner 110 Hz (mean |dev| 0.07) is NOT anomalous vs
+the above-corner tones (0.11). The dense 1 kHz ladder shows the static model tracking
+the capture's H2-vs-level to ~0.5 dB over 30 dB. => The capture's JFET H2-vs-level is
+STATIC-CONSISTENT; the C3 degeneration-bypass does NOT introduce a memory effect the
+static shelf+shaper misses. LEAN: STATIC (caveat: below-corner = one frequency, thin).
+
+CROSS-CHECK with STEP 1 (phase), and why they are consistent:
+  * Step 2 says a STATIC shaper CAN fit. Step 1 says the CURRENT (session-11-fitted)
+    ceiling odd term does NOT match the capture's H3 phase (55-166 deg off, freq-dep).
+    These agree: the static FAMILY is adequate, but the current ceiling ODD-TERM SHAPE
+    is wrong (magnitude and possibly sign). A static real nonlinearity can only make H3
+    at intrinsic 0/180 deg (times downstream linear phase); the capture being ~180 from
+    the model at 1 kHz = the ceiling odd term is BACKWARDS there, a STATIC sign fix.
+  * Step 1's freq-dependent verdict (ceiling-right at 220/440, backwards at 1000) is,
+    under the static conclusion, LINEAR-MODEL phase error (the mismodelled 717 Hz
+    bridged-T notch corrupts 220's H3 at 660 Hz) — NOT genuine intrinsic freq-dependence
+    (a static nonlinearity cannot have that). So down-weight 220 in any phase-aware fit.
+
+BRANCH DECISION (handover §3o(3)):
+  Static is NOT contradicted => the indicated path is the STATIC branch:
+    reshape the JFET ceiling's ODD-LIMITING term, fitted against COMPLEX (phase-aware)
+    targets, with a §3j-style discriminating check BEFORE any fit, and dsp-validator
+    (Opus, high) sign-off on the JfetStage.h change (monotonicity, ADAA-preserving
+    antiderivative, existing odd-part/H3-zero/DC-step tests).
+  NOT the expensive coupled-Newton JFET rewrite — no dynamic evidence supports it.
+
+DE-RISK BEFORE COMMITTING (pre-authorised, user decision — a capture, not code):
+  ONE capture: drive-min level ladder at 110 AND 220 Hz, 3 dB steps, extending BELOW
+  -36 dBFS. Gives dense clipper-free H2-vs-level slope curves at a below-corner and an
+  on-corner frequency to overlay against the 1 kHz ladder and CONFIRM static before the
+  branch commit. The below-corner static evidence currently rests on 3 slope samples at
+  one frequency; this capture removes that thinness. Cheap; nothing else new is needed.
+
+TRAPS FOUND THIS SESSION (both are in the plan's own recipe — keep flagged):
+  1. 'ceiling-only via high clipSat' (§3o step 1) is INVALID: the D1/D2 clamp window
+     tracks satLo (Clipper.h clampHi=9.6-satLo), so clipSat>~10 freezes node W into a DC
+     source and the residual output is the harmonic-free clean BLEND bleed. Use coherent
+     complex subtraction of valid renders instead (done).
+  2. Raw A_eff-collapse (only Gpre) is confounded by the treble net + clipper AFTER the
+     JFET, which a STATIC model shares — so raw non-collapse is NOT a dynamic signature.
+     The differential-vs-static-model is the confound-free test (done).

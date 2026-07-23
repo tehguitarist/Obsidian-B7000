@@ -1,0 +1,112 @@
+Session 13 step 1 — phase-aware harmonic analysis (drive-min).
+psi_n = phi_n - n*phi_1 (deg), shift-invariant; LS complex-harmonic fit.
+
+shift-invariance self-test: PASS
+
+==============================================================================
+TRAP FOUND (why the ceiling cannot be isolated by 'high clipSat'):
+  The clipper's D1/D2 clamp window TRACKS satLo (Clipper.h: clampHi = 9.6 - satLo,
+  clampLo = -0.6 - satLo). So clipSat >~ 10 makes the window ~[-1e4,-1e4], FREEZING
+  node W -> the clipper becomes a DC source, and the only tone left at the output is
+  the harmonic-free clean BLEND bleed (H2/H3 at the -168 dB floor). The plan's
+  'ceiling-only via clipper at high sat' technique is INVALID. Isolations used here:
+   * clipper-only  = jfetCeilPos/Neg = 1e6 (ceiling off, clipper NORMAL) — VALID.
+   * ceiling contribution = COHERENT COMPLEX subtraction full - clipper-only among
+     the aligned model renders (same chain latency), NOT a separate render.
+==============================================================================
+
+--- CAPTURE  drive-0700_base-od.wav ---
+    tone |   H2dB   H3dB   H4dB |    psi2    psi3    psi4 |  noise
+     110 |  -40.3  -80.9  -82.4 |  -173.1   122.0   179.7 |  -85.5
+     220 |  -36.0  -59.8  -69.9 |  -128.1   -23.2   136.7 |  -84.8
+     440 |  -35.7  -63.0  -55.8 |   110.7   -18.7    80.4 |  -85.9
+    1000 |  -18.5  -25.6  -32.7 |    40.9  -132.9  -152.9 |  -72.8
+
+--- MODEL full (session-11 fitted point, -14 dBFS) ---
+    tone |   H2dB   H3dB   H4dB |    psi2    psi3    psi4 |  noise
+     110 |  -42.2  -99.4 -100.1 |   -65.8   126.9   -83.8 |  -98.1
+     220 |  -41.0  -59.4  -72.2 |    79.8   -78.0   -24.0 |  -84.8
+     440 |  -33.4  -40.0  -51.2 |    81.6  -120.8  -157.3 |  -80.0
+    1000 |  -17.7  -40.5  -44.6 |   -24.1    60.5    84.5 |  -83.2
+
+--- MODEL clipper-only, -14 dBFS (ceiling off, clipper normal) ---
+    tone |   H2dB   H3dB   H4dB |    psi2    psi3    psi4 |  noise
+     110 |  -43.0  -84.2  -85.7 |   -65.6   134.8   -82.5 |  -99.6
+     220 |  -42.1  -98.7  -65.7 |    80.5    87.3   -22.1 |  -89.6
+     440 |  -34.8  -77.4  -46.4 |    81.1  -171.0  -156.7 |  -87.9
+    1000 |  -19.5  -33.7  -44.4 |   -24.9  -114.4    48.0 |  -82.5
+
+--- MODEL clipper-only, HOT +10 dB (clipper H3 at good SNR) ---
+    tone |   H2dB   H3dB   H4dB |    psi2    psi3    psi4 |  noise
+     110 |  -37.0  -63.0  -61.3 |   -65.1   133.2   -83.9 |  -89.9
+     220 |  -39.9  -77.9  -45.8 |    80.1    80.2   -22.8 |  -61.6
+     440 |  -35.5  -54.6  -30.5 |    80.4   172.0  -158.4 |  -52.6
+    1000 |  -22.3  -16.7  -31.9 |    38.3  -141.0   176.2 |  -50.1
+
+==============================================================================
+MODEL H3 DECOMPOSITION — complex, per tone (deg = phase re that render's own phi1,
+i.e. psi3; |.| = dB re fundamental). ceiling = full - clipper (coherent).
+==============================================================================
+    tone | full |H3|    psi3 | clip |H3|    psi3 | ceil |H3|    psi3 | ceil<->clip
+     110 |     -99.4   126.9 |     -84.2   134.8 |     -85.8   -43.8 |      178.7
+     220 |     -59.4   -78.0 |     -98.7    87.3 |     -59.3   -78.2 |      165.5
+     440 |     -40.0  -120.8 |     -77.4  -171.0 |     -40.1  -120.2 |       50.8
+    1000 |     -40.5    60.5 |     -33.7  -114.4 |     -30.4    65.7 |      179.8
+  (ceil<->clip ~ 180 deg re-derives session-12's anti-phase interference from PHASE.)
+
+==============================================================================
+VERDICT — capture H3 phase vs the model's ceiling and clipper contributions
+==============================================================================
+    tone |  H3 Hz |  cap psi3 capSNR |    ceil    clip | cap<->ceil cap<->clip | verdict
+     110 |    330 |     122.0      5 |     -44     133 |        166         11 | (inconclusive: capSNR)
+     220 |    660 |     -23.2     25 |     -78      80 |         55        103 | (inconclusive: H3@notch,clipSNR)
+     440 |   1320 |     -18.7     23 |    -120     172 |        102        169 | (inconclusive: clipSNR,refs<90)
+    1000 |   3000 |    -132.9     47 |      66    -141 |        161          8 | CLIPPER (ceiling BACKWARDS)
+
+  Reading:
+   * capture near CEILING phase  -> model ceiling odd term has the RIGHT sign, just
+     too big -> a ceiling-magnitude reshape can work.
+   * capture near CLIPPER phase  -> model ceiling odd term is BACKWARDS -> magnitude
+     tweak cannot fix it; a phase-aware fit target is mandatory.
+   * verdict DIFFERING across (clean) tones = the nonlinear H3 phase is
+     FREQUENCY-DEPENDENT -> direct evidence for the static-vs-dynamic test (step 2).
+
+  Conclusive tones: {'CLIPPER': 1}
+
+==============================================================================
+STEP-1 SUMMARY (session 13)
+==============================================================================
+METHOD VALIDATED: psi_n shift-invariance exact (0.000 deg) over integer + fractional
+shifts incl. the session-8 26-sample lag. LS complex-harmonic fit is leakage-free.
+
+INTERNAL CHECK PASSED: the model's ceiling-H3 and clipper-H3 are ~180 deg apart
+(178.7/165.5/179.8 deg at 110/220/1000) by COHERENT complex subtraction — session
+12's anti-phase interference re-derived from PHASE, independent of amplitude.
+
+TRAP FOUND + AVOIDED: 'ceiling-only via high clipSat' is INVALID — the D1/D2 clamp
+window tracks satLo (clampHi=9.6-satLo), so clipSat>~10 freezes node W into a DC
+source and the residual output is just the harmonic-free clean BLEND bleed. Used
+coherent subtraction of valid renders instead.
+
+VERDICT: AMBIGUOUS / FREQUENCY-DEPENDENT.
+  * 1000 Hz (H3=3000, capSNR 47 dB, notch-free, the ONLY strictly-conclusive tone):
+    capture MATCHES the clipper (8 deg) and OPPOSES the ceiling (161 deg)
+    -> ceiling odd term BACKWARDS at that frequency.
+  * 220 & 440 Hz: capture leans the OTHER way (toward the ceiling / right-sign),
+    but 220's H3 (660 Hz) sits on the bridged-T notch whose DEPTH the linear model
+    gets wrong (model -28 vs capture -3.4 dB) -> the model H3 phase there is
+    confounded by a KNOWN linear error, not necessarily nonlinear phase. 440 has
+    poor clipper-ref SNR and unresolvable refs (68 deg).
+  * 110 Hz: capture H3 SNR only 5 dB -> unusable.
+
+So a single 'ceiling too big' vs 'ceiling backwards' answer does NOT hold across
+frequency, and the one clean tone disagrees with the (contaminated) others. Two
+readings are consistent with the data and cannot be separated by phase alone:
+  (a) the nonlinear H3 phase is genuinely FREQUENCY-DEPENDENT (a static shaper of
+      any family is structurally inadequate) — the step-2 static-vs-dynamic test
+      decides this directly; OR
+  (b) the frequency spread is linear-model phase error (the 717 Hz notch, SK
+      corners) contaminating the per-tone capture-vs-model comparison.
+Per the agreed protocol, step 1 alone does NOT pick a shape family. Step 2 is the
+decider. Phase-aware (complex) targets are mandatory in any future fit regardless,
+since interference nulls are otherwise a hidden confounder (the sessions-7-12 cycle).
