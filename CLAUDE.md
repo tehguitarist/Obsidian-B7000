@@ -133,13 +133,25 @@ high, execute routine work cheap) is what should persist.
 > explains the model's FLAT H3−H2 across min/9:30/noon (−17.7/−17.7/−17.8) vs the capture's
 > ramp (−23.2/−21.0/−10.6): the ceiling H3 floor is 5.4 dB too HIGH at min AND masks the
 > clipper's ramp at noon.
-> **▶ NEXT (decision needed, NOT agreed yet): the suspect is now the JFET ceiling's
-> odd-limiting SHAPE** — one term explains both halves of the error (floor too high + ramp
-> masked). Rework it with its own §3j-style discriminating check BEFORE any refit; keep `clipK`
-> in the tree (k≈2.5-3 reproduces old tanh to ~1 dB; cannot be FIT while the interference null
-> dominates noon — the optimiser would fit the null). dsp-validator sign-off on the vtc reshape
-> was deferred when the gate fired — run it before any commit that includes it. Full detail:
-> handover "SESSION 12" §3k–3n. ctest 16/16.
+> **▶ NEXT (AGREED with user 2026-07-23, handover §3o): measure FIRST, decide the path with
+> data — no third shape-family guess.** The sessions-7–12 meta-pattern is amplitude-only fits
+> killed by measurements the objective couldn't see; two measurements from EXISTING captures
+> (no code, no new captures) decide everything: **(1) phase-aware harmonic analysis** of the
+> drive-min tones via the shift-invariant relative phase `φn − n·φ1` (alignment-lag-immune) —
+> does the real pedal's low-drive H3 phase OPPOSE the clipper's (ceiling too big) or MATCH it
+> (ceiling BACKWARDS)? Then fold complex targets into `fit_nonlinear.py` so interference nulls
+> become fitted, not hidden. **(2) static-vs-dynamic test** — C3's degeneration bypass corner
+> is 219 Hz, IN the measurement band (every fit so far sat at 220 Hz, ON it): if drive-min
+> H2-vs-level curves at different tone frequencies don't collapse onto one static curve, NO
+> static W-H shaper of any family can fit. **Branch:** static holds + phase blames ceiling →
+> reshape ceiling's odd term (or data-driven monotone-spline static map from the level ladder)
+> fitted against COMPLEX targets with a §3j-style check first; static fails → give the JFET
+> the clipper treatment (Q1/Q2 Shichman-Hodges + R6∥C3 companion INSIDE a per-sample Newton
+> loop; phases emerge from topology; Idss/Vp physically bounded; DAFx-2024 paper in docs/refs)
+> and skip further static families. Do NOT fit black-box shapers on the full drive sweep, do
+> NOT capture anything new before the phase dimension of existing data is read. dsp-validator
+> sign-off on the clipK vtc reshape still deferred — run before any commit that RELIES on it.
+> Full detail: handover "SESSION 12" §3k–3o. ctest 16/16, committed 47c7e35.
 > (1) **`driveTaperExp` validated against the matched-pair drive capture** (`analysis/
 > drive_taper_validate.py`, `analysis/fit_logs/step4_drive_taper.log`) per dsp.md's "fit the taper
 > SHAPE against a matched-pair capture" — session 10's floated 5.45 is REJECTED (it ran the

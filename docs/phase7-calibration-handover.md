@@ -1109,7 +1109,7 @@ restored exactly. So in the assembled chain at noon:
 **A clipper-alone probe structurally could not see this** — the §3j check existed precisely to
 catch it, and did.
 
-### 3n. Where this leaves the model (re-diagnosis, NOT yet agreed — decide next session)
+### 3n. Where this leaves the model (re-diagnosis — superseded as a PLAN by §3o, kept as the evidence)
 
 The capture's profile needs: an H3−H2 floor at drive-min of −23.2 (the model's JFET-ceiling H3
 floor is ~5.4 dB TOO HIGH at −17.7) AND a smooth ramp to −10.6 by noon (the model is FLAT there,
@@ -1125,12 +1125,60 @@ then bursts through at 2:30). Two observations point the same way:
    (the optimiser would be fitting the interference null, the same class of unfalsifiable
    trade the step-2 fits kept falling into).
 
-**Decision needed before any further fitting:** rework the JFET ceiling's odd-limiting shape
-(or its phase/strength) with the same §3j-style discriminating check against the ceiling, THEN
-revisit the joint fit with `clipK` in the set. The `clipK` working-tree change is worth keeping
-regardless (superset of tanh: `k≈2.5-3` ≈ old behaviour; ADAA-anchored at `k=2`) but must not
-ship as a default until the whole set passes acceptance — and it still needs the dsp-validator
-sign-off pass (deferred when the gate fired; run it before any commit that includes the reshape).
+The `clipK` change (now committed, `47c7e35`) is worth keeping regardless — a superset of tanh
+(`k≈2.5-3` ≈ old behaviour; ADAA-anchored at `k=2`) — but must not ship as a fitted default
+until the whole set passes acceptance, and it still needs the dsp-validator sign-off pass
+(deferred when the gate fired; run it before any commit that RELIES on the reshape).
+
+### 3o. ▶ SESSION-13 PLAN (AGREED with the user 2026-07-23) — measure first, decide the path with data
+
+**The meta-lesson of sessions 7–12, named explicitly:** every failure has been a
+locally-plausible parameterized shape, fitted to AMPLITUDE-ONLY data, killed later by a
+measurement the objective could not see (bleed → three fits; taper → session 10; phase
+interference → session 11). Do NOT pick a third shape family the same way. Two measurements —
+both from EXISTING captures, no DSP code, no new captures — decide the path first:
+
+**(1) PHASE-AWARE harmonic analysis of the drive-min tones.** Extract COMPLEX harmonics using
+the shift-invariant relative phase `φn − n·φ1` (a time shift τ multiplies Hn by e^(−inωτ), so
+this combination is invariant — immune to the 0–26-sample alignment lags that made
+cross-capture phase untrustworthy, the session-8 trap; within-capture relative phase is
+trustworthy). Answers directly: does the real pedal's low-drive H3 phase OPPOSE the clipper's
+(as the model's ceiling does) or MATCH it? If it matches, the ceiling's odd term is not just
+too big, it is BACKWARDS, and no magnitude tweak fixes it. Then fold complex targets into
+`fit_nonlinear.py` — with phase in the objective, interference nulls become a fitted quantity
+instead of a hidden confounder, breaking the sessions-7–12 cycle regardless of which path wins.
+
+**(2) STATIC-vs-DYNAMIC discriminating test.** The whole JfetStage is a Wiener-Hammerstein
+static-shaper approximation — but **C3's degeneration bypass corner is 219 Hz, right in the
+measurement band**: below it R6's local feedback linearizes the device, above it the feedback
+is bypassed and distortion rises, so the effective nonlinearity is FREQUENCY-DEPENDENT and no
+static shaper of ANY family can represent it — and every fit so far has been at 220 Hz, sitting
+exactly ON that corner. Test: H2-vs-level curves at drive-min from tones at different
+frequencies (the 1 kHz level ladder `lvl_-36..-3` + the fixed-tone segments + the three sweep
+levels −36/−18/−6 give multi-level data; if that proves too thin, ONE new capture is justified:
+a drive-min level ladder at 110/220 Hz, 3 dB steps, extending lower). If the curves collapse
+onto one static curve after the known linear filters → static holds. If not → structural
+explanation for three sessions of strain, and the static family is dead.
+
+**(3) Branch on the results:**
+- **Static holds + phase points at the ceiling** → reshape the ceiling's odd-limiting term,
+  fitted against COMPLEX targets, with its own §3j-style discriminating check before any fit.
+  A data-driven static map is also on the table here: at drive-min everything around the JFET
+  is linear and settled (mixer/tapers/kInputRef/Norton boundary), so the level ladder
+  over-determines the static curve (amplitudes AND phases vs level) — a monotone spline/low-order
+  fit with numeric ADAA is guaranteed to reproduce it and is falsifiable at every level step.
+- **Static fails** → give the JFET **the clipper treatment**: solve Q1/Q2 (Shichman-Hodges
+  square law) with the R6∥C3 companion INSIDE the loop, per-sample Newton like `Clipper.h`.
+  Precedent is exactly on point: the GRUNT corners were audibly wrong until the clipper became
+  a coupled network instead of "filter then waveshaper". The even strength, the ceiling, and
+  their PHASES then all emerge from the topology + two-three physical params (Idss, Vp —
+  physically bounded, the constraint discipline the fits have lacked). DAFx-2024 JFET paper in
+  `docs/refs/`. ADAA via oversampling like the clipper (precedent exists). Skip further
+  static-family iterations entirely if this branch fires.
+
+**Do NOT:** fit any black-box shaper against the full drive sweep (above min the clipper
+dominates and identifiability collapses back into the bleed-style trap); capture anything new
+before the existing data's phase dimension has been read.
 
 ---
 
