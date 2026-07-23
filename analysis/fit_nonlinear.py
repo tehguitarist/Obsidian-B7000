@@ -1,54 +1,51 @@
 #!/usr/bin/env python3.11
-"""Phase-7 step 2 — fit the CD4049 clipper + J201 shaper constants to the driven captures.
+"""Phase-7 step 3 — fit the CD4049 clipper + J201 shaper to HARMONIC-TO-HARMONIC ratios.
 
-Objective = the tone_220 harmonic profile (THD + H2..H5 dB re fundamental, calibration-and-
-gain-staging.md §6b) across the DRIVE sweep. kInputRef is anchored (step 1); driveTaperExp is
-held at its nominal here (taper fit is step 4 — a coupled re-fit may follow).
+** THE OBJECTIVE (rewritten 2026-07-23, session 10 — the step-3 fix). **
+Earlier this fit scored harmonics re the FUNDAMENTAL (H2/H1, THD, ...). That premise —
+"harmonic RATIOS are level-independent" — is FALSE in this chain and invalidated THREE fits
+(full write-up: docs/phase7-calibration-handover.md, "THE EVEN-HARMONIC LADDER WAS AN
+ARTEFACT"). At BLEND = max-OD the output is alpha(B)*OD + beta(B)*CLEAN, and the clean tap
+carries NO harmonics, so every measured harmonic-re-FUNDAMENTAL ratio is diluted by the
+OD-vs-clean LEVEL — which is exactly what the fit params move. The fitter therefore bought
+harmonic score with level: it drove jfetGm 25x below nominal, cranked `a` to claw H2 back,
+hit the monotonicity gate, and the bump's saturation manufactured the excess H4 that was
+misread as a structural flaw. The shaper shape is FINE; do NOT reshape it.
 
-** ⚠ THIS OBJECTIVE IS NOT LEVEL-INDEPENDENT, AND THAT INVALIDATED THREE FITS. **
-This docstring used to claim "harmonic RATIOS are level-independent, so this is valid before
-makeup (step 5) is set". ** That is FALSE in this chain ** (found 2026-07-23, session 7;
-full write-up in docs/phase7-calibration-handover.md, "THE EVEN-HARMONIC LADDER WAS AN
-ARTEFACT"). At BLEND = max-OD the output is NOT 100% OD: LevelBlend::process() returns the
-LEVEL wiper voltage, which still contains cleanIn, because BLEND's 100k track runs
-pin1(clean) <-> pin3(LEVEL wiper) and the clean source feeds that node through the full 100k
-against the wiper's ~23.3k Thevenin. At LEVEL = noon the mix is 0.3009*od + 0.1892*clean --
-clean only 4.0 dB below OD. The clean tap carries NO harmonics, so it inflates H1 and
-suppresses every measured harmonic by however far the OD path sits below the clean tap:
-+20.9 dB of dilution at jfetGm = 0.0274 mS, +12.9 at 0.090 mS, +5.9 at the nominal 0.69 mS.
+THE FIX: score harmonic-TO-HARMONIC ratios — Hn - H2 in dB (n = 3,4,5). Every harmonic at
+the output is alpha(B)*OD_n (bleed-free, since CLEAN has no harmonics), so a ratio of two
+harmonics cancels alpha EXACTLY. That makes the objective immune to the BLEND clean bleed AND
+to makeup, levelTaperExp and masterTaperExp — genuinely level-independent, which the old
+objective only ever CLAIMED to be. (Hn - H2 = (Hn re H1) - (H2 re H1); H1 cancels
+identically, which is why we can build it from the existing re-fundamental profile without
+ever touching the contaminated fundamental.) The H2-re-fundamental and THD-re-fundamental
+terms are DROPPED — both divide by the contaminated output fundamental.
 
-Consequence: this objective can BUY HARMONIC SCORE WITH LEVEL, and it did -- it drove jfetGm
-25x below nominal, then cranked jfetSatNeg (`a`) to claw H2 back, hit the monotonicity gate,
-and the bump's own saturation manufactured the excess H4 that was misdiagnosed as a
-structural flaw in the waveshaper. The shaper shape is FINE; do not reshape it.
+jfetGm is now HELD at 0.10 mS (step 2, analysis/reanchor_gm.py: bleed-aware re-anchor gave
+gm ~= 0.10 mS, band 0.09-0.15, corroborating 0.090 bleed-FREE). A harmonic-only objective
+must NOT be allowed to vote on gm — that was the whole failure mode. levelTaperExp is held at
+the step-1 measured 2.25 (irrelevant to the ratios, since alpha cancels, but keeps the render
+faithful); jfetRo/jfetRq2 held at nominal (not identifiable from this data, session 4).
 
-** DO NOT SIMPLY RE-RUN THIS. ** The agreed plan is in docs/phase7-calibration-handover.md,
-"THE PATH FORWARD FOR THE J201". Two things must happen first:
+Fit set: jfetSatPos(s), jfetSatNeg(a), jfetCeilPos/Neg, clipA0, clipSatLo/Hi. (driveTaperExp was
+fit in session 10 but is now HELD at 2.5 from the step-4 LEVEL validation — see HELD below.)
+Sanity anchor: at s = 0.3, nominal ceilings/clipper, a ~= 4 lands drive-min H2 within ~0.5 dB
+of the capture at either gm candidate — so expect a fitted `a` in SINGLE DIGITS, not the
+5.5-20 the rejected re-fundamental runs produced.
 
-1. SETTLE THE MIXER. Do not hold jfetGm at the shape fit's 0.090 mS either -- that number is
-   contaminated by the SAME bleed (at 0.090 mS the drive-min render is 0.0097 of OD against
-   0.0328 of clean, i.e. the "OD-path shape" fit_jfet_boundary.py matched is ~77% CLEAN by
-   amplitude, and its gm sensitivity is the MIX RATIO moving, not the OD path's shape). All
-   three gm estimates -- 0.551 / 0.090 / 0.0274 mS -- are really measurements of the OD/clean
-   mix ratio. Re-anchor gm from the corrected mixer first.
-2. CHANGE THE OBJECTIVE to harmonic-TO-HARMONIC ratios (H3/H2, H4/H2, H5/H2) rather than
-   ratios re the FUNDAMENTAL. The clean tap is linear and harmonic-free and everything after
-   BLEND is linear, so every harmonic at the output is alpha(blend) * OD_n while the
-   fundamental is alpha*OD_1 + beta*CLEAN_1. Harmonic-to-harmonic ratios therefore cancel
-   alpha EXACTLY -- immune to the bleed AND to makeup, levelTaperExp and masterTaperExp,
-   which is what this objective only ever CLAIMED to be. (levelTaperExp sets L and hence the
-   bleed coefficients, so under the CURRENT objective a step-4 taper param silently confounds
-   a step-2 harmonic fit.)
-
-Sanity anchor for the eventual re-fit: at s = 0.3 with nominal ceilings/clipper, a ~= 4 puts
-drive-min H2 within ~0.5 dB of the capture at EITHER gm candidate -- so expect a fitted `a`
-in single digits, not the 5.5-20 the rejected runs produced.
+Acceptance (step 4) requires corroboration the objective could NOT see (checks printed below):
+the square-law identity 2*a*jfetCeilNeg ~= 1 (deliberately NOT constrained here), clipA0
+inside circuit.md's 20-30, and NO parameter resting on a bound. Commit nothing to the DSP
+until acceptance passes. Also re-run at gm in {0.09, 0.12, 0.15} mS (--gm-scan): the ratios
+should be nearly gm-insensitive; a large swing would mean the objective is still coupling to
+level somewhere.
 
 Speed trick: the capture targets are precomputed CONSTANTS (measured once from the real captures),
 so each optimiser eval only renders a SHORT synthetic 220 Hz tone through the plug at each drive
 setting — ~20x faster than rendering the full 84 s test signal.
 
-Run: /opt/homebrew/bin/python3.11 analysis/fit_nonlinear.py
+Run: /opt/homebrew/bin/python3.11 analysis/fit_nonlinear.py            (the fit)
+     /opt/homebrew/bin/python3.11 analysis/fit_nonlinear.py --gm-scan  (gm sensitivity of a point)
 """
 import sys, os, subprocess, numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
@@ -60,64 +57,56 @@ from scipy.optimize import minimize
 FS = 48000
 F0 = 220.0
 CAP = "analysis/captures"
-# driveTaperExp is included because the THD-vs-drive SLOPE (how fast distortion ramps across the
-# knob) is set by the drive taper, and is coupled to the clipper/JFET gains — holding it fixed makes
-# the fit match the drive extremes while leaving the mid-range too clean (observed). It is nominally
-# a step-4 taper param, but it cannot be separated from this fit; step 4 refines it if needed.
 # jfetSatPos = square-law knee `s`; jfetSatNeg = even/H2 strength `a` (JfetStage reshape 2026-07-22).
+# The harmonic-vs-drive SLOPE (how fast the clipper ramps across the knob) is set by the drive taper
+# AND coupled to the clipper/JFET gains. Session 10 fit driveTaperExp jointly here; session 11 pins
+# it to the step-4 level measurement (2.5) and lets ONLY the clipper/JFET shape re-absorb — the
+# taper shape is now data (a level capture), not a free harmonic-fit param.
 #
-# ** `jfetG0` is GONE (2026-07-22 restructure) — it was a lumped voltage gain that silently
-# absorbed the J201's output impedance and the treble net's loading. The stage is now a
-# transconductance, so the gain parameter is the device `jfetGm` (S). Passing the old key
-# makes OfflineRender fail loudly rather than fit something else; nothing here aliases it. **
+# ** jfetGm is NOW HELD, not fit (step-3 change, session 10). ** A harmonic-only objective must
+# not vote on gm — that is exactly the failure mode that produced three uncommittable fits. gm
+# is anchored bleed-free at 0.10 mS by analysis/reanchor_gm.py (step 2); the harmonic-to-harmonic
+# ratios are (by construction) nearly gm-insensitive, so holding it costs the fit nothing and
+# removes the level<->harmonic coupling. jfetRo/jfetRq2 are not identifiable from this data
+# (session 4) and levelTaperExp cancels in the ratios — all HELD, emitted explicitly so a render
+# is never at the mercy of the binary's defaults.
 #
-# jfetGm is IN this fit, and jfetRo/jfetRq2 are NOT, on purpose — they are fit by different
-# data and it matters which:
-#   * gm sets the small-signal drain current, i.e. how hard the chain drives the clipper, and
-#     the harmonic profile below is directly sensitive to that. It ALSO sets the degeneration
-#     k0 = 1+gm*R6 (the C3 shelf), which analysis/fit_jfet_boundary.py measures from the
-#     drive-min SHAPE. So gm is OVER-determined by two independent objectives — that is a
-#     feature: if the two disagree, the model is wrong somewhere, and the disagreement is the
-#     finding. Cross-check them; do not quietly average them.
-#   * ro/rq2 only shape the loading, are near-inert in the harmonic profile, and would just
-#     add two flat directions to this search. Held at HELD below (fit_jfet_boundary.py).
+# ** jfetCeilPos/jfetCeilNeg — the J201 drain-current ceiling. ** It fixes the structural gap
+# the step-2 runs exposed (an unbounded shaper whose H2 grew +21.9 dB across the sweep vs the
+# capture's +6). Deliberately NOT constrained to the square law here so 2*a*ceilNeg ~= 1 stays
+# an INDEPENDENT acceptance check (step 4), not an assumption baked into the fit.
+FIT_KEYS = ["jfetSatPos", "jfetSatNeg", "jfetCeilPos", "jfetCeilNeg",
+            "clipA0", "clipSatLo", "clipSatHi"]
+NOMINAL  = [0.3, 4.0, 1.0, 0.5, 25.0, 3.15, 3.85]
+# Held fixed at every eval. jfetGm = 0.10 mS (step-2 re-anchor, band 0.09-0.15); levelTaperExp =
+# 2.25 (step-1 measured); jfetRo/jfetRq2 nominal (inert / unidentifiable). --gm-scan overrides
+# jfetGm to probe the ratios' gm-sensitivity at a fixed parameter point.
 #
-# ** jfetCeilPos/jfetCeilNeg ADDED 2026-07-22 — the whole reason for this re-run. **
-# The previous run's failure was structural, not numerical: the J201 shaper had no
-# ceiling, so H2 grew +21.9 dB across the drive sweep where the capture's grows +6,
-# and the optimiser drove |a|*s into the monotonicity gate and clipA0 into its floor
-# trying to manufacture a bound out of a shape that had none. The ceiling is now an
-# explicit pair of params (gate-volt equivalent, x gm for amps; cutoff side and
-# load-line side). Judge THIS run by whether |a|*s comes off the gate and clipA0 comes
-# off its floor of 3 — if clipA0 still pins, the clipper is the next suspect, not the
-# J201. Also worth checking, and deliberately NOT constrained here so it stays an
-# independent corroboration: the square law ties the two together as 2*a*ceilNeg = 1.
-FIT_KEYS = ["jfetGm", "jfetSatPos", "jfetSatNeg", "jfetCeilPos", "jfetCeilNeg",
-            "clipA0", "clipSatLo", "clipSatHi", "driveTaperExp"]
-NOMINAL  = [0.69e-3, 0.3, 1.0, 1.0, 0.5, 25.0, 3.15, 3.85, 1.5]
-# Params held fixed at every eval, emitted explicitly so a render is never at the mercy of the
-# binary's defaults. ** Update from analysis/fit_jfet_boundary.py once its result is committed;
-# nominal until then. **
-HELD = {"jfetRo": 200.0e3, "jfetRq2": 1.0e6}
-# Bounds WIDENED 2026-07-22 after run 1 pinned jfetSatPos exactly at its old 6.0 ceiling and
-# pushed clipSatLo (1.317) down near its old 1.2 floor — a param resting ON a bound means the
-# optimum is outside the box, so the reported value is an artefact of the box, not a fit.
-# clipSat* floors dropped because the R19-dropped 4049 rail is fitting LOWER than the nominal
-# ~7 V sum.
-#
-# ** RESCALED 2026-07-22 with the restructure — the old jfetSat* ranges are meaningless now. **
-# The shaper's argument is the effective vgs (REAL gate volts), not a post-gain voltage, so:
-#   jfetGm     siemens. Datasheet 0.69 mS; the documented ~5:1 J201 spread plus a decade below
-#              it, because the shape fit pushes that way and the box must not decide that.
+# ** driveTaperExp is NOW HELD at 2.5 (step-4 JOINT RE-FIT, session 11). ** Session 10's fit let
+# driveTaperExp float and it landed at 5.45 — but the step-4 matched-pair LEVEL validation
+# (analysis/drive_taper_validate.py, analysis/fit_logs/step4_drive_taper.log) REJECTED that: the
+# compression-free small-signal DRIVE gain at the linear interior knob points (9:30, noon) measures
+# p = 2.50 (clean taper err 0.18 dB), while p = 5.45 runs noon +8.5 dB too hot (err 6.44 dB). The
+# 5.45 was the harmonic objective buying its targets with taper (more gain into the clipper) instead
+# of the real taper — exactly the coupling dsp.md's "fit the taper SHAPE against a matched-pair
+# capture" guards against. So the taper is now ANCHORED to that level measurement and the clipper/
+# JFET shape params re-absorb here. (Pinning p shallower under-drives the clipper at high knob, so
+# expect clipA0/clipSat to shift to keep the harmonic ratios.)
+HELD = {"jfetGm": 0.10e-3, "jfetRo": 200.0e3, "jfetRq2": 1.0e6,
+        "levelTaperExp": 2.25, "driveTaperExp": 2.5}
+# BOUNDS on the fitted params. The shaper's argument is the effective vgs (REAL gate volts):
 #   jfetSatPos knee `s` in gate volts — order |Vp| (0.3-1.5 V for a J201), room either side.
-#   jfetSatNeg even strength `a` (1/V) = 1/Vov. The real constraint is a PRODUCT/COUPLING,
-#              not a box — enforced by monotonic() below.
-#   jfetCeilPos load-line ceiling, gate-volt equivalent. Estimated 0.2-0.9 V at the nominal
-#              gm and ~7.6x looser at the gm the shape fit prefers, so the box is wide.
+#   jfetSatNeg even strength `a` (1/V) = 1/Vov. The real constraint is a PRODUCT/COUPLING with
+#              s and the ceilings, not a box — enforced by monotonic() below.
+#   jfetCeilPos load-line ceiling, gate-volt equivalent.
 #   jfetCeilNeg cutoff ceiling = Vov/2. Physically ties to `a` as 1/(2a); left free so that
 #              identity stays an independent check on the result rather than an assumption.
-BOUNDS   = [(1.0e-5, 5.0e-3), (0.05, 5.0), (0.0, 10.0), (0.05, 20.0), (0.05, 10.0),
-            (3, 30), (0.4, 6.5), (0.4, 7.5), (0.4, 3.0)]
+#   clipA0     CD4049 open-loop gain; circuit.md says 20-30. Lower bound 3 so a pin on it is
+#              still diagnostic (the step-2 runs pinned it at 3 when starved).
+#   clipSatLo/Hi per-side clip ceilings (V); their sum tests against the ~7 V R19-dropped rail.
+# (driveTaperExp is no longer fit — HELD at 2.5 from the step-4 level validation; see HELD above.)
+BOUNDS   = [(0.05, 5.0), (0.0, 10.0), (0.05, 20.0), (0.05, 10.0),
+            (3, 30), (0.4, 6.5), (0.4, 7.5)]
 # drive capture -> label
 DRIVE_CAPS = [
     ("drive-0700_base-od.wav", "min"),
@@ -126,8 +115,11 @@ DRIVE_CAPS = [
     ("drive-1430_base-od.wav", "2:30"),
     ("drive-1700_base-od.wav", "max"),
 ]
-# harmonic weights (dB error) — H2/H3 carry clip CHARACTER, weight them; H4/H5 noisier; +THD
-W = dict(H2=1.0, H3=1.0, H4=0.5, H5=0.3, THD=0.7)
+# Harmonic-TO-HARMONIC ratio terms (dB): Hn - H2. Fundamental cancels (both are re-fund) and
+# alpha (BLEND bleed / makeup / tapers) cancels EXACTLY because every output harmonic is
+# alpha*OD_n. H3-H2 is the primary discriminator (clipper-odd H3 vs J201-even H2); H4/H5 sit
+# 20-40 dB lower and are noisier -> down-weighted.
+RATIO_W = {("H3", "H2"): 1.0, ("H4", "H2"): 0.5, ("H5", "H2"): 0.3}
 
 SHORT_IN = "/tmp/fit_tone220.wav"
 
@@ -238,20 +230,53 @@ def cost(params, targets, verbose=False):
         return 1e6
     total = 0.0
     for lbl in targets:
-        for key, w in W.items():
-            e = prof[lbl][key] - targets[lbl][key]
+        for (hi, lo), w in RATIO_W.items():
+            e = (prof[lbl][hi] - prof[lbl][lo]) - (targets[lbl][hi] - targets[lbl][lo])
             total += w * e * e
     if verbose:
         return total, prof
     return total
 
 
+def gm_scan(params, targets, gms):
+    """Re-score ONE parameter point at several held gm values. The harmonic-to-harmonic ratios
+    should be nearly gm-insensitive; a large cost swing means the objective still couples to
+    level somewhere. Restores HELD['jfetGm'] on exit."""
+    saved = HELD["jfetGm"]
+    print("\ngm sensitivity of the fitted point (ratios should be ~flat vs gm):")
+    print(f"  {'gm(mS)':>7} | {'cost':>7} | " + " | ".join(f"{lbl} H3-H2/H4-H2" for lbl in targets))
+    try:
+        for gm in gms:
+            HELD["jfetGm"] = gm
+            c, prof = cost(params, targets, verbose=True)
+            cells = []
+            for lbl in targets:
+                p = prof[lbl]
+                cells.append(f"{p['H3']-p['H2']:+5.1f}/{p['H4']-p['H2']:+5.1f}")
+            print(f"  {gm*1e3:>7.3f} | {c:>7.1f} | " + " | ".join(cells))
+    finally:
+        HELD["jfetGm"] = saved
+
+
 def main():
     make_short_input()
     targets = capture_targets()
-    print("Capture targets (tone_220, dB re fundamental):")
+    print("Capture targets (tone_220): harmonic-to-harmonic ratios (dB) are the objective;")
+    print("H2 re-fund shown for reference only (NOT fit — it is bleed-contaminated).")
+    print(f"  {'drive':5s}  {'H3-H2':>7} {'H4-H2':>7} {'H5-H2':>7}   {'(H2reF)':>8}")
     for lbl, p in targets.items():
-        print(f"  {lbl:5s} THD={p['THD']:6.1f} H2={p['H2']:6.1f} H3={p['H3']:6.1f} H4={p['H4']:6.1f} H5={p['H5']:6.1f}")
+        print(f"  {lbl:5s}  {p['H3']-p['H2']:>7.1f} {p['H4']-p['H2']:>7.1f} {p['H5']-p['H2']:>7.1f}   "
+              f"{p['H2']:>8.1f}")
+
+    # --gm-scan: probe gm-sensitivity of a point WITHOUT re-fitting. Point comes from --start=
+    # if given, else NOMINAL. This is the step-3 gm-insensitivity check.
+    if "--gm-scan" in sys.argv:
+        pt = NOMINAL
+        for arg in sys.argv[1:]:
+            if arg.startswith("--start="):
+                pt = [float(v) for v in arg.split("=", 1)[1].split(",")]
+        gm_scan(pt, targets, [0.09e-3, 0.10e-3, 0.12e-3, 0.15e-3])
+        return
 
     c0 = cost(NOMINAL, targets)
     print(f"\nNominal cost = {c0:.1f}")
@@ -261,18 +286,15 @@ def main():
     # best under WIDENED bounds — a param that came back resting on a bound must be re-fit,
     # not committed).
     best = None
-    # Starts RESCALED for the restructured stage (gm in siemens, s/a in gate volts). The three
-    # gm values deliberately straddle the open question: datasheet-nominal, the decade-lower
-    # value the drive-min SHAPE fit prefers (fit_jfet_boundary.py), and the midpoint — so this
-    # objective gets to vote on gm independently instead of inheriting the shape fit's answer.
-    # Ceiling starts (cols 4/5) straddle "loose" and "biting": the whole question this
-    # run answers is whether the fit WANTS a tight J201 ceiling. Start 1 is nominal,
-    # start 2 pairs the low gm with a tight cutoff ceiling, start 3 starts nearly
-    # unbounded so the optimiser has to earn the ceiling rather than inherit it.
+    # Starts (gm AND driveTaperExp HELD now): [s, a, cp, cn, clipA0, clipSatLo, clipSatHi].
+    # All feasible (min_slope > 0). With the taper PINNED at 2.5 the multi-modal-in-driveExp basin
+    # split of session 10 is gone; these three just spread the clipper/JFET start so the re-absorb
+    # doesn't sit in a local min. Start 1 = the session-10 shape at its fitted knee/ceilings, start 2
+    # a tighter knee + lower ceiling, start 3 = nominal.
     starts = [
-        [0.69e-3, 0.3, 1.0, 1.0, 0.5, 25, 3.15, 3.85, 1.0],
-        [0.09e-3, 0.2, 2.0, 0.5, 0.3, 20, 3.0, 3.6, 1.2],
-        [0.22e-3, 0.5, 0.8, 6.0, 3.0, 15, 3.0, 4.0, 0.8],
+        [0.22, 0.91, 6.08, 0.46, 24, 2.0, 2.4],
+        [0.25, 1.8, 0.5, 0.33, 28, 1.6, 1.9],
+        [0.3, 4.0, 1.0, 0.5, 25, 3.15, 3.85],
     ]
     for arg in sys.argv[1:]:
         if arg.startswith("--start="):
@@ -286,29 +308,28 @@ def main():
 
     print(f"\nBest cost = {best.fun:.1f}  (nominal {c0:.1f})")
     print("Fitted params:")
-    # %g, not %7.3f — jfetGm is ~7e-4 and a fixed-point format prints it as "0.001".
     for k, v, nom in zip(FIT_KEYS, best.x, NOMINAL):
         print(f"  {k:12s} {v:12.5g}   (nominal {nom:g})")
     print(f"  held: " + ", ".join(f"{k}={v:g}" for k, v in HELD.items()))
 
-    # ---- Acceptance diagnostics -------------------------------------------------
-    # The previous run was rejected by exactly these, so print them rather than
-    # leaving them to be re-derived by hand from the parameter dump.
+    # ---- Acceptance diagnostics (step 4) ----------------------------------------
+    # Corroboration the harmonic-to-harmonic objective could NOT see. Every prior run was
+    # rejected by exactly these, so print them rather than re-deriving by hand.
     g = dict(zip(FIT_KEYS, best.x))
-    print("\nAcceptance checks (phase7-calibration-handover.md, 'STEP 2 RE-FIT'):")
+    print("\nAcceptance checks (phase7-calibration-handover.md, step 4):")
     print(f"  |a|*s          = {abs(g['jfetSatNeg']) * g['jfetSatPos']:.4f}   "
-          f"(was PINNED at the 1.9997 gate -> must now be off it)")
+          f"(monotonicity coupling; a fitted a should be single-digit)")
     print(f"  min slope      = {min_slope(g['jfetSatPos'], g['jfetSatNeg'], g['jfetCeilPos'], g['jfetCeilNeg']):+.3e}   "
           f"(>= 0; a fold-back is infeasible)")
-    a0pin = " ** STILL PINNED -> suspect the CLIPPER, not the J201 **" if g["clipA0"] < 3.05 else ""
-    print(f"  clipA0         = {g['clipA0']:.3f}   (floor 3.0; circuit.md says 20-30){a0pin}")
+    a0ok = "" if 20.0 <= g["clipA0"] <= 30.0 else " ** OUTSIDE circuit.md's 20-30 **"
+    print(f"  clipA0         = {g['clipA0']:.3f}   (circuit.md says 20-30){a0ok}")
     print(f"  clipSatLo+Hi   = {g['clipSatLo'] + g['clipSatHi']:.3f} V   (R19-dropped rail ~7 V)")
-    print(f"  jfetGm         = {g['jfetGm'] * 1e3:.4f} mS   "
-          f"(drive-min SHAPE fit + level cross-check say ~0.090 mS)")
     print(f"  2*a*ceilNeg    = {2 * g['jfetSatNeg'] * g['jfetCeilNeg']:.3f}   "
-          f"(square law says 1.0 — NOT constrained in the fit, so this is a real check)")
+          f"(square law says ~1.0 — NOT constrained in the fit, so this is a real check)")
     print(f"  ceilNeg / s    = {g['jfetCeilNeg'] / g['jfetSatPos']:.2f}   "
           f"(monotonicity needs >~ 1; resting AT 1 means the ceiling is on a constraint)")
+    print(f"  held jfetGm    = {HELD['jfetGm'] * 1e3:.3f} mS   "
+          f"(step-2 re-anchor; --gm-scan checks ratio sensitivity, band 0.09-0.15)")
     # 1% of the bound, not 0.1%: Nelder-Mead stops NEAR a bound it is pushing against
     # rather than exactly on it (the 2026-07-22 ceiling run returned driveTaperExp
     # 2.9938 against a ceiling of 3.0 — 0.2% off, and a 0.1% test missed it).
@@ -319,14 +340,20 @@ def main():
 
     _, prof = cost(best.x, targets, verbose=True)
     if prof is None:
-        print("\n** every start was INFEASIBLE (|a|*s >= 2, fold-back shaper) — no profile **")
+        print("\n** every start was INFEASIBLE (fold-back shaper) — no profile **")
         return
-    print("\nFITTED plug vs capture (tone_220, dB re fundamental):")
-    print(f"{'drive':6s} | {'THD c/p':>13s} | {'H2 c/p':>13s} | {'H3 c/p':>13s} | {'H4 c/p':>13s}")
+    print("\nFITTED plug vs capture (tone_220): harmonic-to-harmonic ratios c/p (the objective),")
+    print("plus H2 re-fund c/p for reference (NOT fit — bleed-contaminated).")
+    print(f"{'drive':6s} | {'H3-H2 c/p':>13s} | {'H4-H2 c/p':>13s} | {'H5-H2 c/p':>13s} | {'(H2reF) c/p':>13s}")
     for lbl in targets:
         t, p = targets[lbl], prof[lbl]
-        print(f"{lbl:6s} | {t['THD']:5.1f}/{p['THD']:5.1f} | {t['H2']:5.1f}/{p['H2']:5.1f} | "
-              f"{t['H3']:5.1f}/{p['H3']:5.1f} | {t['H4']:5.1f}/{p['H4']:5.1f}")
+        print(f"{lbl:6s} | {t['H3']-t['H2']:5.1f}/{p['H3']-p['H2']:5.1f} | "
+              f"{t['H4']-t['H2']:5.1f}/{p['H4']-p['H2']:5.1f} | "
+              f"{t['H5']-t['H2']:5.1f}/{p['H5']-p['H2']:5.1f} | "
+              f"{t['H2']:5.1f}/{p['H2']:5.1f}")
+
+    print("\nStep-4 gm-sensitivity of the fitted point (should be ~flat):")
+    gm_scan(best.x, targets, [0.09e-3, 0.12e-3, 0.15e-3])
 
 
 if __name__ == "__main__":

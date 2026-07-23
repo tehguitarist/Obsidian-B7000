@@ -104,17 +104,73 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
-> **CURRENT (session 9, 2026-07-23): J201 PLAN step 2 (RE-ANCHOR `jfetGm`) ✅ DONE.** The
-> bleed-aware OD/clean fundamental ratio through the corrected mixer (`analysis/reanchor_gm.py`)
-> gives **`gm ≈ 0.10 mS`** (band 0.09–0.15), corroborating the old 0.090 via a bleed-FREE route
-> and confirming step-1's "bleed matches → 0.090 survives" prediction. NO capture needs redoing.
-> Surfaced a new lead: an OD-path LF-response EXCESS at 82–110 Hz (model ~3–5 dB too bass-heavy),
-> most likely the `clipA0`/GRUNT-coupling HPF corners — a **step-3** parameter, not a new blocker.
-> Nothing committed to the DSP; gm held in the analysis scripts only.
-> **▶ NEXT = step 3: change `fit_nonlinear.py`'s objective to harmonic-TO-HARMONIC ratios
-> (H3−H2, H4−H2, H5−H2 in dB — alpha cancels, bleed/makeup/taper-immune), move `jfetGm` to HELD
-> at 0.10 mS, and fit `s`,`a`,ceilings,`clipA0`,`clipSat`,`driveTaperExp`. Sanity anchor: expect
-> `a` ≈ single digits (a≈4 at s=0.3). Then step-4 acceptance. NOT started this session.**
+> **CURRENT (session 11, 2026-07-23): session 10's fit is REJECTED. `driveTaperExp` SETTLED at
+> 2.5 (measured, not fit); the joint re-fit against it FAILS; root cause found — the clipper VTC
+> SHAPE, not a wrong constant. A small clipper code change is the next step, not a refit.**
+> (1) **`driveTaperExp` validated against the matched-pair drive capture** (`analysis/
+> drive_taper_validate.py`, `analysis/fit_logs/step4_drive_taper.log`) per dsp.md's "fit the taper
+> SHAPE against a matched-pair capture" — session 10's floated 5.45 is REJECTED (it ran the
+> model's noon-knob small-signal gain +8.5 dB hotter than the real pedal). The real value is
+> **p = 2.5**, confirmed two ways: (a) BOTH interior knob points (9:30 +1.1 dB, noon +4.8 dB
+> capture) match ONE `p` simultaneously (0.18 dB clean-taper error) — the two-point test dsp.md
+> requires to rule out a wrong-shape false match; (b) frequency-flat — the same rise measured
+> directly at 220 Hz agrees with the 1 kHz number to ~0.4 dB, so it isn't a frequency artefact.
+> (2) **Re-ran the step-3 harmonic fit with `driveTaperExp` HELD at 2.5 (moved out of `FIT_KEYS`)
+> — REJECTED.** Cost 47.3 → 289.0; `clipA0` pins at its physical ceiling of 30 and still can't
+> reach the harmonic targets (`analysis/fit_logs/step4_joint_refit.log`). Failure is
+> **noon-specific**: capture H3−H2 −10.6 dB vs model −18.6 dB (min/9:30 sit at a roughly constant
+> ~5–6 dB offset instead; 2:30/max already fit). Ruled out as fixes: the whole anchored `jfetGm`
+> band 0.09–0.15 mS (gm-scan doesn't close the noon gap, sometimes widens it); `RailClamp` on the
+> DRIVE stage (`--fit railEnabled=1` renders BIT-IDENTICAL to disabled at this operating point —
+> confirmed inert, signal never nears ±3.3 V at gm=0.10 mS).
+> (3) **Root cause (dsp-validator, Opus, full re-derivation + its own probes): `Clipper.h`'s
+> topology/Newton-solve/GRUNT-reduction are ALL faithful and correct — this is NOT a code bug in
+> that sense.** The Newton solve is provably strictly monotone (`F'(W)` is a sum of strictly
+> negative terms) → globally convergent, no amplitude-dependent convergence artefact (verified by
+> probe: smooth monotone H1/H2/H3 across 42 dB of input swing). D1/D2 clamps confirmed inert
+> in-band. **The actual cause is `vtc()`'s SHAPE** (`Clipper.h:227-232`) — a single per-side
+> `tanh(a0*w/sat)` couples small-signal gain and knee-hardness into ONE parameter (`a0`), so its
+> H3 stays buried until a late, sharp knee (a 20 dB jump packed into ~1 octave of drive, right
+> where "noon" sits) instead of the capture's smooth ramp — and raising `clipA0` moves gain AND
+> hardness together, which is why the fit pins it at 30 and still falls short. Full evidence table
+> + diagnosis in `docs/phase7-calibration-handover.md` "SESSION 11 — CLIPPER VTC SHAPE" (§3i).
+> **▶ NEXT (agreed with user, NOT implemented — planning only): add a hardness parameter `k` to
+> `vtc()`** — replace `tanh(u)` with the algebraic sigmoid `u/(1+u^k)^(1/k)`, keeping `a0`/
+> `satLo`/`satHi` unchanged. **Use `k=2` as the default/anchor — `f_2(u)=u/sqrt(1+u^2)` has the
+> elementary antiderivative `sqrt(1+u^2)`, preserving the stage's required closed-form ADAA**
+> (`k=1` also works: `u−ln(1+u)`); do not ship an arbitrary `k` without checking it keeps a closed
+> form (same trap class as the JfetStage sech→tanh reshape). Needs the same
+> dsp-validator-sign-off rigor as that reshape (odd-part identity if relevant, ADAA-preserving
+> antiderivative, monotonicity) before landing in `Clipper.h` — this is a small MODEL change, not
+> a constants-only refit. Discriminating check before re-committing: sweep `k` through the FULL
+> chain and confirm the "pivot" signature (min/max stay put, noon rises as `k` drops) survives
+> past the clipper-alone probe. Then re-run `fit_nonlinear.py` with `k` added to `FIT_KEYS`,
+> `driveTaperExp` still held at 2.5, re-check all step-3 acceptance checks, THEN validate
+> `masterTaperExp` + makeup, THEN commit the whole set together. §3j has the full plan.
+> Full detail in `docs/phase7-calibration-handover.md`. ctest untouched (analysis/docs only this
+> session — no DSP code changed yet).
+> ── prior history ──
+> **session 10, 2026-07-23: J201 PLAN step 3 (FIX OBJECTIVE + FIT SHAPER) ✅ DONE — and
+> it WORKED (at the time). SUPERSEDED by session 11 above — the fitted set is now rejected.** `analysis/fit_nonlinear.py` rewritten to score
+> **harmonic-TO-HARMONIC ratios `Hn − H2` (n=3,4,5)** (every output harmonic is `alpha·OD_n` → the
+> ratio cancels `alpha` EXACTLY, bleed/makeup/taper-immune); `jfetGm` HELD 0.10 mS, `levelTaperExp`
+> 2.25, ro/rq2 nominal; H2-re-fund + THD dropped. **Result (cost 5154→47.3,
+> `analysis/fit_logs/step3_harmonic_ratio.log`): clipA0 = 24.1 (inside circuit.md's 20–30, UNPINNED
+> — every prior run pinned it at 3), `2·a·ceilNeg` = 0.84 ≈ the square-law identity 1.0
+> UNCONSTRAINED, `a` = 0.91 single-digit, NO param resting on a bound.** All three named acceptance
+> checks PASS; the shaper SHAPE is vindicated (no reshape). **Two coupling caveats → commit the whole
+> SET jointly in step 4, NOT now:** (1) `driveTaperExp` landed at **5.45** (its old [0.4,3.0] box
+> PINNED it; widening to 8.0 found a robust interior min, cost 334→47) — a STEP-4 taper param the
+> shaper/clipper are coupled to (a 1.78→0.91, clipA0 28.6→24.1 as it freed), so validate it against a
+> matched-pair drive capture first per dsp.md. (2) The gm-sensitivity table is FLAT at low drive
+> (bleed confound GONE, as designed) but swings at HIGH drive = real clipper physics (gm drives a
+> hard-clipping stage), so clipSat/driveTaperExp inherit gm's ±0.02 mS. **clipA0 does NOT explain the
+> step-2 LF excess** (base captures are GRUNT=cut, HP corner ~1.7 kHz ≫ 82–110 Hz; clipA0 24 vs 25
+> moves LF only +0.19 dB, wrong way) — LF excess stays a front-end lead. Full data: handover
+> "✅ STEP 3 DONE". ctest untouched (analysis/docs only this session).
+> **▶ NEXT = step 4: validate `driveTaperExp` vs a matched-pair drive capture, fit `masterTaperExp`
+> + makeup, re-check gm/clipA0 jointly, THEN commit the step-3 SET (s,a,ceilPos,ceilNeg,clipA0,
+> clipSatLo/Hi,driveTaperExp) together. NOT started.**
 > ── prior history ──
 > Phase 7 CALIBRATION PROPER — step 1 ✅; OD-path loading blocker ✅ RESOLVED
 > (session 3); J201 boundary params ✅ FITTED (session 4, 2026-07-22): `jfetGm ≈ 0.09 mS`,
