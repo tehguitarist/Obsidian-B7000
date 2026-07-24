@@ -104,6 +104,40 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
+> **CURRENT (session 18, 2026-07-24): ▶ PHASE 9 (REFERENCE VALIDATION) UNDERWAY — first gap FOUND +
+> FIXED + shipped. Phase 8 (UI) confirmed done. ctest 16/16, AU+VST3 clean.**
+> **⭐ THE #1 "doesn't sound like the real pedal" GAP = the low end.** Full A/B of the shipped plugin
+> vs all 63 matrix captures (`analysis/comprehensive_report.py` → `gap_audit.py`): above ~500 Hz the
+> plugin matches the pedal to **~1 dB median** (voicing/EQ/drive all correct — the session-17
+> calibration holds), but below ~400 Hz it was **6-15 dB bass-LIGHT**, worsening toward the bottom
+> (−16 dB at 25 Hz), IDENTICAL in clean & driven. That signature is a spurious ~159 Hz first-order
+> high-pass in the SHARED post-BLEND path = **C21 (100n) against its unvalidated 10k `c21R` nominal**.
+> The capture says the real coupling corner is ~16 Hz (≤11 Hz), ~10× lower. **FIX: `c21R` 10k → 100k**
+> (FitParams.h), fit on ref-clean + validated across 34 EQ/blend captures: low-band RMS deficit
+> **9.8 → 0.69 dB**, clean AND driven, no overshoot. ⚠ implies C21's effective RC is ~10× nominal
+> (C21 > 100n OR stack-input Z > 10k) — flag C21's schematic value/placement for a schematic-checker
+> pass, but the capture is authoritative on the corner (dsp.md fit-the-corner). ** REMEMBER: the plugin
+> reads FitParams via `PluginProcessor::prepareToPlay setFitParams` — session-17 wiring — so editing
+> FitParams.h + rebuild ships it. **
+> **⚙ A/B HARNESS is now iteration-cheap (was ~25 min/run):** `comprehensive_report.py` gained a
+> per-capture RESULT CACHE (keyed by capture-file identity + render args + OS + OfflineRender binary
+> mtime — captures are static, so only a rebuild or a `--fit` override busts records; 8-cap subset
+> 189 s → 0.83 s cached), plus `--only SUBSTR`, `--fit K=V` (test a candidate across the matrix with
+> NO rebuild), and `--out PATH`. Generated JSON + `reports/cache/` are gitignored. Two pre-existing
+> report bugs fixed to run at all: `find_captures` now skips non-matrix `.wav` (the jfet_ladder
+> diagnostics), `analyse_one` tolerant of the string `base-od` token. ⚠ `gap_audit`/`cascade_analysis`
+> DOCSTRINGS are template cruft from a DIFFERENT pedal (PRESENCE/twin-T/V1-V2) — the grading math is
+> generic and fine, but ignore those topology notes; and gap_audit does NOT exclude zero-knob SILENT
+> captures (master-0700/level-0700 → −640 dB garbage → 635 dB aggregate spread), so aggregate over
+> valid captures with a min-level filter (as the session-18 probes do), not gap_audit's raw mean.
+> **▶ NEXT (continue Phase 9): re-run the FULL 63-cap A/B at c21R=100k (regenerate the baseline
+> report — a rebuild busts the cache, ~20 min, background it), then hunt residual gaps** — candidates
+> now that the low end is fixed: the bridged-T notch (risk #1, never capture-reshaped), any per-band
+> mid deviations >1.5 dB, and the OD/clean BLEND balance (kInputRef 0.87→3.377 shifted it, unseen by
+> the harmonic-ratio fit). Then the perf/HQ pass + the deferred OS-fidelity 4× residual. GATE 9 =
+> numbers-not-adjectives report in `docs/`. Also carry-forward from Phase 8: VU idle-gate threshold
+> vs the new makeup (0.9→3.684).
+> ── prior session ──
 > **CURRENT (session 17, 2026-07-24): ✅✅ PHASE-7 CALIBRATION LANDED AND SHIPPED. The full fitted
 > family is written into the shipped defaults, the plugin now actually applies it, ctest 16/16, AU +
 > VST3 build clean, committed.** This closes the multi-session J201/clipper calibration.

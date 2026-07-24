@@ -194,7 +194,15 @@ struct FitParams
     // tone stack's effective INPUT impedance, which is a nominal ~10k estimate,
     // not a single schematic part. It sets a ~159 Hz highpass that audibly shapes
     // bass, so it is a real fit knob (fit alongside the tone stack).
-    double c21R = 10.0e3;
+    double c21R = 100.0e3;  // session-18 Phase-9 A/B fit (was nominal 10k). The clean-sweep
+                            // capture shows the tone-stack coupling corner is ~16 Hz, NOT the
+                            // 159 Hz the 10k estimate gave: the plugin was 6-15 dB bass-light
+                            // below ~100 Hz (identical clean & driven -> shared post-BLEND HP).
+                            // Fit on ref-clean (flat EQ) + validated across 34 EQ/blend captures:
+                            // low-band RMS deficit 9.8 -> 0.69 dB, no overshoot. Implies C21's
+                            // effective RC is ~10x nominal (C21 > 100n OR stack input Z > 10k) —
+                            // ⚠ C21's schematic value/placement is worth a schematic-checker pass;
+                            // the capture is authoritative on the corner (dsp.md fit-the-corner).
 
     // ---- Bridged-T recovery network (RecoveryBridgedT.h) -------------------
     // Risk register #1. The ideal-value response is a ~-28 dB notch at ~717 Hz,
