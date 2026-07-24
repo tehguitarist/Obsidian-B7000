@@ -164,8 +164,13 @@ high, execute routine work cheap) is what should persist.
 > the mid stage's RANGE-setting elements (R38/R39 2k2 end resistors, R40/R41 220k flat-unity legs, and
 > any series R in the wiper/cap leg — a wiper-leg series R caps the range position-independently,
 > which is the observed signature) BEFORE touching the [ENG] cap values; both questions answer from
-> the same evidence.** Then GAP #3b (re-run its candidate table against the new rails-on baseline —
-> part of what `clipC12/C13 ÷4` was compensating for may have been the missing rail clamp).
+> the same evidence. ⚠ USER DECISION (2026-07-25): if the checker confirms the modelled topology is
+> schematic-faithful (no bug), do NOT block looking for a physical explanation — fit a
+> range-limiting element straight to the capture's ~±12 dB target, same posture as
+> c21R/trebleLadderDampR/the rail voltages (dsp.md "fit the corner"; this whole mid-cap table is
+> `[ENG]`-computed, never schematic-verified, so there is no ground truth to defer to anyway).**
+> Then GAP #3b (re-run its candidate table against the new rails-on baseline — part of what
+> `clipC12/C13 ÷4` was compensating for may have been the missing rail clamp).
 > Full detail + tables: `docs/phase9-validation.md` §3, §4 GAP #1b / #3a / #4, §0 backlog.
 > ── prior session ──
 > **CURRENT (session 20, 2026-07-24): ▶ PHASE 9 / A3 — GAP #3 DECOMPOSED. Analysis + probes only:

@@ -504,6 +504,20 @@ observed signature. Do this BEFORE touching the [ENG] cap values: the LO-MID cen
 (229 model / 320 pedal ≈ the stock 22n value) hints the engineered cap table itself may not match the
 real unit, and both questions should be answered from the same evidence.
 
+**⇒ Decision tree for the `schematic-checker` result (user call, 2026-07-25 — captures outrank the
+schematic here):** if it finds a genuine topology bug (a misread node, a bridging part modelled as
+series/shunt wrong, etc. — the GAP #1b/#2 pattern), fix the topology and re-derive the range from the
+corrected network, same as every prior `schematic-checker` catch. **But if it confirms the modelled
+topology is faithful to the schematic** — i.e. the ±14.5…±28 dB spread really is what this network's
+values imply — **do NOT block on finding a physical explanation for the discrepancy. Fit a
+range-limiting element (or retune R38/39, R40/41, or a new wiper-leg series R) directly to the
+capture's ~±12 dB target,** exactly the posture already used for `c21R` (GAP #1),
+`trebleLadderDampR` (GAP #2), and the rail voltages (GAP #3a) — dsp.md "fit the corner", the capture
+is authoritative. This pedal's `[ENG]` mid-cap table was itself only ever a computed *approximation*
+of the real Ultra's response (never schematic-verified — see circuit.md's `[ENG-caps]` tag), so there
+is no schematic ground truth to defer to here even in principle; a clean fit-to-capture is not a
+concession, it's the correct source of truth for this stage.
+
 ### ▶ Remaining candidates (not yet investigated)
 
 - **GAP #3 (A3) is now decomposed above** — 3a (rail clamp) and 3b (static GRUNT-dependent tilt).
