@@ -104,6 +104,59 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 22, 2026-07-25): ▶ PHASE 9 — GAP #4 FIXED + SHIPPED + committed (`1e77a9e`);
+> GAP #3b re-run and DECIDED but deliberately NOT shipped. ctest 16/16. Full 63-cap baseline
+> regenerated on the new build (`analysis/reports/comprehensive_data.json` — the old one is at
+> `/tmp/s21_baseline_backup.json`).**
+> **(1) ✅ GAP #4 (mid range) CLOSED.** `schematic-checker` returned **TOPOLOGY CONFIRMED FAITHFUL**
+> (MidBand.h matches circuit.md node for node; the full R1–R54 BOM census leaves no spare resistor —
+> each mid band uses exactly 4 R + 2 C), so the pre-registered fit-to-capture branch applied.
+> **SHIPPED: `midWiperRLo = 33k` / `midWiperRHi = 22k`** (a fitted series R in the WIPER leg, new
+> `MidBand::setWiperR`, stamped as a lossy cap via the same Norton reduction `TrebleAttack.h` uses for
+> C5 — **no new MNA node, and Rw=0 is EXACTLY the old network** so the existing FR tests stay valid)
+> **+ `midLoCap250 = 47n → 22n`** (the pedal peaks at the 320 Hz band and 22n — the STOCK board's C33
+> — lands there; the one cap the captures actually contradict). Results: boost-to-cut span band-RMS
+> vs the pedal **9.84 → 4.92 dB** on real plugin renders; the 4-point **POT LAW RMS 5.31 → 0.87 dB**
+> (the knob response a player actually feels); full matrix 240 rows **4.023 → 3.680**, mid captures
+> **3.048 → 1.758**, and **non-mid rows bit-identical (0.000)** — the stage is flat at noon, so the
+> change is surgical. New `MidBandTest` Test 5 (oracle match at Rw≠0 + Rw=0-is-exact).
+> **⚠ Two accepted residuals, do not read as bugs:** (a) ONE resistor must serve all three switch
+> positions of a band, so the two SMALLEST caps are slightly OVER-corrected (LO-MID 1k 1.88→2.97,
+> HI-MID 3k 1.20→3.29) — a per-position limiter would fit better and be physically meaningless;
+> (b) Rw pulls peak CENTRES down, so LO-MID 500 (508→403 Hz) and HI-MID 750 (806→640 Hz) now sit a
+> band low. **A joint fit of all six caps scores better on paper (span RMS 2.84) but collapses
+> LO-MID "250" onto ~10n = the 500 Hz position's own cap — destroying the switch's differentiation —
+> so it was REJECTED. Do not re-run it.**
+> **⚠ HONEST CAVEAT:** circuit.md's sim was previously cross-validated against the manufacturer's own
+> **p.3 measured table**, which shows the SAME varying range our model had (26→18 lo-mid, 23→12.6
+> hi-mid). So the capture contradicts p.3's real-hardware numbers too; 33k/22k has no physical
+> counterpart on this board and is a behavioural match to *the unit we captured*. Don't describe it
+> as having found the real circuit.
+> **⭐ METHOD WORTH REUSING (this is what cracked it):** (i) the **boost-to-cut SPAN** is a
+> matched-pair differential in which the entire rest of the chain cancels EXACTLY — immune to the
+> report's gain-match, the clean/OD balance and the other EQ bands; (ii) the **POT LAW** (a control
+> measured at ≥3 knob points, not just its extremes) is what separated "the network's range is wrong"
+> from "the ends of travel are wrong" — extremes alone are ambiguous. Three explanations were KILLED
+> before fitting: the DSP (plugin tracks the modelled network to ~0.5 dB), **rail compression** (the
+> clamp is **bit-inert**, 0.0000 dB, on these captures), and **knob under-travel** (pedal/model RISES
+> 0.49→0.93 toward the small caps = a ceiling, not a constant scale). New tools:
+> `analysis/mid_range_probe.py`, `mid_range_fit.py`, `mid_range_final_fit.py`; `eq_reference.py ::
+> mid_stage_tf` gained an `Rw=` arg (default 0 = bit-identical to before).
+> **(2) ▶ GAP #3b RE-RUN — the question is ANSWERED, the fix is QUEUED not shipped.** "Was ÷4 on the
+> GRUNT caps compensating for the missing rail clamp?" **No.** On the rails-on baseline ÷4 still
+> gives OD band-RMS **6.014 → 5.355** (tilt 8.48 → 7.60; **18 rows better >0.5 dB, 0 worse**), so it
+> is an INDEPENDENT lever. **⭐ NEW: `clipC13 = 22n` ALONE recovers ~74 % of that (→ 5.527, tilt 7.79)
+> leaving C12 at its verified 47n — and 22n is not a fudge, it is the value the BACKUP schematic
+> shows.** circuit.md predicted this exact trigger ("re-zoom the primary GRUNT symbol if the modelled
+> bass-into-clip corner looks wrong"). **▶ NEXT: a `schematic-checker` pass on C13 (primary p.4 GRUNT
+> cap symbol + the BOM line) BEFORE touching the constant.** This is deliberately NOT blind-fitted,
+> unlike GAP #4 — C13 is schematic+BOM-verified with a *documented conflicting value*, so a ground
+> truth exists to settle: confirm 220n and it becomes a fit; find 22n and it is a **bug fix**. (The
+> fit's ideal sits near 55n, between the two, so expect some residual either way.)
+> ⚠ Note `analysis/reports/comprehensive_data*.json` is now gitignored as a glob (was the exact
+> filename only, so scratch reports were commit-able).
+> Full detail + tables: `docs/phase9-validation.md` §4 GAP #4 and §4 "3b re-run", §0 backlog.
+> ── prior session ──
 > **CURRENT (session 21, 2026-07-25): ▶ PHASE 9 — THREE ITEMS CLOSED, ONE SHIPPED, ONE NEW GAP FOUND.
 > ctest 16/16, AU+VST3 build clean. `FitParams.h` + `analysis/captures.py` CHANGED.**
 > **(1) ✅ HARNESS DEFECT FIXED (the session-20 blocker).** `captures.py::render_args()` now emits

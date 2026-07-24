@@ -55,9 +55,15 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   `railNeg = 2.9`, `railPos = 2.7` (physically derived from the +9V/D3/VD chain, not fitted — the
   fit objective is monotone with no interior minimum, a known degeneracy). All 240 rows band-RMS
   4.298 → 4.057 dB, 31 rows better by >0.5 dB vs 4 worse. ctest 16/16. §4 GAP #3a.
-- [ ] **A3-next (iii). Revisit the GRUNT caps** — a lever, but the required ÷4 is not physical, and
-  part of what it was compensating for may have been the (now-shipped) rail clamp. Re-run the 3b
-  candidate table against the rails-on baseline before touching `clipC12`/`clipC13`.
+- [~] **A3-next (iii). GRUNT caps — RE-RUN DONE (session 22), not shipped.** The rail clamp was NOT
+  what ÷4 was compensating for: on the rails-on baseline ÷4 still gives OD band-RMS **6.014 → 5.355**
+  (18 rows better >0.5 dB, 0 worse), so it is an independent lever. **⭐ New: `C13 = 22n` alone — the
+  value the BACKUP schematic shows — recovers ~74 % of that (→ 5.527) while leaving C12 at its
+  verified 47n.** circuit.md predicted this exact trigger ("re-zoom the primary GRUNT symbol if the
+  modelled bass-into-clip corner looks wrong"). **▶ NEXT: a `schematic-checker` pass on C13
+  (primary p.4 GRUNT cap symbol + the BOM line) BEFORE changing the constant** — unlike GAP #4's
+  `[ENG]` caps, C13 is schematic-verified with a documented conflicting value, so there is a ground
+  truth to settle; if the primary really is 220n this becomes a fit, if not it is a bug fix. §4 3b.
 - [ ] **A4. Re-grade the full matrix after A2–A3; write final GATE-9 numbers into §4.**
 
 **B. Performance / quality pass (Phase 9 part 2):**
@@ -452,6 +458,42 @@ read as scoped to that, not as a general verdict). But ÷4 on two schematic-veri
 physical answer and recovers only ~7–9 dB of a 25–35 dB gap. **3b is still open**, and the leading
 structural suspect is the bridged-T depth above (which the GRUNT-cut coupling corner masks and GRUNT
 boost exposes — precisely the observed GRUNT dependence).
+
+#### 3b re-run against the session-22 rails-on baseline (session 22)
+
+The open question was whether part of what `clipC12/C13 ÷ 4` was compensating for was the **missing
+rail clamp**, now shipped. **Answer: no.** Re-measured on the rails-on, mid-fixed baseline, ÷4 is
+still worth nearly as much as before, so it is an INDEPENDENT lever, not a proxy for the clamp:
+
+| candidate | OD band-RMS (92 rows) | tilt | rows better >0.5 dB | worse | physical? |
+|---|---|---|---|---|---|
+| **baseline** (C12 47n / C13 220n) | 6.014 | 8.48 | — | — | primary schematic + BOM |
+| C12/C13 ÷2 (23.5n / 110n) | 5.725 | 8.18 | 10 | 0 | no |
+| **C13 = 22n only** | **5.527** | **7.79** | 12 | 1 | **YES — backup schematic rev** |
+| C12/C13 ÷4 (11.75n / 55n) | **5.355** | **7.60** | 18 | 0 | no |
+
+Clean rows are bit-identical in every candidate (0.000) — this lever is OD-only, as expected.
+Biggest ÷4 wins are exactly the GRUNT-dependent rows: `drive-0700_grunt-boost` sweep_clean
+**20.61 → 12.62**, `grunt-flat` sweep_clean **15.79 → 8.83**, `drive-0930_grunt-flat` drv−18
+**14.81 → 7.70**.
+
+**⭐ The new finding is the third row.** Changing ONLY `C13` to **22n** — which is not a fudge but the
+value the **backup schematic** actually shows — recovers **~74 %** of ÷4's benefit while leaving
+`C12` at its verified 47n. circuit.md already flagged exactly this and even named the trigger:
+*"GRUNT cap C13: primary = 220n; backup = 22n. Different revision. Using primary (220n); **re-zoom
+the primary GRUNT symbol if the modelled bass-into-clip corner looks wrong**."* The corner does look
+wrong, in precisely the GRUNT-dependent way that note anticipated.
+
+**▶ NOT SHIPPED — and deliberately NOT blind-fitted, unlike GAP #4.** The two cases are different in
+kind and the distinction matters: GAP #4's mid-cap table is `[ENG]`-computed with **no ground truth to
+defer to**, so fitting was correct. `C13` is **schematic- AND BOM-verified on the primary**, and there
+is a **documented conflicting value on the backup** — so there IS a ground truth to establish, and a
+`schematic-checker` pass can adjudicate it (re-zoom the primary GRUNT cap symbol + the BOM line for
+C13). Do that BEFORE changing the constant. If the primary's 220n is confirmed, then and only then
+does this become a fit-to-capture like the others; if the primary actually reads 22n (or the board
+was built to the backup rev), this stops being a fit at all and becomes a **bug fix**.
+Note the fit's ideal C13 sits near 55n — between the two documented values — so neither is exact and
+some residual will remain either way.
 
 ### ✅ GAP #4 — the switchable MID positions over-deliver RANGE. FOUND session 21, **FIXED session 22**.
 
