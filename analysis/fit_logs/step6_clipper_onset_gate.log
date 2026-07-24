@@ -1,0 +1,78 @@
+====================================================================================================
+SESSION-16 §3j GATE — clipper ONSET POSITION (kInputRef, the other half of the
+kInputRef<->clipSat degeneracy) as the drive-axis ramp mechanism
+====================================================================================================
+Capture ramp:  min=-23.2  9:30=-21.0  noon=-10.6  2:30=+1.3  max=+1.0
+Capture min->noon leg +12.6 dB, min->max +24.2 dB
+
+L-009 note: --input-ref is NOT a sentinel-encoded flag (offline_render.cpp rejects <= 0
+and always applies it), and the sweep below visibly changes the output, so a null result
+here would be a real null.
+
+----------------------------------------------------------------------------------------------------
+POINT: PHYSICAL clipper (A0=25, sat 3.15/3.85)
+----------------------------------------------------------------------------------------------------
+   K (V/FS)  @-6dBFS |     min    9:30    noon    2:30     max |  min->noon  min err  ramp rms
+       0.87    0.43V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     -1.9     13.97   <- current anchor
+       1.20    0.60V |   -22.4   -22.3   -21.9   -17.6    -3.3 |       +0.5     +0.8     10.03
+       1.70    0.85V |   -19.5   -19.4   -18.8   -10.3    +8.0 |       +0.6     +3.7      7.29
+       2.40    1.20V |   -17.0   -16.9   -16.0    +3.0   +11.5 |       +1.0     +6.2      6.26
+       3.40    1.70V |   -15.7   -15.4   -13.3    +9.3   +16.5 |       +2.4     +7.5      8.93
+       4.80    2.40V |   -17.1   -16.5    -8.3   +15.5    +5.9 |       +8.9     +6.1      7.58
+       6.80    3.40V |   -27.2   -23.0    +4.0   +10.7   +13.5 |      +31.2     -4.0      9.81
+       9.60    4.80V |   -19.2   -21.0   +10.4   +10.1   +17.5 |      +29.6     +4.0     12.71
+
+  capture: min->noon +12.6, min err 0.0, ramp rms 0.00
+  (A) best min->noon leg  : +31.2 dB at K=6.80 (baseline +0.4, gain +30.8)  [bar +6.0]
+  (B) best whole-ramp rms : 6.26 at K=2.40 (baseline 13.97, 55% better)
+  (C) drive-min at best-rms K: -17.0 vs capture -23.2 (err +6.2 dB)
+  (D) implied input level : 2.40 V/FS = 1.20 V peak at the
+      -6 dBFS 'hot bass' rung (a hot ACTIVE bass is ~1-2 V peak; a passive ~0.1-1 V)
+
+  ** JOINT VERDICT — one K satisfying (A) AND (C) AND (B) together: NONE **
+     Authority is REAL and LARGE (see (B): a fully PHYSICAL clipper goes from
+     unreachable to a better ramp than session 15 got from ANY clipper shape),
+     but onset position ALONE does not reproduce the ramp: wherever the min->noon
+     leg steepens, drive-min lifts off the capture with it. Read as NECESSARY but
+     NOT SUFFICIENT — K belongs in the fit, it is not by itself the answer.
+
+----------------------------------------------------------------------------------------------------
+POINT: session-15 beta-only fitted
+----------------------------------------------------------------------------------------------------
+   K (V/FS)  @-6dBFS |     min    9:30    noon    2:30     max |  min->noon  min err  ramp rms
+       0.87    0.43V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6     +3.3      3.88   <- current anchor
+       1.20    0.60V |   -17.3   -16.8   -14.1    +5.9    +6.1 |       +3.2     +5.9      4.73
+       1.70    0.85V |   -14.8   -14.2    -9.9    +5.4   +10.1 |       +4.9     +8.4      6.59
+       2.40    1.20V |   -13.1   -12.1    -2.1    +9.6    +6.8 |      +11.0    +10.1      8.43
+       3.40    1.70V |   -12.6   -10.6    +8.7   +16.4    -1.8 |      +21.3    +10.6     12.86
+       4.80    2.40V |   -13.2    -7.3   +11.6    +2.2    -6.1 |      +24.8    +10.0     12.89
+       6.80    3.40V |   -12.5    +1.0   +20.1    -3.3    -1.0 |      +32.6    +10.6     17.68
+       9.60    4.80V |    -6.9    +8.0   +28.7    -2.5    +5.9 |      +35.6    +16.3     23.19
+
+  capture: min->noon +12.6, min err 0.0, ramp rms 0.00
+  (A) best min->noon leg  : +35.6 dB at K=9.60 (baseline +2.6, gain +33.0)  [bar +6.0]
+  (B) best whole-ramp rms : 3.88 at K=0.87 (baseline 3.88, 0% better)
+  (C) drive-min at best-rms K: -19.8 vs capture -23.2 (err +3.3 dB)
+  (D) implied input level : 0.87 V/FS = 0.43 V peak at the
+      -6 dBFS 'hot bass' rung (a hot ACTIVE bass is ~1-2 V peak; a passive ~0.1-1 V)
+
+  ** JOINT VERDICT — one K satisfying (A) AND (C) AND (B) together: NONE **
+     Authority is REAL and LARGE (see (B): a fully PHYSICAL clipper goes from
+     unreachable to a better ramp than session 15 got from ANY clipper shape),
+     but onset position ALONE does not reproduce the ramp: wherever the min->noon
+     leg steepens, drive-min lifts off the capture with it. Read as NECESSARY but
+     NOT SUFFICIENT — K belongs in the fit, it is not by itself the answer.
+
+====================================================================================================
+HOW TO READ THIS
+====================================================================================================
+  JOINT PASS => the blocker was never a shape at all: the clipper turns on too LATE along the
+  DRIVE sweep, and K/clipSat/clipA0 are ONE degenerate family that must be fit TOGETHER.
+  Session 15's two 'degenerate corner' rejections should then be re-read as the optimiser
+  correctly reporting an onset error while K was frozen at an adopted, unmeasured value —
+  i.e. the physicality test was applied to clipSat alone, half of a degenerate pair.
+  Session 17 would re-fit with K in the parameter set and judge physicality on the PAIR
+  (implied input volts AND clipSat volts), never on clipSat with K pinned.
+  FAIL => onset position is not it either; with taper, rails and onset all refuted, the
+  remaining candidate on the drive axis is a drive-dependent MEMORY effect (clipper input
+  coupling: GRUNT cap bank + R16), which no memoryless VTC can produce — §3u.6's fallback.

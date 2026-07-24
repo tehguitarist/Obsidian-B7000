@@ -96,9 +96,39 @@ CAP = "analysis/captures"
 # session 15) — the discriminating check the session-11 plan required before trusting clipK. The
 # clipper has NO ADAA (oversampling carries its antialiasing — dsp-validator session 15), so any k
 # is shippable (the k=2 fast path is only a VTC-eval optimisation, not an ADAA requirement).
+# ** kInputRef (K) — ADDED TO THE FIT in session 17. ** It is NOT a FitParams field (it is
+# processor-domain — see GainStaging.h) so it is emitted as `--input-ref`, not `--fit`; the
+# _split_flags() helper below is the only place that distinction lives.
+# WHY it is here now: `GainStaging.h` states that K is DEGENERATE with the clip ceiling (scaling K
+# and inversely scaling clipSat is bit-identical), that audio-only captures CANNOT measure it, and
+# that 0.87 was ADOPTED by user decision, never measured. Sessions 10-15 nevertheless fit
+# clipA0/clipSatLo/clipSatHi with K FROZEN at that adopted value, and then rejected the results for
+# landing at an "unphysical" clipSat — i.e. the physicality test was applied to one half of a
+# degenerate pair while the other half was pinned. clipSat = 1.58 V at K = 0.87 IS clipSat = 7.0 V
+# at K = 3.86. Session 16's §3j gate (analysis/clipper_onset_gate.py) then showed the missing
+# mechanism is WHERE ALONG THE DRIVE SWEEP THE CLIPPER TURNS ON, and that K has large authority
+# over it (a FULLY PHYSICAL clipper goes from 13.97 to 6.26 ramp rms as K sweeps — better than
+# session 15 reached with ANY clipper shape) but is NOT sufficient alone. So K belongs IN the
+# parameter set, fit jointly with the clipper it is degenerate with, and physicality must be judged
+# on the FAMILY (implied input volts AND clipSat volts) — never on clipSat with K pinned.
 FIT_KEYS = ["jfetSatPos", "jfetSatNeg", "jfetCeilPos", "jfetCeilNeg", "jfetExpandBeta",
-            "clipA0", "clipSatLo", "clipSatHi", "clipK"]
-NOMINAL  = [0.3, 4.0, 1.0, 0.5, 1.8, 25.0, 3.15, 3.85, 1.5]
+            "clipA0", "clipSatLo", "clipSatHi", "clipK", "kInputRef", "clipC11"]
+NOMINAL  = [0.3, 4.0, 1.0, 0.5, 1.8, 25.0, 3.15, 3.85, 1.5, 0.87, 4.7]
+# ** gm was ADDED to the fit in session 17 and REJECTED by its own guard (fit in mS, tight band). **
+# The harmonic-RATIO objective cancels the bleed that contaminated the session-4/7 gm anchor, so gm
+# is nominally identifiable here — BUT the fit ran gm straight to its LOWER bound (0.095 mS, optimum
+# outside the box) while barely improving noon (2.0 vs 2.3 dB) and dragging clipA0 down to 21 and
+# clipK onto its bound: gm floating just re-exploits the level degeneracy (log step7_fenced_gm_fit).
+# So gm is HELD at 0.10 mS (the session-4 anchor) and the SHIPPED calibration is the fenced fit
+# (`--fence-a0=20,30`, gm held): clipA0 26.1 / clipC11 5.72 nF / noon 2.3 dB short (gm-limited,
+# documented). Do NOT re-add gm to FIT_KEYS — it re-finds the bound.
+# Keys that are NOT FitParams fields — emitted as their own CLI flag instead of `--fit`.
+CLI_FLAG_KEYS = {"kInputRef": "--input-ref"}
+# Keys carried in the fit vector in a SCALED unit (O(1) for Nelder-Mead's simplex) and multiplied
+# by this factor when emitted as the FitParams value. clipC11 is fit in NANOFARADS (schematic 4.7)
+# and emitted in Farads — a raw 4.7e-9 coordinate next to O(1) params gets a negligible simplex
+# step and is never explored. The result dict g[...] therefore holds clipC11 in nF (read as nF).
+EMIT_SCALE = {"clipC11": 1e-9}
 # Held fixed at every eval. jfetGm = 0.10 mS (step-2 re-anchor, band 0.09-0.15); levelTaperExp =
 # 2.25 (step-1 measured); jfetRo/jfetRq2 nominal (inert / unidentifiable). --gm-scan overrides
 # jfetGm to probe the ratios' gm-sensitivity at a fixed parameter point.
@@ -114,7 +144,18 @@ NOMINAL  = [0.3, 4.0, 1.0, 0.5, 1.8, 25.0, 3.15, 3.85, 1.5]
 # JFET shape params re-absorb here. (Pinning p shallower under-drives the clipper at high knob, so
 # expect clipA0/clipSat to shift to keep the harmonic ratios.)
 HELD = {"jfetGm": 0.10e-3, "jfetRo": 200.0e3, "jfetRq2": 1.0e6,
-        "levelTaperExp": 2.25, "driveTaperExp": 2.5}
+        "levelTaperExp": 2.25, "driveTaperExp": 1.98}
+# jfetGm HELD at 0.10 mS (session-4 anchor; the session-17 gm-add was rejected — see FIT_KEYS note).
+# jfetRo/jfetRq2 nominal (proven unidentifiable, session 4). driveTaperExp 1.98 + levelTaperExp 2.25
+# are MEASURED and held.
+# ** driveTaperExp MOVED 2.5 -> 1.98 (session 17). ** It is the DRIVE-pot resistance exponent, i.e.
+# the level-vs-drive curve = the ONSET AXIS the clipper family is being fit against, so fitting the
+# family at 2.5 and shipping 1.98 would invalidate the fit. 1.98 is MEASURED, not fit: the
+# bleed-free resistance curve (analysis/drive_taper_curve.py, LS p=1.977 through the 3 measured
+# points, endpoints pinned by construction) — the same measure-the-taper discipline that holds
+# levelTaperExp at 2.25. It is HELD (not floated): session 10 floated it and it ran away to 5.45.
+# NOTE the session-16 gate showing the corrected taper moves noon the WRONG way applied to adopting
+# it ALONE; adopting it as part of THIS re-fit (the family compensates) is exactly task 4.
 # BOUNDS on the fitted params. The shaper's argument is the effective vgs (REAL gate volts):
 #   jfetSatPos knee `s` in gate volts — order |Vp| (0.3-1.5 V for a J201), room either side.
 #   jfetSatNeg even strength `a` (1/V) = 1/Vov. The real constraint is a PRODUCT/COUPLING with
@@ -141,8 +182,24 @@ HELD = {"jfetGm": 0.10e-3, "jfetRo": 200.0e3, "jfetRq2": 1.0e6,
 # gap is honestly the clipper-level blocker, not a hidden cheat:
 #   clipSatLo/Hi each [1.5, 4.0] (sum 3-8 V — R19-dropped rail, circuit.md), clipK [1.2, 3.0]
 #   (off the soft floor), beta [0, 4] (the gate's drive-min -23.2 crossing is ~1.8, not 5+).
+#   kInputRef  volts (peak, at the input jack) per 1.0 full scale. [0.40, 6.00]. The test signal
+#              documents its -6 dBFS rung as "hot bass", so the physically-meaningful quantity is
+#              K/2: the box spans 0.20-3.00 V peak there, i.e. from a quiet passive bass to hotter
+#              than any active bass. A pin at either end is therefore DIAGNOSTIC (it means the fit
+#              wants an input voltage no real bass produces), which is the whole point of leaving
+#              the box generous rather than fencing K to the answer we expect.
+#              ** clipSatLo/Hi stay fenced at [1.5, 4.0] each. ** That is NOT redundant with K
+#              floating: the ~7 V R19-dropped rail is a real, K-INDEPENDENT circuit fact, so
+#              fencing clipSat and freeing K breaks the degeneracy in the direction that has
+#              physical content — clipSat keeps its measured meaning and K absorbs the onset.
+#   clipC11    the always-present GRUNT=Cut coupling cap, IN NANOFARADS (schematic 4.7). Bound
+#              [2.0, 47.0] nF = 0.4x..10x schematic; a pin at 47 nF (= C12's value) is DIAGNOSTIC
+#              — it means the Cut corner wants a value no 4n7-labelled film cap explains, so the
+#              real error is elsewhere (R16, or a mechanism outside the coupling), NOT that C11 is
+#              a 10x mis-mark. User-authorised to move it (2026-07-24); the bound stays generous so
+#              the data, not the schematic, sets it.
 BOUNDS   = [(0.05, 5.0), (0.0, 10.0), (0.05, 20.0), (0.05, 10.0), (0.0, 4.0),
-            (3, 30), (1.5, 4.0), (1.5, 4.0), (1.2, 3.0)]
+            (3, 30), (1.5, 4.0), (1.5, 4.0), (1.2, 3.0), (0.40, 6.00), (2.0, 47.0)]
 # drive capture -> label
 DRIVE_CAPS = [
     ("drive-0700_base-od.wav", "min"),
@@ -226,16 +283,32 @@ def capture_phase_target():
     return PH.rel_phase(H)[3]
 
 
-def render_phase(params):
-    """Render the short 1 kHz tone at DRIVE-MIN through the plug; return model ψ3 (deg)."""
-    extra = []
+def _split_flags(params):
+    """(extra_args_for_render_args, own_cli_flags) for a parameter vector.
+
+    Everything in HELD/FIT_KEYS is a FitParams field emitted as `--fit k=v`, EXCEPT the keys in
+    CLI_FLAG_KEYS (kInputRef -> --input-ref), which are processor-domain and have their own flag.
+    Routing kInputRef through `--fit` would make OfflineRender reject the whole render (there is no
+    such FitParams field), so this split is load-bearing, not cosmetic.
+    """
+    extra, own = [], []
     for k, v in HELD.items():
         extra += ["--fit", f"{k}={v:.9g}"]
     for k, v in zip(FIT_KEYS, params):
-        extra += ["--fit", f"{k}={v}"]
+        v_emit = v * EMIT_SCALE[k] if k in EMIT_SCALE else v   # nF -> F for clipC11, etc.
+        if k in CLI_FLAG_KEYS:
+            own += [CLI_FLAG_KEYS[k], f"{v_emit:.9g}"]
+        else:
+            extra += ["--fit", f"{k}={v_emit:.9g}"]
+    return extra, own
+
+
+def render_phase(params):
+    """Render the short 1 kHz tone at DRIVE-MIN through the plug; return model ψ3 (deg)."""
+    extra, own = _split_flags(params)
     parsed = parse_capture(DRIVE_MIN_CAP)
     o = "/tmp/fit_phase1k.wav"
-    subprocess.run([RENDER_BIN, PHASE_IN, o, "--os", "8"] + render_args(parsed, extra),
+    subprocess.run([RENDER_BIN, PHASE_IN, o, "--os", "8"] + own + render_args(parsed, extra),
                    check=True, capture_output=True)
     r = A.load(o)
     seg = r[int(0.5 * FS):int(1.15 * FS)]
@@ -245,16 +318,12 @@ def render_phase(params):
 
 def render_profiles(params):
     """Render the short tone through the plug at each drive setting; return {label: profile}."""
-    extra = []
-    for k, v in HELD.items():
-        extra += ["--fit", f"{k}={v:.9g}"]
-    for k, v in zip(FIT_KEYS, params):
-        extra += ["--fit", f"{k}={v}"]
+    extra, own = _split_flags(params)
     out = {}
     for cap, lbl in DRIVE_CAPS:
         parsed = parse_capture(cap)
         o = f"/tmp/fit_{lbl.replace(':','')}.wav"
-        subprocess.run([RENDER_BIN, SHORT_IN, o, "--os", "8"] + render_args(parsed, extra),
+        subprocess.run([RENDER_BIN, SHORT_IN, o, "--os", "8"] + own + render_args(parsed, extra),
                        check=True, capture_output=True)
         r = A.load(o)
         # steady window: last ~0.6 s (after smoother settle), trimmed
@@ -345,11 +414,11 @@ def cost(params, targets, verbose=False):
 
 
 def gm_scan(params, targets, gms):
-    """Re-score ONE parameter point at several held gm values. The harmonic-to-harmonic ratios
-    should be nearly gm-insensitive; a large cost swing means the objective still couples to
-    level somewhere. Restores HELD['jfetGm'] on exit."""
+    """Re-score ONE parameter point at several HELD gm values. gm is HELD (not fit), so override
+    HELD['jfetGm']. The LOW-drive ratios must stay flat (the bleed-confound check); the high-drive
+    ratios are expected to swing (gm scales the level into a hard-clipping stage — real physics)."""
     saved = HELD["jfetGm"]
-    print("\ngm sensitivity of the fitted point (ratios should be ~flat vs gm):")
+    print("\ngm sensitivity of the fitted point (LOW-drive ratios flat = bleed-confound check):")
     print(f"  {'gm(mS)':>7} | {'cost':>7} | " + " | ".join(f"{lbl} H3-H2/H4-H2" for lbl in targets))
     try:
         for gm in gms:
@@ -407,14 +476,36 @@ def main():
     # beta-only fit (clipK 2.0) — the refit adds clipK freedom from there; starts 2/3 seed a
     # SOFTER clipK (1.3/1.5) with a HIGHER rail (clipSat sum ~7 V) so the optimiser can find the
     # "soft knee + late saturation" basin that raises noon without overshooting 2:30/max.
+    # Session-17: 10th element is kInputRef. The three K seeds bracket the onset gate's finding
+    # (best ramp rms at K~2.4, useful authority from ~1.7): start 1 = the session-15 beta-only
+    # shape at the gate's best-rms K, start 2 = a hotter K with a full-rail clipper, start 3 = the
+    # OLD adopted K = 0.87 kept deliberately as a CONTROL — if the optimiser leaves 0.87 for a
+    # much better cost from that start too, the improvement is the mechanism and not the seed.
+    # Session-17: 11th element is clipC11 in nF (schematic 4.7). The input-coupling gate localised
+    # the residual min->noon ramp to the GRUNT=Cut corner (C11 too small -> bass strangled ->
+    # clipper never turns on with DRIVE); the implied effective coupling was ~22 nF (confounded).
+    # start 1 = big C11 (implied) at the gate's best-rms K; start 2 = a moderate C11 at a hotter K;
+    # start 3 = the SCHEMATIC C11 = 4.7 nF at the OLD adopted K = 0.87, a deliberate CONTROL — if
+    # the optimiser leaves BOTH 4.7 nF and 0.87 for a much better cost from that start too, the
+    # improvement is the coupling mechanism, not the seed.
     starts = [
-        [0.33, 1.69, 1.43, 0.49, 1.8, 25, 3.15, 3.15, 1.5],
-        [0.30, 1.8, 1.4, 0.5, 1.6, 28, 3.5, 3.5, 1.3],
-        [0.28, 2.5, 1.0, 0.45, 2.0, 22, 2.5, 3.0, 2.0],
+        [0.33, 1.69, 1.43, 0.49, 1.8, 25, 3.15, 3.15, 1.5, 2.40, 22.0],
+        [0.30, 1.8, 1.4, 0.5, 1.6, 28, 3.5, 3.5, 1.3, 3.40, 12.0],
+        [0.28, 2.5, 1.0, 0.45, 2.0, 22, 2.5, 3.0, 2.0, 0.87, 4.7],
     ]
     for arg in sys.argv[1:]:
         if arg.startswith("--start="):
             starts = [[float(v) for v in arg.split("=", 1)[1].split(",")]]
+        if arg.startswith("--fence-a0="):
+            # Session-17 fenced refit: the GRUNT-corner measurement (grunt_corner_measure.py) proved
+            # the cut corner is genuinely LOW — but a low corner is A0<->C11 degenerate, so the
+            # question is only WHICH knob carries it. Fencing clipA0 into its datasheet prior [20,30]
+            # and freeing clipC11 asks: can the ramp close with the low corner expressed as a large
+            # C11 instead of a low A0? If yes, that is the more conservative ship (A0 stays in prior).
+            lo, hi = (float(v) for v in arg.split("=", 1)[1].split(","))
+            BOUNDS[FIT_KEYS.index("clipA0")] = (lo, hi)
+            print(f"** clipA0 FENCED to [{lo:g}, {hi:g}] — session-17 fenced refit "
+                  f"(GRUNT-corner measurement: the low cut corner is real; carry it in C11) **")
     for start in starts:
         res = minimize(cost, start, args=(targets,), method="Nelder-Mead",
                        bounds=BOUNDS, options=dict(maxiter=400, xatol=0.02, fatol=0.3))
@@ -439,7 +530,30 @@ def main():
           f"(>= 0; a fold-back is infeasible)")
     a0ok = "" if 20.0 <= g["clipA0"] <= 30.0 else " ** OUTSIDE circuit.md's 20-30 **"
     print(f"  clipA0         = {g['clipA0']:.3f}   (circuit.md says 20-30){a0ok}")
-    print(f"  clipSatLo+Hi   = {g['clipSatLo'] + g['clipSatHi']:.3f} V   (R19-dropped rail ~7 V)")
+    # ---- THE DEGENERATE FAMILY (session 17) -------------------------------------
+    # kInputRef and the clip ceiling are ONE degenerate pair (GainStaging.h). Judging clipSat
+    # alone — which is what sessions 10-15 did, with K frozen at an adopted value — tests half a
+    # pair and rejects fits for a number that is only meaningful together with K. Both halves are
+    # printed together, and BOTH must be physical for the point to be acceptable.
+    K = g["kInputRef"]
+    satsum = g["clipSatLo"] + g["clipSatHi"]
+    satok = "" if 3.0 <= satsum <= 8.0 else " ** OUTSIDE the ~7 V R19-dropped rail envelope **"
+    # The test signal's -6 dBFS rung is documented as "hot bass" (gen_test_signal.py), so the
+    # physically-checkable voltage is K/2, not K at a never-played 0 dBFS.
+    vhot = K / 2.0
+    vok = "" if 0.3 <= vhot <= 2.5 else " ** implausible for a bass pickup **"
+    print(f"  clipSatLo+Hi   = {satsum:.3f} V   (R19-dropped rail ~7 V){satok}")
+    print(f"  kInputRef      = {K:.3f} V/FS  -> {vhot:.2f} V peak at the -6 dBFS 'hot bass' rung "
+          f"(passive ~0.1-1 V, hot active ~1-2 V){vok}")
+    print(f"  FAMILY verdict = {'PHYSICAL' if not (satok or vok) else 'NOT PHYSICAL'}   "
+          f"(clipSat AND implied input volts must BOTH be sane — never clipSat with K pinned)")
+    # clipC11 (session 17) — the GRUNT=Cut coupling cap, fit in nF (schematic 4.7). A value near a
+    # bound is DIAGNOSTIC, not a fitted answer: a rest at 47 nF means the Cut corner wants a value
+    # no 4n7-labelled cap explains (look to R16 / a non-coupling mechanism); a rest at 2 nF means
+    # the coupling was never the lever after all.
+    c11 = g["clipC11"]
+    c11pin = " ** RESTING ON A BOUND — diagnostic, not a fit **" if (c11 <= 2.05 or c11 >= 46.9) else ""
+    print(f"  clipC11        = {c11:.2f} nF   (schematic 4.7 nF; user-authorised to move){c11pin}")
     print(f"  2*a*ceilNeg    = {2 * g['jfetSatNeg'] * g['jfetCeilNeg']:.3f}   "
           f"(square law says ~1.0 — NOT constrained in the fit, so this is a real check)")
     print(f"  ceilNeg / s    = {g['jfetCeilNeg'] / g['jfetSatPos']:.2f}   "
@@ -455,7 +569,7 @@ def main():
         print(f"  ψ3 @ {PHASE_TONE:g}Hz    = model {psi3:+.1f} vs capture {PHASE_TARGET:+.1f} deg "
               f"(|err| {abs(dphi):.1f}; small = JFET H3 in-phase, the branch-B claim)")
     print(f"  held jfetGm    = {HELD['jfetGm'] * 1e3:.3f} mS   "
-          f"(step-2 re-anchor; --gm-scan checks ratio sensitivity, band 0.09-0.15)")
+          f"(session-4 anchor; --gm-scan checks LOW-drive ratio flatness, band 0.09-0.15)")
     # 1% of the bound, not 0.1%: Nelder-Mead stops NEAR a bound it is pushing against
     # rather than exactly on it (the 2026-07-22 ceiling run returned driveTaperExp
     # 2.9938 against a ceiling of 3.0 — 0.2% off, and a 0.1% test missed it).

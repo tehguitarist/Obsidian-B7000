@@ -73,6 +73,7 @@ static std::vector<double> renderSine(PedalChain::Params p, int order, double fr
     PedalDSP dsp;
     const int block = 256;
     dsp.prepare(fs, block);
+    dsp.setFitParams(FitParams{});   // shipped session-17 calibration (matches PluginProcessor)
     dsp.setFactorOrder(order);
     dsp.setParams(p);
 
@@ -165,10 +166,19 @@ int main()
         p.drive = 0.85;   // hard into the clipper
         p.master = 1.0;
 
-        // amp 0.2: hard into the clipper for the CURRENT gain staging, and clear
-        // of the known bad zone documented in this file's header. The sweep below
-        // prints every amplitude so the anomaly is never silently passed over.
-        const double f0 = 2500.0, gateAmp = 0.2;
+        // amp 0.35: hard into the clipper for the SESSION-17 fitted gain staging
+        // (kInputRef 3.377), and clear of the known bad zone. ** The probe amp MUST
+        // track the gain staging** — it was 0.2 through session 16, but the fitted
+        // kInputRef (0.87 -> 3.377) raised the clipper-onset input level, so at 0.2
+        // the chain now sits BELOW onset and every OS factor is at the measurement
+        // floor (nothing for oversampling to reduce -> a false gate failure). At the
+        // fitted point 0.35 drives 2x to catastrophic aliasing (-1.6 dB) while 4x/8x
+        // stay at the floor, so "8x beats 2x" is tested where it is meaningful.
+        // Bonus (see the header anomaly note): the fitted point ELIMINATES the old
+        // nominal "8x goes backwards at amp 0.5/0.7" reversal — 8x is now monotonically
+        // the cleanest at every amp. The sweep below still prints every amplitude so
+        // the residual (2x/4x narrow-band spikes) is never silently passed over.
+        const double f0 = 2500.0, gateAmp = 0.35;
         const int N = 1 << 15;
 
         auto aliasFloorDb = [&](int order, double amp) {

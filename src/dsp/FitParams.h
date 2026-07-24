@@ -20,12 +20,18 @@
 // fits cross-checked against multiple captures. Making them settable lets
 // OfflineRender sweep hundreds of candidates per minute from Python.
 //
-// **The nominal defaults are unchanged.** Each stage keeps its original
-// `static constexpr kXxx` as the documented NOMINAL, and the matching field
-// here is initialised from it — so a default-constructed FitParams reproduces
-// the pre-refactor build exactly, and the per-stage tests (which reference the
-// `kXxx` constants as their oracle) keep testing the nominal path. Nothing is
-// re-tuned by this struct existing; it only makes the tuning possible.
+// **These defaults are now the SHIPPED session-17 calibration, NOT the stage
+// nominals.** Through session 16 the defaults here mirrored each stage's
+// `static constexpr kXxx` so a default-constructed FitParams reproduced the
+// pre-fit build exactly. Session 17 froze the full-chain fit and wrote it here:
+// every field above whose comment says "session-17 fit" is now the measured
+// value, and PluginProcessor applies a default-constructed FitParams in
+// prepareToPlay (it did not before — the plugin used to silently ignore this
+// struct), so THIS file is the single source the shipped plugin AND OfflineRender
+// both start from. The stage `kXxx` constexprs are retained UNCHANGED as the
+// documented pre-fit nominal and as the per-stage tests' oracle (those tests
+// construct stages directly, without a FitParams, so they still test the nominal
+// path). To re-baseline OfflineRender to nominal, pass the `kXxx` values via --fit.
 //
 // **Scope boundary.** These are all CHAIN-domain (real volts, inside
 // PedalChain). The two DAW-domain scalars — `kInputRef` (volts per full scale)
@@ -46,9 +52,9 @@ struct FitParams
     // R19-dropped effective rail (nominal ~7 V, below the 8.6 V op-amp rail) and
     // their DIFFERENCE is the even-harmonic asymmetry. Fit to the drive-sweep
     // Farina THD(f) + low-frequency-tone H2/H3 balance.
-    double clipA0 = 25.0;
-    double clipSatLo = 3.15;
-    double clipSatHi = 3.85;
+    double clipA0 = 26.142;      // session-17 fenced fit (was nominal 25)
+    double clipSatLo = 2.0067;   // session-17 fenced fit (was nominal 3.15)
+    double clipSatHi = 2.9321;   // session-17 fenced fit (was nominal 3.85)
     // clipK = the VTC knee HARDNESS (session-11 reshape 2026-07-23, Clipper.h
     // vtc()): the per-side sigmoid is u/(1+u^k)^(1/k). A single tanh could not
     // decouple knee hardness from the small-signal gain a0 — the step-3/4 fits
@@ -58,7 +64,28 @@ struct FitParams
     // antiderivative sqrt(1+u^2); k=1 also closed-form) — do NOT commit an
     // arbitrary fitted k as the default without checking its antiderivative
     // stays closed-form (same trap class as the JfetStage sech->tanh reshape).
-    double clipK = 2.0;
+    // ** Session 17 ships the fitted k = 2.846, a NON-anchor value. Safe here
+    // because the clipper carries NO ADAA (its VTC lives inside the implicit
+    // RC-coupled Newton solve — memoryless-ADAA does not apply; oversampling
+    // does the antialiasing), so the closed-form antiderivative is never used.
+    // The k != 2 forward path (Clipper.h vtc()/vtcDeriv()) is a plain pow(), exact
+    // for any k; only the k==2 sqrt fast-path is skipped (a little more CPU/sample). **
+    double clipK = 2.8462;       // session-17 fenced fit (was anchor 2.0 — see closed-form note below)
+    // clipC11 = the ALWAYS-PRESENT GRUNT coupling cap (schematic 4n7, Clipper.h
+    // kC11). Made fittable in session 17 (user-authorised 2026-07-24: "ATTACK and
+    // GRUNT are somewhat estimated; I trust the captures more than the schematics").
+    // It sets the GRUNT=Cut high-pass corner 1/(2*pi*C11*(R16 + R18/(1+A0))) that
+    // gates how much bass reaches the clipper. The re-diagnosis (handover §3v.4) is
+    // that the model is STRUCTURALLY flat across drive-min..noon at Cut (+1.1 dB)
+    // while the capture ramps +12.6 dB — the signature of the Cut corner being too
+    // HIGH (bass strangled -> clipper never turns on with DRIVE). C11 is the ISOLATED
+    // lever for it: bigger C11 lowers ONLY the Cut corner (Boost/Flat corners are
+    // already sub-band), whereas R16 would also cut the clipper gain and A0 is ruled
+    // out (analysis/clipa0_grunt_corner_probe.py: the gain drop cancels the corner
+    // shift). Fit it JOINTLY with the K/clipSat/clipA0 family; a pin at its bound is
+    // diagnostic (the corner wants a value no 4n7-labelled cap explains -> look past
+    // C11). Only the Cut position depends on it alone; Boost = C11||220n is ~immune.
+    double clipC11 = 5.7207e-9;  // session-17 fenced fit (schematic 4.7 nF; user-authorised to move)
 
     // ---- J201 JFET stage (JfetStage.h) --------------------------------------
     // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;
@@ -78,7 +105,7 @@ struct FitParams
     // Removing (not renaming) the old fields is deliberate: a stale
     // `--fit jfetG0=...` now fails loudly in OfflineRender instead of silently
     // setting something with different physical meaning.
-    double jfetGm = 0.69e-3;   // S   (gm*R6 = 2.277 at nominal)
+    double jfetGm = 0.10e-3;   // S   session-4 anchor / session-17 HELD (was nominal 0.69e-3; gm*R6 = 0.33)
     double jfetRo = 200.0e3;   // ohm  Q1 drain output resistance (1/gos)
     double jfetRq2 = 1.0e6;    // ohm  Q2 C4-bootstrapped active-load impedance
     // jfetSatPos/Neg feed JfetStage's SQUARE-LAW even-shaper (JfetStage.h, Phase-7
@@ -97,8 +124,8 @@ struct FitParams
     // DIFFERENT function, not a revert of the 2026-07-22 bug fix. With a finite ceiling
     // NEITHER closed form is sufficient: the constraint couples s, a and jfetCeilNeg, so
     // a fitter must scan the slope NUMERICALLY (fit_nonlinear.py does). **
-    double jfetSatPos = 0.3;   // s: square-law knee (gate volts)
-    double jfetSatNeg = 1.0;   // a: even strength (signed)
+    double jfetSatPos = 0.20072; // s: square-law knee (gate volts) — session-17 fit (was 0.3)
+    double jfetSatNeg = 3.1769;  // a: even strength (signed) — session-17 fit (was 1.0)
     // ---- Asymmetric drain-current CEILING (added 2026-07-22) ----------------
     // The step-2 re-fit REJECTED its own result and diagnosed why: the capture's
     // H2 grows +6 dB across the drive sweep and the unbounded model's grew
@@ -129,8 +156,8 @@ struct FitParams
     // The asymmetry between them is a SECOND source of even harmonics alongside
     // jfetSatNeg, and reinforces it in the same direction; expect the fit to trade
     // the two off. Passing >= 1e6 disables a side exactly (pre-ceiling model).
-    double jfetCeilPos = 1.0;
-    double jfetCeilNeg = 0.5;
+    double jfetCeilPos = 2.3428;   // session-17 fit (was nominal 1.0)
+    double jfetCeilNeg = 0.27408;  // session-17 fit (was nominal 0.5)
     // jfetExpandBeta = the EXPANSIVE cubic coefficient of the core shape (session-15
     // branch B, 2026-07-23, JfetStage.h coreLimit()). SUPERSEDES the session-13/14
     // `jfetCeilK` hardness knob, which was proven the wrong lever (its pivot gate
@@ -149,16 +176,18 @@ struct FitParams
     // JfetStage.h), which is the only regime this branch uses; still scanned
     // numerically in fit_nonlinear.py + JfetStageTest per the standing bound-verify
     // rule. Nominal 0.0 is a PLACEHOLDER — this is the session-15 primary fit target.
-    double jfetExpandBeta = 0.0;
+    double jfetExpandBeta = 2.1354;  // session-17 fit — EXPANSIVE cubic (was placeholder 0.0)
 
     // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
     // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at
     // least TWO knob points across the range (a wrong shape can match one
     // position and flip sign at another). The capture matrix provides 4 points
     // per pot for exactly this.
-    double driveTaperExp = 1.5;   // VR3 100k C-taper, in (1-x) — 0 ohm at full CW
-    double levelTaperExp = 1.43;  // VR2 100k A-taper
-    double masterTaperExp = 1.43; // VR8 100k A-taper [ENG]
+    double driveTaperExp = 1.98;  // VR3 100k C-taper, in (1-x) — 0 ohm at full CW. session-17
+                                  // measured (bleed-free taper, drive_taper_curve.log; was 1.5/2.5)
+    double levelTaperExp = 2.25;  // VR2 100k A-taper — session-8 measured (36 estimates; was 1.43)
+    double masterTaperExp = 2.25; // VR8 100k A-taper [ENG] — session-17; same pot as LEVEL, so
+                                  // shares its 2.25 (master captures bracket it: 2.06/2.37; was 1.43)
 
     // ---- C21 (100n) inter-stage coupling into the tone stack ----------------
     // The 100n cap is schematic-verified; the resistance it works against is the

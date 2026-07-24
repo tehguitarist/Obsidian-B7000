@@ -161,6 +161,14 @@ void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPe
     for (auto& d : dsp)
     {
         d.prepare(sampleRate, samplesPerBlock);
+        // Apply the Phase-7 CAPTURE-FIT calibration (FitParams.h defaults). This is
+        // the ONE place the shipped plugin picks up the fitted chain-domain constants;
+        // without it every stage runs its pre-fit `constexpr kXxx` nominal and the
+        // plugin silently ignores FitParams (OfflineRender applies it via --fit, so the
+        // two would otherwise diverge). Called after prepare() so each stage re-derives
+        // its coefficients from the stored sample rate. The DAW-domain scalars
+        // (kInputRef/kOutputMakeup) are deliberately NOT here — they live in GainStaging.h.
+        d.setFitParams(FitParams{});
         d.setFactorOrder(startOrder);
         d.reset();
     }

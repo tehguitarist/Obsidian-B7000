@@ -1,0 +1,46 @@
+==========================================================================================
+MASTER taper (masterTaperExp) + output makeup (kOutputMakeup) — session 17
+==========================================================================================
+Clean-path isolation: DIST off => clipper/JFET bypassed; kInputRef cancels. Depends only on
+the EQ/MASTER linear stages. Level = RMS over the sweep_clean segment (gain-n12 corrected).
+
+------------------------------------------------------------------------------------------
+CAPTURE LEVELS (sweep_clean RMS, gain-n12 corrected)
+------------------------------------------------------------------------------------------
+  master 0.00  master-0700_base-clean.wav                RMS  -52.83 dBFS (gain-corr +0.0 dB)
+  master 0.25  master-0930_base-clean.wav                RMS  -41.43 dBFS (gain-corr +0.0 dB)
+  master 0.75  master-1430_gain-n12_base-clean.wav       RMS  -22.54 dBFS (gain-corr +12.1 dB)
+  master 1.00  master-1700_gain-n12_base-clean.wav       RMS  -16.62 dBFS (gain-corr +12.1 dB)
+
+------------------------------------------------------------------------------------------
+(1) masterTaperExp p   [ divRatio(m) = m^p ;  p = ln(R(m)/R(1.0)) / ln(m) ]
+------------------------------------------------------------------------------------------
+  m=0.25: R(m)/R(1.0) = 0.0575 = -24.81 dB  ->  p = 2.061
+  m=0.75: R(m)/R(1.0) = 0.5059 = -5.92 dB  ->  p = 2.369  (both gain-n12 -> correction CANCELS, cleanest)
+  => two estimates 2.061 / 2.369; PREFER the gain-n12-cancelling 0.75/1.0: p = 2.369  (mean 2.215)
+  shipped interim was 1.43; A-taper pots typically p ~ 2-3. A pin-free interior value that
+  both knobs agree on is the accept condition.
+
+------------------------------------------------------------------------------------------
+(2) kOutputMakeup   [ render CLEAN at master=1.0, makeup=1, match the capture ]
+------------------------------------------------------------------------------------------
+  R_cap(1.0)          =  -16.62 dBFS
+  R_mdl(1.0,makeup=1) =  -27.94 dBFS
+  => kOutputMakeup = R_cap/R_mdl = 3.6840  (+11.33 dB)
+  (calibration §2: makeup MAY exceed 1.0 — do NOT pad for headroom.)
+
+------------------------------------------------------------------------------------------
+(3) CONSISTENCY — model (fitted p + makeup) vs capture at each master (the fit did NOT
+    target absolute level here, so agreement is real corroboration)
+------------------------------------------------------------------------------------------
+   master |   capture     model  err dB
+     0.25 |   -41.43   -45.14   -3.71
+     0.75 |   -22.54   -22.54   -0.00
+     1.00 |   -16.62   -16.62   +0.00
+  worst |err| = 3.71 dB  (CHECK — taper/makeup mismatch)
+
+==========================================================================================
+RESULT — write these into the shipped defaults
+==========================================================================================
+  MasterOut.h  kMasterTaperExp  : 1.43 -> 2.369
+  GainStaging.h kOutputMakeupNominal : 0.90 -> 3.684

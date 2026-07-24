@@ -1,0 +1,80 @@
+============================================================================================
+SESSION-16 §3j GATE — is the DRIVE taper a viable lever for the noon H3-H2 shortfall?
+============================================================================================
+Pre-registered: (A) noon must respond >= 3.0 dB to VR3 resistance; (B) the MEASURED
+resistance must move noon TOWARD the capture; (C) no regression at the other knobs.
+
+Capture H3-H2 ramp (tone_220):  min=-23.2  9:30=-21.0  noon=-10.6  2:30=+1.3  max=+1.0
+
+    knob |   MODEL R    gain |  MEASURED R    gain |  level err
+     min |   100.00k  12.39 |     100.00k  12.39 |     +0.00 dB
+    9:30 |    48.71k  17.18 |      65.27k  15.18 |     -1.99 dB
+    noon |    17.68k  24.09 |      25.66k  21.59 |     -2.50 dB
+    2:30 |     3.12k  33.15 |       6.33k  30.11 |     -3.03 dB
+     max |     0.00k  37.81 |       0.00k  37.81 |     +0.00 dB
+
+--------------------------------------------------------------------------------------------
+POINT: beta-only fitted   [jfetSatPos=0.33045, jfetSatNeg=1.6862, jfetCeilPos=1.4315, jfetCeilNeg=0.49194, jfetExpandBeta=1.4233, clipA0=20.115, clipSatLo=1.4607, clipSatHi=1.7869]
+--------------------------------------------------------------------------------------------
+(A)+(B)  noon H3-H2 vs VR3 resistance at noon   [capture wants -10.6]
+     R noon  stage gain |  noon H3-H2 |  err vs capture
+      8.00k      28.89 |      -12.0 |           -1.4
+     12.00k      26.55 |      -15.3 |           -4.7
+     17.68k      24.09 |      -17.3 |           -6.7  <- MODEL (1-x)^2.5
+     22.00k      22.64 |      -18.0 |           -7.4
+     25.66k      21.59 |      -18.5 |           -7.8  <- MEASURED (step 1)
+     32.00k      20.08 |      -18.9 |           -8.3
+     45.00k      17.72 |      -19.4 |           -8.8
+
+  (A) authority over the swept range : 7.4 dB (PASS, need >= 3.0)
+  (B) measured taper moves noon      : -17.3 -> -18.5 (capture -10.6)  err 6.7 -> 7.8 dB  (FAIL)
+
+(C)  full ramp — power law vs measured taper, all five knobs
+    knob |  capture |  power law     err |  measured     err |   verdict
+     min |   -23.2 |     -19.8    3.3 |    -19.8    3.3 |     worse
+    9:30 |   -21.0 |     -19.4    1.5 |    -19.7    1.3 |    better
+    noon |   -10.6 |     -17.3    6.7 |    -18.5    7.8 |     worse
+    2:30 |    +1.3 |      +4.8    3.6 |     -9.4   10.7 |     worse
+     max |    +1.0 |      +3.1    2.1 |     +3.1    2.1 |     worse
+  rms ramp error: power law 3.88 dB   measured taper 6.20 dB   (REGRESSES)
+
+--------------------------------------------------------------------------------------------
+POINT: physical clipper   [jfetSatPos=0.3, jfetSatNeg=4, jfetCeilPos=1, jfetCeilNeg=0.5, jfetExpandBeta=1.8, clipA0=25, clipSatLo=3.15, clipSatHi=3.85]
+--------------------------------------------------------------------------------------------
+(A)+(B)  noon H3-H2 vs VR3 resistance at noon   [capture wants -10.6]
+     R noon  stage gain |  noon H3-H2 |  err vs capture
+      8.00k      28.89 |      -23.8 |          -13.2
+     12.00k      26.55 |      -24.4 |          -13.8
+     17.68k      24.09 |      -24.7 |          -14.1  <- MODEL (1-x)^2.5
+     22.00k      22.64 |      -24.8 |          -14.2
+     25.66k      21.59 |      -24.9 |          -14.3  <- MEASURED (step 1)
+     32.00k      20.08 |      -25.0 |          -14.4
+     45.00k      17.72 |      -25.1 |          -14.4
+
+  (A) authority over the swept range : 1.2 dB (FAIL, need >= 3.0)
+  (B) measured taper moves noon      : -24.7 -> -24.9 (capture -10.6)  err 14.1 -> 14.3 dB  (FAIL)
+
+(C)  full ramp — power law vs measured taper, all five knobs
+    knob |  capture |  power law     err |  measured     err |   verdict
+     min |   -23.2 |     -25.1    1.9 |    -25.1    1.9 |     worse
+    9:30 |   -21.0 |     -25.1    4.1 |    -25.1    4.1 |     worse
+    noon |   -10.6 |     -24.7   14.1 |    -24.9   14.3 |     worse
+    2:30 |    +1.3 |     -21.6   22.9 |    -23.4   24.7 |     worse
+     max |    +1.0 |     -14.3   15.2 |    -14.3   15.2 |     worse
+  rms ramp error: power law 13.97 dB   measured taper 14.60 dB   (REGRESSES)
+
+============================================================================================
+VERDICT
+============================================================================================
+    beta-only fitted: (A) authority   7.4 dB PASS   (B) direction FAIL   (C) ramp rms 3.88 -> 6.20 FAIL
+    physical clipper: (A) authority   1.2 dB FAIL   (B) direction FAIL   (C) ramp rms 13.97 -> 14.60 FAIL
+
+  ** GATE NOT PASSED. ** The step-1 measurement stands on its own (it is a direct,
+  bleed-free, self-tested measurement of a circuit quantity, and the shipped power law
+  is demonstrably wrong), but the claim that reshaping it CLOSES the noon H3-H2 gap is
+  NOT supported. Do not present a C-taper as the noon fix.
+  Specifically (B): the real pedal is QUIETER at noon than the model, while noon
+  H3-H2 RISES with level and the model is already SHORT there — so the corrected
+  taper moves noon the WRONG WAY. The noon deficit must come from somewhere else
+  (next suspect per §3u.6: the clipper INPUT coupling — GRUNT cap bank + R16 —
+  for drive-dependent behaviour a memoryless VTC cannot produce).

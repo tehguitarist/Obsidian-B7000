@@ -1,0 +1,58 @@
+================================================================================================
+SESSION-16 §3j GATE — DRIVE-stage op-amp RAIL CLAMP as the missing drive-axis mechanism
+================================================================================================
+Capture H3-H2 ramp:  min=-23.2  9:30=-21.0  noon=-10.6  2:30=+1.3  max=+1.0
+Capture min->noon leg: +12.6 dB   (the ramp the model cannot make)
+
+------------------------------------------------------------------------------------------------
+POINT: beta-only fitted
+------------------------------------------------------------------------------------------------
+(L) LIVENESS (L-009): railEnabled 0 vs 1 at max drive -> diff rms 3.290e-03 (-22.3 dB re signal)  LIVE
+
+     rail |     min    9:30    noon    2:30     max |  min->noon  ramp rms
+      OFF |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88   <- current baseline
+     1.0V |   -19.8   -19.4   -17.3   +10.9    +8.2 |       +2.6      6.36
+     1.5V |   -19.8   -19.4   -17.3    +5.1    +7.9 |       +2.6      4.90
+     2.0V |   -19.8   -19.4   -17.3    +4.8    +3.2 |       +2.6      3.89
+     2.5V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88
+     3.0V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88
+     3.5V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88
+     4.5V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88
+     6.0V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88
+    20.0V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6      3.88   <- OFF control
+
+  capture target: min->noon +12.6 dB, ramp rms 0.00
+  (A) best extra min->noon slope: +0.0 dB at rail 1 V (FAIL, need >= +4.0)
+  (B) whole-ramp rms at that rail: 3.88 -> 6.36 (FAIL)
+
+------------------------------------------------------------------------------------------------
+POINT: physical clipper
+------------------------------------------------------------------------------------------------
+(L) LIVENESS (L-009): railEnabled 0 vs 1 at max drive -> diff rms 1.814e-02 (-10.0 dB re signal)  LIVE
+
+     rail |     min    9:30    noon    2:30     max |  min->noon  ramp rms
+      OFF |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     13.97   <- current baseline
+     1.0V |   -25.1   -25.1   -24.7    -1.9    -2.3 |       +0.4      6.93
+     1.5V |   -25.1   -25.1   -24.7   -16.7    +1.9 |       +0.4     10.43
+     2.0V |   -25.1   -25.1   -24.7   -21.6    -4.7 |       +0.4     12.46
+     2.5V |   -25.1   -25.1   -24.7   -21.6   -12.8 |       +0.4     13.67
+     3.0V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     13.97
+     3.5V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     13.97
+     4.5V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     13.97
+     6.0V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     13.97
+    20.0V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     13.97   <- OFF control
+
+  capture target: min->noon +12.6 dB, ramp rms 0.00
+  (A) best extra min->noon slope: +0.0 dB at rail 1 V (FAIL, need >= +4.0)
+  (B) whole-ramp rms at that rail: 13.97 -> 6.93 (PASS)
+
+================================================================================================
+HOW TO READ THIS
+================================================================================================
+  PASS => the rail clamp is a real drive-axis mechanism the model is missing, and the
+  session-17 fit should enable it and fit railPos/railNeg WITH the clipper (they are
+  degenerate with kInputRef, so they must be fit, never guessed).
+  FAIL on (A) => the rail cannot reach the ramp either; the drive-axis deficit is then
+  not a level/limiting phenomenon anywhere in the OD chain, and the next suspect is a
+  drive-dependent MEMORY effect (clipper input coupling: GRUNT cap bank + R16, whose
+  time constants a memoryless VTC cannot reproduce) — handover §3u.6's fallback.

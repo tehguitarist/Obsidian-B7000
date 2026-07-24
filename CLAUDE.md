@@ -104,6 +104,100 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
+> **CURRENT (session 17, 2026-07-24): ✅✅ PHASE-7 CALIBRATION LANDED AND SHIPPED. The full fitted
+> family is written into the shipped defaults, the plugin now actually applies it, ctest 16/16, AU +
+> VST3 build clean, committed.** This closes the multi-session J201/clipper calibration.
+> **(0) ROOT-CAUSE BUG FOUND + FIXED — the plugin was NEVER applying FitParams.** `PedalChain()` is
+> `=default` and `PluginProcessor::prepareToPlay` called `prepare/setFactorOrder/reset` but NEVER
+> `setFitParams`, so the shipped plugin ran each stage's `constexpr kXxx` NOMINAL and silently ignored
+> the entire FitParams struct — only OfflineRender/tests ever saw a fit. Editing FitParams.h alone
+> would have calibrated every A/B render and NOT the plugin. Fix: `prepareToPlay` now applies
+> `setFitParams(FitParams{})` per channel (single source of truth; matches how OfflineRender consumes
+> it). **Lesson: a `=default` DSP chain + a settable-but-never-set calibration struct is a silent
+> "calibration doesn't ship" trap — verify the shipped path reads the values, don't assume.**
+> **(1) SHIPPED SET (accepted fenced fit, `analysis/fit_logs/step7_fenced_A0_fit.log`, gm HELD, cost
+> 22.5 vs nominal 2219; all step-4 acceptance checks green: ψ3 err 0.7°, clipA0∈[20,30], FAMILY
+> verdict PHYSICAL, no param on a bound, min-slope≥0):** FitParams.h defaults — clipA0 26.14 /
+> clipSatLo 2.007 / clipSatHi 2.932 / clipK 2.846 / clipC11 5.72 nF / jfetGm 0.10 mS (HELD) /
+> jfetSatPos 0.2007 / jfetSatNeg 3.177 / jfetCeilPos 2.343 / jfetCeilNeg 0.2741 / jfetExpandBeta
+> 2.135 / driveTaperExp 1.98 / levelTaperExp 2.25 / masterTaperExp 2.25. GainStaging.h — **kInputRef
+> 0.87 → 3.377** (the session-16 degenerate-family resolution: a PHYSICAL clipper, clipSat sum 4.94 V
+> near the ~7 V rail, is only reachable at the hotter input scale; 0.87 forced an unphysical ~1.3 V
+> ceiling) and **kOutputMakeup 0.90 → 3.684** (clean-path level-match; K cancels there so it is
+> independent of the kInputRef move; net outputGain = makeup/K ≈ 1.09, so clean loudness is
+> preserved — the 4× kInputRef is NOT 4× louder). masterTaperExp = 2.25 chosen to match levelTaperExp
+> (same 100k A-taper pot as LEVEL; master captures bracket it 2.06/2.37) over the log's 2.369.
+> **(2) clipK 2.846 is a NON-anchor value but SAFE:** the clipper carries NO ADAA (VTC is inside the
+> RC-coupled Newton solve), so its closed-form-antiderivative caveat (k=2/k=1) never binds; the k≠2
+> `pow()` forward path in `Clipper.h vtc()` is exact for any k (only the k==2 sqrt fast-path is
+> skipped). Documented at FitParams::clipK.
+> **(3) OSValidationTest — re-run at the genuinely fitted point (now applies `setFitParams`), 16/16.**
+> Direct nominal-vs-fitted sweep comparison: **the fitted point ELIMINATES the old nominal "8× goes
+> backwards at amp 0.5/0.7" reversal** (nominal 8x −17.5 dB → fitted 8x −40.5 dB pristine at every
+> amp) — a real improvement. The gate's fixed probe amp had to move 0.2 → 0.35: the hotter kInputRef
+> raised clipper-onset, so at 0.2 the chain now sits BELOW onset (all OS factors at the −40 floor →
+> a FALSE gate failure with nothing to reduce); 0.35 drives 2x to −1.6 dB where "8× beats 2×" is
+> meaningful. ⚠ **Documented residual (NOT a blocker, deferred to Phase-8 OS polish): the narrow-band
+> clipper/decimator anomaly moved from 8× onto 4× at the amp-0.5 extreme corner** (fitted 4x −16.4 dB
+> vs nominal −33.4; 8x pristine there). At an extreme synthetic probe (2.5 kHz sine, drive 0.85,
+> −6 dBFS); recommend 8× for extreme high-drive, and it's a candidate for the deferred OSFidelity /
+> low-OS-restore work. The sweep still prints every amp unconditionally so it stays visible.
+> **▶ NEXT: Phase 8 (UI build-out) + Phase 9 reference validation (full A/B vs captures: FR / swept-
+> THD / null / knob-tracking), and the deferred Phase-8 OS-fidelity polish (the 4× residual above).**
+> HELD (unchanged, do not re-open): the JFET core (jfetGm 0.10 mS, jfetRo/jfetRq2 nominal). Do NOT
+> re-add gm to the fit — the session-17 gm-add rested on its bound (`step7_fenced_gm_fit.log`) and was
+> rejected. Full detail: handover "SESSION 17".
+> ── prior session ──
+> **CURRENT (session 16, 2026-07-24): step (1) DELIVERED — the DRIVE taper is now MEASURED
+> bleed-free. Step (2) STOPPED at a pre-registered gate: the taper is genuinely mis-modelled but is
+> NOT the noon fix. Two further drive-axis mechanisms gated and refuted; the blocker is RE-DIAGNOSED
+> as clipper ONSET POSITION, plus a degeneracy that invalidates how session 15 judged its own
+> rejections. NO `src/` file changed, ctest 16/16, nothing committed as a DSP default.**
+> **(1) The taper, measured with the clean BLEND bleed CANCELLED ALGEBRAICALLY** (not estimated —
+> `analysis/drive_taper_bleedfree.py`). Only DriveStage is drive-dependent, so the output phasor is
+> exactly affine in the gain-leg conductance `Y=C+M·g(x)` and the bleed lives entirely in `C`;
+> anchored on the two taper-SHAPE-independent endpoints. **9:30 65.1k / noon 25.4k / 2:30 6.3k vs
+> the power law's 48.7k/17.7k/3.1k — the real pedal is 2.0-3.0 dB QUIETER across the interior**, and
+> the implied per-knob exponents (1.48/1.96/1.99) are not one constant, so the SHAPE FAMILY is
+> wrong as suspected. Trusted on three guards: an L-006 self-test recovering a KNOWN taper to
+> **0.00%**, two estimators that fail differently agreeing to ≤2.3% (one alignment-immune by
+> construction), and flat per-rung stability. **Session 11's p=2.5 is explained, not just
+> contradicted** — its "matched pair" cancels clipping but not the shared bleed, which dominates
+> exactly where its two points sat. ⚠ **New trap documented: per-take sweep-anchor alignment is
+> DRIVE-DEPENDENT** (lags drift 3.5 smp = 11° at 440 Hz), silently biasing any naive phasor read.
+> **(2) GATE FAILED — the taper is not the noon fix** (`analysis/drive_taper_gate.py`). §3u.6's
+> inference had a hole: gm and the taper both reach noon through the SAME channel (level into the
+> CD4049), so "uniform vs non-uniform" is irrelevant if noon barely responds to level. It doesn't:
+> authority is 1.2 dB over an 11 dB range at a physical clipper. Worse, **direction FAILS at both
+> points** — noon H3−H2 RISES with level, the measured taper delivers LESS level at noon, and the
+> model is already SHORT there, so correcting the taper moves noon the WRONG WAY (err 6.7→7.8 dB).
+> Not implemented; adopt it only as part of a re-fit, never sold as the ramp fix.
+> **(3) Rail clamp REFUTED** (`analysis/drive_rail_gate.py`): `railEnabled` has been false for every
+> fit since session 7 despite `DriveStage.h` saying IC2_A rails before the clipper and its kInputRef
+> precondition being met 2026-07-22. L-009 liveness checked FIRST (it IS live, −10 dB), so the null
+> is real: min/9:30/noon are unmoved at every rail 1.0-6.0 V; only 2:30/max respond.
+> **(4) ⭐ RE-DIAGNOSIS.** Structural fact: DRIVE is DOWNSTREAM of the J201, so at low drive (clipper
+> ~linear) H3−H2 is a J201-INTRINSIC constant and the model is **structurally obliged to be flat**
+> across min/9:30/noon — it is; the capture is not (+12.6 dB min→noon leg). So the question is not
+> any shape's magnitude but **WHERE ALONG THE DRIVE SWEEP THE CLIPPER TURNS ON**. And `GainStaging.h`
+> says kInputRef is DEGENERATE with the clip ceiling and that 0.87 was ADOPTED, never measured —
+> so **session 15 rejecting fits for "unphysical clipSat" while K was frozen was testing half of a
+> degenerate pair** (clipSat 1.58 V at K=0.87 IS clipSat 7.0 V at K=3.86). Gating K at a FULLY
+> PHYSICAL clipper (`analysis/clipper_onset_gate.py`) drops ramp rms **13.97 → 6.26**, better than
+> session 15 got from ANY clipper shape — but **no single K** works jointly (steepen the leg and
+> drive-min lifts with it). **NECESSARY, NOT SUFFICIENT.**
+> **▶ NEXT (session 17): fit the DEGENERATE FAMILY together — add `kInputRef` to the fit alongside
+> clipA0/clipSatLo/clipSatHi, and judge physicality on the FAMILY (implied input volts AND clipSat
+> volts), never on clipSat with K pinned.** Keep every other session-15 acceptance criterion; the
+> JFET core is DONE, do not re-open it. Expect K alone not to close it — the remaining low-end
+> shortfall points at the ONE untested drive-axis candidate, a drive-dependent MEMORY effect
+> (clipper INPUT COUPLING: GRUNT cap bank + R16), which no memoryless VTC can produce; §3j-gate it
+> BEFORE building. Adopt the measured taper as part of that re-fit (as a proper C-taper through the
+> 3 measured points — its endpoints are already pinned, so a power law has ONE dof for THREE points;
+> do NOT fit another exponent). THEN masterTaperExp + makeup, re-run OSValidationTest, commit the
+> whole set. **Do NOT re-run any clipper fit with K frozen** — it re-finds session 15's corner.
+> Full detail: handover "SESSION 16" §3v.1–3v.5. HELD: jfetGm 0.10 mS, levelTaperExp 2.25.
+> ── prior session ──
 > **CURRENT (session 15, 2026-07-23): branch B LANDED, its §3j gate CONFIRMED, dsp-validator PASS on
 > both the new JFET core AND the deferred clipK — THE JFET H3 PHASE PROBLEM (sessions 12-14) IS
 > FIXED. Full joint fit STOPPED per protocol — a SEPARATE, pre-existing clipper-level issue blocks

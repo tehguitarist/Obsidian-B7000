@@ -1,0 +1,57 @@
+====================================================================================================
+SESSION-17 §3j GATE — clipper INPUT COUPLING (GRUNT cap bank + R16) as a
+drive-dependent MEMORY effect: the last untested mechanism on the drive axis
+====================================================================================================
+Point under test: jfetSatPos=0.3, jfetSatNeg=4, jfetCeilPos=1, jfetCeilNeg=0.5, jfetExpandBeta=1.8, clipA0=25, clipSatLo=3.15, clipSatHi=3.85, clipK=1.5, kInputRef=0.87
+
+PRE-REGISTERED (all three required, or STOP):
+  (A) LIVENESS  : model |GRUNT delta| > 1.0 dB somewhere (L-009)
+  (B) AUTHORITY : GRUNT cut->boost moves the MODEL min->noon leg by >= 4.0 dB
+  (C) DISCREPANCY: |I_capture - I_model| >= 2.0 dB  (else the coupling is
+                   already modelled correctly and cannot be the residual)
+
+----------------------------------------------------------------------------------------------------
+(B) MODEL authority — H3-H2 across the FULL drive sweep at each GRUNT position
+    (model only; no capture exists at grunt-boost below noon — authority test, not a
+     validation). The min->noon leg is the quantity that is +12.6 dB in the capture and
+     structurally ~0 in the model.
+----------------------------------------------------------------------------------------------------
+   GRUNT        Cg |     min    9:30    noon    2:30     max |  min->noon
+     cut     4.7nF |   -25.0   -24.8   -23.9   -19.1   -10.7 |       +1.1
+    flat    51.7nF |   -26.0   -15.6    -3.1    +0.2    +1.3 |      +22.8
+   boost   224.7nF |   -20.7   -12.5    -4.2    -0.5    +0.7 |      +16.5
+
+  capture min->noon leg = +12.6 dB;  model leg spans 21.8 dB across a 48x coupling-cap change
+  ** implied effective coupling at GRUNT=cut: 21.8 nF (schematic C11 = 4.7 nF, ratio 4.6x) **
+     i.e. to reach the capture's noon value (-10.6 dB) the model needs the cut
+     position to pass 220 Hz as if its coupling cap were that large — equivalently
+     its GRUNT corner (1/(2*pi*Cg*(R16 + R18/(1+A_eff)))) is too HIGH.
+
+----------------------------------------------------------------------------------------------------
+(A)+(C) The matched 2x2 factorial — capture vs model, H3-H2 (dB) at 220 Hz
+----------------------------------------------------------------------------------------------------
+   drive  grunt |   capture     model      c-m
+    noon    cut |     -10.6     -23.9    +13.3
+    noon  boost |      +1.0      -4.2     +5.2
+     max    cut |      +1.0     -10.7    +11.7
+     max  boost |      +2.0      +0.7     +1.3
+
+  ⚠ CEILING CHECK: capture H3-H2 saturates ~+1 dB; cells at/near the ceiling: noon/boost, max/cut, max/boost (3 of 4)
+     => (C)'s interaction is CONFOUNDED by saturation and is reported as WEAK
+        evidence only. The robust findings are (B) and the direct cut-position gap.
+
+  GRUNT effect (boost - cut)   at noon : capture +11.6   model +19.7
+  GRUNT effect (boost - cut)   at max  : capture +1.0   model +11.4
+  ** INTERACTION (how much the coupling's effect DEPENDS ON DRIVE) **
+     I_capture = -10.6 dB      I_model = -8.3 dB      |difference| = 2.3 dB
+
+====================================================================================================
+VERDICT
+====================================================================================================
+  (A) LIVENESS    : model |delta| max 19.7 dB  (bar 1.0)   PASS
+  (B) AUTHORITY   : model min->noon leg span 21.8 dB  (bar 4.0)   PASS
+  (C) DISCREPANCY : |I_cap - I_mdl| 2.3 dB  (bar 2.0)   PASS
+
+  ** GATE PASSED ** — the input-coupling network has real authority over the drive-axis
+  ramp AND the model does not reproduce the real pedal's version of it. Proceed to
+  design the refinement (and only then), with this 2x2 interaction as its target.

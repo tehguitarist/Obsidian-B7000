@@ -153,7 +153,7 @@ public:
         fs = sampleRate;
         gc14 = kC14 * 2.0 * sampleRate; // feedback cap companion
         gFb = 1.0 / kR18 + gc14;        // R18 || C14 conductance
-        setGruntCap(gruntCap(grunt));   // (re)build the input-branch coefficients
+        setGruntCap(gruntCapNow(grunt)); // (re)build the input-branch coefficients (uses fittable c11)
         reset();
     }
 
@@ -164,7 +164,8 @@ public:
         wPrev = 0.0;
     }
 
-    // Static so the test/oracle can share the exact cap value.
+    // Static so the test/oracle can share the exact SCHEMATIC cap value (the FR
+    // test fits nothing, so it uses kC11 directly).
     static double gruntCap(Grunt g) noexcept
     {
         switch (g)
@@ -176,10 +177,33 @@ public:
         return kC11;
     }
 
+    // Instance version — uses the FITTABLE c11 (session 17) instead of kC11, so a
+    // fitted clipC11 moves the Cut corner. C12/C13 stay at schematic values (Boost/
+    // Flat are ~immune to C11 and already fit — see FitParams::clipC11).
+    double gruntCapNow(Grunt g) const noexcept
+    {
+        switch (g)
+        {
+            case Grunt::Cut:   return c11;
+            case Grunt::Flat:  return c11 + kC12;
+            case Grunt::Boost: return c11 + kC13;
+        }
+        return c11;
+    }
+
+    // Set the always-present GRUNT coupling cap (FitParams::clipC11) and re-derive
+    // the current position's branch coefficients. Safe in any order vs setGrunt():
+    // both re-run setGruntCap() off the live c11/grunt pair.
+    void setC11(double v) noexcept
+    {
+        c11 = v;
+        setGruntCap(gruntCapNow(grunt));
+    }
+
     void setGrunt(Grunt g) noexcept
     {
         grunt = g;
-        setGruntCap(gruntCap(g));
+        setGruntCap(gruntCapNow(g));
     }
 
     // Set the input-branch coupling cap directly (used by the FR test to sweep Cg
@@ -295,6 +319,7 @@ private:
     // Feedback branch (R18 || C14).
     double gc14 = 0.0, gFb = 0.0, ieq14 = 0.0;
     // Input branch (Cg series R16), Norton-reduced.
+    double c11 = kC11;   // fittable always-present GRUNT cap (FitParams::clipC11); schematic 4n7
     double gcG = 0.0, dNode = 0.0, gIn = 0.0, ieqG = 0.0;
     // Newton warm-start.
     double wPrev = 0.0;
