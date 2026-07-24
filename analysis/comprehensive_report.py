@@ -187,10 +187,13 @@ def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_so
 
         settings = {}
         for k, v in parsed.items():
-            if k in ("rev", "sw", "mode"):
-                continue
+            if k in ("rev", "sw", "mode", "base", "gain"):
+                continue  # non-knob tokens (mode/gain-correction), not numeric settings
             if v is not None:
-                settings[k] = float(v) if not isinstance(v, (int, float)) else v
+                try:
+                    settings[k] = float(v) if not isinstance(v, (int, float)) else v
+                except (TypeError, ValueError):
+                    settings[k] = v  # keep any non-numeric switch value as-is
 
         result = {
             "id": short_id(parsed),

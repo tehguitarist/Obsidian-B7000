@@ -45,6 +45,7 @@ Implemented below:
 """
 import os
 import re
+import sys
 import glob
 from collections import Counter
 
@@ -268,13 +269,27 @@ CAPTURE_MATRIX_SECONDARY = [
 
 
 def find_captures(directory=CAPTURE_DIR):
-    """Return sorted [(path, parsed_dict), ...] for every .wav under directory."""
+    """Return sorted [(path, parsed_dict), ...] for every MATRIX .wav under directory.
+
+    Non-matrix diagnostic captures (e.g. the session-13 ``jfet_ladder_*`` dense
+    ladders, whose stimulus name uses underscores and so is not ``key-value``)
+    legitimately share the capture directory; they are SKIPPED here with a note
+    rather than aborting the whole A/B run. A genuine filename typo in a matrix
+    capture still surfaces — as a skipped-file line — so it is not silently lost.
+    """
     if not os.path.isdir(directory):
         return []
-    return [
-        (p, parse_capture(p))
-        for p in sorted(glob.glob(os.path.join(directory, "*.wav")))
-    ]
+    out, skipped = [], []
+    for p in sorted(glob.glob(os.path.join(directory, "*.wav"))):
+        try:
+            out.append((p, parse_capture(p)))
+        except ValueError as e:
+            skipped.append((os.path.basename(p), str(e).split(":")[-1].strip()))
+    if skipped:
+        print(f"find_captures: skipped {len(skipped)} non-matrix .wav "
+              f"(not key-value filenames): {', '.join(n for n, _ in skipped)}",
+              file=sys.stderr)
+    return out
 
 
 def load_capture(path, expect_fs=48000):

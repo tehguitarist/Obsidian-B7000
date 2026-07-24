@@ -142,11 +142,26 @@ high, execute routine work cheap) is what should persist.
 > vs nominal −33.4; 8x pristine there). At an extreme synthetic probe (2.5 kHz sine, drive 0.85,
 > −6 dBFS); recommend 8× for extreme high-drive, and it's a candidate for the deferred OSFidelity /
 > low-OS-restore work. The sweep still prints every amp unconditionally so it stays visible.
-> **▶ NEXT: Phase 8 (UI build-out) + Phase 9 reference validation (full A/B vs captures: FR / swept-
-> THD / null / knob-tracking), and the deferred Phase-8 OS-fidelity polish (the 4× residual above).**
 > HELD (unchanged, do not re-open): the JFET core (jfetGm 0.10 mS, jfetRo/jfetRq2 nominal). Do NOT
 > re-add gm to the fit — the session-17 gm-add rested on its bound (`step7_fenced_gm_fit.log`) and was
 > rejected. Full detail: handover "SESSION 17".
+> **✅ PHASE 8 (FULL UI) DONE + user-confirmed working (2026-07-24):** data-driven centre pedal face
+> (`src/ui/PedalFace.{h,cpp}` from base image + CSV) — 8 knobs, 2 footswitches + LEDs, ATTACK/GRUNT
+> icon glyphs, LO-MID/HI-MID + freq selectors, all APVTS-bound — plus the peripheral chrome
+> (PedalLookAndFeel, VUMeter, halo trims + Trim Link, OS/scale strip). ⚠ ONE carry-forward into
+> Phase 9: the VU idle-noise gate threshold should be re-verified against the NEW makeup (0.9→3.684
+> is a 4× idle-floor shift — calibration §7 / build-plan Phase-8 item 3 flagged exactly this).
+> **▶ NEXT — PHASE 9 (REFERENCE VALIDATION): A/B the full chain vs the capture matrix to close the
+> remaining sound gap** (user listened 2026-07-24: "not quite sounding like the real pedal yet").
+> Harness is ready (`analysis/analyze.py`, `comprehensive_report.py`, `farina_validate.py`,
+> `gap_audit.py`). Per validation-and-capture.md: 1/3-oct FR, continuous swept-THD, sub-sample null,
+> knob-tracking pass/fail — **fix by DECOMPOSITION, not fudge factors** (§4). Prime suspects for the
+> voicing gap (all still at nominal / unvalidated end-to-end): the bridged-T notch (risk #1 — all
+> four values fittable but never capture-reshaped), the EQ voicing (Baxandall/mids vs captures), and
+> the OD/clean BLEND balance (which the kInputRef 0.87→3.377 move shifted, and the harmonic-ratio
+> objective could not see). Then the perf pass (PerfBenchmark/FeatureProfile/OSFidelity) + the HQ
+> decision, and the deferred OS-fidelity polish (the session-17 4× amp-0.5 residual). GATE 9 = a
+> numbers-not-adjectives validation report written into `docs/`.
 > ── prior session ──
 > **CURRENT (session 16, 2026-07-24): step (1) DELIVERED — the DRIVE taper is now MEASURED
 > bleed-free. Step (2) STOPPED at a pre-registered gate: the taper is genuinely mis-modelled but is
