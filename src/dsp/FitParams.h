@@ -131,6 +131,25 @@ struct FitParams
     // the two off. Passing >= 1e6 disables a side exactly (pre-ceiling model).
     double jfetCeilPos = 1.0;
     double jfetCeilNeg = 0.5;
+    // jfetExpandBeta = the EXPANSIVE cubic coefficient of the core shape (session-15
+    // branch B, 2026-07-23, JfetStage.h coreLimit()). SUPERSEDES the session-13/14
+    // `jfetCeilK` hardness knob, which was proven the wrong lever (its pivot gate
+    // failed: a COMPRESSIVE ceiling's H3 is intrinsically ~180 deg from the
+    // clipper's, and no knee hardness flips that sign — handover §3t.2). The core
+    // is now the expansive-then-bounded rational map
+    //   T(w) = w*(1+c*w^2)/(1+(w/L)^2)^(3/2),  c = beta + 1.5/L^2
+    // whose small-signal series is EXACTLY w + beta*w^3 + O(w^5). beta is thus the
+    // cubic coefficient DIRECTLY: beta > 0 gives EXPANSIVE H3 (in-phase with the
+    // clipper), which the phase-aware measurement (§3t.5) showed the real JFET has;
+    // beta = 0 is cubic-neutral; beta < 0 recovers a compressive shape (the old
+    // ceiling's regime, kept only as an A/B). Shared by both sides (asymmetry is an
+    // H2 lever on jfetCeilPos/Neg, not an H3 one). The antiderivative is elementary
+    // for ANY beta, L (unlike jfetCeilK's k != 2 case), so the closed-form 1st-order
+    // ADAA is preserved unconditionally. Provably monotone for beta >= 0 (see
+    // JfetStage.h), which is the only regime this branch uses; still scanned
+    // numerically in fit_nonlinear.py + JfetStageTest per the standing bound-verify
+    // rule. Nominal 0.0 is a PLACEHOLDER — this is the session-15 primary fit target.
+    double jfetExpandBeta = 0.0;
 
     // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
     // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at

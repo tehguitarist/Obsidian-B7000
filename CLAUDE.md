@@ -104,6 +104,89 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
+> **CURRENT (session 15, 2026-07-23): branch B LANDED, its §3j gate CONFIRMED, dsp-validator PASS on
+> both the new JFET core AND the deferred clipK — THE JFET H3 PHASE PROBLEM (sessions 12-14) IS
+> FIXED. Full joint fit STOPPED per protocol — a SEPARATE, pre-existing clipper-level issue blocks
+> acceptance. NOTHING committed to git; branch is OPEN and needs the user for the next lever.**
+> `jfetExpandBeta` — the new odd core `T(w)=w(1+c·w²)/(1+(w/L)²)^1.5`, `c=beta+1.5/L²`, small-signal
+> `w+beta·w³+O(w^5)` (beta IS the cubic coefficient), bounded `±(beta·L³+1.5·L)`, **provably monotone
+> for beta≥0 with NO parameter coupling** (a first for this file — every prior reshape needed a
+> numeric-only scan; sympy-verified: `T'(w)=L³(L²+w²(3L²beta+2.5))/(...)`, sum of positive terms),
+> elementary ADAA for ANY (beta,L). Replaces `jfetCeilK` entirely (that hardness knob is gone —
+> proven the wrong lever). Fully plumbed: `JfetStage.h`/`FitParams.h`/`PedalChain.h`/
+> `offline_render.cpp`/`JfetStageTest.cpp`, new gate `analysis/expandbeta_gate.py`. **ctest 16/16**
+> (incl. `OSValidationTest` — session 14's anomaly does NOT recur at nominal beta=0.0).
+> **The §3j gate CONFIRMED, cleanly inverting session 14's failure:** full-chain drive-min H3−H2
+> rises MONOTONICALLY −57.3→−6.1 dB as beta sweeps 0→16 (crosses the capture's −23.2 at beta≈1.8, no
+> interior null at ANY drive setting), and the isolated JFET-core H3 flips from ~180° ANTI-phase to
+> IN-phase with the clipper (110 Hz 177°→2°, 1 kHz 171°→42°) — exactly the sign flip session 14
+> proved a compressive shape could never produce. **dsp-validator (Opus, high) PASSED both shapes**
+> (every closed-form claim sympy-verified exact, including re-auditing the even-bump's `2.598` bound
+> for a repeat of the wrong-extremum bug — none found) and cleared clipK's session-11/12
+> still-deferred sign-off in the same sitting.
+> **Three fit attempts, all REJECTED at acceptance — but NOT because of the JFET.** (1) beta-only
+> (clipK held at 2.0): beta=1.42 (expansive ✓), drive-min ψ3 err 14.2° (was ~160° off pre-branch-B),
+> clipA0=20.1 (inside 20-30), no bound-resting param — but noon H3−H2 landed 6.7 dB short (the
+> persistent session-10/11 "noon-specific" shortfall, previously untestable because the anti-phase
+> JFET masked it). (2) A targeted probe confirmed clipK's discriminating signature RETURNS now that
+> the JFET is in-phase (softening clipK unmasks noon, unlike session 12) — added it to the fit: noon
+> error dropped to 3.6 dB and ψ3 err to 8.6°, but landed in a DEGENERATE corner (clipK pinned at its
+> floor, clipSat collapsed to 1.58 V vs the ~7 V rail, `2·a·ceilNeg`=12.7, gm-scan not flat) —
+> REJECTED. (3) Physically-constrained clipper bounds (clipSat≥1.5 V/side, clipK≥1.2): the optimiser
+> just found a DIFFERENT unphysical knob (clipA0 dropped to 8.2, outside circuit.md's 20-30) to fake
+> the same thing — REJECTED, noon still 4.6 dB short.
+> **Localised (two diagnostic grids, not fits): the residual gap is a SEPARATE, pre-existing problem
+> — NOT branch B.** At a FULLY physical clipper (A0 20-30, sat 3.15/3.85 V, clipK 1.0-2.0) noon
+> caps out ~9-10 dB short REGARDLESS of clipper shape; sweeping `jfetGm` across its
+> ALREADY-ESTABLISHED 0.09-0.15 mS band closes 2:30/max (max −3.2→+15.9 dB) but noon stays stuck at
+> −18…−21 dB REGARDLESS of gm — a drive-POSITION-specific signature, not a uniform level error, so a
+> NON-uniform level change (the DRIVE taper SHAPE) is the remaining lever. **KEY INSIGHT: VR3 is a
+> C-TAPER (reverse-log) but `DriveStage.h` models it as a single POWER LAW `R=100k·(1-x)^2.5` — a
+> C-taper is NOT a power law, and session 11 only ever pinned p=2.5 to a 2-POINT level match.** A
+> new probe `analysis/drive_taper_shape.py` measured the real gain-vs-knob from the ladders: it has
+> a BLEED confound at low/mid drive (base-OD fundamental carries the drive-independent clean bleed),
+> but the ONE bleed-free step (2:30→max) shows the real pedal gains **+2.4 dB more at the top** than
+> `(1-x)^2.5` — real evidence the taper shape is wrong. **NEXT (session 16), IN ORDER: (1) a
+> BLEED-AWARE drive-taper measurement (subtract the drive-independent bleed) to get the clean shape
+> at noon; (2) replace `(1-x)^p` with a proper C-taper curve in `DriveStage.h`; (3) re-run THIS
+> session's branch-B fit (JFET core DONE — keep beta/jfetSat*/jfetCeil* + the phase-aware ψ3
+> objective; only the clipper-input side changes). Do NOT re-attempt a joint clipK+clipSat+clipA0
+> fit first — it re-finds the degenerate "lower the ceiling" trick. If a correct C-taper still
+> doesn't close noon, look at the clipper INPUT coupling (GRUNT + R16).** Full detail: handover
+> "SESSION 15" §3u.6. HELD: jfetGm 0.10 mS (0.09-0.15 band), levelTaperExp 2.25 — driveTaperExp is
+> now ACTIVE, no longer held.
+> ── prior session ──
+> **CURRENT (session 14, 2026-07-23): the §3s ceiling-hardness reshape was IMPLEMENTED and its
+> pre-registered §3j pivot gate FAILED — STOPPED per protocol. NO fit, NOTHING committed. Branch is
+> OPEN and needs the user.** `jfetCeilK` algebraic-sigmoid ceiling `T(w)=w/(1+|w/L|^k)^(1/k)` (k=2
+> anchor, exact ADAA `F_T=L·√(L²+w²)−L²`, midpoint-ADAA fallback for k≠2) is fully implemented in
+> the WORKING TREE, uncommitted: `JfetStage.h` + `FitParams.h`/`PedalChain.h`/`offline_render.cpp`
+> plumbing + `JfetStageTest.cpp`/`fit_nonlinear.py::min_slope` monotonicity updated for the power-law
+> tail. **ctest 15/16** — the 1 fail is `OSValidationTest`'s 4×-vs-2× aliasing diff-gate at amp 0.2
+> (the KNOWN clipper/decimator narrow-band anomaly relocated onto the probe amp by the shape change,
+> at PLACEHOLDER nominal ceiling; 8× floor −40.5 clean, oversampling+delay-comp both pass — deferred
+> to post-fit, NOT masked). **The pivot verdict** (`analysis/fit_logs/step5_ceilk_pivot.log`): as k
+> rises, drive-min AND drive-noon H3−H2 fall the SAME direction through an anti-phase null, at BOTH
+> the session-11 point and a proper-clipper point — hardness cannot make the capture's ramp
+> (−23.2/−21.0/−10.6/+1.3/+1.0); the model is FLAT across min/9:30/noon at every k. **Diagnosis: an
+> H3 PHASE/SIGN problem, not magnitude — the JFET's drive-min H3 must be IN-PHASE with the clipper's
+> (they're anti-phase now). I first blamed the ~320/717 Hz notches, but `analysis/notch_scope.py`
+> FALSIFIED that: in the ASSEMBLED/loaded chain both notches are only ≤2.6 dB (not the isolated
+> −28 dB), too shallow to explain ~180° — so the anti-phase H3 is very likely REAL nonlinear
+> structure and the leading fix is the JFET odd-term IN-PHASE H3 (branch B), NOT resolving the
+> notch.** **▶ USER chose verify-then-B; VERIFICATION DONE (handover §3t.5): the anti-phase
+> reproduces (ceil↔clip 178.8/166.0/178.7° at 110/220/1000), the CAPTURE matches the CLIPPER not the
+> ceiling (1 kHz conclusive, cap↔clip 8°), and it is NOT a polarity bug (a global inversion cannot
+> change a RELATIVE phase; per-stage fundamentals DC-step-verified). => the REAL JFET H3 is
+> EXPANSIVE-signed (in-phase with the clipper); no compressive ceiling or hardness makes it.**
+> **NEXT (session 15) = branch B: design an expansive-near-origin-then-BOUNDED odd JFET term (reuse
+> jfetCeilK's sigmoid for the loud-input bound), §3j complex gate BEFORE fitting, phase-aware ψ3/ψ2
+> fit, dsp-validator, accept, master taper + makeup, commit. KEY SIMPLIFIER: DRIVE is downstream of
+> the JFET so the J201 sees a FIXED level — it only needs the right H3 at ONE operating point
+> (H3−H2=−23.2, the drive-min capture). §3t.6 has the full plan.** Probes:
+> `analysis/phase_harmonics.py`, `analysis/scratch_ceilk_clipk_probe.py`, `analysis/notch_scope.py`.
+> HELD unchanged: driveTaperExp 2.5, jfetGm 0.10 mS, levelTaperExp 2.25.
+> ── prior session ──
 > **CURRENT (session 13, 2026-07-23): the two §3o measurements are IN — result LEANS STATIC.
 > Analysis-only (no DSP code, no new captures). New tools `analysis/phase_harmonics.py`,
 > `analysis/static_vs_dynamic.py`; logs `analysis/fit_logs/step5_phase_harmonics.log`,

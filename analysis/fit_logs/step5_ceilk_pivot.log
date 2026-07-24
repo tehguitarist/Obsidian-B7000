@@ -1,0 +1,22 @@
+Capture targets (tone_220, H3-H2 dB):
+  min      -23.2
+  9:30     -21.0
+  noon     -10.6
+  2:30       1.3
+  max        1.0
+
+Full-chain H3-H2 (dB) vs jfetCeilK — HELD as in the fit; point:
+  jfetSatPos=0.246, jfetSatNeg=2.61, jfetCeilPos=0.487, jfetCeilNeg=0.274, clipA0=25, clipSatLo=3.15, clipSatHi=3.85
+      k |    min |   9:30 |   noon |   2:30 |    max
+   1.00 |   -7.4 |   -7.4 |   -7.4 |   -7.6 |   -8.2
+   1.50 |  -11.0 |  -11.0 |  -11.0 |  -11.6 |  -13.8
+   2.00 |  -15.2 |  -15.2 |  -15.3 |  -16.6 |  -22.4
+   3.00 |  -24.5 |  -24.6 |  -25.0 |  -31.0 |  -18.4
+   4.00 |  -34.2 |  -34.4 |  -35.9 |  -33.4 |  -15.3
+   6.00 |  -54.0 |  -56.7 |  -53.2 |  -28.3 |  -14.1
+   8.00 |  -81.6 |  -64.6 |  -48.0 |  -27.9 |  -14.0
+
+Pre-registered signature (capture: min -23.2, noon -10.6):
+  min  falls as k rises : +74.3 dB  (want > 0, toward -23.2)
+  noon rises as k rises : -40.6 dB  (want > 0, toward -10.6)
+  SIGNATURE ** NOT CONFIRMED — STOP, wrong lever **

@@ -32,14 +32,16 @@
 //            four things the ceiling has to be right about, by exercising the
 //            SHIPPED map (waveshape/waveshapeAD are public for exactly this — a
 //            replica of a piecewise map in a test only tests the replica):
-//            (a) BOUNDED and asymmetric — g -> +cp + a*s^2/2 and -cn + a*s^2/2, so
-//                a 100x hotter drive barely raises the output. This is the whole
-//                point: before it, the J201 fed the CD4049 37.9 V at 0 dBFS.
+//            (a) BOUNDED and asymmetric — g -> +(beta*cp^3+1.5*cp) + a*s^2/2 and the
+//                mirror on the cutoff side, so a 100x hotter drive barely raises the
+//                output. This is the whole point: before it, the J201 fed the CD4049
+//                37.9 V at 0 dBFS. (Asymptote is c*L^3, NOT +-L — the session-15
+//                rational core, see JfetStage.h coreLimit().)
 //            (b) MONOTONE — no NEGATIVE slope anywhere. Note slope -> 0 in the far
 //                tail is CORRECT (that is saturation/cutoff), so the assert is
-//                slope >= 0, not > 0. With a finite ceiling the closed-form
-//                |a|*s bound is necessary but NOT sufficient (it couples s, a and
-//                cn), which is why this is a numeric scan of the real map.
+//                slope >= 0, not > 0. The core is provably monotone for beta >= 0
+//                (JfetStage.h), the bump has its own |a|*s < 2.598 bound; this is a
+//                numeric scan of the summed real map per the standing verify rule.
 //            (c) F' == g — the ADAA antiderivative, now piecewise, still integrates
 //                the shipped shape. A wrong branch here is silent: it would only
 //                show up as excess aliasing at low OS.
@@ -333,25 +335,38 @@ int main()
     {
         const double s = JfetStage::kSatPos, a = JfetStage::kSatNeg;
         const double cp = JfetStage::kCeilPos, cn = JfetStage::kCeilNeg;
-        // Asymptotes: the even bump saturates at a*s^2/2 on BOTH sides (a DC offset —
-        // rectification), so the swing is bounded by the two ceilings about it.
+        const double beta = JfetStage::kExpandBeta;
+        // Asymptotes: the expansive-then-bounded core (session-15 branch B) saturates
+        // to c*L^3 = beta*L^3 + 1.5*L per side (verified via sympy.limit — NOT +-L any
+        // more; the rational shape's ceiling scale is 1.5*L at beta=0). The even bump
+        // saturates at a*s^2/2 on BOTH sides (a DC offset — rectification), so the swing
+        // is bounded by the two core asymptotes about that bump offset.
         const double bump = 0.5 * a * s * s;
-        const double gTop = cp + bump, gBot = -cn + bump;
+        auto coreAsym = [beta](double L) { return beta * L * L * L + 1.5 * L; };
+        const double gTop = coreAsym(cp) + bump, gBot = -coreAsym(cn) + bump;
 
         JfetStage stage;
         stage.prepare(48000.0);
 
-        // (a) BOUNDED + asymmetric. 60*max(cp,cn), not 60*cp — a later fit may well
-        // produce cn >> cp, and scanning only to 60*cp would then never reach negative
-        // saturation and would fail for the wrong reason.
-        const double wSat = 60.0 * std::max(cp, cn);
+        // (a) BOUNDED + asymmetric. ** The rational core approaches its asymptote c*L^3
+        // as a POWER LAW: T(w) - c*L^3 ~ -L^3*(1.25 + 1.5*beta*L^2)/w^2 (approach from
+        // BELOW for beta >= 0, so the map NEVER exceeds the asymptote), still measurably
+        // short at moderate w. Scan far enough (2000*max) that the shortfall (~1e-7 at
+        // the nominal params) is well under the tolerance, and assert the map never
+        // EXCEEDS the asymptote (a hard bound) and gets within tolerance of it. **
+        // max(cp,cn) not cp — a later fit may produce cn >> cp, and scanning only to a
+        // cp-multiple would never reach negative saturation and fail for the wrong reason.
+        const double wBound = 2000.0 * std::max(cp, cn);
         double lo = 1.0e9, hi = -1.0e9;
-        for (double w = -wSat; w <= wSat; w += 1.0e-3)
+        for (double w = -wBound; w <= wBound; w += 2.0e-2)
         {
             lo = std::min(lo, stage.waveshape(w));
             hi = std::max(hi, stage.waveshape(w));
         }
-        const bool bounded = std::abs(hi - gTop) < 1.0e-6 && std::abs(lo - gBot) < 1.0e-6;
+        // Never exceeds the asymptote (the sigmoid is < L strictly, the bump <= its
+        // asymptote), and converges to it within the power-law shortfall at wBound.
+        const bool bounded = hi <= gTop + 1.0e-9 && lo >= gBot - 1.0e-9
+                             && (gTop - hi) < 1.0e-4 && (lo - gBot) < 1.0e-4;
         // Asymmetric about the bump offset: the two ceilings must genuinely differ,
         // which is the "clips toward the rail one way, toward cutoff the other" claim.
         const bool asym = std::abs((hi - bump) - (bump - lo)) > 0.01 * cp;
@@ -364,10 +379,13 @@ int main()
         // (Before the ceiling the J201 handed the CD4049 37.9 V at 0 dBFS/1 kHz, and
         // the DriveStage 546 V against a +-3.3 V TL072 rail.) Measured against what
         // the UNBOUNDED core would have done over the same span, so the assert scales
-        // with the params instead of hardcoding a tolerance.
+        // with the params instead of hardcoding a tolerance. ** Tolerance 5e-3, looser
+        // than the old tanh ceiling's 1e-3: the rational core has a SOFTER knee (it
+        // approaches its asymptote ~1/w^2, not exp), so g(2*cp) is not yet fully
+        // saturated and (y2-y1) is a larger — but still ~0.1% of unbounded — fraction. **
         const double y1 = stage.waveshape(2.0 * cp), y2 = stage.waveshape(200.0 * cp);
         const double unbounded = 198.0 * cp; // the old g(w) -> w
-        const bool saturates = (y2 - y1) < 1.0e-3 * unbounded;
+        const bool saturates = (y2 - y1) < 5.0e-3 * unbounded;
         std::printf("  g(2*cp) %+.4f -> g(200*cp) %+.4f  (100x drive: %+.4f, vs %+.1f "
                     "unbounded = %.2f%%): %s\n",
                     y1, y2, y2 - y1, unbounded, 100.0 * (y2 - y1) / unbounded,
@@ -377,9 +395,16 @@ int main()
 
         // (b) MONOTONE at the shipped params. Slope -> 0 in the tail is CORRECT
         // (saturation), so assert never-NEGATIVE, with a tolerance for the difference
-        // quotient's own roundoff. The closed-form |a|*s bound is NOT sufficient once
-        // the ceiling is finite — it couples s, a and cn (roughly cn >~ s), so this
-        // has to be a numeric scan. Nominal is chosen INSIDE that region (cn/s = 1.67).
+        // quotient's own roundoff. ** The rational core is PROVABLY monotone for any
+        // beta >= 0 (T'(w) = L^3*(L^2 + w^2*(3*L^2*beta+2.5))/(...) has a strictly
+        // positive numerator — a sum of two positive terms — for beta >= 0; see
+        // JfetStage.h). So unlike the session-14 sigmoid there is NO s/a/L/beta coupling
+        // for the CORE to track; the only fold-back risk is the even bump's own
+        // |a|*s < 2.598, which is a SEPARATE closed bound. This numeric scan still runs
+        // per the standing rule (verify, don't trust the derivation) and covers the sum
+        // g' = T' + bump'. ** The bump slope decays exponentially, so beyond ~10*s only
+        // T' > 0 remains. Scan a generous multiple of max(s,cp,cn) to cover the knee.
+        const double wSat = 60.0 * std::max(s, std::max(cp, cn));
         const double worst = minSlope(stage, wSat);
         const bool mono = worst > -1.0e-9;
         std::printf("  min slope %+.3e over |w| <= %.0f (>= 0 == no fold-back; cn/s = %.2f): %s\n",
@@ -387,8 +412,10 @@ int main()
         if (! mono)
             ++failures;
 
-        // (c) F' == g for the now-PIECEWISE antiderivative (ADAA correctness). The
-        // floor is the central difference's own roundoff, ~eps*|F|/h, not h^2.
+        // (c) F' == g for the piecewise antiderivative (ADAA correctness). The core's
+        // antiderivative is now elementary for ANY beta,L (session-15), so this must be
+        // exact everywhere, not just at a special value. The floor is the central
+        // difference's own roundoff, ~eps*|F|/h, not h^2.
         double worstF = 0.0, atW = 0.0;
         const double h = 1.0e-6;
         for (double w = -20.0; w <= 20.0; w += 1.0e-3)
@@ -403,7 +430,7 @@ int main()
         if (! adOk)
             ++failures;
 
-        // Finite everywhere, including absurd drive (cosh/tanh must not produce NaN).
+        // Finite everywhere, including absurd drive (the sqrt/tanh must not produce NaN).
         bool finite = true;
         for (const double w : { 1.0e3, 1.0e12, -1.0e12 })
             finite = finite && std::isfinite(stage.waveshape(w)) && std::isfinite(stage.waveshapeAD(w));

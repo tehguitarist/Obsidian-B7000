@@ -1,0 +1,59 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:288: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+Capture targets (tone_220): harmonic-to-harmonic ratios (dB) are the objective;
+H2 re-fund shown for reference only (NOT fit — it is bleed-contaminated).
+  drive    H3-H2   H4-H2   H5-H2    (H2reF)
+  min      -23.2   -33.9   -50.4      -36.0
+  9:30     -21.0   -37.2   -49.1      -34.4
+  noon     -10.6   -19.7   -25.4      -31.4
+  2:30       1.3    -6.5    -0.8      -31.9
+  max        1.0    -5.8     1.2      -30.0
+Phase target: drive-min ψ3 @ 1000 Hz = -132.9 deg (weight 0.05/deg^2; 220/440 down-weighted to 0 — bridged-T notch)
+
+Nominal cost = 1925.3
+  start [0.3, 1.7, 1.4, 0.5, 1.4, 20.1, 1.5, 1.8, 2.0] -> cost 181.0
+  start [0.3, 1.8, 1.4, 0.5, 1.5, 25, 3.3, 3.7, 1.3] -> cost 168.9
+  start [0.3, 2.5, 1.0, 0.5, 1.6, 22, 2.5, 3.0, 1.5] -> cost 69.5
+
+Best cost = 69.5  (nominal 1925.3)
+Fitted params:
+  jfetSatPos        0.71191   (nominal 0.3)
+  jfetSatNeg         8.1854   (nominal 4)
+  jfetCeilPos        3.3458   (nominal 1)
+  jfetCeilNeg       0.77629   (nominal 0.5)
+  jfetExpandBeta       5.1989   (nominal 1.8)
+  clipA0             28.615   (nominal 25)
+  clipSatLo         0.80388   (nominal 3.15)
+  clipSatHi         0.77607   (nominal 3.85)
+  clipK              1.0064   (nominal 1.5)
+  held: jfetGm=0.0001, jfetRo=200000, jfetRq2=1e+06, levelTaperExp=2.25, driveTaperExp=2.5
+
+Acceptance checks (phase7-calibration-handover.md, step 4):
+  |a|*s          = 5.8273   (monotonicity coupling; a fitted a should be single-digit)
+  min slope      = +2.576e-05   (>= 0; a fold-back is infeasible)
+  clipA0         = 28.615   (circuit.md says 20-30)
+  clipSatLo+Hi   = 1.580 V   (R19-dropped rail ~7 V)
+  2*a*ceilNeg    = 12.709   (square law says ~1.0 — NOT constrained in the fit, so this is a real check)
+  ceilNeg / s    = 1.09   (monotonicity needs >~ 1; resting AT 1 means the ceiling is on a constraint)
+  jfetExpandBeta = 5.199   (EXPANSIVE cubic; must be > 0 — a <= 0 is the compressive regime the gate rejects)
+  ψ3 @ 1000Hz    = model -141.5 vs capture -132.9 deg (|err| 8.6; small = JFET H3 in-phase, the branch-B claim)
+  held jfetGm    = 0.100 mS   (step-2 re-anchor; --gm-scan checks ratio sensitivity, band 0.09-0.15)
+  ** clipK is RESTING ON ITS BOUND (1.00645 in [1, 4]) — the optimum is outside the box, so this value is a property of the box, not the pedal. **
+
+FITTED plug vs capture (tone_220): harmonic-to-harmonic ratios c/p (the objective),
+plus H2 re-fund c/p for reference (NOT fit — bleed-contaminated).
+drive  |     H3-H2 c/p |     H4-H2 c/p |     H5-H2 c/p |   (H2reF) c/p
+min    | -23.2/-20.9 | -33.9/-34.9 | -50.4/-51.1 | -36.0/-31.3
+9:30   | -21.0/-19.6 | -37.2/-30.0 | -49.1/-46.3 | -34.4/-27.2
+noon   | -10.6/-14.2 | -19.7/-19.1 | -25.4/-29.3 | -31.4/-23.5
+2:30   |   1.3/ -0.0 |  -6.5/ -7.2 |  -0.8/ -1.4 | -31.9/-26.1
+max    |   1.0/  3.8 |  -5.8/ -6.1 |   1.2/  4.1 | -30.0/-27.3
+
+Step-4 gm-sensitivity of the fitted point (should be ~flat):
+
+gm sensitivity of the fitted point (ratios should be ~flat vs gm):
+   gm(mS) |    cost | min H3-H2/H4-H2 | 9:30 H3-H2/H4-H2 | noon H3-H2/H4-H2 | 2:30 H3-H2/H4-H2 | max H3-H2/H4-H2
+    0.090 |    78.1 | -20.9/-35.5 | -19.8/-30.8 | -15.2/-20.5 |  -1.0/ -7.6 |  +3.1/ -6.2
+    0.120 |   102.0 | -20.8/-33.9 | -19.2/-28.3 | -12.2/-16.7 |  +1.5/ -6.7 |  +5.0/ -6.0
+    0.150 |   222.8 | -20.7/-32.5 | -18.4/-26.2 |  -9.4/-14.0 |  +3.2/ -6.4 |  +6.6/ -5.8
+EXIT=0

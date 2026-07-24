@@ -176,6 +176,66 @@ public:
     static constexpr double kCeilNeg = 0.5;  // V-equiv (x gm -> A), cutoff side
     static constexpr double kCeilOff = 1.0e6; // >= this == "no ceiling" (exact bypass)
 
+    // ---- EXPANSIVE-THEN-BOUNDED core (session-15 branch B, 2026-07-23) -------
+    // SUPERSEDES the session-13/14 `jfetCeilK` hardness reshape, which was PROVEN
+    // the wrong lever: its pre-registered pivot gate failed robustly (handover §3t.2
+    // — hardness only rescales the ceiling's H3 magnitude, and the ceiling's H3 is
+    // structurally ANTI-PHASE to the clipper's, ~180 deg apart, so no k drove the
+    // capture's monotonic drive-min->noon H3-H2 ramp; it just walked both through a
+    // shared anti-phase null). A follow-up phase-aware measurement (§3t.5,
+    // analysis/phase_harmonics.py) then showed the anti-phase is GENUINE (not a
+    // notch confound, not a polarity bug — a global inversion cannot change a
+    // RELATIVE phase, and per-stage fundamentals are DC-step-verified): the capture
+    // matches the model's CLIPPER phase at the one conclusive tone (1 kHz, 8 deg
+    // apart) and opposes the ceiling (160 deg). **The real JFET's H3 is
+    // EXPANSIVE-signed** (in-phase with the clipper) — no compressive shape, however
+    // hard its knee, can produce that sign. This core replaces the compressive
+    // sigmoid with a shape whose small-signal cubic term has the OPPOSITE sign.
+    //
+    //     T(w) = w*(1 + c*w^2) / (1 + (w/L)^2)^(3/2),   c = beta + 3/(2*L^2)
+    //
+    // reparameterised so the small-signal series is EXACT or DESIGN, not incidental:
+    //     T(w) = w + beta*w^3 + O(w^5)                   (verified via sympy.series)
+    // `beta` (kExpandBeta / eBeta) is the expansive cubic coefficient directly —
+    // beta > 0 gives in-phase (expansive) H3 at the tone level; beta = 0 is neutral
+    // (cubic-free) though the shape still saturates via the 3/(2L^2) baseline; beta
+    // < 0 recovers a compressive shape (the OLD ceiling's regime, as a special case
+    // of the SAME family, useful as an A/B against session 14's finding). T is still
+    // BOUNDED for loud input: as w -> +-inf, T(w) -> +-(beta*L^3 + 1.5*L) (finite —
+    // verified via sympy.limit), i.e. L still sets the ceiling's SCALE (its old,
+    // pre-14 job) while beta ALSO now contributes to where the asymptote lands. Per
+    // side (Lp = kCeilPos load-line side, Ln = kCeilNeg cutoff side, unchanged
+    // meanings/values from the original 2026-07-22 ceiling), sharing ONE beta —
+    // asymmetry is an H2 (even) lever (session 14 §3t.4 "reject" note), so it stays
+    // on cPos/cNeg + the untouched even bump, not duplicated onto beta.
+    //
+    // ** WHY NOT literally reuse jfetCeilK's `w/(1+|w/L|^k)^(1/k)` sigmoid composed
+    // with an inner w+beta*w^3 pre-warp (i.e. T(w) = Sigmoid(w+beta*w^3))? ** Tried
+    // first, REJECTED: composing two nonlinear maps does not have an elementary
+    // antiderivative in general (confirmed: at k=2 the composed integral reduces to
+    // an elliptic-type integral of a degree-6 polynomial under a square root, not a
+    // closed form) — it would have broken the mandatory closed-form ADAA. The
+    // rational-function form above is NOT that composition; it is a single elementary
+    // map engineered so its OWN series matches w+beta*w^3 near 0 while its OWN tail
+    // saturates — same qualitative goal (expansive-then-bounded), different
+    // construction, one that keeps a real antiderivative (see coreLimitAD()).
+    //
+    // ** MONOTONICITY — proven analytically, not just scanned (a first for this file's
+    // reshapes; every prior shape here needed only a numeric scan because no closed
+    // bound existed). T'(w) = L^3*(L^2 + w^2*(3*L^2*beta + 2.5)) /
+    // (sqrt(L^2+w^2)*(L^2+w^2)^2). The denominator is always positive; the numerator's
+    // sign is that of L^2 + w^2*(3*L^2*beta+2.5). For beta >= 0 the bracket
+    // (3*L^2*beta+2.5) is >= 2.5 > 0, so the WHOLE bracket is a sum of two strictly
+    // positive terms for ANY w, L>0 — T'(w) > 0 EVERYWHERE, unconditionally. (For
+    // beta < -2.5/(3*L^2) the bracket can go negative at large |w| and the map folds
+    // back — verified numerically the threshold is exact to float precision — but
+    // beta must stay >= 0 for this branch's whole purpose, so that region is simply
+    // out of scope, not a constraint the fitter needs to track.) Still gated
+    // numerically in JfetStageTest AND fit_nonlinear.py per this file's standing
+    // rule (memory: derive bounds from the shape in the file, then verify — an
+    // analytic derivation has been wrong here before).
+    static constexpr double kExpandBeta = 0.0; // PLACEHOLDER — session-15 fit target
+
     // Thevenin/Norton output network handed to TrebleAttack, which stamps it into
     // its nodal matrix: Zout(s) = [ro + (Rp || Cp)] || Rq2, the exact ro*k(s)||Rq2.
     struct SourceZ
@@ -202,7 +262,7 @@ public:
     // hence the stored fs and the updateShelf() call. Calling this before
     // prepare() is fine; prepare() recomputes from the stored values.
     void setNonlinear(double Gm, double Ro, double Rq2, double satPos, double satNeg,
-                      double ceilPos, double ceilNeg) noexcept
+                      double ceilPos, double ceilNeg, double expandBeta = kExpandBeta) noexcept
     {
         gm = (Gm > 1.0e-9) ? Gm : 1.0e-9; // rp = ro*gm*R6 must stay non-degenerate
         ro = Ro;
@@ -216,6 +276,11 @@ public:
         // clamp rather than let a stray fit value produce inf/NaN in the chain.
         cPos = (ceilPos > 1.0e-6) ? ceilPos : 1.0e-6;
         cNeg = (ceilNeg > 1.0e-6) ? ceilNeg : 1.0e-6;
+        // Expansive-cubic strength (branch-B core, see kExpandBeta). No floor needed
+        // — beta=0 is a perfectly valid (neutral) value, and the shape is provably
+        // monotone for all beta >= 0 (see the class-level note), so there is no
+        // divide-by-zero or fold-back risk to guard against here.
+        eBeta = expandBeta;
         updateShelf();
     }
 
@@ -318,154 +383,124 @@ public:
     // s/a fitted against the sech form do not carry over either — but `a`'s meaning
     // (the square-law quadratic coefficient) is unchanged, and its asymptote halved.
     //
-    // ---- THE ASYMMETRIC DRAIN-CURRENT CEILING (added 2026-07-22) -------------
-    // The LINEAR term of the core is replaced by a per-side soft limit:
-    //     T(w)  = Lp*tanh(w/Lp)   w >= 0      (Lp = kCeilPos, load-line side)
-    //             Ln*tanh(w/Ln)   w <  0      (Ln = kCeilNeg, cutoff side)
+    // ---- THE ASYMMETRIC DRAIN-CURRENT CORE (added 2026-07-22; RESHAPED 2026-07-23,
+    // session 15, branch B — see kExpandBeta for the full derivation/rejected
+    // alternatives). The LINEAR term of the core is replaced by a per-side
+    // EXPANSIVE-THEN-BOUNDED rational map (NOT a compressive sigmoid — that family
+    // was proven the wrong lever by the session-14 pivot gate):
+    //     T(w)  = w*(1 + c*w^2) / (1 + (w/Lp)^2)^(3/2),  c = beta + 3/(2*Lp^2)   w >= 0
+    //             w*(1 + c*w^2) / (1 + (w/Ln)^2)^(3/2),  c = beta + 3/(2*Ln^2)   w <  0
     //     g(w)  = T(w) + (a*s^2/2)*tanh^2(w/s)
-    // so the whole map is now BOUNDED: g -> +Lp + a*s^2/2 and -Ln + a*s^2/2. (The
-    // even bump's own asymptote is the SAME constant on both sides, i.e. a
-    // saturating DC offset — rectification — so the peak-to-peak AC swing is
-    // bounded by gm*(Lp+Ln), which is the physical statement wanted.)
+    // Lp = kCeilPos (load-line side), Ln = kCeilNeg (cutoff side) — same names/values/
+    // physical meanings as the original 2026-07-22 ceiling (see their doc comments
+    // above); only the SHAPE bolted onto them changed. The even bump is UNCHANGED —
+    // only the core's limiter shape changed (again).
     //
-    // ** THE EVEN BUMP CHANGED SHAPE WITH THIS COMMIT: a*s^2*(1-sech(w/s)) ->
-    // (a*s^2/2)*tanh^2(w/s). Both forms are exactly even with the same leading term
-    // a*w^2/2 (so `a` keeps its meaning and the bump still adds no odd content),
-    // but their TAILS decay at different rates, and the tail is what decides
-    // monotonicity once a ceiling is present:
-    //     ceiling slope  sech^2(w/L)          ~ 4*exp(-2|w|/L)
-    //     old bump slope a*s*sech*tanh (w/s)  ~ 2*a*s*exp(-|w|/s)   <- 2x SLOWER
-    //     new bump slope a*s*tanh*sech^2(w/s) ~ 4*a*s*exp(-2|w|/s)  <- MATCHED RATE
-    // With the OLD bump the ceiling's slope dies off faster than the bump's, so deep
-    // in cutoff the bump always wins eventually and g FOLDS BACK unless Ln > 2s.
-    // With the matched rate that relaxes to **Ln > s** — a 2x wider feasible region,
-    // which is the honest size of the win. It is NOT "makes a ceiling possible at
-    // all": both regions have plenty of interior, and both have zero margin ON their
-    // own boundary, where the min slope decays to zero (measured: new shape at
-    // Ln/s = 1.0 gives +5e-174, old shape at Ln/2s = 1.0 the same). So a fit that
-    // parks at Ln ~= s is still resting on a constraint and must be read that way.
-    // At exactly Ln = s the slope FACTORISES on the negative side, which pins the
-    // condition down without any asymptotics (x = |w|/s, w < 0):
-    //     g'(w) = sech^2(x) * (1 - a*s*tanh(x))   ->   feasible iff **|a|*s < 1**
-    // (NOT the (4 - 2*a*s) => |a|*s < 2 first written here; dsp-validator caught it,
-    // counterexample on the shipped map: s=0.3, a=5.0, cn=0.3 gives min slope
-    // -0.0765.) That is much tighter than the ceiling-OFF bound of 2.598 below, and
-    // it is why the gate must be numeric.
-    // Measured at the nominal set (s=0.3, a=1, cp=1, cn=0.5): min slope +0.0013 over
-    // |w| <= 2 and +2.4e-104 globally (i.e. saturating, not folding). The old bump at
-    // the same nominal gives -3e-6 — marginally infeasible. **
+    // ** WHY THIS RESHAPE (handover §3t, session 14-15). ** Session 14 gave the
+    // ceiling a hardness knob `k` (T(w)=w/(1+|w/L|^k)^(1/k)) and its own pre-registered
+    // pivot gate FAILED: as k rose, drive-min AND drive-noon H3-H2 fell the SAME
+    // direction (through an anti-phase null) instead of separating — hardness only
+    // rescales the ceiling's H3 magnitude, and a COMPRESSIVE shape's H3 is
+    // intrinsically ~180 deg from the clipper's H3 at the chain's output, so no k
+    // could flip it in-phase. A follow-up phase-aware measurement (§3t.5) confirmed
+    // this is genuine (not a notch confound, not a polarity bug): the real JFET's H3
+    // is EXPANSIVE-signed. This core's cubic term is +beta (not the old shape's
+    // implicit -something), so the SIGN itself is now a first-class fit lever.
     //
-    // WHY, and why this shape specifically (phase7-calibration-handover.md,
-    // "STEP 2 RE-FIT"): the capture's H2 grows only +6 dB across the drive sweep
-    // while the unbounded model's grew +21.9 dB — the real drain saturates and the
-    // model did not. The step-2 fitter, having no ceiling to reach for, drove
-    // |a|*s into the 2.0 monotonicity gate (1.9997) trying to bend the even term
-    // over, and pushed clipA0 to its floor to weaken everything downstream. So the
-    // ceiling has to be its OWN structure, and it must be inert at low drive:
-    //   * T(0) = 0 and T'(0) = 1 EXACTLY on both sides, so gm remains the
-    //     small-signal transconductance and the linear oracle is untouched.
-    //   * T is C2 at the seam (T'' = 0 from both sides; the branches first differ
-    //     in T''' = -2/L^2), so the piecewise join makes no spurious harmonics.
-    //   * With Lp,Ln >= kCeilOff it reduces EXACTLY to the previous g(w) = w + ...
-    // Below the knee T(w) ~ w - w^3/(3L^2), so the ceiling's own H3 goes as
-    // (A/L)^2 while the core's H2 goes as a*A: H2/H3 ~ 3*a*L^2/A. The core's
-    // intrinsic H3 is still EXACTLY zero — all H3 here now comes from the ceiling,
-    // by construction, and vanishes as the ceiling is raised. That is deliberate:
-    // H3 currently tracks the capture to ~1.4 dB and must not be disturbed at low
-    // drive, and a bounded map cannot have an exactly-linear odd part (bounding
-    // IS an odd-order operation), so the only safe place to put it is a knee the
-    // fit can push out of the way.
-    // ** Do NOT get the bound by raising |a|*s instead — that breaks monotonicity
-    // (see the gate below; the applicable limit depends on the ceiling and is as
-    // tight as |a|*s < 1 when Ln = s) and re-introduces H3 everywhere, not just
-    // above a knee. **
+    // WHY it stays inert at low drive and preserves the structure the reshape depends on:
+    //   * T(0) = 0 and T'(0) = 1 EXACTLY on both sides (independent of beta and L), so
+    //     gm remains the small-signal transconductance and the linear oracle/FR/corner
+    //     tests are UNTOUCHED.
+    //   * T is C1 at the seam (T'(0+) = T'(0-) = 1 for any Lp, Ln, beta), so the
+    //     piecewise join makes no spurious first-order harmonic.
+    //   * With Lp,Ln >= kCeilOff it reduces EXACTLY to g(w) = w + bump (beta is
+    //     ignored in the bypass branch — see coreLimit()).
+    // Near the origin T(w) = w + beta*w^3 + O(w^5) BY CONSTRUCTION (beta is not an
+    // incidental coefficient of some other shape parameter, it IS the cubic term) —
+    // beta > 0 is what makes drive-min H3 rise in-phase with the clipper.
     //
-    // ** MONOTONICITY — READ THIS, THE BOUND MOVED AND IT IS A TRAP **
-    //     g'(w) = sech^2(w/L) + a*s*tanh(w/s)*sech^2(w/s),    L = Lp or Ln
-    // With the ceilings OFF (sech^2(w/L) == 1) the bound is set by
-    // max|tanh*sech^2| = 2/(3*sqrt(3)) = 0.38490, i.e. **|a|*s < 3*sqrt(3)/2 =
-    // 2.598** for the NEW bump — where the OLD (sech) bump's bound was |a|*s < 2
-    // from max|sech*tanh| = 1/2.
-    // ** So 2.598 is now CORRECT here, and it is the same numeral that was WRONG
-    // in this file until 2026-07-22 (it was 1/max(sech^2*tanh), quoted against a
-    // shape whose extremum was max(sech*tanh) = 1/2). Do not "fix" it back to 2,
-    // and do not carry the old 2.0 forward: check which bump shape is in the file
-    // before trusting either number. Both are now derived above from their own
-    // extremum so the derivation, not the numeral, is the source of truth. **
-    // With a FINITE ceiling neither closed-form bound is sufficient — the
-    // condition couples s, a and L (the tail argument above adds L >~ s). A fitter
-    // must scan g'(w) NUMERICALLY: fit_nonlinear.py does, and JfetStageTest
-    // finite-differences the shipped map rather than a replica.
+    // ** MONOTONICITY — proven analytically for the region this branch actually
+    // needs (beta >= 0), then still gated numerically per this file's standing rule. **
+    //     T'(w) = L^3*(L^2 + w^2*(3*L^2*beta + 2.5)) / (sqrt(L^2+w^2)*(L^2+w^2)^2)
+    // Denominator always > 0. Numerator's sign = sign of L^2 + w^2*(3*L^2*beta+2.5).
+    // For beta >= 0, (3*L^2*beta+2.5) >= 2.5 > 0, so the bracket is a SUM OF TWO
+    // STRICTLY POSITIVE TERMS for every w, L>0 — T'(w) > 0 unconditionally, no
+    // coupling with s/a/L to track (unlike every prior reshape in this file — the
+    // even bump's OWN bound, |a|*s < 2.598, is unaffected and still applies
+    // separately). The fold-back region only exists for beta < -2.5/(3*L^2), i.e.
+    // strictly outside this branch's beta >= 0 regime. Still scanned numerically in
+    // JfetStageTest AND fit_nonlinear.py (memory: verify-extremum-derived-bounds —
+    // an analytic derivation has been wrong here before; this one was additionally
+    // checked against a numeric finite-difference sweep before being trusted, see
+    // session-15 log).
     inline double waveshape(double w) const noexcept
     {
         const double th = std::tanh(w / sPos);
         return coreLimit(w) + 0.5 * sNeg * sPos * sPos * th * th;
     }
 
-    // Per-side soft ceiling on the linear core (see waveshape()).
+    // Per-side expansive-then-bounded core (see waveshape() and the class-level note
+    // above kExpandBeta for the full derivation). T(w) = w*(1+c*w^2)/(1+(w/L)^2)^1.5,
+    // c = beta + 1.5/L^2, reparameterised so the small-signal series is EXACTLY
+    // w + beta*w^3 + O(w^5). T(0)=0, T'(0)=1 exactly, and (per side) odd in w — so the
+    // even bump keeps its exact-zero-H3 property. Computed via s = sqrt(1+(w/L)^2) and
+    // s^3 rather than std::pow(x, 1.5) (cheaper, and avoids a general fractional-power
+    // codepath for a fixed exponent).
     inline double coreLimit(double w) const noexcept
     {
         const double L = (w >= 0.0) ? cPos : cNeg;
         if (L >= kCeilOff)
-            return w; // exact bypass — the pre-ceiling model
-        return L * std::tanh(w / L);
+            return w; // exact bypass — the pre-shape model (ignores beta too)
+        const double c = eBeta + 1.5 / (L * L);
+        const double r2 = (w / L) * (w / L);
+        const double s = std::sqrt(1.0 + r2);
+        return w * (1.0 + c * w * w) / (s * s * s);
     }
 
-    // Antiderivative of coreLimit: L^2 * ln(cosh(w/L)), zero at w = 0 on BOTH
-    // sides, so F stays continuous and C1 across the seam.
+    // Antiderivative of coreLimit (elementary for ANY beta, L — verified via
+    // sympy.integrate + a direct d/dw check, session-15 log):
+    //   F(w) = c*L^3*sqrt(L^2+w^2) + (c*L^5 - L^3)/sqrt(L^2+w^2),  c = beta + 1.5/L^2
+    //   G(w) = F(w) - F(0),   F(0) = 2*c*L^4 - L^2      (G(0)=0, G'=T, C1 at the seam)
+    //   bypass: G(w) = w^2/2
     inline double coreLimitAD(double w) const noexcept
     {
         const double L = (w >= 0.0) ? cPos : cNeg;
         if (L >= kCeilOff)
             return 0.5 * w * w;
-        return L * L * lnCosh(w / L);
-    }
-
-    // ln(cosh x), numerically safe at BOTH ends. The textbook form
-    // |x| + log1p(exp(-2|x|)) - ln2 overflows nothing but catastrophically
-    // cancels as x -> 0 (it subtracts two ~ln2 quantities to get ~x^2/2), which
-    // matters here because a large ceiling drives x = w/L towards zero — exactly
-    // the "ceiling nearly disabled" region a fitter sweeps through.
-    // ** Crossover 3e-3, NOT 1e-4. ** It has to be picked from BOTH error curves,
-    // not just the series truncation: measured relative error vs mpmath is
-    //     x      series      closed form
-    //     1e-4   1.1e-16     4.4e-9      <- the closed form is 1e7 x worse here
-    //     1e-3   4.5e-14     5.1e-11
-    //     3e-3   3.6e-12     2.8e-12     <- the curves cross HERE
-    // so a 1e-4 crossover hands x in [1e-4, 1e-3] to the branch this function
-    // exists to avoid. Not academic: dsp-validator measured ADAA returning 10.1
-    // instead of ~1 at L = 1e4, w = 1, du = 1e-9 (just above the midpoint guard).
-    // At 3e-3 both branches are <= 3e-12.
-    static inline double lnCosh(double x) noexcept
-    {
-        const double ax = std::abs(x);
-        if (ax < 3.0e-3)
-            return 0.5 * x * x * (1.0 - x * x / 6.0); // x^2/2 - x^4/12
-        return ax + std::log1p(std::exp(-2.0 * ax)) - 0.69314718055994531;
+        const double c = eBeta + 1.5 / (L * L);
+        const double L2 = L * L, L3 = L2 * L, L4 = L2 * L2, L5 = L4 * L;
+        const double hyp = std::sqrt(L2 + w * w);
+        const double F0 = 2.0 * c * L4 - L2;
+        return c * L3 * hyp + (c * L5 - L3) / hyp - F0;
     }
 
     // Antiderivative of waveshape (for 1st-order ADAA):
     //   F(w) = FT(w) + (a*s^2/2) * (w - s*tanh(w/s)),
     //   since d/dw[w - s*tanh(w/s)] = 1 - sech^2(w/s) = tanh^2(w/s).
-    //   FT = coreLimitAD (w^2/2 with the ceiling disabled).
-    // F(0) = 0 and F is C1, so 1st-order ADAA is well-posed (exact at DC). The
-    // Gudermannian the old sech bump needed is gone — this one integrates in
-    // elementary terms, and stays finite for any w (tanh saturates, so F grows
-    // linearly rather than overflowing).
+    //   FT = coreLimitAD. F(0) = 0 and F is C1, so 1st-order ADAA is well-posed (exact
+    // at DC). Stays finite for any w (the core saturates, tanh saturates).
     inline double waveshapeAD(double w) const noexcept
     {
         const double s = sPos, a = sNeg;
         return coreLimitAD(w) + 0.5 * a * s * s * (w - s * std::tanh(w / s));
     }
 
-    // 1st-order ADAA: y = (F(u) - F(uPrev)) / (u - uPrev); midpoint fallback when
-    // the two are too close (avoids 0/0), which also keeps it exact at DC.
-    // The previous sample is a PARAMETER, not the `uPrev` member, so the caller
-    // controls the pairing — named `prev` so it doesn't shadow that member.
+    // coreLimitAD is elementary for every (beta, L) — unlike the session-14 shape,
+    // there is no non-exact regime to fall back from. Kept as a named predicate
+    // (rather than deleting the branch in adaaShape) so a future reshape that
+    // reintroduces a non-elementary case has an obvious place to wire the fallback
+    // back in, and so the "exact at DC" contract stays a documented invariant, not
+    // an implicit assumption.
+    inline bool adaaExact() const noexcept { return true; }
+
+    // 1st-order ADAA: y = (F(u) - F(uPrev)) / (u - uPrev); midpoint fallback only when
+    // the two samples are too close (avoids 0/0, keeps it exact at DC). The previous
+    // sample is a PARAMETER, not the `uPrev` member, so the caller controls
+    // the pairing — named `prev` so it doesn't shadow that member.
     inline double adaaShape(double u, double prev) const noexcept
     {
         const double du = u - prev;
-        if (std::abs(du) < 1.0e-9)
+        if (! adaaExact() || std::abs(du) < 1.0e-9)
             return waveshape(0.5 * (u + prev));
         return (waveshapeAD(u) - waveshapeAD(prev)) / du;
     }
@@ -473,7 +508,7 @@ public:
 private:
     // Phase-7 capture-fit amplitude params (FitParams.h), nominal-initialised.
     double gm = kGm, ro = kRo, rq2 = kRq2, sPos = kSatPos, sNeg = kSatNeg;
-    double cPos = kCeilPos, cNeg = kCeilNeg;
+    double cPos = kCeilPos, cNeg = kCeilNeg, eBeta = kExpandBeta;
 
     // Input-HP companion (set in prepare()).
     double fs = 48000.0;

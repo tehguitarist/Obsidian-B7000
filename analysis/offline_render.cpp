@@ -215,6 +215,9 @@ static const FitField kFitFields[] = {
     // for amps; >= 1e6 disables a side exactly (A/B against the pre-ceiling model).
     {"jfetCeilPos", &FitParams::jfetCeilPos},
     {"jfetCeilNeg", &FitParams::jfetCeilNeg},
+    // Expansive-cubic strength of the core (session-15 branch B, JfetStage.h
+    // coreLimit()); beta>0 = expansive/in-phase H3. Supersedes jfetCeilK.
+    {"jfetExpandBeta", &FitParams::jfetExpandBeta},
     {"driveTaperExp", &FitParams::driveTaperExp},
     {"levelTaperExp", &FitParams::levelTaperExp},
     {"masterTaperExp", &FitParams::masterTaperExp},
