@@ -4,9 +4,12 @@
 > captured Darkglass B7K Ultra, the gaps found (with dB), the fixes shipped, and what's left.
 > Read this + `docs/validation-and-capture.md` (method) + `.claude/rules/dsp.md` (fix rules).
 >
-> **Status (2026-07-24, session 18):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
-> Phase 9 in progress — the dominant "doesn't sound like the pedal" gap (the low end) is FOUND,
-> FIXED, and committed. Residual-gap hunt continues.
+> **Status (2026-07-25, session 21):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
+> Phase 9 in progress. GAP #1 (low end), GAP #1b (bridged-T — investigated twice, closed both times,
+> non-issue), GAP #2 (treble notch), and GAP #3a (rail clamp) are all FIXED and, except this
+> session's rail-clamp change, committed. A harness defect (gain-n12 captures rendered 12 dB hot)
+> that had been distorting the GAP #3a rail-clamp trial is also fixed. GAP #3b (static GRUNT-tilt)
+> remains open — see §4.
 
 ---
 
@@ -17,10 +20,40 @@ detail section below. Check off + move to the Gap log (§4) as they land.
 
 **A. Close the remaining voicing gaps (Phase 9 core — highest impact on the sound):**
 - [x] **A0. Regenerate the full 63-cap baseline report at the shipped c21R=100k** (session 19). Confirmed GAP #1 holds (clean low end ~0 dB). Cache seeded.
-- [x] **A1. Bridged-T ~717 Hz notch** — INVESTIGATED, **non-issue** (session 19). No unmatched notch: bands 508/640/806/1016 track flat (~−1.5 dB), no local dip. Do NOT reshape `bt*`. See §4 GAP #1b.
+- [x] **A1. Bridged-T ~717 Hz notch** — INVESTIGATED, **CLOSED, non-issue** (session 19, re-opened and re-closed session 20/21). Tested like-for-like in the OUTPUT: plugin's mid dip matches the pedal's to ~0.5 dB over 116 OD rows (median −2.45 vs −3.02 dB). Topology re-verified pixel-zoom on both schematics, identical. Do NOT reshape `bt*`, no `schematic-checker` pass needed. See §4 GAP #1b.
 - [x] **A1b/c/d. TREBLE ~322 Hz notch too deep — the real root gap. FIXED + shipped** (session 19, GAP #2 below). Found while chasing A1: the OD low-mids (100–500 Hz) are scooped by the treble-ladder two-path cancellation notch (~28 dB model vs −3.4 dB capture). New `trebleLadderDampR=30k` shallows it. This is the root of the "backwards GRUNT" + the 254 Hz BLEND null.
-- [ ] **A2. Mid-band deviations > 1.5 dB.** Mine the existing baseline (mids are unaffected by the low-end/notch fixes). Fix via the Baxandall/mid `FitParams` or taper as decomposition warrants.
+- [~] **A3 STARTED (session 20) — DECOMPOSED into two independent gaps, see §4 GAP #3.** The
+  residual is NOT one thing: **3a** is a DRIVE-DEPENDENT bass tilt (the DRIVE op-amp's rail clamp
+  has never been enabled) and **3b** is a STATIC ~19-23 dB bass tilt that only GRUNT flat/boost
+  expose. Levers tested and **refuted**: `clipA0` (null), `clipC11` (−1 dB), bridged-T series
+  damping (no efficient element exists), R24/SK loading of the bridged-T (deepens it). Levers with
+  a real hit: `railEnabled=1` (−5…−8 dB tilt at drive-1430/1700, its predicted domain) and the
+  GRUNT caps `clipC12/C13` ÷4 (−2.1 dB mean, −8 dB on grunt-flat) — **neither shipped yet.**
+- [x] **A2. Mid-band deviations > 1.5 dB — MINED (session 21). No broadband mid EQ error exists**
+  (clean rows median −0.31 dB; EQ pots band-RMS 1.70; ref/attack 0.31). The uniform mid deficit on OD
+  rows is GAP #3b's bass excess seen through the gain-match. **But it surfaced a NEW, larger gap:**
+- [ ] **A2b / GAP #4. The switchable MID positions over-deliver RANGE** — `lomidfreq-250` is
+  **+12…+15 dB** too deep/tall and centred at 254 Hz vs the pedal's 320 Hz; `himidfreq-750` is
+  **+7…+8.5 dB** over; `lomidfreq-1k` and `himidfreq-3k` are fine. The pedal's range is ~±12 dB at
+  every position; the model's follows the [ENG] cap table's ±14.5…±28 dB. Scaling both caps as a
+  pair (circuit.md's parked alternative) does NOT fix it. **Next: `schematic-checker` on the mid
+  stage's range-setting elements (R38/R39, R40/R41, wiper-leg series R) before touching the caps.**
+  §4 GAP #4.
 - [ ] **A3. OD/clean BLEND balance — now the BIGGEST residual.** The `grunt-boost`/`grunt-flat` captures stay 12–26 dB off after the notch fix: a sub-bass excess (20–40 Hz) where the pedal has a low-mid bump. Session 19 proved the 254 Hz null is NOT a polarity bug (OD/clean in-phase at LF) and C12/C13 don't fix it (level, not corner). Root suspect = the clean-bleed level/shape + grunt coupling in the clipping regime (kInputRef 0.87→3.377 move). **Start here for the next voicing gain.** Probes: `blend_null_probe.cpp`, `od_taps_probe.cpp`.
+- [x] **A3-next (0). `render_args()` now emits `--input-trim`** for `gainSessionDb`; baseline
+  regenerated (session 21). Send-vs-record-gain settled three ways. §3.
+- [x] **A3-next (i). IC2_B recovery network — CLOSED, not a gap** (session 21). Topology re-verified
+  at pixel zoom on BOTH schematics (identical, dot for dot) and, tested like-for-like in the OUTPUT,
+  the plugin's mid dip matches the pedal's to ~0.5 dB across 116 OD rows (and is *shallower*, not
+  deeper). Session 20's re-opening compared a stage transfer against an output shape. No
+  `schematic-checker` pass needed. §4 GAP #1b.
+- [x] **A3-next (ii). SHIP the rail clamp — DONE (session 21).** `railEnabled = true`,
+  `railNeg = 2.9`, `railPos = 2.7` (physically derived from the +9V/D3/VD chain, not fitted — the
+  fit objective is monotone with no interior minimum, a known degeneracy). All 240 rows band-RMS
+  4.298 → 4.057 dB, 31 rows better by >0.5 dB vs 4 worse. ctest 16/16. §4 GAP #3a.
+- [ ] **A3-next (iii). Revisit the GRUNT caps** — a lever, but the required ÷4 is not physical, and
+  part of what it was compensating for may have been the (now-shipped) rail clamp. Re-run the 3b
+  candidate table against the rails-on baseline before touching `clipC12`/`clipC13`.
 - [ ] **A4. Re-grade the full matrix after A2–A3; write final GATE-9 numbers into §4.**
 
 **B. Performance / quality pass (Phase 9 part 2):**
@@ -82,8 +115,52 @@ though the output is identical — a rebuild won't reuse pre-rebuild `--fit` res
 stale data (the safe direction); it just occasionally re-renders what it could have reused. Key on
 the *effective* FitParams (via `OfflineRender --print-fit`) if this ever becomes worth it.
 
+**Session-20 tools.** `analysis/od_tilt_metric.py <report.json>...` prints the GAP #3 tilt / low-band
+RMS / mid-band RMS per OD capture and the mean, for any number of report JSONs side by side — the
+metric every candidate above was scored on. `analysis/od_level_probe.cpp` (standalone:
+`c++ -std=c++17 -O2 -I libs/chowdsp_wdf/include analysis/od_level_probe.cpp -o od_level`) measures
+the OD chain's own transfer over an amplitude ladder, i.e. how the model's internal voicing moves as
+it is driven — the gate that separated GAP #3a from #3b. Both need no captures.
+
 ## 3. Tooling caveats (must-know)
 
+- **✅ HARNESS DEFECT — FIXED (session 21).** `render_args()` now emits
+  `--input-trim -<measured dB>` whenever `gainSessionDb != 0` (the MEASURED
+  `gain_correction_db`, −12.071, not the nominal dial), and the baseline
+  `reports/comprehensive_data.json` was regenerated on it. Effect exactly as predicted: the 15
+  `base-clean` n12 rows moved **< 0.05 dB** (linear ⇒ a level change is invisible after
+  gain-matching) while the OD n12 rows moved a lot — `level-1700_gain-n12` drv−6 **18.27 → 5.80 dB**
+  band-RMS, drv−12 12.04 → 6.76, `ref-od_gain-n12` drv−18 8.96 → 5.27; two rows got *worse*
+  (`ref-od_gain-n12` drv−6 4.34 → 10.25, `level-0930_gain-n12` drv−6 2.50 → 4.19) — real
+  drive-dependence error now measured honestly rather than accidentally cancelled. All-240-row mean
+  band-RMS 4.386 → 4.298. **The rail-clamp verdict flipped on this fix — see GAP #3a.**
+  The original defect, for the record: `render_args()` emitted every pot and switch but **never
+  `--input-trim` for `gainSessionDb`**, so `OfflineRender` always ran at full test-signal level.
+  The report then gain-matches the *output* by a scalar, which hides it completely for a linear
+  capture — and silently invalidates **every nonlinear comparison** on those files.
+  **Proof the SEND was lowered (the pedal saw less), not the record gain** — this is the one thing
+  the fix depends on, so session 21 re-derived it from the raw WAVs and added a third, stronger leg:
+  1. **cal_1k anchor, re-measured:** ref-clean → ref-clean_gain-n12 = **−12.071 dB**, but
+     ref-od → ref-od_gain-n12 = **−2.854 dB**. A record-gain change is a scalar on the file and
+     *must* give the same number on both; only compression INSIDE the pedal can shrink it.
+  2. **Same pair on the quieter `sweep_clean` segment:** clean −12.146, OD **−9.362** — i.e. the OD
+     shortfall tracks level (more compression at the hotter cal tone), the signature of a real
+     input-level change.
+  3. **⭐ Within-file, immune to session/take noise:** the pedal's own level-dependence collapses in
+     the n12 file. The normalised band shape moves **2.59 dB RMS** across the drv−18→drv−6 sweep step
+     in `ref-od.wav` but only **0.86 dB** in `ref-od_gain-n12.wav`. Under a record-gain change the
+     pedal is driven identically in both files and those two numbers would be equal.
+  **⚠ A tempting test that does NOT work (don't repeat it):** comparing the pedal's normalised band
+  SHAPE of `ref-od_gain-n12` @drv−6 against `ref-od` @drv−18 (nominally the same absolute level).
+  It appears to favour the wrong answer (@drv−6 matches at 1.89 dB, @drv−18 at 3.76) but it has **no
+  discriminating power** — leg 3 shows a full 12 dB level step only moves the shape 2.6 dB, which is
+  *below* the 3–4 dB take-to-take spread between the two capture sessions. Level anchors (high SNR,
+  absolute) beat shape correlations here.
+  **Scope:** ~15 of the 20 are `base-clean` (DIST disengaged → genuinely linear → unaffected); the
+  exposed ones are `ref-od_gain-n12` and the four `level-*_gain-n12`, **plus any clean capture the
+  model drives into a nonlinearity that the real pedal never reached** — which is exactly what the
+  GAP #3a rail-clamp trial did (see below). **Fix: emit `--input-trim` from `render_args()`** (the
+  flag exists) and re-baseline; this busts the cache for those 20 records only.
 - **`gap_audit.py` does NOT exclude zero-knob SILENT captures.** `master-0700` (master=0),
   `level-0700` (OD volume=0) render to true silence → empty FFT bins → −640 dB → a **635 dB
   aggregate spread** that swamps `gap_audit`'s raw mean. Aggregate over VALID captures with a
@@ -95,6 +172,15 @@ the *effective* FitParams (via `OfflineRender --print-fit`) if this ever becomes
 - **`find_captures` skips non-matrix `.wav`** — the session-13 `jfet_ladder_*` diagnostic captures
   use underscore stimulus names (not `key-value`), so they're skipped with a note (a real matrix
   typo still surfaces as a skipped-file line).
+- **The 320 Hz band dip in the OD captures is REAL, not an artifact — do NOT exclude it** (session 20
+  checked, having first assumed the opposite). Across all 240 valid rows the pedal's 320 Hz band sits
+  **−5.5 dB median** below the mean of its 254/403 Hz neighbours in **DIST-engaged (`base-od`)
+  captures** and **0.00 dB median** in clean ones (min −1.3). Present only in the OD path, at the
+  frequency of the TrebleAttack two-path cancellation notch → this is that notch (GAP #2), measured.
+  **The plugin does not reproduce it** (its own 320 Hz dev is ~0 in the same OD captures). Useful as
+  a *bleed-sensitive* probe: an OD-path notch only survives into the output if the OD sits above the
+  clean bleed there, so "pedal shows its notch, plugin doesn't" says the plugin's OD is too weak
+  relative to bleed in the mids — consistent with GAP #3b.
 - **Driven low-band FR is contaminated by clipping harmonics** — sub-knee fundamentals get clipped,
   so the driven sweep's low bands are NOT a clean measure of a *linear* filter. Fit linear
   low-frequency shaping (e.g. coupling caps) on the CLEAN sweep; use driven only as a cross-check.
@@ -183,24 +269,253 @@ authoritative on the notch depth (same posture as c21R's 10× corner).
 notch in the full output (it cost only ~2–4 dB in captures). The BIG residual — the `grunt-boost`
 sub-bass — is a SEPARATE issue (A3 / GAP #3, not yet fixed).
 
+### ✅ GAP #1b — CLOSED (session 21). The bridged-T is correct; session 20's re-opening was itself the wrong test.
+
+**Session 21 verdict: the IC2_B network is NOT a gap and the file needs no further work on it.**
+Session 20 re-opened it (kept below for the record) by comparing the *model's isolated stage
+transfer* (−28.1 dB at 717 Hz) against the *pedal's OUTPUT band shape* (~4 dB dip) — two different
+quantities. Compared like-for-like, in the OUTPUT, the plugin and the pedal agree, and the residual
+sign is the **opposite** of the hypothesis:
+
+| dip at 640/806 Hz vs the mean of its 403/1613 Hz neighbours | plugin | pedal | plugin − pedal |
+|---|---|---|---|
+| all 116 valid OD rows (median) | −2.45 dB | −3.02 dB | **+0.41 dB** (mean +0.48) |
+| all 120 clean rows (median) | +0.01 | −0.03 | +0.04 |
+| `drive-0700_grunt-boost` sweep_clean (session 20's own exhibit) | −4.1 | −5.3 | +1.2 |
+
+The plugin's mid dip is if anything ~0.5 dB **shallower** than the pedal's — the clean bleed fills
+the isolated 28 dB scoop in BOTH, identically. There is no excess scoop to remove. (The small
+remaining sign — pedal slightly deeper — is the same bleed-sensitive signature as the 320 Hz notch
+note in §3: the plugin's OD is a little weak vs the bleed in the mids, which is GAP #3b, not this
+network.)
+
+**Topology independently re-verified at pixel zoom (session 21, both sources).** Primary p.4 and the
+backup schematic draw the SAME network, junction dot for junction dot: buffer out = {pin7, C16 left,
+R22 left}; C16 → node Nout (dot) which also feeds R24 → SK; R23 hangs from Nout down to Nmid;
+Nmid = {R22 right, R23 bottom, C17 top}; C17 → GND. Backup designators U2B/C18 680pF/R25 100k/R24
+33k/C19 0.022µF map 1:1 onto primary IC2_B/C16/R22/R23/C17 with identical values. `RecoveryBridgedT`
+implements exactly this. **No `schematic-checker` follow-up is needed and no topology question
+remains open.** (What the network does is not really a "notch" but a broad mid scoop — 0 dB below
+the R22·C17 corner at 72 Hz, floor through the mids, back to 0 dB above the R23·C16 corner at
+7.1 kHz — which is why a *local-dip* test (session 19) and a *stage-transfer-vs-output* test
+(session 20) both mis-read it. The output test above is the one that answers the question.)
+
+<details><summary>Session 20's re-opening (superseded — kept for the reasoning trail)</summary>
+
+#### ⚠ GAP #1b REVISITED — the bridged-T verdict was reached with the WRONG TEST (session 20)
+
+A1 (session 19) cleared the bridged-T by checking whether bands 508/640/806/1016 Hz show a **local
+dip** at 717 Hz in the final output. They don't — but that test is **structurally blind to this
+network's actual shape**. The IC2_B bridged-T is not a narrow notch; it is an enormous *broad*
+scoop, and neighbouring 1/3-oct bands share it, so "the bands track flat together" is exactly what
+a too-deep broad scoop looks like:
+
+| Hz | 40 | 100 | 202 | 400 | 640 | **717** | 1016 | 2560 | 8000 |
+|---|---|---|---|---|---|---|---|---|---|
+| model (= ideal oracle, exact) | −1.3 | −5.0 | −10.3 | −18.1 | −26.9 | **−28.1** | −22.0 | −10.3 | −2.7 |
+
+The C++ `RecoveryBridgedT` reproduces the unloaded oracle to 0.01 dB (verified via the new OD taps),
+so this is the shipped OD path: **−18 dB at 400 Hz** in a bass preamp. The capture disagrees — in
+`drive-0700_grunt-boost` (near-linear, GRUNT boost moves the coupling corner out of the way so the
+OD path's own shape is exposed) the pedal shows a smooth ~**4 dB** dip at 640–806 Hz against its
+403/1613 Hz neighbours, not 28 dB. Same pathology as GAP #2's treble notch (−37 model / −3.4
+capture), one stage later. In the GRUNT-**cut** captures it stays invisible because the clean bleed
+fills it, which is why every earlier pass missed it.
+
+**Ruled out as the explanation (session 20):** the deferred **R24 → Sallen-Key loading**
+carry-forward (circuit.md "real notch DEPTH is loaded ... capture-validate"). The SK input impedance
+is 222 kΩ at 717 Hz (hand-derived and numerically confirmed), and loading the oracle with it moves
+the notch −28.1 → −29.2 dB — it **deepens** the notch and adds a ~1 dB broadband loss. Loading is
+not the missing mechanism; the unloaded approximation is fine. **This carry-forward is closed.**
+
+Also ruled out: a GAP #2-style series damping R. A scan over series damping on C16 and on C17, and
+over R22/R23/C16 individually, finds **no efficient damping element** — 100 kΩ in series with C16
+buys 4 dB of notch depth; the R22 reductions that do flatten the skirt move the notch to 1.2 kHz and
+leave it 25 dB deep. Unlike the treble ladder, this network's null is not shallowed by a lossy cap.
+
+**Therefore the open question is the TOPOLOGY, not a fit constant** — the same "same VALUES ≠ same
+TOPOLOGY" trap circuit.md already caught once here (IC2_B was read as a +12 dB active shelf before
+it was re-read as unity buffer + bridged-T). A `schematic-checker` pass on the IC2_B recovery
+network is now evidence-driven, not speculative: the modelled topology predicts a 28 dB scoop where
+the pedal measures ~4 dB.
+
+*(Session 21: the premise of this whole section is the category error above — "the modelled topology
+predicts 28 dB" is the STAGE transfer, "the pedal measures ~4 dB" is the OUTPUT. The plugin's own
+output also measures ~4 dB. Ruled-out items below — SK loading, series damping — remain valid
+negative results.)*
+</details>
+
+### ▶ GAP #3 — the OD path is too bass-heavy (A3). DECOMPOSED, not yet fixed (session 20).
+
+**Symptom, stated precisely.** Define `tilt = mean(Δ over 20–50 Hz) − mean(Δ over 202–1613 Hz)`
+(Δ = plugin − pedal per band, already gain-matched, so pure shape; no bands excluded). Over 44
+valid OD rows the mean tilt is **16.7 dB** — but it is not spread evenly:
+
+| captures | tilt |
+|---|---|
+| `drive-0700`, GRUNT **cut** | **0.9 – 1.2 dB** (essentially correct) |
+| `drive-1430` / `drive-1700`, GRUNT cut | **13.3 – 20.6 dB** |
+| any GRUNT **flat** / **boost** | **8.6 – 33.2 dB** |
+
+So the OD path is right at low drive with GRUNT cut, and goes wrong along **two independent axes**.
+
+**3a — drive-dependent (the rail clamp).** A new probe, `analysis/od_level_probe.cpp`, measures the
+OD chain's own transfer (skA tap) over an amplitude ladder. The model's internal LF-vs-mid tilt
+**grows 4.4 → 19.5 dB** as level rises (GRUNT cut, drive max): single tones, so this is per-frequency
+compression, not intermodulation — the mids saturate the clipper and the LF, attenuated by the GRUNT
+coupling before it, sails through uncompressed. Cross-checked against the captures: from drive-min to
+drive-max the **pedal** gains ~11 dB in the mids and ~4 dB in the low bass (mid-weighted), while the
+**plugin** gains ~9.7 dB in the bass and ~0.9 dB in the mids (bass-weighted) — a 15 dB divergence.
+
+The missing mechanism is almost certainly **IC2_A's output rail clamp, which has never been enabled**
+(`railEnabled = false`; calibration §6 makes it a GATE item on every op-amp output, and
+`DriveStage.h` says IC2_A at ×78 rails *before* the 4049). It sits **upstream** of the GRUNT coupling
+and its input is bass-heavy (+10 dB at 40 Hz vs 254 Hz at the DRIVE output), so it limits LF
+preferentially — exactly the missing compression. Session 16's `drive_rail_gate.py` "REFUTED" verdict
+was about the drive-min/9:30/**noon** harmonic ramp and explicitly recorded that **2:30/max DO
+respond**; the high-drive domain was never tested. Measured with `--fit railEnabled=1`:
+
+| capture / sweep | tilt before | after |
+|---|---|---|
+| `drive-1700` drv−18 / −12 / −6 | 19.4 / 16.9 / 17.6 | **11.4 / 8.8 / 11.9** |
+| `drive-1430` drv−12 / −6 | 18.3 / 13.3 | **12.2 / 8.3** |
+| `ref-od` drv−6 | 7.3 | **4.1** |
+| `drive-0700` (all), and every `sweep_clean` row | — | unchanged (below the rail) |
+| `drive-1700_grunt-boost` drv−6 | 21.5 | 23.6 (small regression) |
+
+**Full-matrix trial of `railEnabled=1` (all 63 captures, `--os 4`).** Aggregate band-RMS
+|plugin−pedal| (25 Hz–12.9 kHz) improves on both halves: **clean 2.26 → 2.07 dB, OD 6.51 → 6.21 dB**;
+OD tilt 9.49 → 8.78 dB over 92 rows. 14 of 240 rows get worse by >0.5 dB — and **12 of those 14 are
+`gain-n12` clean captures at the hottest sweep** (`bass-1700` 2.47 → 6.97, `treble-1700` 2.14 → 6.08,
+…), i.e. precisely the rows the harness renders 12 dB too hot (§3). So the model rails there at a
+level the real pedal never reached, and those regressions are **not** evidence against the clamp.
+
+**⇒ NOT SHIPPED yet, deliberately.** Two things must land first: (1) the `--input-trim` harness fix,
+so the trial can be judged on a level-honest matrix; (2) a real rail voltage — ±3.3 V is the
+`FitParams` placeholder and the note there already says the TL07x is asymmetric around VD with the
+positive side clipping first. Enabling it also switches on the clamp for *every* op-amp stage at
+once (`PedalChain::setFitParams`), including the ±28 dB mid stages; per-stage enables may be wanted.
+
+### ✅ 3a — SHIPPED (session 21). Both blockers cleared.
+
+**(1) Harness fix landed (§3), full matrix re-judged.** With the level-honest matrix, `railEnabled=1`
+at the (still-placeholder) symmetric ±3.3 V is a clean win across the whole 63-capture set — no
+longer contaminated by the 12-dB-hot `gain-n12` false regressions:
+
+| | band-RMS (25 Hz–12.9 kHz) | rows better by >0.5 dB | rows worse by >0.5 dB |
+|---|---|---|---|
+| OD (120 rows) | 6.336 → 6.091 dB | — | — |
+| CLEAN (116 rows) | 2.335 → 2.090 dB | — | — |
+| ALL (240 rows) | **4.298 → 4.057 dB** | **31** | **4** |
+
+The 4 remaining regressions are all small (largest +2.21 dB, `drive-1700_grunt-boost` drv−6) and none
+are the EQ-boost `gain-n12` rows that falsely flagged the trial before the harness fix — those are
+now among the *biggest improvements* (`lomidfreq-250_lomid-1700_gain-n12` drv−6: −5.38 dB).
+
+**(2) Rail voltage — derived physically, not fitted.** A voltage sweep on the high-drive subset
+(`drive-1430/1700`, `grunt-*`, `lomid/himid-1700_gain-n12`, `ref-od`, `level-1700`; 80 rows) found the
+objective **monotone all the way down** — 3.8 V → 7.71, 3.3 V → 7.64, 2.9 V → 7.53, 2.6 V → 7.42,
+2.3 V → 7.30, 2.0 V → 7.22 dB band-RMS, vs 8.25 V at rail-off — with **no interior minimum**. That is
+the same "make the clipper see less" degeneracy that killed the session-5/6 clipper fits (dsp.md), so
+the voltage was **not** fit to the floor of that curve. Instead: +9 V → D3 (1N5817, ~0.35 V drop) →
+rail ≈ 8.65 V; VD = rail/2 ≈ 4.32 V; a TL07x swings to within ~1.5–1.8 V of each rail (datasheet
+typical) ⇒ **±2.7–2.9 V around VD**, positive side clipping first per the existing FitParams note.
+Landed as **`railNeg = 2.9 V`, `railPos = 2.7 V`** — captures ~0.8 of the available −1.0 dB gain at
+the physical point without chasing the unphysical floor. A quick asymmetric-vs-symmetric check at
+matched mean (2.9/2.3 vs 2.6/2.6) confirmed the asymmetry direction helps (−0.12 dB further, band-RMS
+7.42 → 7.29 on the subset), small but consistent with the physical picture.
+
+**Shipped:** `FitParams.h` — `railEnabled = true`, `railNeg = 2.9`, `railPos = 2.7` (was
+`false`/3.3/3.3). Applies to every op-amp stage via the existing `PedalChain::setFitParams` wiring
+(no per-stage split — the full-matrix trial above already reflects that). **ctest 16/16.**
+
+**3b — static, GRUNT-dependent.** At *small signal* the model's OD path is already 4.4 dB bass-tilted
+with GRUNT cut and **23.3 dB** with GRUNT boost. The correction the captures ask for is a high-pass:
+0 dB above ~250 Hz falling at ~13 dB/oct below it, ~31 dB deep by 40 Hz for boost, ~24 dB for flat,
+~5 dB for cut — i.e. **its depth scales with the GRUNT cap**. Levers tested:
+
+| candidate | mean tilt (44 rows) | note |
+|---|---|---|
+| shipped baseline | 16.74 | |
+| `clipA0 = 100` (small-signal Zin ÷4) | 16.55 | **null — Zin is not the lever** |
+| `clipC11 = 2.35 nF` (÷2) | 16.36* | −1.0 dB only (*320-excluded metric) |
+| `clipC12/C13 ÷ 4` (11.75 n / 55 n) | **14.65** | −7.4 dB on `drive-0700_grunt-flat`, `ref-od`/`drive-*` cut untouched, no regressions |
+| `railEnabled = 1` | 15.98 | 3a's lever; −5…−8 dB in its own domain |
+
+The GRUNT caps ARE a lever (session 19's "C12/C13 are NOT the lever" note was assessed against a
+*different* symptom — the OD bass-peak frequency, before the GAP #2 notch fix landed — and should be
+read as scoped to that, not as a general verdict). But ÷4 on two schematic-verified caps is not a
+physical answer and recovers only ~7–9 dB of a 25–35 dB gap. **3b is still open**, and the leading
+structural suspect is the bridged-T depth above (which the GRUNT-cut coupling corner masks and GRUNT
+boost exposes — precisely the observed GRUNT dependence).
+
+### ▶ GAP #4 — the switchable MID positions over-deliver RANGE (A2's real answer). FOUND session 21, not fixed.
+
+**A2 as originally framed ("mid-band deviations > 1.5 dB → fix via the Baxandall/mid FitParams") is
+answered: there is no broadband mid-band EQ error.** Mining all 236 valid rows, every 1/3-oct band
+250 Hz–6 kHz sits at a median Δ of −1.0 to −2.2 dB — but that is uniform across the whole mid band,
+and it splits cleanly by path: **CLEAN rows median −0.31 dB, OD rows median −3.55 dB**. Since the
+deltas are gain-matched, a uniform mid *deficit* on the OD rows is the mirror image of GAP #3b's bass
+*excess*, not an independent problem. Per clean-path control group:
+
+| group | n | median mid Δ | band-RMS |
+|---|---|---|---|
+| EQ pots (bass/treble/lomid/himid) | 64 | −0.30 dB | 1.70 dB |
+| master / level / blend | 12 | −0.04 | 0.93 |
+| ref-clean / attack | 8 | −0.04 | **0.31** |
+| **mid-frequency switch positions** | 32 | −0.92 | **3.68** ← the one outlier |
+
+**The real finding.** Reading each mid-freq position's own peak, renormalised at 5.1 kHz (immune to
+the report's broadband gain-match), the model's boost/cut RANGE tracks the [ENG] cap table's
+±14.5…±28 dB while **the real pedal's range is roughly CONSTANT at ~±11–13 dB at every position**:
+
+| position | plugin peak | @Hz | pedal peak | @Hz | excess |
+|---|---|---|---|---|---|
+| `lomidfreq-250` BOOST | +25.9 | 254 | +11.1 | **320** | **+14.8 dB** |
+| `lomidfreq-250` CUT | −26.0 | 254 | −14.1 | **320** | **+11.9 dB** |
+| `himidfreq-750` BOOST | +20.3 | 806 | +11.8 | 806 | **+8.5 dB** |
+| `himidfreq-750` CUT | −20.3 | 806 | −12.9 | 806 | **+7.4 dB** |
+| `lomidfreq-1k` BOOST / CUT | +12.5 / −12.5 | 1016 | +10.6 / −11.3 | 1016 | +1.9 / +1.2 |
+| `himidfreq-3k` BOOST / CUT | +5.4 / −5.4 | 3225 | +4.6 / −3.0 | 2560/3225 | +0.8 / +2.4 * |
+
+\* the 3 kHz row understates both sides — the 5.1 kHz renormalisation reference sits too close to a
+3.2 kHz peak. Treat it as "no evidence of a problem", not as a measurement.
+
+So the error is confined to the **two large-cap (low-frequency) positions** — C33 = 47n (LO-MID
+"250 Hz") and C35 = 15n (HI-MID "750 Hz") — is **symmetric** (boost and cut over-deliver equally, so
+it is the stage's range, not an asymmetry), and at LO-MID the **centre is wrong too**: the pedal
+peaks at **320 Hz**, not the computed 229. Note 320 Hz is essentially the STOCK board's C33 = 22n
+centre (335 Hz).
+
+**This is exactly the test `circuit.md` left open** ("the per-position boost RANGE genuinely varies
+±14.5…±28 dB … confirm against captures", plus the parked "constant-range alternative — switching
+BOTH caps as a scaled pair — exists if the real Ultra ever contradicts this"). The captures now
+contradict it. **But the parked alternative is NOT the fix as stated:** scaling both caps together
+was checked against the oracle here and keeps the range at ~24 dB (best variant RMS 6.46 dB vs the
+pedal's curve; shipped 47n/22n is 8.78) — it moves the centre, not the range. No single cap pair
+reproduces a ~±12 dB, position-independent range.
+
+**⇒ Next step is a topology question, so this one IS a genuine `schematic-checker` candidate** (unlike
+GAP #1b): what limits the real mid stage's range to ~±12 dB regardless of the switched cap? Prime
+suspects are the R38/R39 (2k2) end resistors and the R40/R41 (220k) flat-unity legs around the pot —
+the range in this topology is set by the wiper leg's authority against those, and a larger series
+resistance in the wiper/cap leg would cap the range position-independently, which is precisely the
+observed signature. Do this BEFORE touching the [ENG] cap values: the LO-MID centre error
+(229 model / 320 pedal ≈ the stock 22n value) hints the engineered cap table itself may not match the
+real unit, and both questions should be answered from the same evidence.
+
 ### ▶ Remaining candidates (not yet investigated)
 
-- **OD/clean BLEND balance (A3) — the biggest residual.** `grunt-boost`/`grunt-flat` captures stay
-  12–26 dB off: the plugin over-emphasises 20–40 Hz vs the pedal's low-mid bump. NOT a polarity bug,
-  NOT C12/C13. Suspect the clean-bleed level/shape + grunt coupling in the clipping regime.
-- **C12/C13 (GRUNT switched caps) — made fittable (session 19) but NOT a fix.** Shrinking them changes
-  the boost LEVEL, not the OD bass-peak FREQUENCY (that was the treble notch, GAP #2). Left at
-  schematic values (47n/220n). Do not fit them to compensate for the A3 sub-bass.
-
-- **Bridged-T recovery notch** (risk register #1). All four values are `FitParams` fields but were
-  never capture-reshaped; ideal −28 dB @ ~717 Hz is suspiciously deep. Check the ~700 Hz region in
-  the OD-path captures (it's post-clipper, pre-BLEND → affects driven, not the clean tap).
+- **GAP #3 (A3) is now decomposed above** — 3a (rail clamp) and 3b (static GRUNT-dependent tilt).
+  Superseded here: the earlier one-line framing ("sub-bass excess, suspect the clean-bleed level")
+  and the blanket "NOT C12/C13" (see the table above — they are a partial lever, just not a
+  physical answer at the size required).
 - **Per-band mid deviations > 1.5 dB** in the existing report (the low-end fix doesn't touch mids,
   so the current baseline's mid/high data is still valid to mine — no re-render needed).
-- **OD/clean BLEND balance** — the `kInputRef 0.87 → 3.377` move (session 17) shifted where the OD
+- **BLEND-sweep balance** — the `kInputRef 0.87 → 3.377` move (session 17) shifted where the OD
   path sits vs the clean tap in the clipping regime; the harmonic-ratio fit objective could not see
-  it. Check BLEND-sweep captures (blend-0700..1430) for a balance error that appears only at
-  intermediate BLEND.
+  it. Check `blend-0700..1430` for a balance error that appears only at intermediate BLEND. (Not
+  yet examined; the session-20 subset used max-OD captures only.)
 
 ## 5. Performance / HQ pass (not started)
 

@@ -251,13 +251,25 @@ struct FitParams
     double btC17 = 22.0e-9;
 
     // ---- TL07x op-amp output rails (RailClamp, shared by every op-amp stage) -
-    // calibration §6. DISABLED by default and deliberately so: enabling a rail
-    // clamp before kInputRef is anchored clips the signal against an arbitrary
-    // reference, which corrupts every other fit downstream of it. Enable only
-    // AFTER kInputRef is set from the bypass capture, then confirm the levels
-    // against a capture that actually drives a stage into its rails. The
-    // symmetric +-3.3 V default is a placeholder — the real TL07x is asymmetric
-    // around VD and the positive side is expected to clip first.
+    // calibration §6. ** ENABLED 2026-07-25 (Phase 9 session 21) ** — the standing
+    // GATE item, finally landed. Its precondition (kInputRef anchored, session 17)
+    // has been met since 2026-07-22; what blocked it until now was a HARNESS bug
+    // (the 20 gain-n12 captures were rendered ~12 dB hot because render_args()
+    // never emitted --input-trim), which made the EQ-boost-max captures look like
+    // rail-clamp regressions. On the level-honest matrix it is a clear win across
+    // all 63 captures / 240 rows — phase9-validation.md GAP #3a.
+    //
+    // VOLTAGES ARE DERIVED, NOT FITTED. +9 V -> D3 (1N5817, ~0.35 V) -> rail
+    // ~8.65 V; VD = rail/2 = 4.32 V; a TL07x swings to within ~1.5 V of each rail
+    // (datasheet typ; worst-case min is ~3 V) => ~+-2.8 V around VD, with the
+    // POSITIVE side clipping first. Hence 2.7 V positive / 2.9 V negative.
+    // ** Do NOT "fit" these lower.** The capture scan is MONOTONE all the way down
+    // (subset band-RMS 7.64 at 3.3 V -> 7.42 at 2.6 -> 7.22 at 2.0, no interior
+    // minimum), i.e. the objective always wants more clipping — the same
+    // "make the clipper see less" degeneracy that killed the session-5/6 fits.
+    // Taking the physical typical value captures most of the gain (~-0.8 of the
+    // -1.0 dB available at 2.0 V) without chasing an unphysical optimum; the
+    // 0.2 V asymmetry is worth a further -0.12 dB at matched mean.
     // ** BOTH ARE MAGNITUDES (positive), not signed limits: RailClamp saturates
     // into [-railNeg, +railPos] and uses railNeg as a magnitude internally
     // (x < -(railNeg - knee)). railNeg was -3.3 here until 2026-07-22, which made
@@ -266,7 +278,7 @@ struct FitParams
     // railEnabled has always been false; it would have surfaced as a garbage
     // step-2 re-fit the moment rails were enabled. RailClamp::setRailVoltages now
     // takes |v| defensively so a signed --fit railNeg cannot resurrect it. **
-    bool railEnabled = false;
-    double railNeg = 3.3;
-    double railPos = 3.3;
+    bool railEnabled = true;
+    double railNeg = 2.9;
+    double railPos = 2.7;
 };

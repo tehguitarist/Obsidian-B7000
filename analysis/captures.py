@@ -361,11 +361,19 @@ def render_args(parsed, extra_args=None):
 
     extra_args (e.g. ["--fit", "clipA0=27"]) is appended verbatim, which is how a
     calibration sweep varies one FitParams value across a whole capture batch.
+
+    ⚠ A `gain-*` capture was recorded with the interface send turned DOWN, so the real
+    pedal saw a quieter signal — that must be reproduced with --input-trim or every
+    NONLINEAR comparison on those files is wrong (the report gain-matches the OUTPUT by a
+    scalar, which hides it perfectly for a linear capture and silently invalidates a
+    driven one). Uses the MEASURED delta (gain_correction_db), not the nominal dial.
     """
     if parsed.get("bypass"):
         return ["--bypass", "1"] + list(extra_args or [])
 
     args = []
+    if parsed.get("gainSessionDb", 0):
+        args += ["--input-trim", f"{-gain_correction_db(parsed):.6f}"]
     for field, flag in _POT_FLAGS.items():
         args += [flag, f"{float(parsed[field]):.6f}"]
     for field, flag in _SWITCH_FLAGS.items():
