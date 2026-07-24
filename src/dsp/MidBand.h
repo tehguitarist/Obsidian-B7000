@@ -104,6 +104,40 @@ public:
         if (mna::differs(c, cSeries)) { cSeries = c; gc33 = cSeries * twoOverT; dirty = true; }
     }
 
+    // Range-limiting series resistance in the WIPER leg (Phase 9 GAP #4, session 22).
+    // Sits between the wiper and the switched cap C33/C35, so the leg is a series
+    // R+C from node W to the 0 V virtual ground — stamped as ONE branch via the same
+    // Norton reduction TrebleAttack.h uses for its lossy C5, with NO new MNA node:
+    //   g33eff = gc33/(1 + gc33*Rw),  ieq' = ieqC33/(1 + gc33*Rw).
+    // Rw = 0 reproduces the ideal network EXACTLY (the factor is 1), so the existing
+    // FR tests against the unmodified oracle stay valid.
+    //
+    // WHY IT EXISTS. The captures say the real pedal's mid range is ~+-12 dB at EVERY
+    // switch position, while this network's values imply +-14.5...+-28 dB. It is fitted,
+    // not derived: `schematic-checker` (2026-07-25) returned TOPOLOGY CONFIRMED FAITHFUL
+    // (MidBand.h matches circuit.md node for node; the full R1-R54 BOM census leaves no
+    // spare resistor), so there is no unmodelled part to find — and circuit.md tags this
+    // whole stage's cap table [ENG-caps], computed and never schematic-verified, so there
+    // is no ground truth to defer to. Same posture as c21R / trebleLadderDampR / the rail
+    // voltages: dsp.md "fit the corner", the capture is authoritative.
+    //
+    // WHY THIS ELEMENT AND NOT ANOTHER. Two independent signatures pick it out:
+    //   * the excess tracks the ABSOLUTE size of the switched cap (47n +26.6 dB down to
+    //     820p +1.5 dB) — a series R is negligible while Xc dominates (small caps) and
+    //     dominant once the cap is a short (large caps);
+    //   * the measured 4-point POT LAW matches the model to ~1 dB at 25%/75% travel and
+    //     only diverges at the ends — exactly where the pot's own series resistance stops
+    //     masking the wiper leg. (Rail compression was ruled out: the clamp is bit-inert
+    //     on these captures. Knob under-travel was ruled out: pedal/model RISES 0.49->0.93
+    //     toward the small caps, a ceiling, not a constant scale.)
+    // One resistor must serve all three switch positions of a band, so the two smallest
+    // caps are slightly over-corrected — an inherent, accepted trade (see FitParams).
+    void setWiperR(double rOhm) noexcept
+    {
+        const double r = rOhm > 0.0 ? rOhm : 0.0;
+        if (mna::differs(r, wiperR)) { wiperR = r; dirty = true; }
+    }
+
     // Rail-clamp passthroughs (calibration §6) — applied to Vout (op-amp output).
     void setRailClampEnabled(bool e) noexcept { rail.setEnabled(e); }
     void setRailVoltages(double vNeg, double vPos) noexcept { rail.setRailVoltages(vNeg, vPos); }
@@ -116,18 +150,25 @@ public:
         // RHS: source (R38, R41) + capacitor history. See header stamping.
         //   rhs[P3] = Vin/R38 + ieqC32 ;  rhs[P1] = -ieqC32
         //   rhs[W]  = ieqC33          ;  rhs[Vout] = -Vin/R41 + ieqC33
+        // The wiper leg's Norton source is scaled by the same 1/(1+gc33*Rw) factor as
+        // its conductance (setWiperR); at Rw=0 dampDiv is 1 and this is the ideal cap.
+        const double ieqC33b = ieqC33 / dampDiv;
+
         double rhs[4];
         rhs[0] = vin / val.r38 + ieqC32;
         rhs[1] = -ieqC32;
-        rhs[2] = ieqC33;
-        rhs[3] = -vin / val.r41 + ieqC33;
+        rhs[2] = ieqC33b;
+        rhs[3] = -vin / val.r41 + ieqC33b;
 
         double x[4];
         mna::matvec<4>(yinv, rhs, x);
 
         // Capacitor state update: Ieq_new = 2*gc*v_ab − Ieq_old.
         ieqC32 = 2.0 * gc32 * (x[0] - x[1]) - ieqC32; // v_ab = P3 − P1
-        ieqC33 = 2.0 * gc33 * x[2] - ieqC33;          // v_ab = W − (−)=0
+        // Lossy wiper leg: the CAP voltage is the branch voltage minus the Rw drop.
+        // i33 = g33eff*W − ieqC33b ; v_c33 = W − i33*Rw. Rw=0 => v_c33 = W exactly.
+        const double i33 = g33eff * x[2] - ieqC33b;
+        ieqC33 = 2.0 * gc33 * (x[2] - i33 * wiperR) - ieqC33;
 
         return rail.process(x[3]); // Vout, then op-amp rails
     }
@@ -139,15 +180,20 @@ private:
         const double Rb = (1.0 - posA) * kRp; // W  → P1
         const double gRa = 1.0 / Ra, gRb = 1.0 / Rb;
 
+        // Wiper-leg Norton reduction (setWiperR): a series Rw + C33 branch from W to
+        // the 0 V virtual ground collapses to one conductance, no extra node.
+        dampDiv = 1.0 + gc33 * wiperR;   // == 1 when Rw = 0 -> ideal cap, exactly
+        g33eff = gc33 / dampDiv;
+
         double Y[4][4] = {};
         // Row P3: (1/R38 + gc32 + 1/Ra) P3 − gc32 P1 − (1/Ra) W
         Y[0][0] = 1.0 / val.r38 + gc32 + gRa; Y[0][1] = -gc32; Y[0][2] = -gRa;
         // Row P1: −gc32 P3 + (1/R39 + gc32 + 1/Rb) P1 − (1/Rb) W − (1/R39) Vout
         Y[1][0] = -gc32; Y[1][1] = 1.0 / val.r39 + gc32 + gRb; Y[1][2] = -gRb; Y[1][3] = -1.0 / val.r39;
-        // Row W: −(1/Ra) P3 − (1/Rb) P1 + (1/Ra + 1/Rb + gc33) W
-        Y[2][0] = -gRa; Y[2][1] = -gRb; Y[2][2] = gRa + gRb + gc33;
-        // Row (−)/Vout: gc33 W + (1/R40) Vout   (oracle "currents into node" sign)
-        Y[3][2] = gc33; Y[3][3] = 1.0 / val.r40;
+        // Row W: −(1/Ra) P3 − (1/Rb) P1 + (1/Ra + 1/Rb + g33eff) W
+        Y[2][0] = -gRa; Y[2][1] = -gRb; Y[2][2] = gRa + gRb + g33eff;
+        // Row (−)/Vout: g33eff W + (1/R40) Vout   (oracle "currents into node" sign)
+        Y[3][2] = g33eff; Y[3][3] = 1.0 / val.r40;
 
         double tmp[4][4];
         if (mna::invert<4>(Y, tmp))
@@ -164,6 +210,9 @@ private:
     double cSeries = kLoMid10n;
     double twoOverT = 0.0;
     double gc32 = 0.0, gc33 = 0.0;
+    double wiperR = 0.0;             // fitted series R in the wiper leg (setWiperR)
+    double dampDiv = 1.0;            // 1 + gc33*wiperR (1 when wiperR = 0)
+    double g33eff = 0.0;             // gc33 / dampDiv — the stamped leg conductance
     double posA = 0.5;               // electrical pot fraction (0.5 = flat)
     double yinv[4][4] = {};          // precomputed Y^-1 (rebuilt on dirty)
     double ieqC32 = 0.0, ieqC33 = 0.0;

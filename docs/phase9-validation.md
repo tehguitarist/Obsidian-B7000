@@ -32,13 +32,17 @@ detail section below. Check off + move to the Gap log (§4) as they land.
 - [x] **A2. Mid-band deviations > 1.5 dB — MINED (session 21). No broadband mid EQ error exists**
   (clean rows median −0.31 dB; EQ pots band-RMS 1.70; ref/attack 0.31). The uniform mid deficit on OD
   rows is GAP #3b's bass excess seen through the gain-match. **But it surfaced a NEW, larger gap:**
-- [ ] **A2b / GAP #4. The switchable MID positions over-deliver RANGE** — `lomidfreq-250` is
-  **+12…+15 dB** too deep/tall and centred at 254 Hz vs the pedal's 320 Hz; `himidfreq-750` is
-  **+7…+8.5 dB** over; `lomidfreq-1k` and `himidfreq-3k` are fine. The pedal's range is ~±12 dB at
-  every position; the model's follows the [ENG] cap table's ±14.5…±28 dB. Scaling both caps as a
-  pair (circuit.md's parked alternative) does NOT fix it. **Next: `schematic-checker` on the mid
-  stage's range-setting elements (R38/R39, R40/R41, wiper-leg series R) before touching the caps.**
-  §4 GAP #4.
+- [x] **A2b / GAP #4. The switchable MID positions over-deliver RANGE — FIXED + shipped (session 22).**
+  `schematic-checker` returned **TOPOLOGY CONFIRMED FAITHFUL** (MidBand.h matches circuit.md node for
+  node; the full R1–R54 BOM census leaves no spare resistor), so the decision tree's fit-to-capture
+  branch applied. Shipped: **`midWiperRLo = 33k` / `midWiperRHi = 22k`** (a fitted series R in the
+  wiper leg, `MidBand::setWiperR`, Norton-reduced like `trebleLadderDampR` — no new MNA node) and
+  **`midLoCap250 = 47n → 22n`** (the capture's 320 Hz centre = the STOCK board's C33; the one cap
+  value the captures actually contradict). Span band-RMS **9.66 → 4.68 dB**, 4-point POT LAW RMS
+  **5.31 → 0.87 dB**. ctest 16/16. Rail compression and knob under-travel were both explicitly
+  killed first. **⚠ Two residuals:** the two SMALLEST caps are slightly over-corrected (one resistor
+  serves all three positions of a band — accepted trade), and Rw pulls the LO-MID 500 / HI-MID 750
+  centres a band low. §4 GAP #4.
 - [ ] **A3. OD/clean BLEND balance — now the BIGGEST residual.** The `grunt-boost`/`grunt-flat` captures stay 12–26 dB off after the notch fix: a sub-bass excess (20–40 Hz) where the pedal has a low-mid bump. Session 19 proved the 254 Hz null is NOT a polarity bug (OD/clean in-phase at LF) and C12/C13 don't fix it (level, not corner). Root suspect = the clean-bleed level/shape + grunt coupling in the clipping regime (kInputRef 0.87→3.377 move). **Start here for the next voicing gain.** Probes: `blend_null_probe.cpp`, `od_taps_probe.cpp`.
 - [x] **A3-next (0). `render_args()` now emits `--input-trim`** for `gainSessionDb`; baseline
   regenerated (session 21). Send-vs-record-gain settled three ways. §3.
@@ -449,7 +453,90 @@ physical answer and recovers only ~7–9 dB of a 25–35 dB gap. **3b is still o
 structural suspect is the bridged-T depth above (which the GRUNT-cut coupling corner masks and GRUNT
 boost exposes — precisely the observed GRUNT dependence).
 
-### ▶ GAP #4 — the switchable MID positions over-deliver RANGE (A2's real answer). FOUND session 21, not fixed.
+### ✅ GAP #4 — the switchable MID positions over-deliver RANGE. FOUND session 21, **FIXED session 22**.
+
+**Outcome (session 22, 2026-07-25).** `schematic-checker` returned **TOPOLOGY CONFIRMED FAITHFUL**,
+so the pre-registered decision tree's second branch applied and the range limiter was **fitted to the
+capture**: `midWiperRLo = 33k`, `midWiperRHi = 22k` (a series R in the wiper leg, `MidBand::setWiperR`)
+plus the one cap value the captures actually contradict, `midLoCap250 = 47n → 22n`. ctest 16/16.
+
+| metric (all six switch positions) | shipped | fitted |
+|---|---|---|
+| boost-to-cut span, band-RMS 160 Hz–4.1 kHz | **9.66 dB** | **4.68 dB** |
+| 4-point POT LAW RMS (the knob response a player feels) | **5.31 dB** | **0.87 dB** |
+
+Per position (span peak dB @ Hz; the ±range is half the span):
+
+| position | pedal | shipped | fitted | RMS ship → fit |
+|---|---|---|---|---|
+| LO-MID 250 (C33 47n→**22n**) | 25.2 @ 320 | 51.8 @ 254 | 27.9 @ **320** | 17.42 → **6.44** |
+| LO-MID 500 (10n) | 24.8 @ 508 | 42.5 @ 508 | 26.2 @ 403 | 10.20 → **5.61** |
+| LO-MID 1k (2n2) | 21.8 @ 1016 | 24.6 @ 1016 | 18.7 @ 1016 | 1.64 → 2.91 |
+| HI-MID 750 (15n) | 24.7 @ 806 | 39.9 @ 806 | 22.4 @ 640 | 10.92 → **5.83** |
+| HI-MID 1.5k (3n3) | 18.6 @ 1613 | 29.8 @ 1613 | 18.2 @ 1280 | 5.30 → **3.04** |
+| HI-MID 3k (820p) | −19.5 @ 160\* | −20.9 @ 160\* | −16.9 @ 160\* | 1.38 → 2.63 |
+
+\* the 3 kHz row's peak search lands on the 5.12 kHz renormalisation artefact, not the stage's peak —
+treat it as "no strong evidence" either way, as session 21 already flagged.
+
+**⚠ ACCEPTED TRADE, not a fit artefact:** ONE resistor must serve all three switch positions of a
+band, so the two SMALLEST caps are slightly over-corrected (LO-MID 1k 1.64 → 2.91, HI-MID 3k 1.38 →
+2.63). The net is decisive (the two large-cap positions improve by 10–11 dB RMS) and the pot law goes
+near-exact, so this was taken deliberately. A per-position limiter would fit better and be physically
+meaningless.
+
+**⚠ RESIDUAL, still open:** Rw pulls each peak's CENTRE down, so LO-MID 500 (508 → 403 Hz) and HI-MID
+750 (806 → 640 Hz) now sit a band low where they were previously right. Only LO-MID 250's centre was
+recovered (via the cap). A joint fit that refits **all six** caps scores better on paper (span RMS
+2.84) but **collapses LO-MID "250" onto ~10n — the 500 Hz position's own cap** — destroying the
+switch's frequency differentiation, so it was **rejected**. Recovering the other centres needs its own
+evidence, not a blind fit.
+
+#### How the element was identified (six independent checks — reusable method)
+
+Sessions 19/20 both mis-read a stage by testing the wrong quantity, so each step here is a separate
+measurement, and three plausible explanations were **killed** before the fit:
+
+1. **The DSP is not at fault.** The plugin reproduces the modelled network's span to **~0.5 dB** at
+   all six positions ⇒ the error is in the NETWORK MODEL, not `MidBand.h`'s solve.
+2. **`schematic-checker`: TOPOLOGY CONFIRMED FAITHFUL.** `MidBand.h` matches circuit.md node for
+   node; the full **R1–R54 BOM census** leaves no spare resistor (each mid band uses exactly 4 R +
+   2 C), so no unmodelled range-limiting part exists on the board.
+3. **✗ Rail compression — KILLED.** The rail clamp is **bit-inert** on these captures (0.0000 dB vs
+   an explicit `railEnabled=0` render), so the session-21 clamp is not involved.
+4. **✗ Knob under-travel — KILLED.** pedal/model ratio **RISES 0.49 → 0.93** toward the small caps.
+   Under-travel would give a CONSTANT ratio; a rising one is a *ceiling* the small caps never reach.
+5. **The excess tracks the ABSOLUTE switched-cap size** (47n +26.6 dB, 15n +15.2, 10n +17.7, 3n3
+   +11.2, 2n2 +2.8, 820p +1.5) — the signature of a series R in the wiper leg: negligible while Xc
+   dominates (small caps), dominant once the cap is a short (large caps).
+6. **The measured 4-point POT LAW confirms it from the other side.** At 25%/75% travel the model
+   already matched the pedal to ~1 dB; the ENTIRE error was in the last of the travel, symmetrically
+   at both ends — exactly where the pot's own series resistance stops masking the wiper leg.
+
+Levers scanned and **rejected** (none reproduces the pattern across all six positions): R38/R39 end
+resistors (RMS 9.66 → 9.42, wrong direction), R40/R41 flat legs (→ 8.22), the across-lug cap C32/C34
+(→ 10.49, worse), a uniform cap-table scale (→ 8.63), and pot end-travel (best 4.03 but it
+over-suppresses every small-cap position).
+
+**Two things worth carrying forward.** (a) The **boost-to-cut SPAN is the right metric** for any
+symmetric EQ control — a matched-pair differential in which the whole rest of the chain cancels
+exactly, immune to the report's gain-match, the clean/OD balance, and the other EQ bands. (b) The
+**pot LAW** (a control measured at ≥3 knob points, not just its extremes) is what separated "the
+network's range is wrong" from "the ends of the travel are wrong" — the extremes alone are ambiguous.
+`analysis/mid_range_probe.py`, `mid_range_fit.py`, `mid_range_final_fit.py` implement all of this.
+
+**⚠ One fact this fit does NOT explain, recorded honestly.** circuit.md's nodal sim was previously
+cross-validated against the **manufacturer's own measured table on p.3**, which shows the SAME varying
+range our model had (26→18 dB lo-mid, 23→12.6 dB hi-mid). So our capture contradicts p.3's
+real-hardware measurements as well as our sim — the fitted 33k/22k has no physical counterpart on this
+board and is a behavioural match to *the unit we captured*, nothing more. That is the accepted posture
+here (the cap table is `[ENG]`-computed and never schematic-verified, so there is no ground truth to
+defer to), but it should not be described as having found the real circuit.
+
+---
+
+#### Original session-21 finding (kept for context)
+
 
 **A2 as originally framed ("mid-band deviations > 1.5 dB → fix via the Baxandall/mid FitParams") is
 answered: there is no broadband mid-band EQ error.** Mining all 236 valid rows, every 1/3-oct band

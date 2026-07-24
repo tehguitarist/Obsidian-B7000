@@ -81,12 +81,14 @@ static const std::vector<Cfg> kCfgs = {
       { -0.00286, -0.01784, -0.07100, -0.27860, -0.60799, -1.54811, -4.67537, -11.27482 } },
 };
 
-static double measureDb(const MidBand::Values& v, double cSeries, double a, double freq, double fs)
+static double measureDb(const MidBand::Values& v, double cSeries, double a, double freq, double fs,
+                        double wiperR = 0.0)
 {
     MidBand stage;
     stage.configure(v, cSeries);
     stage.prepare(fs);
     stage.setPosition(a);
+    stage.setWiperR(wiperR);
 
     const double period = fs / freq;
     const int settle = static_cast<int>(std::max(0.25 * fs, 8.0 * period));
@@ -174,6 +176,50 @@ int main()
         const bool ok = (y < 0.0) && std::abs(gain + 1.0) < 2e-3;
         std::printf("  a=%.1f  Vout/Vin=%.6f (expect -1.0)  %s\n", a, gain, ok ? "PASS" : "FAIL");
         if (! ok)
+            ++failures;
+    }
+
+    // ---- Test 5: wiper-leg series R (GAP #4 range limiter) ------------------
+    // The fitted midWiperR is stamped as a lossy cap via the Norton reduction (no new
+    // MNA node). Two things must hold: (a) it reproduces the oracle's Rw != 0 response,
+    // and (b) Rw = 0 is EXACTLY the ideal network, so Tests 1-4 stay meaningful.
+    {
+        std::printf("\n=== Wiper-leg series R vs oracle (mid_stage_tf Rw=) ===\n");
+        struct WCfg { const char* name; const MidBand::Values& v; double c; double a; double rw;
+                      double db[kNF]; };
+        const std::vector<WCfg> wcfgs = {
+            { "LO-MID 22n Rw=33k boost", MidBand::kLoMid, 22.0e-9, 0.0, 33.0e3,
+              { +1.69820, +5.91572, +10.58697, +14.50678, +15.24923, +13.86967, +9.56574, +5.01933 } },
+            { "LO-MID 22n Rw=33k cut",   MidBand::kLoMid, 22.0e-9, 1.0, 33.0e3,
+              { -1.69820, -5.91572, -10.58697, -14.50678, -15.24923, -13.86967, -9.56574, -5.01933 } },
+            { "HI-MID 15n Rw=22k boost", MidBand::kHiMid, 15.0e-9, 0.0, 22.0e3,
+              { +0.80423, +3.54348, +7.71021, +12.67859, +15.31777, +17.54283, +17.17323, +13.38032 } },
+            { "HI-MID 15n Rw=22k cut",   MidBand::kHiMid, 15.0e-9, 1.0, 22.0e3,
+              { -0.80423, -3.54348, -7.71021, -12.67859, -15.31777, -17.54283, -17.17323, -13.38032 } },
+        };
+        for (const auto& c : wcfgs)
+        {
+            double worst = 0.0;
+            for (int i = 0; i < kNF; ++i)
+                worst = std::max(worst,
+                                 std::abs(measureDb(c.v, c.c, c.a, kFreqs[i], 48000.0, c.rw) - c.db[i]));
+            // Same tolerance as Test 1: <= 2 kHz the only deviation is bilinear warp.
+            const bool ok = worst < 0.15;
+            std::printf("  %-26s worst |dev| = %.4f dB  %s\n", c.name, worst, ok ? "PASS" : "FAIL");
+            if (! ok)
+                ++failures;
+        }
+
+        // Rw = 0 must be bit-identical to not calling setWiperR at all.
+        double worst0 = 0.0;
+        for (int i = 0; i < kNF; ++i)
+            worst0 = std::max(worst0,
+                              std::abs(measureDb(MidBand::kLoMid, MidBand::kLoMid10n, 0.0, kFreqs[i], 48000.0, 0.0)
+                                       - measureDb(MidBand::kLoMid, MidBand::kLoMid10n, 0.0, kFreqs[i], 48000.0)));
+        const bool ok0 = worst0 == 0.0;
+        std::printf("  %-26s worst |dev| = %.1e dB  %s\n", "Rw=0 is exactly ideal", worst0,
+                    ok0 ? "PASS" : "FAIL");
+        if (! ok0)
             ++failures;
     }
 

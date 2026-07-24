@@ -15,7 +15,7 @@ __pycache__/
 analysis/pedal_results*/
 # Generated A/B report data + per-capture result cache (regenerate via comprehensive_report.py;
 # the tracked analysis/reports/*.example.* files are the committed samples)
-analysis/reports/comprehensive_data.json
+analysis/reports/comprehensive_data*.json
 analysis/reports/cache/
 
 # Generated schematic rasters (regenerate via schematics/crop.py; sources are PDFs)

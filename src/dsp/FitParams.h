@@ -281,4 +281,36 @@ struct FitParams
     bool railEnabled = true;
     double railNeg = 2.9;
     double railPos = 2.7;
+
+    // ---- MID stages: range limiter + the LO-MID "250" cap (Phase 9 GAP #4) -------
+    // The captures say the real pedal's mid boost/cut range is ~+-12 dB at EVERY switch
+    // position; the modelled network's values imply +-14.5...+-28 dB (circuit.md's
+    // [ENG-caps] table). `schematic-checker` (2026-07-25) returned TOPOLOGY CONFIRMED
+    // FAITHFUL — MidBand.h matches circuit.md node for node and the full R1-R54 BOM
+    // census leaves no spare resistor — so per the pre-registered decision tree in
+    // docs/phase9-validation.md §4 GAP #4 these are FITTED to the capture, exactly as
+    // c21R / trebleLadderDampR / the rail voltages were. The full derivation (why a
+    // wiper-leg series R and not R38/R39, R40/R41, the across-lug cap, pot end-travel
+    // or rail compression) is in MidBand.h::setWiperR and the §4 gap log.
+    //
+    // Measured effect over all six switch positions (boost-to-cut span, 160 Hz-4.1 kHz,
+    // matched-pair differential so the rest of the chain cancels exactly):
+    //   band-RMS vs the pedal  9.66 -> 4.68 dB
+    //   4-point POT LAW RMS    5.31 -> 0.87 dB   <- the knob response a player feels
+    // ONE resistor has to serve all three switch positions of a band, so the two
+    // smallest caps (LO-MID 1k, HI-MID 3k) are slightly OVER-corrected (RMS 1.64->2.91
+    // and 1.38->2.63). That is an accepted, inherent trade, not a fit artefact — the
+    // net is decisive and the two large-cap positions improve by 10-11 dB RMS.
+    double midWiperRLo = 33.0e3;   // LO-MID (IC5_D) wiper leg; fit 53.7k, E12-rounded
+    double midWiperRHi = 22.0e3;   // HI-MID (IC6_A) wiper leg; fit 22.1k
+
+    // LO-MID "250 Hz" switch position. The [ENG] table computed 47n (-> a 229 Hz
+    // centre); the capture peaks at the 320 Hz band, and 22n — which is the STOCK
+    // board's C33, schematic- and BOM-verified — puts the modelled centre exactly
+    // there. Two independent lines of evidence agree, so this is the one cap value
+    // in the table the captures actually contradict. The other five stay [ENG].
+    // (A joint fit that refits ALL six caps scores better on paper but collapses this
+    // position onto ~10n, i.e. onto the 500 Hz position's cap — it destroys the
+    // switch's frequency differentiation, so it was rejected. §4 GAP #4.)
+    double midLoCap250 = 22.0e-9;
 };

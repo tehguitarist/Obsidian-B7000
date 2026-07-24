@@ -250,6 +250,11 @@ public:
         loMid.setRailClampEnabled(f.railEnabled);
         hiMid.setRailClampEnabled(f.railEnabled);
         masterOut.setRailClampEnabled(f.railEnabled);
+
+        // Mid-stage range limiter (Phase 9 GAP #4). The switched-cap value itself is
+        // applied through loMidCap() in applyParams(), which reads fit.midLoCap250.
+        loMid.setWiperR(f.midWiperRLo);
+        hiMid.setWiperR(f.midWiperRHi);
     }
 
     const FitParams& getFitParams() const noexcept { return fit; }
@@ -366,12 +371,15 @@ private:
             default: return Clipper::Grunt::Cut;
         }
     }
-    static double loMidCap(int idx) noexcept
+    // NOT static: the "250" position's cap is capture-fitted (FitParams::midLoCap250 —
+    // the [ENG] 47n centres at 229 Hz, the capture peaks at 320 Hz). The other two
+    // positions keep their [ENG] constants.
+    double loMidCap(int idx) const noexcept
     {
         // APVTS {250, 500, 1k}
         switch (idx)
         {
-            case 0: return MidBand::kLoMid47n;
+            case 0: return fit.midLoCap250;
             case 1: return MidBand::kLoMid10n;
             default: return MidBand::kLoMid2n2;
         }

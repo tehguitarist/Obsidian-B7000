@@ -138,14 +138,25 @@ def drive_stage_tf(f, Rdrive, R15=330e3, C10=47e-12, R17=3.3e3, R32=1e3):
     return 1.0 + Zf / Zg
 
 
-def mid_stage_tf(f, a, C33, Rp=100e3, R38=2.2e3, R39=2.2e3, R40=220e3, R41=220e3, C32=22e-9):
-    """Return complex gain Vout/Vin of the mid peaking stage at frequencies f, pot position a."""
+def mid_stage_tf(f, a, C33, Rp=100e3, R38=2.2e3, R39=2.2e3, R40=220e3, R41=220e3, C32=22e-9,
+                 Rw=0.0):
+    """Return complex gain Vout/Vin of the mid peaking stage at frequencies f, pot position a.
+
+    Rw = series resistance in the WIPER leg, between the wiper and the switched series
+    cap C33/C35 (0.0 = the shipped/nominal network, bit-identical to before). It enters
+    ONLY as a lossy-cap admittance yLeg = 1/(Rw + 1/(s*C33)) replacing s*C33 — the leg is
+    a plain series R+C from node W to the 0 V virtual ground, so no extra node is needed.
+    This is the GAP #4 range-limiting element: Rw caps the wiper leg's authority against
+    R38/R41 at frequencies where the cap is a short, so it bounds the boost/cut range
+    POSITION-INDEPENDENTLY (the observed signature) instead of per-cap.
+    """
     w = 2j * np.pi * f
     a = min(max(a, 1e-6), 1 - 1e-6)
     Ra, Rb = a * Rp, (1 - a) * Rp
     out = np.zeros(len(f), dtype=complex)
     for i, s in enumerate(w):
-        yC32, yC33 = s * C32, s * C33
+        yC32 = s * C32
+        yC33 = (s * C33) if Rw <= 0.0 else 1.0 / (Rw + 1.0 / (s * C33))
         # unknowns x = [P3, P1, W, Vout]; Vin = 1; virtual ground node = 0 V (ideal op-amp)
         A = np.zeros((4, 4), dtype=complex); b = np.zeros(4, dtype=complex)
         # KCL P3: (P3-Vin)/R38 + (P3-P1)*yC32 + (P3-W)/Ra = 0

@@ -232,6 +232,9 @@ static const FitField kFitFields[] = {
     {"btC17", &FitParams::btC17},
     {"railNeg", &FitParams::railNeg},
     {"railPos", &FitParams::railPos},
+    {"midWiperRLo", &FitParams::midWiperRLo},
+    {"midWiperRHi", &FitParams::midWiperRHi},
+    {"midLoCap250", &FitParams::midLoCap250},
 };
 
 static void applyFitAssignment(FitParams& fit, const std::string& assignment)
