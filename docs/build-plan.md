@@ -421,13 +421,17 @@ opaque/semi-opaque selected/unselected states.
 
 ## Phase 9 — Reference validation + performance pass
 
+> **▶ IN PROGRESS — running report + gap log lives in `docs/phase9-validation.md`** (the GATE-9
+> report). Gap #1 (low end / C21) FOUND + FIXED + committed; residual-gap hunt continues.
+
 1. Full `docs/validation-and-capture.md` A/B run against the whole capture matrix; fix by
-   decomposition, not fudge factors.
+   decomposition, not fudge factors. (Harness: `analysis/comprehensive_report.py` now caches +
+   supports `--only`/`--fit`/`--out` for cheap iteration — see phase9-validation.md §2.)
 2. PerfBenchmark / FeatureProfile / OSFidelity probes → decide `hq` toggle (omega4 vs
    AccurateOmega is usually the only real lever), README performance table.
 
-**GATE 9:** validation report written into `docs/` (numbers, not adjectives); HQ decision made
-and implemented or explicitly rejected.
+**GATE 9:** validation report written into `docs/` (numbers, not adjectives) — `phase9-validation.md`;
+HQ decision made and implemented or explicitly rejected.
 
 ## Phase 10 — Final sweep + release
 
