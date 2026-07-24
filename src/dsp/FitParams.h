@@ -86,6 +86,20 @@ struct FitParams
     // diagnostic (the corner wants a value no 4n7-labelled cap explains -> look past
     // C11). Only the Cut position depends on it alone; Boost = C11||220n is ~immune.
     double clipC11 = 5.7207e-9;  // session-17 fenced fit (schematic 4.7 nF; user-authorised to move)
+    // clipC12/clipC13 = the SWITCHED GRUNT caps (schematic 47 nF / 220 nF, added in
+    // Flat / Boost respectively). Made fittable in session 19 (Phase 9): the A/B
+    // baseline showed the plugin's GRUNT is voiced BACKWARDS — matched-pair
+    // boost-cut is a sub-bass shelf (corner ~37 Hz) vs the pedal's low-mid growl
+    // bump (~150 Hz), a LEVEL-INDEPENDENT (linear) +15..22 dB excess at 20-40 Hz.
+    // The coupling corner 1/(2*pi*C*(R16 + R18/(1+A0))) is too LOW because C12/C13
+    // are too big → the capture wants ~10x smaller caps (circuit.md already flags
+    // C13 = 220n primary vs 22n backup as an unresolved revision discrepancy; the
+    // capture favours the backup). Only Flat depends on C12, only Boost on C13; Cut
+    // is C11 alone (unaffected). ⚠ These move OFF a "triple-checked" primary-schematic
+    // value — provenance is a schematic-checker follow-up (which cap vs the impedance),
+    // but dsp.md "fit the corner" makes the capture authoritative on the corner.
+    double clipC12 = 47.0e-9;    // GRUNT Flat  add-cap (schematic 47 nF; session-19 fittable)
+    double clipC13 = 220.0e-9;   // GRUNT Boost add-cap (schematic 220 nF; session-19 fittable)
 
     // ---- J201 JFET stage (JfetStage.h) --------------------------------------
     // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;
@@ -211,6 +225,26 @@ struct FitParams
     // fixed, to be reshaped to whatever the capture actually shows (including
     // "much shallower than ideal"). The NOTCH FREQUENCY is far more trustworthy
     // than its depth; weight the fit accordingly.
+    // ---- Treble-ladder notch damping (TrebleAttack.h) -----------------------
+    // The R7-vs-(C5/C9/C6) two-path cancellation notch at ~322 Hz is ~28 dB deep
+    // in the ideal model but only -3.4 dB in the capture, and tolerance cannot
+    // explain the gap (circuit.md risk #1; Monte Carlo never got shallower than
+    // -23 dB). The over-deep notch scoops the OD low-mids (100-500 Hz), which is
+    // the session-19 root cause of the "backwards GRUNT" + the 254 Hz BLEND null.
+    // trebleLadderDampR = a series loss on the C5 ladder cap (real ESR / PCB /
+    // unmodelled damping R) that shallows the cancellation. 0 = ideal deep notch;
+    // fit to the capture's -3.4 dB DEPTH (dsp.md "fit the corner/depth to capture";
+    // the notch FREQUENCY moves little with it). See analysis/od_taps_probe.cpp.
+    double trebleLadderDampR = 30.0e3;  // ohms; session-19 Phase-9 A/B fit (was implicit 0).
+                            // Fit on the clean OD captures (notch region 127-640 Hz):
+                            // low-mid RMS 3.64 -> 1.96 dB across 6 flat-EQ OD captures, HF
+                            // (1-6 kHz) cost only +0.11 dB (the knee; 40k trades +0.12 HF for
+                            // -0.09 more low-mid). Shallows the 322 Hz notch from ~28 dB to a
+                            // capture-like depth. ⚠ 30k is LARGE for literal cap ESR — the
+                            // physical origin (why the ideal notch is far too deep; tolerance
+                            // ruled out) is a schematic-checker follow-up, but dsp.md makes the
+                            // capture authoritative on the notch depth (like c21R's 10x corner).
+
     double btR22 = 100.0e3;
     double btR23 = 33.0e3;
     double btC16 = 680.0e-12;

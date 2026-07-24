@@ -208,6 +208,8 @@ public:
 
         clipper.setNonlinear(f.clipA0, f.clipSatLo, f.clipSatHi, f.clipK);
         clipper.setC11(f.clipC11);   // fittable GRUNT=Cut coupling cap (session 17)
+        clipper.setC12(f.clipC12);   // fittable GRUNT=Flat  add-cap (session 19)
+        clipper.setC13(f.clipC13);   // fittable GRUNT=Boost add-cap (session 19)
         jfet.setNonlinear(f.jfetGm, f.jfetRo, f.jfetRq2, f.jfetSatPos, f.jfetSatNeg,
                           f.jfetCeilPos, f.jfetCeilNeg, f.jfetExpandBeta);
         // The J201 drain's output impedance is stamped into the treble net's nodal
@@ -217,6 +219,7 @@ public:
             const auto z = jfet.getSourceZ();
             treble.setSourceZ(z.ro, z.rq2, z.rp, z.cp);
         }
+        treble.setNotchDamp(f.trebleLadderDampR); // session-19: shallow the 322 Hz notch
 
         drive.setTaperExp(f.driveTaperExp);
         levelBlend.setTaperExp(f.levelTaperExp);
@@ -269,6 +272,24 @@ public:
         s = skB.process(s);
         s = skA.process(s);
         return s;
+    }
+
+    // Diagnostic-only per-stage taps of the OD region (session 19, Phase 9). Runs
+    // the identical stage order as runOdSample() but records each boundary output,
+    // so a probe can localise WHICH OD stage shapes a given band. Not used by the
+    // plugin or OfflineRender; state advances exactly like runOdSample().
+    struct OdTaps { double jfet, treble, drive, clipper, recovery, skB, skA; };
+    inline OdTaps runOdSampleTapped(double buf) noexcept
+    {
+        OdTaps t;
+        t.jfet = jfet.process(buf);
+        t.treble = treble.process(t.jfet);
+        t.drive = drive.process(t.treble);
+        t.clipper = clipper.process(t.drive);
+        t.recovery = recovery.process(t.clipper);
+        t.skB = skB.process(t.recovery);
+        t.skA = skA.process(t.skB);
+        return t;
     }
 
     // Base-rate: LevelBlend crossfade (clean tap already delay-compensated by the

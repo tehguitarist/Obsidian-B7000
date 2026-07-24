@@ -16,11 +16,12 @@ Ordered by impact on "sounds like the real pedal" first, then release-readiness.
 detail section below. Check off + move to the Gap log (§4) as they land.
 
 **A. Close the remaining voicing gaps (Phase 9 core — highest impact on the sound):**
-- [ ] **A0. Regenerate the full 63-cap baseline report at the shipped c21R=100k** (`comprehensive_report.py --os 4`, ~20 min — background it). A rebuild busted the cache, so this seeds a clean baseline + fills the cache so A1–A3 gap-hunts are instant. Do this FIRST so A1–A3 read a correct baseline.
-- [ ] **A1. Bridged-T ~717 Hz notch** (risk register #1). Ideal −28 dB is suspiciously deep; never capture-reshaped. All four values are `FitParams` fields (`btR22/btR23/btC16/btC17`). OD-path only (post-clipper, pre-BLEND) → check the ~700 Hz region in OD-path captures, not the clean tap. See §4 "Remaining candidates".
-- [ ] **A2. Mid-band deviations > 1.5 dB.** Mine the existing baseline (mids are unaffected by the low-end fix — no re-render needed to *find* them). Fix via the Baxandall/mid `FitParams` or taper as decomposition warrants.
-- [ ] **A3. OD/clean BLEND balance.** The `kInputRef 0.87 → 3.377` move (session 17) shifted where the OD path sits vs the clean tap in the clipping regime; the harmonic-ratio fit couldn't see it. Check blend-sweep captures (`blend-0700..1430`) for an error that appears only at intermediate BLEND.
-- [ ] **A4. Re-grade the full matrix after A1–A3; write final GATE-9 numbers into §4.**
+- [x] **A0. Regenerate the full 63-cap baseline report at the shipped c21R=100k** (session 19). Confirmed GAP #1 holds (clean low end ~0 dB). Cache seeded.
+- [x] **A1. Bridged-T ~717 Hz notch** — INVESTIGATED, **non-issue** (session 19). No unmatched notch: bands 508/640/806/1016 track flat (~−1.5 dB), no local dip. Do NOT reshape `bt*`. See §4 GAP #1b.
+- [x] **A1b/c/d. TREBLE ~322 Hz notch too deep — the real root gap. FIXED + shipped** (session 19, GAP #2 below). Found while chasing A1: the OD low-mids (100–500 Hz) are scooped by the treble-ladder two-path cancellation notch (~28 dB model vs −3.4 dB capture). New `trebleLadderDampR=30k` shallows it. This is the root of the "backwards GRUNT" + the 254 Hz BLEND null.
+- [ ] **A2. Mid-band deviations > 1.5 dB.** Mine the existing baseline (mids are unaffected by the low-end/notch fixes). Fix via the Baxandall/mid `FitParams` or taper as decomposition warrants.
+- [ ] **A3. OD/clean BLEND balance — now the BIGGEST residual.** The `grunt-boost`/`grunt-flat` captures stay 12–26 dB off after the notch fix: a sub-bass excess (20–40 Hz) where the pedal has a low-mid bump. Session 19 proved the 254 Hz null is NOT a polarity bug (OD/clean in-phase at LF) and C12/C13 don't fix it (level, not corner). Root suspect = the clean-bleed level/shape + grunt coupling in the clipping regime (kInputRef 0.87→3.377 move). **Start here for the next voicing gain.** Probes: `blend_null_probe.cpp`, `od_taps_probe.cpp`.
+- [ ] **A4. Re-grade the full matrix after A2–A3; write final GATE-9 numbers into §4.**
 
 **B. Performance / quality pass (Phase 9 part 2):**
 - [ ] **B1. PerfBenchmark / FeatureProfile / OSFidelity probes** → the `hq` toggle decision (omega4 vs AccurateOmega is usually the only real lever) + README perf table. See §5.
@@ -138,7 +139,58 @@ or the stack-input Z > 10k. `c21R` is the sanctioned model knob for this corner 
 authoritative (dsp.md "fit the corner"), but **C21's exact schematic value/placement is worth a
 `schematic-checker` pass** to attribute the ~10× to the cap vs the impedance.
 
+### ✅ GAP #1b — Bridged-T ~717 Hz notch (risk #1). INVESTIGATED, NOT A GAP (session 19).
+
+No unmatched notch: across all OD-path captures, bands 508/640/806/1016 Hz sit flat together
+(~−1.5 dB) with no local dip at 717 Hz. The bridged-T is fine as-is; `btR22/btR23/btC16/btC17` were
+left at their schematic values. (The isolated model notch is filled by the clean bleed in the full
+output, so it never surfaced as a capture gap.)
+
+### ✅ GAP #2 — Treble ~322 Hz notch too deep → OD low-mids scooped. FIXED (session 19).
+
+**Symptom.** The OD path's low-mids (100–500 Hz) are scooped: the plugin's OD peaks ~50–60 Hz and
+falls off a cliff above, while the pedal has a low-mid bump at ~180 Hz. This made GRUNT look
+"backwards" (the pedal's GRUNT is a ~180 Hz growl bump; the plugin's was a sub-bass shelf) and
+exposed a 254 Hz null in `grunt-boost` (the OD low-mids drop to the flat clean-bleed level, so the
+ordinary OD-vs-clean phase cancellation becomes visible — NOT a polarity bug: OD/clean are in-phase
+at LF, +8.9° @40 Hz).
+
+**Localised** (`runOdSampleTapped` + `analysis/od_taps_probe.cpp`) to ONE stage: the **TrebleAttack**
+network (JFET→treble transimpedance). Its ~322 Hz two-path cancellation notch (R7 vs the C5/C9/C6
+ladder) is **~37 dB deep in the assembled model but −3.4 dB in the capture** — the parked risk
+register #1 item ("Monte Carlo tolerance can't explain it"). Downstream stages just add gain,
+preserving the scoop.
+
+**Cause.** The ideal two-path cancellation is far more perfect than the real circuit's — a series
+loss the ideal model omits (cap ESR / PCB / an unmodelled damping R).
+
+**Fix.** New `trebleLadderDampR` (`FitParams`): a series damping R on the C5 ladder cap, modelled as
+a lossy cap (Norton reduction, no new MNA node; Rd=0 = ideal exactly). Fit to the clean OD captures:
+
+| | before (Rd=0) | after (Rd=30k) |
+|---|---|---|
+| low-mid RMS (127–640 Hz), 6 flat-EQ OD caps | 3.64 dB | **1.96 dB** |
+| HF cost (1–6 kHz) | — | +0.11 dB (the knee; 40k trades +0.12 HF for −0.09 more low-mid) |
+
+Validated: the C++ lossy-C5 matches the independent Python oracle (`treble_attack_tf(RdampC5=...)`)
+to <0.05 dB at Rd=30k across all ATTACK positions (`TrebleAttackTest` Tests 6/7). ctest 16/16.
+
+**Physical note.** 30k is large for literal cap ESR — the origin (why the ideal notch is far too
+deep; tolerance ruled out) is a `schematic-checker` follow-up, but dsp.md makes the capture
+authoritative on the notch depth (same posture as c21R's 10× corner).
+
+**Payoff is modest (~1.7 dB low-mid)** because the flat clean bleed already fills the isolated 37 dB
+notch in the full output (it cost only ~2–4 dB in captures). The BIG residual — the `grunt-boost`
+sub-bass — is a SEPARATE issue (A3 / GAP #3, not yet fixed).
+
 ### ▶ Remaining candidates (not yet investigated)
+
+- **OD/clean BLEND balance (A3) — the biggest residual.** `grunt-boost`/`grunt-flat` captures stay
+  12–26 dB off: the plugin over-emphasises 20–40 Hz vs the pedal's low-mid bump. NOT a polarity bug,
+  NOT C12/C13. Suspect the clean-bleed level/shape + grunt coupling in the clipping regime.
+- **C12/C13 (GRUNT switched caps) — made fittable (session 19) but NOT a fix.** Shrinking them changes
+  the boost LEVEL, not the OD bass-peak FREQUENCY (that was the treble notch, GAP #2). Left at
+  schematic values (47n/220n). Do not fit them to compensate for the A3 sub-bass.
 
 - **Bridged-T recovery notch** (risk register #1). All four values are `FitParams` fields but were
   never capture-reshaped; ideal −28 dB @ ~717 Hz is suspiciously deep. Check the ~700 Hz region in

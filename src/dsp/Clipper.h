@@ -177,16 +177,17 @@ public:
         return kC11;
     }
 
-    // Instance version — uses the FITTABLE c11 (session 17) instead of kC11, so a
-    // fitted clipC11 moves the Cut corner. C12/C13 stay at schematic values (Boost/
-    // Flat are ~immune to C11 and already fit — see FitParams::clipC11).
+    // Instance version — uses the FITTABLE c11/c12/c13 instead of kC11/kC12/kC13,
+    // so a fitted clipC11 moves the Cut corner and fitted clipC12/clipC13 move the
+    // Flat/Boost corners (session 19 — the capture shows GRUNT voiced backwards, a
+    // too-low boost/flat corner; see FitParams::clipC12/clipC13).
     double gruntCapNow(Grunt g) const noexcept
     {
         switch (g)
         {
             case Grunt::Cut:   return c11;
-            case Grunt::Flat:  return c11 + kC12;
-            case Grunt::Boost: return c11 + kC13;
+            case Grunt::Flat:  return c11 + c12;
+            case Grunt::Boost: return c11 + c13;
         }
         return c11;
     }
@@ -197,6 +198,21 @@ public:
     void setC11(double v) noexcept
     {
         c11 = v;
+        setGruntCap(gruntCapNow(grunt));
+    }
+
+    // Set the SWITCHED GRUNT caps (FitParams::clipC12/clipC13). Like setC11, each
+    // re-derives the current position's branch coefficients; order-independent vs
+    // setC11()/setGrunt() (all re-run setGruntCap() off the live c11/c12/c13/grunt).
+    void setC12(double v) noexcept
+    {
+        c12 = v;
+        setGruntCap(gruntCapNow(grunt));
+    }
+
+    void setC13(double v) noexcept
+    {
+        c13 = v;
         setGruntCap(gruntCapNow(grunt));
     }
 
@@ -320,6 +336,8 @@ private:
     double gc14 = 0.0, gFb = 0.0, ieq14 = 0.0;
     // Input branch (Cg series R16), Norton-reduced.
     double c11 = kC11;   // fittable always-present GRUNT cap (FitParams::clipC11); schematic 4n7
+    double c12 = kC12;   // fittable GRUNT Flat  add-cap (FitParams::clipC12); schematic 47n
+    double c13 = kC13;   // fittable GRUNT Boost add-cap (FitParams::clipC13); schematic 220n
     double gcG = 0.0, dNode = 0.0, gIn = 0.0, ieqG = 0.0;
     // Newton warm-start.
     double wPrev = 0.0;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NoAmp Low Rider DI — Comprehensive A/B Dashboard</title>
+<title>Obsidian-B7000 — B7K Ultra Plugin vs. Pedal A/B Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -57,9 +57,8 @@
   .quick-take h4 { color: var(--accent); margin-bottom: 8px; }
   .quick-take li { margin-bottom: 4px; font-size: 13px; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
-  .badge-v1e { background: #312e4a; color: #a78bfa; }
-  .badge-v1l { background: #2d3340; color: #60a5fa; }
-  .badge-v2 { background: #2d3a30; color: #4ade80; }
+  .silent-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .silent-note code { color: var(--warn); }
   .na-cell { color: var(--muted); background: rgba(255,255,255,.02); }
   .blank-slate { text-align: center; padding: 80px 20px; color: var(--muted); }
   .blank-slate p { margin-top: 8px; }
@@ -72,7 +71,7 @@
 <body>
 
 <header>
-  <h1>NoAmp Low Rider DI — A/B Dashboard</h1>
+  <h1>Obsidian-B7000 (B7K Ultra) — Plugin vs. Pedal A/B Dashboard</h1>
   <div style="display:flex;align-items:center;gap:16px">
     <span class="status" id="status">No data loaded</span>
     <input type="file" id="fileInput" accept=".json">
@@ -90,7 +89,7 @@
 <main>
   <div class="blank-slate" id="blankSlate">
     <h2>No data loaded</h2>
-    <p>Select <code>comprehensive_data.json</code> using the file picker above to begin.</p>
+    <p>Select <code>analysis/reports/comprehensive_data.json</code> (produced by <code>comprehensive_report.py</code>) using the file picker above to begin.</p>
   </div>
 
   <div class="tab" id="tab-fr">
@@ -128,7 +127,7 @@
   <div class="tab" id="tab-harmonics">
     <div class="card">
       <div class="controls">
-        <label>Revision: <select id="harRev"></select></label>
+        <label>Category: <select id="harRev"></select></label>
         <label>Driven level: <span class="radio-group" id="harLevel"></span></label>
         <label>Anchor freq: <span class="radio-group" id="harAnchor"></span></label>
       </div>
@@ -138,7 +137,7 @@
 
   <div class="tab" id="tab-summary">
     <div class="card">
-      <h3>Per-Revision Summary</h3>
+      <h3>Per-Category Summary</h3>
       <table id="summaryTable"></table>
     </div>
     <div class="quick-take" id="quickTake">
@@ -157,6 +156,64 @@ function destroyChartKeys(prefix) {
     charts[k]?.destroy();
     delete charts[k];
   });
+}
+
+// --- Capture identity / categorisation ---
+// The report is a single plugin-vs-pedal shootout (no hardware "revisions" — every
+// capture's `rev` field is the literal string "?"), so the meaningful axis for grouping
+// and labelling is the capture MATRIX FILE NAME, not `id`/`rev` (both degenerate: most
+// `id`s collapse to the same "? D0.50 BL1.00" string across ~30 unrelated captures).
+function stripWav(file) {
+  return (file || '').replace(/\.wav$/i, '');
+}
+
+const CATEGORY_LABELS = {
+  ref: 'Reference / Bypass', bypass: 'Reference / Bypass',
+  attack: 'Attack', grunt: 'Grunt', blend: 'Blend', drive: 'Drive', level: 'Level',
+  master: 'Master', bass: 'Bass (Lo)', treble: 'Treble (Hi)',
+  lomid: 'Lo-Mid', lomidfreq: 'Lo-Mid Freq', himid: 'Hi-Mid', himidfreq: 'Hi-Mid Freq'
+};
+
+// 'bypass.wav' and 'ref-*.wav' are both the reference/no-effect family and share one
+// label above — canonicalise their keys too, or they'd render as two identically-labelled
+// rows/dropdown-options that are impossible to tell apart.
+const KEY_ALIASES = { bypass: 'ref' };
+
+function categoryOf(file) {
+  const first = (file || '').replace(/\.wav$/i, '').split('_')[0];
+  const rawKey = first.split('-')[0].toLowerCase();
+  const key = KEY_ALIASES[rawKey] || rawKey;
+  return { key, label: CATEGORY_LABELS[key] || key.toUpperCase() };
+}
+
+// Deterministic hue per category (no fixed palette to maintain as new capture families appear).
+function catHue(key) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+
+function catBadge(file) {
+  const { key, label } = categoryOf(file);
+  const hue = catHue(key);
+  return `<span class="badge" style="background:hsl(${hue},45%,20%);color:hsl(${hue},70%,72%)">${label}</span>`;
+}
+
+// --- Silence-sentinel guard ---
+// Zero-knob settings (LEVEL/MASTER fully CCW etc.) render digital silence, and the
+// analysis harness represents that as a large negative dB sentinel (observed: plugin_db
+// -640, harmonic dB -400) rather than NaN. Left unguarded, a single such capture swamps
+// every RMS/max-error/chart scale with a fake ~600 dB "error" and buries the real,
+// interesting deviations (see project memory: gap_audit's raw mean over zero-knob
+// captures inflates aggregate spread by ~635 dB). Treat anything at/below this floor as
+// "no signal" (null), not as data.
+const SILENCE_FLOOR_DB = -150;
+function cleanDb(v) {
+  return (typeof v === 'number' && isFinite(v) && v > SILENCE_FLOOR_DB) ? v : null;
+}
+function dbDiff(a, b) {
+  const ca = cleanDb(a), cb = cleanDb(b);
+  return (ca === null || cb === null) ? null : ca - cb;
 }
 
 function parseFile() {
@@ -222,6 +279,22 @@ let hmSweepLevel = 'sweep_clean';
 let thdCaptureIdx = 0, thdSweepLevel = 'sweep_drv_-18';
 let harRev = 'all', harSweepLevel = 'sweep_drv_-18', harAnchorIdx = 0;
 
+// Group-then-sort capture options by category so e.g. all the "drive-*" sweeps sit
+// together instead of being interleaved alphabetically with unrelated files.
+function captureOptionsHtml(caps) {
+  const groups = new Map();
+  caps.forEach((c, i) => {
+    const { label } = categoryOf(c.file);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push({ i, text: stripWav(c.file) });
+  });
+  return [...groups.entries()].sort((a,b) => a[0].localeCompare(b[0])).map(([label, opts]) =>
+    `<optgroup label="${label}">` +
+    opts.sort((a,b) => a.text.localeCompare(b.text)).map(o => `<option value="${o.i}">${o.text}</option>`).join('') +
+    `</optgroup>`
+  ).join('');
+}
+
 function populateControls() {
   const caps = DATA.captures;
   const levels = DATA.meta.all_sweep_levels;
@@ -230,7 +303,7 @@ function populateControls() {
 
   // FR tab
   const frSel = document.getElementById('frCapture');
-  frSel.innerHTML = caps.map((c,i) => `<option value="${i}">${c.id}</option>`).join('');
+  frSel.innerHTML = captureOptionsHtml(caps);
   frSel.value = '0';
   frSel.addEventListener('change', () => { frCaptureIdx = +frSel.value; updateFR(); });
 
@@ -241,16 +314,23 @@ function populateControls() {
 
   // THD tab
   const thdSel = document.getElementById('thdCapture');
-  thdSel.innerHTML = caps.map((c,i) => `<option value="${i}">${c.id}</option>`).join('');
+  thdSel.innerHTML = captureOptionsHtml(caps);
   thdSel.value = '0';
   thdSel.addEventListener('change', () => { thdCaptureIdx = +thdSel.value; updateTHD(); });
 
   buildRadio('thdLevel', drivenLevels.map(l => ({label: l.replace('sweep_drv_','drv '), value: l})), 'sweep_drv_-18', v => { thdSweepLevel = v; updateTHD(); });
 
-  // Harmonics tab
+  // Harmonics tab — categories are derived from the actual filenames on load, not a
+  // hardcoded revision list (this project has one plugin build vs. one real pedal, no
+  // hardware revisions to compare).
+  const cats = [...new Set(caps.map(c => categoryOf(c.file).key))]
+    .map(key => ({ key, label: CATEGORY_LABELS[key] || key.toUpperCase() }))
+    .sort((a,b) => a.label.localeCompare(b.label));
   const harRevSel = document.getElementById('harRev');
-  harRevSel.innerHTML = '<option value="all">All Revisions</option><option value="V1E">V1 Early</option><option value="V1L">V1 Late</option><option value="V2">V2</option>';
+  harRevSel.innerHTML = '<option value="all">All Categories</option>' +
+    cats.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
   harRevSel.value = 'all';
+  harRev = 'all';
   harRevSel.addEventListener('change', () => { harRev = harRevSel.value; updateHarmonics(); });
 
   buildRadio('harLevel', drivenLevels.map(l => ({label: l.replace('sweep_drv_','drv '), value: l})), 'sweep_drv_-18', v => { harSweepLevel = v; updateHarmonics(); });
@@ -286,8 +366,10 @@ function updateFR() {
   const bands = DATA.meta.bands;
   const fr = c.fr[frSweepLevel];
   if (!fr) return;
-  const plugin = fr.plugin_db, pedal = fr.pedal_db;
-  const diff = plugin.map((v,i) => v - pedal[i]);
+  // null out silence-sentinel bands (see cleanDb) so Chart.js draws a gap instead of
+  // auto-scaling the whole axis to a spurious -640 dB reading.
+  const plugin = fr.plugin_db.map(cleanDb), pedal = fr.pedal_db.map(cleanDb);
+  const diff = plugin.map((v,i) => (v === null || pedal[i] === null) ? null : v - pedal[i]);
 
   charts.fr = new Chart(document.getElementById('frChart'), {
     type: 'line',
@@ -353,10 +435,9 @@ function updateHeatmap() {
   // Header row
   html += `<div class="hm-header"></div>`;
   caps.forEach(c => {
-    const revCls = 'badge-' + c.rev.toLowerCase();
     const bl = c.settings.blend;
     const blendWarn = bl != null && bl < 0.90 ? ' ⚠' : '';
-    html += `<div class="hm-header"><span class="badge ${revCls}">${c.rev}</span> D${(c.settings.drive ?? 0).toFixed(2)}${blendWarn}</div>`;
+    html += `<div class="hm-header" title="${stripWav(c.file)}">${catBadge(c.file)} D${(c.settings.drive ?? 0).toFixed(2)}${blendWarn}</div>`;
   });
 
   // Data rows
@@ -365,8 +446,8 @@ function updateHeatmap() {
     caps.forEach(c => {
       const fr = c.fr[hmSweepLevel];
       if (!fr) { html += '<div class="hm-cell na-cell">—</div>'; return; }
-      const diff = fr.plugin_db[bi] - fr.pedal_db[bi];
-      if (diff == null || isNaN(diff)) { html += '<div class="hm-cell na-cell">—</div>'; return; }
+      const diff = dbDiff(fr.plugin_db[bi], fr.pedal_db[bi]);
+      if (diff === null || isNaN(diff)) { html += '<div class="hm-cell na-cell">—</div>'; return; }
       const bg = heatColor(diff);
       const fg = Math.abs(diff) > 3 ? '#fff' : '#c9cdd6';
       html += `<div class="hm-cell" style="background:${bg};color:${fg}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}</div>`;
@@ -435,7 +516,7 @@ function updateTHD() {
 
 function updateHarmonics() {
   if (!DATA) return;
-  const caps = harRev === 'all' ? DATA.captures : DATA.captures.filter(c => c.rev === harRev);
+  const caps = harRev === 'all' ? DATA.captures : DATA.captures.filter(c => categoryOf(c.file).key === harRev);
   const grid = document.getElementById('harmGrid');
   grid.innerHTML = '';
 
@@ -447,7 +528,7 @@ function updateHarmonics() {
 
     const div = document.createElement('div');
     div.className = 'card';
-    div.innerHTML = `<h3>${c.id}</h3><canvas id="harCanvas${ci}" height="250"></canvas>`;
+    div.innerHTML = `<h3>${catBadge(c.file)} ${stripWav(c.file)}</h3><canvas id="harCanvas${ci}" height="250"></canvas>`;
     grid.appendChild(div);
 
     const ctx = document.getElementById('harCanvas' + ci).getContext('2d');
@@ -456,11 +537,11 @@ function updateHarmonics() {
 
     const pluginVals = orders.map(o => {
       const key = 'H' + o;
-      return har[key] ? har[key].plugin_db[ai] : null;
+      return har[key] ? cleanDb(har[key].plugin_db[ai]) : null;
     });
     const pedalVals = orders.map(o => {
       const key = 'H' + o;
-      return har[key] ? har[key].pedal_db[ai] : null;
+      return har[key] ? cleanDb(har[key].pedal_db[ai]) : null;
     });
 
     charts['har_' + ci] = new Chart(ctx, {
@@ -488,55 +569,125 @@ function updateHarmonics() {
 }
 
 // === Summary ===
+// NOTE: DATA.summary.by_revision is a template holdover from a multi-hardware-revision
+// pedal — this project has exactly one plugin build vs. one real pedal, so every capture's
+// `rev` is the literal string "?" and the JSON's own single "?" row is not useful (it's
+// also polluted by the same silence-sentinel issue cleanDb() guards against below — its
+// fr_rms_max is a ~600 dB artifact from a zero-knob capture, not a real deviation). Compute
+// a per-CATEGORY breakdown client-side instead, using the same silence-floor guard as the
+// FR/heatmap tabs, and call out which captures were excluded so the gap isn't silent.
+function frRmsForCapture(c, bands) {
+  const fr = c.fr['sweep_clean'];
+  if (!fr) return null;
+  let sumSq = 0, n = 0, silentBands = 0;
+  bands.forEach((b, i) => {
+    const d = dbDiff(fr.plugin_db[i], fr.pedal_db[i]);
+    if (d === null) { silentBands++; return; }
+    sumSq += d * d;
+    n++;
+  });
+  // Require most of the band set to carry real signal, else this capture's "FR" is really
+  // just measuring the sentinel guard, not the plugin — exclude rather than report ~0.
+  if (n < bands.length * 0.5) return { rms: null, silentBands };
+  return { rms: Math.sqrt(sumSq / n), silentBands };
+}
+
 function updateSummary() {
   if (!DATA) return;
-  const summary = DATA.summary.by_revision;
+  const caps = DATA.captures;
+  const bands = DATA.meta.bands;
   const table = document.getElementById('summaryTable');
 
-  let html = '<thead><tr><th>Revision</th><th>Captures</th><th>FR RMS Mean</th><th>FR RMS Median</th><th>FR RMS Min</th><th>FR RMS Max</th><th>Best</th><th>Worst</th></tr></thead><tbody>';
-  for (const [rev, s] of Object.entries(summary)) {
+  const perCapture = caps.map(c => ({ c, ...frRmsForCapture(c, bands) }));
+  const excluded = perCapture.filter(r => r.rms === null);
+  const scored = perCapture.filter(r => r.rms !== null);
+
+  const byCat = new Map();
+  scored.forEach(r => {
+    const { key, label } = categoryOf(r.c.file);
+    if (!byCat.has(key)) byCat.set(key, { label, rows: [] });
+    byCat.get(key).rows.push(r);
+  });
+
+  const median = arr => {
+    const s = [...arr].sort((a,b) => a-b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid-1] + s[mid]) / 2;
+  };
+
+  let html = '<thead><tr><th>Category</th><th>Captures</th><th>FR RMS Mean</th><th>FR RMS Median</th><th>FR RMS Min</th><th>FR RMS Max</th><th>Best</th><th>Worst</th></tr></thead><tbody>';
+
+  const overallRms = scored.map(r => r.rms);
+  html += `<tr style="font-weight:600">
+    <td>All captures (valid FR)</td>
+    <td>${scored.length}${excluded.length ? ` <span class="na-cell" style="padding:1px 5px;border-radius:3px">+${excluded.length} excluded</span>` : ''}</td>
+    <td>${(overallRms.reduce((a,b)=>a+b,0)/overallRms.length).toFixed(2)} dB</td>
+    <td>${median(overallRms).toFixed(2)} dB</td>
+    <td>${Math.min(...overallRms).toFixed(2)} dB</td>
+    <td>${Math.max(...overallRms).toFixed(2)} dB</td>
+    <td colspan="2"></td>
+  </tr>`;
+
+  [...byCat.entries()].sort((a,b) => a[1].label.localeCompare(b[1].label)).forEach(([key, group]) => {
+    const rmsVals = group.rows.map(r => r.rms);
+    const best = group.rows.reduce((a,b) => a.rms < b.rms ? a : b);
+    const worst = group.rows.reduce((a,b) => a.rms > b.rms ? a : b);
     html += `<tr>
-      <td><span class="badge badge-${rev.toLowerCase()}">${rev}</span></td>
-      <td>${s.n_captures}</td>
-      <td>${s.fr_rms_mean.toFixed(2)} dB</td>
-      <td>${s.fr_rms_median.toFixed(2)} dB</td>
-      <td>${s.fr_rms_min.toFixed(2)} dB</td>
-      <td>${s.fr_rms_max.toFixed(2)} dB</td>
-      <td>${s.best_capture}</td>
-      <td>${s.worst_capture}</td>
+      <td>${catBadge(group.rows[0].c.file)}</td>
+      <td>${group.rows.length}</td>
+      <td>${(rmsVals.reduce((a,b)=>a+b,0)/rmsVals.length).toFixed(2)} dB</td>
+      <td>${median(rmsVals).toFixed(2)} dB</td>
+      <td>${Math.min(...rmsVals).toFixed(2)} dB</td>
+      <td>${Math.max(...rmsVals).toFixed(2)} dB</td>
+      <td>${stripWav(best.c.file)}</td>
+      <td>${stripWav(worst.c.file)}</td>
     </tr>`;
-  }
+  });
   html += '</tbody>';
   table.innerHTML = html;
 
-  // Quick-take: scan heatmap data for top issues
-  const issues = [];
-  const caps = DATA.captures;
-  const bands = DATA.meta.bands;
+  const silentNote = document.getElementById('silentNote') || (() => {
+    const p = document.createElement('p');
+    p.id = 'silentNote';
+    p.className = 'silent-note';
+    document.getElementById('summaryTable').closest('.card').appendChild(p);
+    return p;
+  })();
+  silentNote.innerHTML = excluded.length
+    ? `Excluded from FR RMS (mostly/fully digital silence at this knob setting — e.g. LEVEL/MASTER fully CCW — where the harness reports a sentinel dB floor rather than real signal): ` +
+      excluded.map(r => `<code>${stripWav(r.c.file)}</code>`).join(', ')
+    : '';
 
-  // Find captures with large HF errors
+  // Quick-take: scan for real FR issues, silence-guarded so a zero-knob capture can't
+  // masquerade as a ~600 dB "error" and bury the genuine deviations underneath it.
+  const issues = [];
+
   caps.forEach(c => {
     const fr = c.fr['sweep_clean'];
     if (!fr) return;
     let hfError = 0, count = 0;
     bands.forEach((b, i) => {
       if (b >= 8000) {
-        hfError += Math.abs(fr.plugin_db[i] - fr.pedal_db[i]);
+        const d = dbDiff(fr.plugin_db[i], fr.pedal_db[i]);
+        if (d === null) return;
+        hfError += Math.abs(d);
         count++;
       }
     });
     if (count) {
       const avg = hfError / count;
-      if (avg > 6) issues.push({ capture: c.id, rev: c.rev, issue: `HF (≥8kHz) avg error ${avg.toFixed(1)} dB`, severity: 'high' });
-      else if (avg > 3) issues.push({ capture: c.id, rev: c.rev, issue: `HF (≥8kHz) avg error ${avg.toFixed(1)} dB`, severity: 'med' });
+      if (avg > 6) issues.push({ file: c.file, issue: `HF (≥8kHz) avg error ${avg.toFixed(1)} dB`, severity: 'high' });
+      else if (avg > 3) issues.push({ file: c.file, issue: `HF (≥8kHz) avg error ${avg.toFixed(1)} dB`, severity: 'med' });
     }
     // Check max error
     let maxErr = 0, maxBand = 0;
     bands.forEach((b, i) => {
-      const e = Math.abs(fr.plugin_db[i] - fr.pedal_db[i]);
+      const d = dbDiff(fr.plugin_db[i], fr.pedal_db[i]);
+      if (d === null) return;
+      const e = Math.abs(d);
       if (e > maxErr) { maxErr = e; maxBand = b; }
     });
-    if (maxErr > 10) issues.push({ capture: c.id, rev: c.rev, issue: `Max error ${maxErr.toFixed(1)} dB at ${Math.round(maxBand)} Hz`, severity: 'high' });
+    if (maxErr > 10) issues.push({ file: c.file, issue: `Max error ${maxErr.toFixed(1)} dB at ${Math.round(maxBand)} Hz`, severity: 'high' });
   });
 
   // Sort by severity then error
@@ -545,7 +696,7 @@ function updateSummary() {
 
   const qtList = document.getElementById('quickTakeList');
   qtList.innerHTML = topIssues.map(i =>
-    `<li><span class="badge badge-${i.rev.toLowerCase()}">${i.rev}</span> ${i.capture}: ${i.issue} ${i.severity === 'high' ? '⚠' : ''}</li>`
+    `<li>${catBadge(i.file)} ${stripWav(i.file)}: ${i.issue} ${i.severity === 'high' ? '⚠' : ''}</li>`
   ).join('');
   if (!topIssues.length) qtList.innerHTML = '<li>No major issues detected across captures.</li>';
 }

@@ -113,6 +113,26 @@ public:
         reset();
     }
 
+    // Notch-damping series resistance on the C5 ladder cap (session 19, Phase 9).
+    // The R7-vs-(C5/C9/C6-ladder) two-path cancellation gives a ~322 Hz notch
+    // that is ~28 dB deep in the ideal model but only -3.4 dB in the capture, and
+    // component tolerance cannot explain the gap (circuit.md risk register; Monte
+    // Carlo never got shallower than -23 dB). A real series loss in the ladder (cap
+    // ESR / PCB / an unmodelled damping R) shallows the cancellation. Modelled as
+    // a lossy C5: series Rd + C5 between G and L1, stamped as ONE branch (no new
+    // node) via the Norton reduction g5eff = gc5/(1+gc5*Rd), ieq' = ieqC5/(1+gc5*Rd).
+    // Rd=0 reproduces the ideal deep notch EXACTLY (the 1+gc5*Rd factor is 1). Fit
+    // Rd to the capture's notch DEPTH (dsp.md "the capture is authoritative"); the
+    // notch FREQUENCY is set by the cap/resistor ratios and moves little with Rd.
+    void setNotchDamp(double rOhm) noexcept
+    {
+        if (rOhm == ladderDampR)
+            return;
+        ladderDampR = (rOhm > 0.0) ? rOhm : 0.0;
+        if (prepared)
+            rebuild();
+    }
+
     // The J201 drain network (JfetStage::getSourceZ): Zout(s) = [ro + Rp||Cp] || Rq2.
     void setSourceZ(double roOhm, double rq2Ohm, double rpOhm, double cpFarad) noexcept
     {
@@ -152,12 +172,15 @@ public:
         // ---- Build RHS: source current + capacitor history (Ieq) ------------
         // Cap convention (unchanged): for a cap across (a,b) with
         // ieq = 2*gc*(va - vb) - ieq_old, contribute b[a] += ieq, b[b] -= ieq.
+        // C5 is a LOSSY cap (series Rd): its Norton current into the (G,L1) branch
+        // is ieqC5 * c5damp (= ieqC5/(1+gc5*Rd)); c5damp=1 when Rd=0.
+        const double ieqC5b = ieqC5 * c5damp;
         std::array<double, N> b {};
-        b[G] = iIn + ieqC5;          // Norton drive; C5 (a=G,b=L1)
+        b[G] = iIn + ieqC5b;         // Norton drive; C5+Rd (a=G,b=L1)
         b[H] = ieqCp;                // Cp (a=H,b=GND)
         b[M] = -ieqC6;               // C6 (a=L2,b=M)
         b[P] = ieqC7;                // C7 (a=P,b=Q)
-        b[L1] = -ieqC5 + ieqC9;      // C5 -> -Ieq ; C9 (a=L1,b=L2) -> +Ieq
+        b[L1] = -ieqC5b + ieqC9;     // C5+Rd -> -Ieq ; C9 (a=L1,b=L2) -> +Ieq
         b[L2] = -ieqC9 + ieqC6;      // C9 -> -Ieq ; C6 -> +Ieq
         b[Q] = -ieqC7;               // C7 -> -Ieq
 
@@ -183,7 +206,13 @@ public:
         }
 
         // ---- Update capacitor states: Ieq_new = 2*gc*v_ab - Ieq_old ----
-        ieqC5 = 2.0 * gc5 * (v[G] - v[L1]) - ieqC5;
+        // C5 lossy: the CAP voltage is the branch voltage minus the Rd drop.
+        // i5 = g5eff*(v[G]-v[L1]) - ieqC5b; v_c5 = (v[G]-v[L1]) - i5*Rd.
+        // Rd=0 => v_c5 = v[G]-v[L1] (identical to the ideal cap update).
+        const double dv5 = v[G] - v[L1];
+        const double i5 = g5eff * dv5 - ieqC5b;
+        const double vc5 = dv5 - i5 * ladderDampR;
+        ieqC5 = 2.0 * gc5 * vc5 - ieqC5;
         ieqC9 = 2.0 * gc9 * (v[L1] - v[L2]) - ieqC9;
         ieqC6 = 2.0 * gc6 * (v[L2] - v[M]) - ieqC6;
         ieqC7 = 2.0 * gc7 * (v[P] - v[Q]) - ieqC7;
@@ -209,6 +238,10 @@ private:
     void rebuild()
     {
         gcp = srcZ[3] * twoOverT;
+        // Lossy-C5 (notch damping): series Rd + C5 -> single Norton branch.
+        // Rd=0 => c5damp=1 => g5eff=gc5 => exact ideal (undamped) behaviour.
+        c5damp = 1.0 / (1.0 + gc5 * ladderDampR);
+        g5eff = gc5 * c5damp;
         for (size_t pos = 0; pos < 3; ++pos)
             invert(buildY(static_cast<Attack>((int) pos)), yInv[pos]);
     }
@@ -231,7 +264,7 @@ private:
         Y[Q][Q] += kG13;                                  // R13 (Q-GND)
         Y[L2][L2] += kG14;                                // R14 (L2-GND)
         // ---- Capacitor companion conductances ----
-        Y[G][G] += gc5; Y[G][L1] -= gc5; Y[L1][G] -= gc5; Y[L1][L1] += gc5;     // C5 (G-L1)
+        Y[G][G] += g5eff; Y[G][L1] -= g5eff; Y[L1][G] -= g5eff; Y[L1][L1] += g5eff; // C5+Rd (G-L1)
         Y[L1][L1] += gc9; Y[L1][L2] -= gc9; Y[L2][L1] -= gc9; Y[L2][L2] += gc9; // C9 (L1-L2)
         Y[L2][L2] += gc6; Y[L2][M] -= gc6; Y[M][L2] -= gc6; Y[M][M] += gc6;     // C6 (L2-M)
         Y[P][P] += gc7; Y[P][Q] -= gc7; Y[Q][P] -= gc7; Y[Q][Q] += gc7;         // C7 (P-Q)
@@ -292,6 +325,9 @@ private:
     double twoOverT = 2.0 * 48000.0;
     // Companion conductances (set in prepare()/rebuild()).
     double gc5 = 0.0, gc9 = 0.0, gc6 = 0.0, gc7 = 0.0, gc8 = 0.0, gcp = 0.0;
+    // Notch-damping (lossy C5): series resistance Rd, and the derived branch
+    // factor c5damp = 1/(1+gc5*Rd) with g5eff = gc5*c5damp (see setNotchDamp()).
+    double ladderDampR = 0.0, c5damp = 1.0, g5eff = 0.0;
     // Capacitor history (equivalent-source) currents.
     double ieqC5 = 0.0, ieqC9 = 0.0, ieqC6 = 0.0, ieqC7 = 0.0, ieqC8 = 0.0, ieqCp = 0.0;
     // One precomputed nodal-matrix inverse per ATTACK position (Boost/Flat/Cut).

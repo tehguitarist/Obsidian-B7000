@@ -17,7 +17,7 @@ BAXANDALL (IC5_C):
 import numpy as np
 
 def treble_attack_tf(f, position, Zs=None, R7=200e3, R8=470e3, R11=470e3, R12=6.8e3, R14=22e3,
-                     R13=1e6, C5=22e-9, C9=22e-9, C6=22e-9, C7=100e-9, C8=220e-12):
+                     R13=1e6, C5=22e-9, C9=22e-9, C6=22e-9, C7=100e-9, C8=220e-12, RdampC5=0.0):
     """TrebleAttack stage (circuit.md "Treble network + ATTACK", node graph VERIFIED 2026-07-19).
 
     Zs = source impedance at node G (the J201 drain), as a scalar or a per-frequency array.
@@ -53,6 +53,10 @@ def treble_attack_tf(f, position, Zs=None, R7=200e3, R8=470e3, R11=470e3, R12=6.
     zs = None if Zs is None else np.broadcast_to(np.asarray(Zs, dtype=complex), (len(f),))
     for i, s in enumerate(w):
         yC5, yC9, yC6, yC7, yC8 = s * C5, s * C9, s * C6, s * C7, s * C8
+        # Lossy C5 (session-19 notch damping): series RdampC5 + C5 -> one admittance
+        # yC5 = 1/(Rd + 1/(sC5)) = sC5/(1 + sC5*Rd). RdampC5=0 -> ideal sC5.
+        if RdampC5 > 0.0:
+            yC5 = yC5 / (1.0 + yC5 * RdampC5)
         Vin = 1.0
         # Unknowns: [M, P, L1, L2, Q] (+ G when Zs is given). Forward path M->R8->P
         # intact in all positions. Boost: C8 couples M<->P. Cut: C8 shunts P->GND.

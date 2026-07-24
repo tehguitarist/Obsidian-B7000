@@ -103,7 +103,35 @@ high, execute routine work cheap) is what should persist.
 ## Current step
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
-> **⚠ RESUME POINT = `docs/phase7-calibration-handover.md` (READ IT FIRST). Latest below.**
+> **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 19, 2026-07-24): ▶ PHASE 9 — GAP #2 (treble notch) FOUND + FIXED + shipped;
+> the bigger residual (grunt-boost sub-bass) IDENTIFIED for next. ctest 16/16.**
+> This session chased the "GRUNT sounds backwards / too thin" complex and decomposed it. **A0** done
+> (fresh 63-cap baseline at c21R=100k; GAP #1 holds). **A1 (bridged-T 717 Hz notch) = NON-ISSUE** (no
+> unmatched notch; do NOT touch `bt*`). **⭐ ROOT GAP FOUND = the TrebleAttack ~322 Hz two-path
+> cancellation notch is ~37 dB deep in the model vs −3.4 dB in the capture** (the PARKED risk #1) — it
+> scoops the OD low-mids (100–500 Hz), which is what made GRUNT look backwards (pedal GRUNT = ~180 Hz
+> growl bump; plugin was a sub-bass shelf) and exposed a 254 Hz null in grunt-boost. Localised with a
+> new per-stage OD tap (`PedalChain::runOdSampleTapped` + `analysis/od_taps_probe.cpp`). **The 254 Hz
+> null is NOT a polarity bug** (`analysis/blend_null_probe.cpp`: OD/clean in-phase at LF, +8.9° @40 Hz;
+> it's the OD low-mids dropping to the flat clean-bleed level). **C12/C13 (GRUNT switched caps) made
+> fittable but proved NOT the lever** (they change boost LEVEL not the bass-peak FREQUENCY) — left at
+> schematic 47n/220n; do NOT fit them. **FIX SHIPPED: `trebleLadderDampR = 30k`** (FitParams.h) — a
+> series damping R on the C5 ladder cap, modelled as a lossy cap in TrebleAttack.h (Norton reduction,
+> NO new MNA node; Rd=0 = ideal EXACTLY). Fit on the clean OD captures: low-mid RMS (127–640 Hz)
+> **3.64 → 1.96 dB** across 6 flat-EQ OD captures, HF cost only +0.11 dB (30k is the knee). Validated:
+> C++ lossy-C5 matches the Python oracle (`treble_attack_tf(RdampC5=)`) to <0.05 dB at 30k, all ATTACK
+> positions (`TrebleAttackTest` Tests 6/7 added; oracle `eq_reference.py` extended). **⚠ Payoff is
+> MODEST (~1.7 dB low-mid) because the flat clean bleed already fills the isolated 37 dB notch in the
+> full output.** ⚠ 30k is large for literal ESR → `schematic-checker` provenance follow-up (like c21R),
+> but dsp.md makes the capture authoritative on depth. **▶ NEXT = A3 / GAP #3: the grunt-boost SUB-BASS
+> (12–26 dB residual)** — the plugin over-emphasises 20–40 Hz where the pedal has a low-mid bump;
+> suspect the clean-bleed level/shape + grunt coupling in the clipping regime (the kInputRef
+> 0.87→3.377 move). Full detail: `docs/phase9-validation.md` §4 GAP #2 + §0 A3. Re-grade running.
+> **UNCOMMITTED at session close if not yet committed:** TrebleAttack.h/FitParams.h/PedalChain.h/
+> offline_render.cpp/eq_reference.py/TrebleAttackTest.cpp (notch fix) + Clipper.h (fittable C12/C13) +
+> `analysis/blend_null_probe.cpp`, `analysis/od_taps_probe.cpp` (diagnostic probes).
+> ── prior session ──
 > **CURRENT (session 18, 2026-07-24): ▶ PHASE 9 (REFERENCE VALIDATION) UNDERWAY — first gap FOUND +
 > FIXED + shipped. Phase 8 (UI) confirmed done. ctest 16/16, AU+VST3 clean.**
 > **⭐ THE #1 "doesn't sound like the real pedal" GAP = the low end.** Full A/B of the shipped plugin

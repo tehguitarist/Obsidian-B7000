@@ -205,6 +205,8 @@ static const FitField kFitFields[] = {
     // VTC knee hardness (session-11 reshape, Clipper.h vtc()); k=2 anchor.
     {"clipK", &FitParams::clipK},
     {"clipC11", &FitParams::clipC11},
+    {"clipC12", &FitParams::clipC12},
+    {"clipC13", &FitParams::clipC13},
     // jfetG0/jfetGmR6 were REMOVED by the 2026-07-22 restructure (FitParams.h) —
     // deliberately not aliased, so a stale --fit jfetG0=... fails loudly.
     {"jfetGm", &FitParams::jfetGm},
@@ -223,6 +225,7 @@ static const FitField kFitFields[] = {
     {"levelTaperExp", &FitParams::levelTaperExp},
     {"masterTaperExp", &FitParams::masterTaperExp},
     {"c21R", &FitParams::c21R},
+    {"trebleLadderDampR", &FitParams::trebleLadderDampR},
     {"btR22", &FitParams::btR22},
     {"btR23", &FitParams::btR23},
     {"btC16", &FitParams::btC16},

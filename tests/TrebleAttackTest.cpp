@@ -47,6 +47,22 @@ static const std::vector<Ref> kRef = {
     {  10000.0,   73.4138,   66.1214,   57.0993 },
 };
 
+// Damped golden set (session-19): treble_attack_tf(..., RdampC5 = kTestDampR),
+// same Zs recipe as kRef. Validates the lossy-C5 notch-damping code path against
+// the independent Python oracle. Regenerate alongside kRef if anything changes.
+static constexpr double kTestDampR = 30000.0;
+static const std::vector<Ref> kRefDamped = {
+    //  f Hz     boost       flat        cut
+    {      50.0,   85.2483,   85.2633,   85.2534 },
+    {     100.0,   77.0918,   77.1006,   77.0860 },
+    {     200.0,   67.7351,   67.7059,   67.6789 },
+    {     500.0,   63.0893,   62.7722,   62.6769 },
+    {    1000.0,   65.5173,   64.3293,   64.0149 },
+    {    2000.0,   67.9486,   64.7717,   63.6840 },
+    {    5000.0,   71.0821,   64.8864,   60.4928 },
+    {   10000.0,   72.1943,   64.9021,   55.8799 },
+};
+
 static double refFor(const Ref& r, TrebleAttack::Attack a)
 {
     switch (a)
@@ -60,11 +76,12 @@ static double refFor(const Ref& r, TrebleAttack::Attack a)
 
 // Steady-state peak magnitude (dB re 1 ohm, i.e. volts out per amp in — the stage
 // is driven by the J201's Norton current). Settles then measures over 2 periods.
-static double measureDb(double freq, double fs, TrebleAttack::Attack a)
+static double measureDb(double freq, double fs, TrebleAttack::Attack a, double dampR = 0.0)
 {
     TrebleAttack stage;
     stage.prepare(fs);
     stage.setAttack(a);
+    stage.setNotchDamp(dampR); // session-19: lossy-C5 notch damping (0 = ideal)
 
     const double period = fs / freq;
     // 2 s, not the old 0.25 s: with the J201 source network stamped in (2026-07-22),
@@ -174,6 +191,42 @@ int main()
         const double c = measureDb(5000.0, 48000.0, TrebleAttack::Attack::Cut);
         const bool pass = (b > f + 1.0) && (f > c + 1.0);
         std::printf("  boost=%.3f > flat=%.3f > cut=%.3f  %s\n", b, f, c, pass ? "PASS" : "FAIL");
+        if (! pass)
+            ++failures;
+    }
+
+    // ---- Test 6: notch damping (lossy C5) matches the oracle at Rd>0 --------
+    // Validates the session-19 trebleLadderDampR code path (setNotchDamp): the C++
+    // lossy-cap Norton reduction must track the independent Python oracle's series
+    // Rd+C5 admittance. Same tight <=2 kHz tolerance as Test 1 (HF is warp, Test 2).
+    std::printf("\n=== Notch damping (Rd=%.0f) vs oracle @ 48 kHz ===\n", kTestDampR);
+    for (int pi = 0; pi < 3; ++pi)
+    {
+        std::printf("--- ATTACK = %s ---\n", names[pi]);
+        for (const auto& r : kRefDamped)
+        {
+            if (r.f > 2000.0) continue; // HF warp not re-checked here (Test 2 covers it)
+            const double meas = measureDb(r.f, 48000.0, positions[pi], kTestDampR);
+            const double ref = refFor(r, positions[pi]);
+            const double err = std::abs(meas - ref);
+            const bool pass = err <= 0.25;
+            std::printf("  f=%8.1f  meas=%8.3f  ref=%8.3f  err=%.3f dB  %s\n",
+                        r.f, meas, ref, err, pass ? "PASS" : "FAIL");
+            if (! pass)
+                ++failures;
+        }
+    }
+
+    // ---- Test 7: notch damping shallows the ~322 Hz two-path cancellation ---
+    // The whole point of Rd: the ideal notch (~28 dB) is far deeper than the
+    // capture (-3.4 dB). Damping must raise the ~320 Hz null relative to Rd=0.
+    std::printf("\n=== Notch damping shallows the 320 Hz null (Boost) ===\n");
+    {
+        const double ideal = measureDb(320.0, 48000.0, TrebleAttack::Attack::Boost, 0.0);
+        const double damped = measureDb(320.0, 48000.0, TrebleAttack::Attack::Boost, kTestDampR);
+        const bool pass = damped > ideal + 3.0; // meaningfully shallower
+        std::printf("  320 Hz: ideal=%.2f  damped=%.2f  lift=%.2f dB  %s\n",
+                    ideal, damped, damped - ideal, pass ? "PASS" : "FAIL");
         if (! pass)
             ++failures;
     }
