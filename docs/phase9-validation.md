@@ -10,6 +10,36 @@
 
 ---
 
+## 0. Backlog — prioritized TODO (START HERE on a fresh session)
+
+Ordered by impact on "sounds like the real pedal" first, then release-readiness. Each links to the
+detail section below. Check off + move to the Gap log (§4) as they land.
+
+**A. Close the remaining voicing gaps (Phase 9 core — highest impact on the sound):**
+- [ ] **A0. Regenerate the full 63-cap baseline report at the shipped c21R=100k** (`comprehensive_report.py --os 4`, ~20 min — background it). A rebuild busted the cache, so this seeds a clean baseline + fills the cache so A1–A3 gap-hunts are instant. Do this FIRST so A1–A3 read a correct baseline.
+- [ ] **A1. Bridged-T ~717 Hz notch** (risk register #1). Ideal −28 dB is suspiciously deep; never capture-reshaped. All four values are `FitParams` fields (`btR22/btR23/btC16/btC17`). OD-path only (post-clipper, pre-BLEND) → check the ~700 Hz region in OD-path captures, not the clean tap. See §4 "Remaining candidates".
+- [ ] **A2. Mid-band deviations > 1.5 dB.** Mine the existing baseline (mids are unaffected by the low-end fix — no re-render needed to *find* them). Fix via the Baxandall/mid `FitParams` or taper as decomposition warrants.
+- [ ] **A3. OD/clean BLEND balance.** The `kInputRef 0.87 → 3.377` move (session 17) shifted where the OD path sits vs the clean tap in the clipping regime; the harmonic-ratio fit couldn't see it. Check blend-sweep captures (`blend-0700..1430`) for an error that appears only at intermediate BLEND.
+- [ ] **A4. Re-grade the full matrix after A1–A3; write final GATE-9 numbers into §4.**
+
+**B. Performance / quality pass (Phase 9 part 2):**
+- [ ] **B1. PerfBenchmark / FeatureProfile / OSFidelity probes** → the `hq` toggle decision (omega4 vs AccurateOmega is usually the only real lever) + README perf table. See §5.
+- [ ] **B2. Deferred OS-fidelity residual** — the 4× narrow-band aliasing at the amp-0.5 extreme corner (8× pristine; recommend 8× for extreme high-drive). See §5 + the OSValidationTest header.
+
+**C. Carry-forwards:**
+- [ ] **C1. VU idle-gate threshold vs the new makeup** (0.9 → 3.684 shifted the idle floor ~4×; the meter may show idle noise as activity). Phase-8 carry-forward, §6.
+- [ ] **C2. `schematic-checker` pass on C21** — attribute the measured ~10× corner shift to the cap value (>100n?) vs the stack-input impedance (>10k?). The capture is authoritative on the corner regardless; this is provenance. §4 GAP #1.
+
+**D. Release (Phase 10):**
+- [ ] **D1. Full control-sweep soak** — all 8 pots × switches × OS × bypass/DIST transitions: no instability/clicks/NaN/Inf (output > 0 dBFS at extremes is faithful — trim manages it).
+- [ ] **D2. Installers + `release.yml` dry-run + signing** when certs exist. (build.md "Installers".)
+
+**E. Housekeeping (optional / low-priority):**
+- [ ] **E1. Merge `phase9-kickoff` → `main`** (`git checkout main && git merge --ff-only phase9-kickoff`) — 4 Phase-8/9 commits are on the branch.
+- [ ] **E2. Cache-key on effective FitParams** (via `OfflineRender --print-fit`) so a `--fit` result is reused after that value is baked in + rebuilt. Nice-to-have; current key is safe (never stale), just occasionally re-renders. §2 caveat.
+
+---
+
 ## 1. Method
 
 `analysis/comprehensive_report.py` renders the shipped plugin (`OfflineRender`, which now applies

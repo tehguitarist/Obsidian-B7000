@@ -130,13 +130,12 @@ high, execute routine work cheap) is what should persist.
 > generic and fine, but ignore those topology notes; and gap_audit does NOT exclude zero-knob SILENT
 > captures (master-0700/level-0700 → −640 dB garbage → 635 dB aggregate spread), so aggregate over
 > valid captures with a min-level filter (as the session-18 probes do), not gap_audit's raw mean.
-> **▶ NEXT (continue Phase 9): re-run the FULL 63-cap A/B at c21R=100k (regenerate the baseline
-> report — a rebuild busts the cache, ~20 min, background it), then hunt residual gaps** — candidates
-> now that the low end is fixed: the bridged-T notch (risk #1, never capture-reshaped), any per-band
-> mid deviations >1.5 dB, and the OD/clean BLEND balance (kInputRef 0.87→3.377 shifted it, unseen by
-> the harmonic-ratio fit). Then the perf/HQ pass + the deferred OS-fidelity 4× residual. GATE 9 =
-> numbers-not-adjectives report in `docs/`. Also carry-forward from Phase 8: VU idle-gate threshold
-> vs the new makeup (0.9→3.684).
+> **▶ NEXT — the prioritized TODO is `docs/phase9-validation.md` §0 "Backlog (START HERE)".** In
+> short: A0 regenerate the full 63-cap baseline at c21R=100k (background ~20 min, seeds the cache),
+> then A1 bridged-T ~717 Hz notch (risk #1), A2 mid-band deviations >1.5 dB (minable from existing
+> data), A3 OD/clean BLEND balance (kInputRef move suspect), A4 re-grade + final GATE-9 numbers.
+> Then B perf/HQ pass, C carry-forwards (VU idle-gate vs new makeup 0.9→3.684; schematic-checker on
+> C21), D release soak/installers. Branch `phase9-kickoff` (4 commits) not yet merged to main (E1).
 > ── prior session ──
 > **CURRENT (session 17, 2026-07-24): ✅✅ PHASE-7 CALIBRATION LANDED AND SHIPPED. The full fitted
 > family is written into the shipped defaults, the plugin now actually applies it, ctest 16/16, AU +
