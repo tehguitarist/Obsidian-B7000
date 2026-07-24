@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import hashlib
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -28,6 +29,49 @@ import captures as C
 
 DEFAULT_BIN = C.RENDER_BIN
 OUTPUT_JSON = "analysis/reports/comprehensive_data.json"
+
+# ---- Per-capture result cache -------------------------------------------------
+# The captures are STATIC, so a capture-vs-plugin record only changes when the
+# PLUGIN output for that capture's settings changes — i.e. the render args, the OS
+# factor, or the OfflineRender BINARY itself (a rebuild bakes new FitParams
+# defaults into the same args). The key hashes exactly those, so:
+#   * re-running an unchanged config is instant (every record served from cache);
+#   * a rebuild (or a --fit override) busts only the affected records;
+#   * capture files never change, so their side never needs recomputing.
+# Bump CACHE_VERSION when analyse_one's MATH changes (the args/binary won't).
+CACHE_DIR = "analysis/reports/cache"
+CACHE_VERSION = "1"
+
+
+def _file_sig(path):
+    st = os.stat(path)
+    return f"{os.path.basename(path)}:{st.st_size}:{st.st_mtime_ns}"
+
+
+def _cache_key(path, args, os_factor, binpath, bands):
+    h = hashlib.sha1()
+    for part in (CACHE_VERSION, _file_sig(path), _file_sig(binpath),
+                 "|".join(map(str, args)), f"os={os_factor}",
+                 ",".join(f"{b:.1f}" for b in bands)):
+        h.update(part.encode())
+    return h.hexdigest()
+
+
+def _cache_load(key):
+    p = os.path.join(CACHE_DIR, key + ".json")
+    if not os.path.exists(p):
+        return None
+    try:
+        with open(p) as fh:
+            return json.load(fh)
+    except (ValueError, OSError):
+        return None
+
+
+def _cache_store(key, record):
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(os.path.join(CACHE_DIR, key + ".json"), "w") as fh:
+        json.dump(record, fh)
 DRIVEN_SWEEPS = ("sweep_drv_-18", "sweep_drv_-12", "sweep_drv_-6")
 ALL_SWEEP_LEVELS = ("sweep_clean",) + DRIVEN_SWEEPS
 FARINA_CEILING_HZ = A.thd_max_measurable_hz(max_order=2)
@@ -161,14 +205,23 @@ def short_id(parsed):
     return " ".join(parts)
 
 
-def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_source_map):
+def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_source_map,
+                extra_fit=None, use_cache=True):
+    """Return (record_or_None, was_cached)."""
+    args = C.render_args(parsed) + list(extra_fit or [])
+
+    if use_cache and not keep_dir:
+        key = _cache_key(path, args, os_factor, binpath, bands)
+        cached = _cache_load(key)
+        if cached is not None:
+            return cached, True
+
     cap = C.load_capture(path)
     if not A.is_full_length(cap, orig):
         sys.stderr.write(f"  SKIP (truncated {len(cap)}/{len(orig)}): {os.path.basename(path)}\n")
-        return None
+        return None, False
     cap_al, _ = A.align(cap, orig)
 
-    args = C.render_args(parsed)
     tmp = None
     try:
         if keep_dir:
@@ -181,7 +234,7 @@ def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_so
             tmp.close()
 
         if not render_plugin(binpath, args, out_path, os_factor):
-            return None
+            return None, False
         ren = A.load(out_path)
         ren_al, _ = A.align(ren, orig)
 
@@ -219,7 +272,9 @@ def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_so
         for sw in DRIVEN_SWEEPS:
             result["harmonics"][sw] = harmonics_at_anchors(cap_al, ren_al, orig, sw)
 
-        return result
+        if use_cache and not keep_dir:
+            _cache_store(key, result)
+        return result, False
 
     finally:
         if tmp and os.path.exists(out_path):
@@ -267,6 +322,17 @@ def main():
     ap.add_argument("--bin", default=DEFAULT_BIN)
     ap.add_argument("--os", type=int, default=8)
     ap.add_argument("--keep-renders", default=None)
+    ap.add_argument("--only", default=None,
+                    help="comma-separated filename substrings; only matching captures are run "
+                         "(fast iteration, e.g. --only ref,bass,drive)")
+    ap.add_argument("--fit", action="append", default=[], metavar="K=V",
+                    help="pass a FitParams override to EVERY render (repeatable), e.g. --fit c21R=53000 "
+                         "— for testing a candidate value across the matrix WITHOUT rebuilding")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="ignore the per-capture result cache (force re-render + re-analyse)")
+    ap.add_argument("--out", default=OUTPUT_JSON,
+                    help="output JSON path (use a scratch path for subset/candidate runs so the "
+                         "baseline report is not overwritten)")
     a = ap.parse_args()
 
     if not os.path.exists(a.bin):
@@ -277,25 +343,37 @@ def main():
     bands = [round(b, 1) for b in A.fractional_octave_freqs(20.0, 20000.0, 3)]
     band_source_map = build_band_source_map(bands)
 
+    fit_args = []
+    for kv in a.fit:
+        fit_args += ["--fit", kv]
+
     orig = A.load(A.ORIG)
     caps = C.find_captures()
+    if a.only:
+        subs = [s.strip() for s in a.only.split(",") if s.strip()]
+        caps = [(p, d) for p, d in caps if any(s in os.path.basename(p) for s in subs)]
 
-    sys.stderr.write(f"Comprehensive report: {len(caps)} captures | OS={a.os}x | {len(bands)} bands\n")
+    use_cache = not a.no_cache
+    sys.stderr.write(f"Comprehensive report: {len(caps)} captures | OS={a.os}x | {len(bands)} bands"
+                     f"{' | fit=' + ','.join(a.fit) if a.fit else ''}"
+                     f"{' | cache OFF' if not use_cache else ''}\n")
     sys.stderr.write(f"  THD coverage: {sum(1 for _, s in band_source_map if s != 'na')}/{len(bands)} bands\n\n")
 
-    results = []
+    results, n_cached = [], 0
     for i, (path, parsed) in enumerate(caps):
         sys.stderr.write(f"[{i + 1}/{len(caps)}] {short_id(parsed)} ... ")
         sys.stderr.flush()
-        res = analyse_one(path, parsed, orig, a.bin, a.os, a.keep_renders, bands, band_source_map)
+        res, cached = analyse_one(path, parsed, orig, a.bin, a.os, a.keep_renders, bands,
+                                  band_source_map, extra_fit=fit_args, use_cache=use_cache)
         if res:
-            sys.stderr.write("done\n")
+            n_cached += cached
+            sys.stderr.write("cached\n" if cached else "done\n")
         else:
             sys.stderr.write("FAILED\n")
         results.append(res)
 
     ok = [r for r in results if r]
-    sys.stderr.write(f"\n{len(ok)}/{len(results)} captures analysed.\n")
+    sys.stderr.write(f"\n{len(ok)}/{len(results)} captures analysed ({n_cached} from cache).\n")
 
     summary = compute_summary(ok, bands)
 
@@ -303,6 +381,7 @@ def main():
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat(),
             "os_factor": a.os,
+            "fit_overrides": a.fit,
             "num_captures": len(ok),
             "num_bands": len(bands),
             "bands": bands,
@@ -316,10 +395,10 @@ def main():
         "summary": summary,
     }
 
-    os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
-    with open(OUTPUT_JSON, "w") as fh:
+    os.makedirs(os.path.dirname(a.out), exist_ok=True)
+    with open(a.out, "w") as fh:
         json.dump(out, fh, indent=2)
-    sys.stderr.write(f"wrote {OUTPUT_JSON}  ({os.path.getsize(OUTPUT_JSON)} bytes)\n")
+    sys.stderr.write(f"wrote {a.out}  ({os.path.getsize(a.out)} bytes)\n")
 
 
 if __name__ == "__main__":
