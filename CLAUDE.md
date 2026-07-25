@@ -104,6 +104,73 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 26, 2026-07-25): ▶ PHASE 9 / A2c-2 — MID-BAND SHAPE FIXED + SHIPPED, and A2c
+> then DELIBERATELY CAPPED (target unreachable, floor recorded). All branches merged; `main` = the
+> working branch. ctest 17/17 (RailClampTest merged in), AU+VST3 clean.**
+> **(0) BRANCHES MERGED FIRST.** The stray `claude/jovial-rosalind-7c0c73` (a `RailClampTest` closing
+> the 926c0cc "no test exercises the enabled clamp" gap — which matters now the clamp IS enabled) was
+> merged and `main` fast-forwarded. **ctest 16/16 → 17/17.** No unmerged branches remain.
+> **(1) ⭐ THE A2c RESIDUAL WAS NEITHER OF THE TWO PRE-REGISTERED CANDIDATES.** The handover asked
+> "centre error (fixable by the cap table) or range error (already spent by GAP #4)?". It is
+> **NEITHER — it is peak WIDTH (Q).** Decisive datum: `lomidfreq-250_lomid-0700` carried a **3.38 dB**
+> stage residual while its peak DEPTH and 1/3-oct centre band matched the pedal **exactly** (−14.0 dB
+> @ 320 Hz both); a pure range correction only got it to 2.05, a pure centre correction to 3.33. The
+> half-depth bandwidth was **4.10 octaves vs the pedal's 2.19**, 1.54× too broad over all 12 curves.
+> **And the width error is GAP #4's own fix:** a series R in the wiper leg buys range by DAMPING, so
+> it pays for height with Q (oracle BW 3.44 → 5.29 oct as Rw 0 → 33k), and GAP #4 fitted Rw against
+> the boost-to-cut SPAN — a HEIGHT metric, nearly blind to width, so nothing pushed back.
+> **(2) ⚠⚠ METHOD CORRECTION — DO NOT READ A PEAK'S FREQUENCY OFF THE 1/3-OCTAVE GRID.** It locates a
+> peak only to ±1/6 octave. On the raw grid three of six positions looked EXACT. Refined by a
+> parabolic fit through the peak band + its two neighbours on the log-f axis
+> (`analysis/mid_shape_verify.py::peak`), **every one of the six was 9–20 % LOW** — including the two
+> GAP #4 believed it had landed. This was caught only because the user asked "do all the frequencies
+> peak where the pedal does?"; my first pass had answered "yes" off the band grid and was wrong. It
+> also **retires GAP #4's argument that `midLoCap250 = 22n` was corroborated by the stock board's
+> schematic-verified C33** — that corroboration came from circuit.md's nodal sim run at **Rw = 0**;
+> with the fitted wiper R in the model 22n centres at 306 Hz vs the measured 349 Hz. A behavioural
+> match does not survive a change to the rest of the network.
+> **(3) ✅ SHIPPED:** `midWiperRLo` 33k→**22k**, `midWiperRHi` 22k→**18k**, and the WHOLE switched-cap
+> table — LO-MID **15n/6.8n/1.8n**, HI-MID **10n/2.7n/0.68n**. Five new FitParams fields
+> (`midLoCap500/1k`, `midHiCap750/1500/3k`) + `--fit` keys; `PedalChain::loMidCap()/hiMidCap()` read
+> all six. **Peak-frequency error 13.0 %→3.1 % mean, 20.1 %→8.7 % worst; bandwidth ratio 1.54×→1.31×;
+> stage-curve RMS 2.390→1.819 dB.** Full matrix: **CLEAN 1.152→1.023, ALL 3.558→3.494, OD 5.965
+> BIT-IDENTICAL** (mids are post-BLEND and flat in every OD capture — surgical by construction);
+> **5 rows better >0.5 dB, 0 worse.** Per capture (correct unit for clean): **mean 1.168→1.045 dB,
+> 21/29→22/29 ≤1.5, worst 3.53→3.30.** Three captures move +0.02…+0.12 dB — inside the 0.144 dB
+> take-to-take floor, i.e. noise.
+> **(4) NON-DEGENERATE — checked BEFORE shipping.** All 8 values (6 caps + 2 Rw) sit at **interior
+> minima** with E12 neighbours worse on BOTH sides (LO-MID 250: 10n 1.24 / 12n 1.05 / **15n 0.97** /
+> 18n 1.05 / 22n 1.24; Rw: 0k 2.00 / 15k 1.07 / **22k 0.97** / 33k 1.09 / 68k 1.83). Positions stay
+> differentiated (ratios 2.2×/3.8× and 3.7×/4.0×) — NOT the session-22 joint fit that collapsed "250"
+> onto the 500 Hz cap. **Rejected structural alternatives:** R40/R41 instead of Rw (needs 19.7k vs a
+> schematic-verified 220k, and 175 nF caps); C32 switched as a scaled PAIR with C33 for constant Q
+> (RMS worse than shipped — confirms session 21's rejection on SHAPE as well as range); R40/R41 on
+> top of Rw (runs away to Rw = 4.2 MΩ, R40/41 ×165 for 0.002 dB — textbook degeneracy).
+> **(5) ⛔ A2c IS CAPPED — DO NOT KEEP FITTING IT.** Seven captures remain >1.5 dB
+> (`himidfreq-750_himid-1700` 3.30, `_0700` 3.29, `lomidfreq-250_lomid-1700` 2.91, `_0700` 2.31,
+> `himid-1700` 2.09, `lomid-1700` 1.92, `himid-0700` 1.74); mean **1.045 dB** (0.969 over the agreed
+> 30 Hz–10 kHz band) vs the ≤0.7 target. The binding constraint is the residual 1.31× width and it is
+> **structural under the shared-parameter constraint**: a PER-POSITION unconstrained fit reaches
+> **0.17–0.44 dB**, so the topology CAN reproduce the curve — but only by letting **C32, the fixed
+> schematic-verified across-lug cap, take a different value at every switch position** (26.8n/31.9n/
+> 7.2n on LO-MID) with R40/R41 at 3.5–9.6×. That is a per-position fudge with no physical
+> counterpart, exactly what GAP #4 rejected on principle. Two floors bound what is left: the pedal's
+> OWN cut-vs-boost captures disagree on peak frequency by **6.1 % mean / 16 % worst**, so the
+> surviving 3.1 % mean error is AT the measurement floor; and knob-pointer error alone is worth >1 dB
+> on a ±28 dB range. **Recorded achievable floor: ~1.0 dB mean / ~3.3 dB worst.** Reopening needs NEW
+> evidence about the switch's real topology (is the Ultra's mid-freq selector 2-pole, switching the
+> across-lug cap too?) — not another fit.
+> **(6) NEW REUSABLE TOOLS.** `analysis/mid_shape_verify.py` — the acceptance check: sub-band
+> interpolated peak frequency + peak dB + half-depth bandwidth + whole-curve RMS, per position and
+> both knob extremes, from REAL renders, with A/B between two reports. **Use this, not a band-grid
+> argmax, for any peaking-stage claim.** `analysis/mid_centre_range_decompose.py` — splits a residual
+> into centre vs range vs irreducible by refitting (shift, scale) against the pedal's own stage shape.
+> `analysis/mid_shape_fit.py` / `mid_shape_hypotheses.py` — the shape objective + the structural
+> hypothesis comparison.
+> **▶ NEXT = A3, the last voicing gap** (OD/clean BLEND balance below ~200 Hz), per
+> `docs/phase9-validation.md` §4 "A3 handover" — unchanged by this session, and note the OD half of
+> the matrix is bit-identical so its numbers still stand. Full detail: §4 "A2c-2", §0 backlog.
+> ── prior session ──
 > **CURRENT (session 25, 2026-07-25): ▶ PHASE 9 / A2c — FIRST CLEAN-PATH FIT SHIPPED. The TREBLE
 > range error is CLOSED; the clean target is still NOT met and what remains is entirely the mid-band
 > group. ctest 16/16, AU+VST3 build clean. Branch `phase9-session23-c13-closed`.**

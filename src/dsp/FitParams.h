@@ -315,18 +315,67 @@ struct FitParams
     // smallest caps (LO-MID 1k, HI-MID 3k) are slightly OVER-corrected (RMS 1.64->2.91
     // and 1.38->2.63). That is an accepted, inherent trade, not a fit artefact — the
     // net is decisive and the two large-cap positions improve by 10-11 dB RMS.
-    double midWiperRLo = 33.0e3;   // LO-MID (IC5_D) wiper leg; fit 53.7k, E12-rounded
-    double midWiperRHi = 22.0e3;   // HI-MID (IC6_A) wiper leg; fit 22.1k
+    //
+    // ---- A2c-2 (session 26) RETUNE: both values REDUCED, jointly with the cap table
+    // below. GAP #4 fitted Rw against the boost-to-cut SPAN, which is dominated by the
+    // peak's HEIGHT and nearly blind to its WIDTH — and a series R in the wiper leg is
+    // exactly the element that buys range by DAMPING, i.e. it pays for height with Q.
+    // Measured against the pedal's full stage SHAPE it overshot: at LO-MID 250 the
+    // shipped model matched the pedal's peak depth and centre exactly (-14.0 dB @
+    // 320 Hz both) yet its skirts were 4.33 octaves wide at half-depth against the
+    // pedal's 2.67. Re-fitting Rw and the switched caps TOGETHER against the shape
+    // recovers the peak CENTRES that GAP #4 recorded as its open residual (see the
+    // cap table below) at a lower Rw. Both are clean interior minima — LO-MID
+    // 0k 2.00 / 15k 1.07 / 22k 0.97 / 33k 1.09 / 68k 1.83 dB; HI-MID 0k 2.04 /
+    // 12k 1.13 / 18k 1.04 / 22k 1.06 / 68k 2.09 — so the objective pushes back from
+    // both sides, unlike the "make it see less" degeneracies of sessions 5/6 + GAP #3b.
+    double midWiperRLo = 22.0e3;   // LO-MID (IC5_D) wiper leg; was 33k (GAP #4)
+    double midWiperRHi = 18.0e3;   // HI-MID (IC6_A) wiper leg; was 22k (GAP #4)
 
-    // LO-MID "250 Hz" switch position. The [ENG] table computed 47n (-> a 229 Hz
-    // centre); the capture peaks at the 320 Hz band, and 22n — which is the STOCK
-    // board's C33, schematic- and BOM-verified — puts the modelled centre exactly
-    // there. Two independent lines of evidence agree, so this is the one cap value
-    // in the table the captures actually contradict. The other five stay [ENG].
-    // (A joint fit that refits ALL six caps scores better on paper but collapses this
-    // position onto ~10n, i.e. onto the 500 Hz position's cap — it destroys the
-    // switch's frequency differentiation, so it was rejected. §4 GAP #4.)
-    double midLoCap250 = 22.0e-9;
+    // ---- Switched mid-frequency cap table (Phase 9 A2c-2, session 26) -----------
+    // circuit.md's [ENG-caps] table was COMPUTED (f ~ 1/sqrt(C_series)) and has never
+    // been schematic-verified — the 3-way mid-frequency selectors do not exist on our
+    // schematic at all, so unlike R36/C13 there is no document to defer to here. These
+    // are fitted to the captured unit's measured stage shape (both knob extremes, all
+    // three positions of a band at once, every parameter shared across the band — no
+    // per-position fudge), jointly with midWiperR* above.
+    //
+    // What this fixes: GAP #4's Rw pulled every peak CENTRE down, which that gap
+    // recorded as an accepted-but-open residual. Peak frequencies are compared at
+    // SUB-BAND resolution (parabolic fit through the peak band and its neighbours on
+    // the log-f axis, analysis/mid_shape_verify.py) — the 1/3-octave grid only locates
+    // a peak to +-1/6 octave, and reading it off the raw grid says three of these
+    // positions were already exact when in fact EVERY one was 9-20% low:
+    //              pedal    was (GAP #4)      now
+    //   LO-MID    349 Hz    294 Hz (-16%)   371 Hz (+6%)
+    //             545 Hz    436 Hz (-20%)   548 Hz ( 0%)
+    //            1090 Hz    929 Hz (-15%)  1064 Hz (-2%)
+    //   HI-MID    784 Hz    665 Hz (-15%)   827 Hz (+5%)
+    //            1613 Hz   1409 Hz (-13%)  1594 Hz (-1%)
+    //            3026 Hz   2611 Hz (-14%)  3178 Hz (+5%)
+    // Worst peak error 20.3% -> 6.1% (LO-MID) and 15.2% -> 5.4% (HI-MID); stage-shape
+    // band-RMS 1.68 -> 0.97 and 1.44 -> 1.04 dB.
+    //
+    // The positions stay clearly differentiated (cap ratios 2.2x/3.8x and 3.7x/4.0x),
+    // so this is NOT the session-22 joint fit that collapsed the "250" position onto
+    // the 500 Hz cap and was rejected for destroying the switch's spread. Every one of
+    // the eight values (6 caps + 2 Rw) sits at an interior minimum of the shape
+    // objective with its E12 neighbours worse on both sides — e.g. LO-MID 250
+    // 10n 1.24 / 12n 1.05 / 15n 0.97 / 18n 1.05 / 22n 1.24.
+    //
+    // ⚠ This RETIRES the GAP #4 argument that midLoCap250 = 22n was corroborated by
+    // being the STOCK board's schematic-verified C33. That corroboration came from
+    // circuit.md's nodal sim, which was run at Rw = 0; with the fitted wiper-leg R in
+    // the model, 22n centres at 306 Hz against the pedal's measured 349 Hz. The value
+    // was only ever a behavioural match, so it does not survive a change to the rest
+    // of the network. (Coincidentally the 3 kHz position lands on 0.68n, which IS the
+    // stock board's C35 — treat that as no more meaningful than the 22n coincidence.)
+    double midLoCap250 = 15.0e-9;   // 250 Hz  ([ENG] table said 47n; GAP #4 shipped 22n)
+    double midLoCap500 = 6.8e-9;    // 500 Hz  ([ENG] table said 10n)
+    double midLoCap1k = 1.8e-9;     // 1 kHz   ([ENG] table said 2n2)
+    double midHiCap750 = 10.0e-9;   // 750 Hz  ([ENG] table said 15n)
+    double midHiCap1500 = 2.7e-9;   // 1.5 kHz ([ENG] table said 3n3)
+    double midHiCap3k = 680.0e-12;  // 3 kHz   ([ENG] table said 820p)
 
     // ---- Baxandall TREBLE range limiter (Phase 9 A2c-1, session 25) -------------
     // R36 (Wt -> IC5_C virtual ground) is schematic-verified at 3.3k, but the captured

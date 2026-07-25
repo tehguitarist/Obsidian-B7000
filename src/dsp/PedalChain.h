@@ -252,7 +252,8 @@ public:
         masterOut.setRailClampEnabled(f.railEnabled);
 
         // Mid-stage range limiter (Phase 9 GAP #4). The switched-cap value itself is
-        // applied through loMidCap() in applyParams(), which reads fit.midLoCap250.
+        // applied through loMidCap()/hiMidCap() in applyParams(), which read the
+        // capture-fitted switched-cap table (fit.midLoCap* / fit.midHiCap*).
         loMid.setWiperR(f.midWiperRLo);
         hiMid.setWiperR(f.midWiperRHi);
 
@@ -374,27 +375,28 @@ private:
             default: return Clipper::Grunt::Cut;
         }
     }
-    // NOT static: the "250" position's cap is capture-fitted (FitParams::midLoCap250 —
-    // the [ENG] 47n centres at 229 Hz, the capture peaks at 320 Hz). The other two
-    // positions keep their [ENG] constants.
+    // NOT static: the whole switched-cap table is capture-fitted (FitParams::midLoCap*
+    // / midHiCap* — the [ENG] table was computed, never schematic-verified, and the
+    // 3-way selectors are [ENG] themselves, so there is no document to defer to). The
+    // MidBand::kLoMid*/kHiMid* constexprs remain the [ENG] nominals.
     double loMidCap(int idx) const noexcept
     {
         // APVTS {250, 500, 1k}
         switch (idx)
         {
             case 0: return fit.midLoCap250;
-            case 1: return MidBand::kLoMid10n;
-            default: return MidBand::kLoMid2n2;
+            case 1: return fit.midLoCap500;
+            default: return fit.midLoCap1k;
         }
     }
-    static double hiMidCap(int idx) noexcept
+    double hiMidCap(int idx) const noexcept
     {
         // APVTS {750, 1.5k, 3k}
         switch (idx)
         {
-            case 0: return MidBand::kHiMid15n;
-            case 1: return MidBand::kHiMid3n3;
-            default: return MidBand::kHiMid820p;
+            case 0: return fit.midHiCap750;
+            case 1: return fit.midHiCap1500;
+            default: return fit.midHiCap3k;
         }
     }
 

@@ -235,6 +235,11 @@ static const FitField kFitFields[] = {
     {"midWiperRLo", &FitParams::midWiperRLo},
     {"midWiperRHi", &FitParams::midWiperRHi},
     {"midLoCap250", &FitParams::midLoCap250},
+    {"midLoCap500", &FitParams::midLoCap500},
+    {"midLoCap1k", &FitParams::midLoCap1k},
+    {"midHiCap750", &FitParams::midHiCap750},
+    {"midHiCap1500", &FitParams::midHiCap1500},
+    {"midHiCap3k", &FitParams::midHiCap3k},
     {"trebleWiperR", &FitParams::trebleWiperR},
 };
 

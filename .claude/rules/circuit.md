@@ -337,6 +337,29 @@ only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
 | 10n | 496 Hz (500, −0.9%) | ±23.0 dB | | 3n3 | 1552 Hz (1.5k, +3.5%) | ±23.3 dB |
 | 2n2 | 1058 Hz (1k, +5.8%) | ±14.5 dB | | 820pF | 3116 Hz (3k, +3.9%) | ±15.6 dB |
 
+> ⚠ **THE MODEL NO LONGER SHIPS THIS TABLE — every value has been fitted to the captured unit**
+> (Phase 9 GAP #4 + A2c-2; `FitParams::midLoCap*` / `midHiCap*` / `midWiperRLo/Hi`, applied via
+> `PedalChain::loMidCap()/hiMidCap()`). Shipped: **LO-MID 15n / 6.8n / 1.8n** and **HI-MID 10n /
+> 2.7n / 0.68n**, alongside a fitted series R in each band's wiper leg (22k / 18k). The table above
+> stays as the [ENG] derivation of record and as `MidBand::kLoMid*`/`kHiMid*` (the per-stage tests'
+> nominal oracle) — it is NOT what the plugin runs.
+> **Why:** the captured unit's mid range is ~±12 dB at every position (not the ±14.5…±28 above), and
+> its peaks sit at 349 / 545 / 1090 Hz and 784 / 1613 / 3026 Hz. Fitting the range alone (GAP #4, a
+> wiper-leg damping R against the boost-to-cut SPAN) pulled every peak **9–20 % low** and left the
+> peaks **1.54× too broad**, because a damping R buys range by lowering Q. Re-fitting the caps and
+> that R **together** against the full stage SHAPE lands all six peaks within **3.1 % mean / 8.7 %
+> worst** and cuts the width error to 1.31×. All eight values sit at interior minima of the objective.
+> **Two cautions.** (1) This cap table is `[ENG]` — the 3-way selectors do not exist on our schematic
+> at all — so unlike R36/C13 there is no document being contradicted, only a computed table being
+> replaced by a measurement. (2) The earlier claim that LO-MID "250" = 22n was corroborated by the
+> STOCK board's schematic-verified C33 **does not survive**: that came from the nodal sim run with
+> **no** wiper R, and with the fitted R in the model 22n centres at 306 Hz vs the measured 349 Hz.
+> Coincidentally the fitted 3 kHz cap (0.68n) IS the stock C35 — treat that as equally meaningless.
+> A residual remains: the peaks are still ~1.31× too broad, and closing it would require C32/C34 (the
+> FIXED, schematic-verified across-lug caps) to differ per switch position — i.e. a 2-pole selector.
+> That is the open question if this is ever reopened; do not fit it away. `docs/phase9-validation.md`
+> §4 "A2c-2".
+
 > ✅ **Validated by full nodal sim of the verified topology (2026-07-19, open item c), and the sim
 > itself is cross-validated against the p.3 MEASURED tables** (triple-check pass): every table row
 > the sim covers agrees within ~3% in frequency and ~1–2.5 dB in peak gain — e.g. 3n3: sim
