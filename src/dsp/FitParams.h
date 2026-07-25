@@ -87,19 +87,33 @@ struct FitParams
     // C11). Only the Cut position depends on it alone; Boost = C11||220n is ~immune.
     double clipC11 = 5.7207e-9;  // session-17 fenced fit (schematic 4.7 nF; user-authorised to move)
     // clipC12/clipC13 = the SWITCHED GRUNT caps (schematic 47 nF / 220 nF, added in
-    // Flat / Boost respectively). Made fittable in session 19 (Phase 9): the A/B
-    // baseline showed the plugin's GRUNT is voiced BACKWARDS — matched-pair
-    // boost-cut is a sub-bass shelf (corner ~37 Hz) vs the pedal's low-mid growl
-    // bump (~150 Hz), a LEVEL-INDEPENDENT (linear) +15..22 dB excess at 20-40 Hz.
-    // The coupling corner 1/(2*pi*C*(R16 + R18/(1+A0))) is too LOW because C12/C13
-    // are too big → the capture wants ~10x smaller caps (circuit.md already flags
-    // C13 = 220n primary vs 22n backup as an unresolved revision discrepancy; the
-    // capture favours the backup). Only Flat depends on C12, only Boost on C13; Cut
-    // is C11 alone (unaffected). ⚠ These move OFF a "triple-checked" primary-schematic
-    // value — provenance is a schematic-checker follow-up (which cap vs the impedance),
-    // but dsp.md "fit the corner" makes the capture authoritative on the corner.
-    double clipC12 = 47.0e-9;    // GRUNT Flat  add-cap (schematic 47 nF; session-19 fittable)
-    double clipC13 = 220.0e-9;   // GRUNT Boost add-cap (schematic 220 nF; session-19 fittable)
+    // Flat / Boost respectively). Only Flat depends on C12, only Boost on C13; Cut is
+    // C11 alone (unaffected). Made fittable in session 19 to chase the GRUNT sub-bass
+    // excess; **session 23 (2026-07-25) CLOSED that line — they are the WRONG LEVER
+    // and both stay at their schematic values. DO NOT FIT THEM.** The mechanism is
+    // upstream: the OD path carries ~13-15 dB too much 40-50 Hz relative to the clean
+    // blend, which C12/C13 can only mask by subtracting bass downstream of it.
+    // Four independent strands (docs/phase9-validation.md §4 "3b CLOSED"):
+    //   1. The excess is FULLY present at GRUNT **Cut** — C12 and C13 out of circuit
+    //      entirely — at +12.8 dB (40 Hz) / +14.8 dB (50 Hz) vs the pedal.
+    //   2. The plugin-vs-pedal LF error tracks the BLEND knob, not GRUNT: -0.47 dB at
+    //      pure clean -> +9.51 dB at full OD, monotone; the clean path matches to 0.32 dB.
+    //   3. A 1-D scan of clipC13 is MONOTONE with no interior minimum down to 0.5 nF
+    //      (grunt-boost band-RMS 11.25 -> 5.09): the best "fit" is to delete the boost
+    //      cap. Same "make the clipper see less" degeneracy that killed the session-5/6
+    //      clipper fits and the rail-voltage fit — a degenerate objective, not a value.
+    //   4. At 22n the model's boost-minus-flat span INVERTS (-3.8 dB at 100 Hz vs the
+    //      pedal's consistent +5.6..+6.1 dB), destroying the switch's differentiation —
+    //      the exact failure mode that got GAP #4's joint mid-cap fit rejected.
+    // C13's provenance is also settled: circuit.md's re-zoom trigger was executed and
+    // the primary p.4 symbol + BOM both read 220n unambiguously (though they are ONE CAD
+    // source, not two independent ones — and neither schematic describes the Ultra we
+    // captured; see circuit.md "GRUNT cap C13"). The backup's 22n is a genuine 2021
+    // revision difference. Left fittable ONLY so a future probe can sweep them
+    // diagnostically — a shipped value other than the schematic's needs the A3 gap
+    // (the OD/clean LF balance) closed first, or it is just re-fitting this degeneracy.
+    double clipC12 = 47.0e-9;    // GRUNT Flat  add-cap (schematic 47 nF — do NOT fit, see above)
+    double clipC13 = 220.0e-9;   // GRUNT Boost add-cap (schematic 220 nF — do NOT fit, see above)
 
     // ---- J201 JFET stage (JfetStage.h) --------------------------------------
     // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;

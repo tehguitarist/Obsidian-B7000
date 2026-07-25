@@ -227,8 +227,17 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels). **UI position map ✅ VERIFIED against capture 2026-07-22 (was assumed 2026-07-20): up/Boost = 4n7∥220n (MOST low end), mid/Cut = 4n7 alone (LEAST), down/Flat = 4n7∥47n (MEDIUM).** Semantics Cut<Flat<Boost. Measured (matched-pair vs the cut baseline, 50–300 Hz of the driven sweep, `analysis/grunt_a0_check.py`): cut 0 dB < flat **+5.43 dB** < boost **+6.81 dB**, monotone bin-by-bin. |
 | C11 | 4n7 | always in forward path |
 | C12 | 47n | added in GRUNT pos 1 (via switch) |
-| C13 | 220n | added in GRUNT pos 3 (via switch) — **primary=220n; backup=22n (rev diff), see Validation** |
+| C13 | 220n | added in GRUNT pos 3 (via switch) — **primary=220n (RE-ZOOMED + CONFIRMED 2026-07-25, session 23); backup=22n (rev diff), see Validation.** Model it at 220n; do NOT fit it (the capture objective on this cap is degenerate — see the Validation note and `FitParams::clipC13`). |
 | R16 | 6k8 | clipper input resistor (sets 4049 amp gain with R18) |
+
+> ✅ **GRUNT pole/throw RE-VERIFIED at 900 DPI (2026-07-25, session 23)** — the ATTACK-class
+> pole-vs-throw error is NOT present here. Switch **pin 2 is the POLE**, wired to a junction dot on
+> the vertical that carries IC2_A pin 1 (output) down to the R15/C10 feedback node — i.e. the pole is
+> on the DRIVING side, as stated. **Pin 1 → C12's left plate; pin 3 → C13's left plate** (the caps'
+> left plates are the throws). All three caps' RIGHT plates land on one node = R16's input (single
+> vertical rail with junction dots at C12 and C13) — genuinely parallel, no hidden series element.
+> IC2_A's output reaches C11's left plate by bare wire (no series R); node W has no bias resistor
+> other than R18.
 
 ### CLIPPER — CD4049UBE CMOS inverter overdrive (IC3), NOT a diode clipper
 | Ref | Value | Function |
@@ -568,8 +577,50 @@ BLEND crossfade) — see Footswitches below; this is an Ultra-only addition, not
 - **C33 (LO-MID series cap): primary schematic p.4 = 22n AND BOM = 22n → use 22n.** Backup schematic
   (2021 "B7X" rev) shows 2200pF for the equivalent cap — a **revision difference**, not our board.
   Confirmed by zooming both the schematic symbol and the BOM table.
-- **GRUNT cap C13: primary = 220n; backup = 22n.** Different revision. Using primary (220n); re-zoom
-  the primary GRUNT symbol if the modelled bass-into-clip corner looks wrong.
+- **GRUNT cap C13: primary = 220n; backup = 22n.** Different revision. Using primary (220n).
+  ✅ **THE RE-ZOOM TRIGGER FIRED AND WAS EXECUTED (2026-07-25, session 23) — 220n CONFIRMED, and the
+  bass-into-clip corner turned out NOT to be a C13 problem at all.** `schematic-checker` pass at
+  900 DPI (vector PDF, not a scan):
+  - **Primary p.4 symbol reads `220n`, unambiguous.** Three evenly-kerned digits at the same
+    designator-above/value-below offset as C11's `4n7` and C12's `47n`; no stray glyph, no
+    mis-attribution from a neighbour, and the same page renders `220pf` (C14) identically two symbols
+    away. **Primary BOM p.1 reads `C13 | 220n`** (extractable vector text, not OCR).
+  - ⚠ **BUT the symbol and the BOM are NOT independent evidence — treat 220n as ONE data point, not
+    two.** The BOM's value strings carry the schematic's own idiosyncratic notation verbatim
+    (`4n7`/`47n`/`47pf`/`2u2`/`1m`/`6k8` — letter-as-decimal in some, suffix-style in others), there
+    is no independently-sourced column (no supplier line, quantity roll-up, footprint), and the
+    triple-check pass found ZERO symbol↔BOM disagreements across ~100 parts, which is what one
+    upstream CAD source looks like. Hard corroboration: the *same* primary PDF's p.3 dissents on a
+    different cap (it bolds C33 = 10n as the stock value where p.4 + BOM both say 22n) — the
+    hand-authored page is the only genuinely separate voice in the set.
+  - **Backup designator mapping (record this — it is shuffled):** backup **C15** `4700pF` (always in
+    path) = primary **C11**; backup **C14** `0.047uF` = primary **C12**; backup **C13** `0.022uF` =
+    primary **C13**. Only C13↔C13 happens to line up. ⚠ The primary's *own* C14 (220pF clipper
+    feedback) and C15 (2u2 clipper output coupling) are different real parts **in the same region** —
+    a careless cross-reference drops `0.047uF` onto the clipper feedback cap. Topology is identical
+    node-for-node; R16/R19 `6k8`, both 1N4148s, and TL072ACP all match. So this is a **single-part,
+    one-decade delta** between the two revisions, equally consistent with a deliberate
+    range-widening and with a `0.022uF`→`0.22uF` re-entry slip — the 10× factor is evidence for
+    neither, do not read it as suspicious.
+  - 🚩 **AND THE BIGGER POINT: neither schematic documents the unit we captured.** The capture unit is
+    a real **Darkglass B7K Ultra**; the primary is PCB Guitar Mania's "Black Mirror VII" clone of the
+    **original B7K**. A perfectly-read `220n` tells us what the clone's rev-1.1v CAD file specifies,
+    **not what is fitted on the Darkglass PCB we recorded.** So for any capture disagreement there is
+    always a live third branch — "the document is right AND the captured unit differs" — which is the
+    same situation already documented for the `[ENG]` mid caps (and the pedal's lo-mid "250" centre
+    matching the *stock* 22n rather than the engineered 47n). Sessions 21–23 have hit this three
+    times; expect it, and do not let "the schematic is verified" imply "the captured unit matches".
+  - **⛔ C13 is NOT the bass-into-clip lever, and must not be fitted.** Four independent strands, all
+    in `docs/phase9-validation.md` §4 "3b CLOSED": (i) the LF excess is FULLY present at GRUNT **cut**,
+    with C12 and C13 out of circuit entirely (+12.8 dB at 40 Hz / +14.8 at 50 Hz vs the pedal); (ii)
+    the plugin-vs-pedal LF error scales monotonically with the **BLEND** knob (−0.47 dB at pure clean
+    → +9.51 dB at full OD) while the clean path matches to 0.32 dB; (iii) a proper 1-D scan of C13 is
+    **monotone with no interior minimum** all the way down to 0.5 nF (band-RMS 11.25 → 5.09, i.e. the
+    best "fit" is to DELETE the boost cap) — the same "make the clipper see less" degeneracy that
+    killed the session-5/6 clipper fits and the rail-voltage fit; (iv) at 22n the model's
+    boost-minus-flat span **inverts** (−3.8 dB at 100 Hz where the pedal measures a consistent
+    +5.6…+6.1 dB), destroying the switch's differentiation exactly as the rejected GAP #4 joint
+    mid-cap fit did. The real gap is the OD path's LF vs the clean blend (GAP #3/A3).
 - **IC3 marked "4049N" on primary, "CD4049UBE" on backup.** Both = unbuffered CD4049UB. Use the
   **unbuffered (UB)** transfer curve (single inverter stage), NOT the buffered CD4049 (3-stage).
 - **Ultra-Mod (primary p.3)** describes optional swappable LO-MID/HI-MID caps (remove C33/C35, add a

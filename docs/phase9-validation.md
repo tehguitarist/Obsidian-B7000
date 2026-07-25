@@ -4,12 +4,14 @@
 > captured Darkglass B7K Ultra, the gaps found (with dB), the fixes shipped, and what's left.
 > Read this + `docs/validation-and-capture.md` (method) + `.claude/rules/dsp.md` (fix rules).
 >
-> **Status (2026-07-25, session 21):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
-> Phase 9 in progress. GAP #1 (low end), GAP #1b (bridged-T — investigated twice, closed both times,
-> non-issue), GAP #2 (treble notch), and GAP #3a (rail clamp) are all FIXED and, except this
-> session's rail-clamp change, committed. A harness defect (gain-n12 captures rendered 12 dB hot)
-> that had been distorting the GAP #3a rail-clamp trial is also fixed. GAP #3b (static GRUNT-tilt)
-> remains open — see §4.
+> **Status (2026-07-25, session 23):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
+> Phase 9 in progress. FIXED + committed: GAP #1 (low end), GAP #1b (bridged-T — investigated twice,
+> closed both times, non-issue), GAP #2 (treble notch), GAP #3a (rail clamp), GAP #4 (mid-band range),
+> plus the gain-n12 harness defect. **GAP #3b is now CLOSED as mis-attributed** (session 23): it is not
+> a GRUNT-cap gap, and neither the ÷4 nor the `C13 = 22n` candidate was shipped — see §4 "3b CLOSED".
+> **ONE voicing gap remains: A3, the OD/clean BLEND balance below ~200 Hz**, now quantified with a
+> hard constraint that rules out OD-path-only fixes — §4 "A3 handover". Current grade (240 rows):
+> **OD 6.014 / CLEAN 1.495 / ALL 3.680 dB** band-RMS.
 
 ---
 
@@ -55,16 +57,29 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   `railNeg = 2.9`, `railPos = 2.7` (physically derived from the +9V/D3/VD chain, not fitted — the
   fit objective is monotone with no interior minimum, a known degeneracy). All 240 rows band-RMS
   4.298 → 4.057 dB, 31 rows better by >0.5 dB vs 4 worse. ctest 16/16. §4 GAP #3a.
-- [~] **A3-next (iii). GRUNT caps — RE-RUN DONE (session 22), not shipped.** The rail clamp was NOT
-  what ÷4 was compensating for: on the rails-on baseline ÷4 still gives OD band-RMS **6.014 → 5.355**
-  (18 rows better >0.5 dB, 0 worse), so it is an independent lever. **⭐ New: `C13 = 22n` alone — the
-  value the BACKUP schematic shows — recovers ~74 % of that (→ 5.527) while leaving C12 at its
-  verified 47n.** circuit.md predicted this exact trigger ("re-zoom the primary GRUNT symbol if the
-  modelled bass-into-clip corner looks wrong"). **▶ NEXT: a `schematic-checker` pass on C13
-  (primary p.4 GRUNT cap symbol + the BOM line) BEFORE changing the constant** — unlike GAP #4's
-  `[ENG]` caps, C13 is schematic-verified with a documented conflicting value, so there is a ground
-  truth to settle; if the primary really is 220n this becomes a fit, if not it is a bug fix. §4 3b.
-- [ ] **A4. Re-grade the full matrix after A2–A3; write final GATE-9 numbers into §4.**
+- [x] **A3-next (iii). GRUNT caps — CLOSED (session 23). NOT the lever; nothing shipped.** The
+  `schematic-checker` pass ran and **confirmed 220n on the primary** (unambiguous at 900 DPI, symbol +
+  BOM — but they are ONE CAD source, and neither schematic describes the Ultra we captured). The fix
+  was **rejected anyway**, because the excess it appeared to fix is mis-attributed: it is **fully
+  present at GRUNT *cut*** with C12/C13 out of circuit (+12.8 dB at 40 Hz), it **tracks the BLEND
+  knob** not GRUNT (−0.47 dB at pure clean → +9.51 at full OD, clean path 0.32 dB), the `clipC13` 1-D
+  scan is **monotone to 0.5 nF** (best "fit" = delete the cap — the known degeneracy), and 22n
+  **inverts** the switch's measured boost-over-flat ordering (−3.8 dB vs the pedal's +5.9) — the same
+  trap that got GAP #4's joint fit rejected. The pedal's GRUNT span is a 127–202 Hz **bump**, the
+  model's a monotone **shelf**: no cap value converts one into the other. §4 "3b CLOSED".
+- [ ] **A3. OD/clean BLEND balance — THE remaining voicing gap, now QUANTIFIED.** Target: at GRUNT
+  cut / drive noon / BLEND max the OD position needs **~13–15 dB less 40–64 Hz**, tapering to 0 by
+  ~200 Hz (mids already right to ~1 dB). **⛔ Hard constraint: attenuating the OD path cannot be
+  sufficient** — muting its LF entirely still leaves the model 3.6 dB above the pedal's *total* 40 Hz
+  output, because the `LevelBlend` B=1.0 residual bleed floor sits there. So the bleed's LF
+  level/phase is necessarily part of the fix; gate any OD-only candidate against that number first.
+  Leading hypothesis is frequency-dependent OD-vs-bleed **phase** near the ~896 Hz GRUNT-cut coupling
+  corner (which would explain the bump-vs-shelf shape, not just the level) — `blend_null_probe.cpp`.
+  ⚠ Not a polarity/sign bug; session 19 settled that. **START HERE.** §4 "A3 handover".
+- [ ] **A4. Write final GATE-9 numbers into §4.** ⚠ **No re-grade render is needed for session 23** —
+  nothing in `src/` changed, so the shipped baseline `reports/comprehensive_data.json` IS the current
+  grade: **OD 6.014 / CLEAN 1.495 / ALL 3.680 dB** band-RMS over 240 rows (`matrix_grade.py`). GATE-9
+  should wait for A3, which is the last documented gap materially moving these numbers.
 
 **B. Performance / quality pass (Phase 9 part 2):**
 - [ ] **B1. PerfBenchmark / FeatureProfile / OSFidelity probes** → the `hq` toggle decision (omega4 vs AccurateOmega is usually the only real lever) + README perf table. See §5.
@@ -124,6 +139,17 @@ and a no-fit render from a rebuilt binary with that same value baked in get **di
 though the output is identical — a rebuild won't reuse pre-rebuild `--fit` results. It never returns
 stale data (the safe direction); it just occasionally re-renders what it could have reused. Key on
 the *effective* FitParams (via `OfflineRender --print-fit`) if this ever becomes worth it.
+
+**Session-23 tools.** `analysis/matrix_grade.py A.json [B.json ...]` prints the OD / CLEAN / ALL
+band-RMS + tilt aggregate this document's tables quote (silent zero-knob rows excluded, graded
+25 Hz–12.9 kHz), and with two reports the **row movement** (how many rows better/worse by >0.5 dB,
+biggest mover each way, `--rows N` to list them) — the acceptance evidence to record beside any
+aggregate, since an aggregate win built from a few big gains and many small losses is a different
+result. `analysis/grunt_span_probe.py A.json [B.json ...]` prints the GRUNT **matched-pair span**
+(position minus cut, per band, pedal vs plugin) at every drive setting, including the boost-vs-flat
+ordering check — the GAP #4 span method generalised, and the metric that rejected C13 = 22n. It
+un-applies the report's per-capture `gain_db_applied` before differencing, which a naive cross-capture
+diff must also do. Both need no captures beyond the existing reports.
 
 **Session-20 tools.** `analysis/od_tilt_metric.py <report.json>...` prints the GAP #3 tilt / low-band
 RMS / mid-band RMS per OD capture and the mean, for any number of report JSONs side by side — the
@@ -465,12 +491,17 @@ The open question was whether part of what `clipC12/C13 ÷ 4` was compensating f
 rail clamp**, now shipped. **Answer: no.** Re-measured on the rails-on, mid-fixed baseline, ÷4 is
 still worth nearly as much as before, so it is an INDEPENDENT lever, not a proxy for the clamp:
 
-| candidate | OD band-RMS (92 rows) | tilt | rows better >0.5 dB | worse | physical? |
+| candidate | OD band-RMS (116 OD rows*) | tilt | rows better >0.5 dB | worse | physical? |
 |---|---|---|---|---|---|
 | **baseline** (C12 47n / C13 220n) | 6.014 | 8.48 | — | — | primary schematic + BOM |
 | C12/C13 ÷2 (23.5n / 110n) | 5.725 | 8.18 | 10 | 0 | no |
 | **C13 = 22n only** | **5.527** | **7.79** | 12 | 1 | **YES — backup schematic rev** |
 | C12/C13 ÷4 (11.75n / 55n) | **5.355** | **7.60** | 18 | 0 | no |
+
+\* Row-count correction (session 23): the band-RMS values in this table are over **all 116 OD rows**
+(reproduced exactly by `analysis/matrix_grade.py`); the "92 rows" originally written here was
+`od_tilt_metric.py`'s narrower capture subset, which is where the *tilt* column comes from. Two
+different row sets, one label — the values are right, the count was not.
 
 Clean rows are bit-identical in every candidate (0.000) — this lever is OD-only, as expected.
 Biggest ÷4 wins are exactly the GRUNT-dependent rows: `drive-0700_grunt-boost` sweep_clean
@@ -492,8 +523,119 @@ is a **documented conflicting value on the backup** — so there IS a ground tru
 C13). Do that BEFORE changing the constant. If the primary's 220n is confirmed, then and only then
 does this become a fit-to-capture like the others; if the primary actually reads 22n (or the board
 was built to the backup rev), this stops being a fit at all and becomes a **bug fix**.
-Note the fit's ideal C13 sits near 55n — between the two documented values — so neither is exact and
-some residual will remain either way.
+
+> ⚠ **The "fit's ideal C13 sits near 55n" claim above is WRONG and was never measured** — 55n was
+> simply 220/4 from the ÷4 candidate, not the optimum of a scan. Session 23 ran the actual 1-D scan;
+> it is monotone with no interior minimum. Corrected below.
+
+### ✅ 3b — CLOSED (session 23, 2026-07-25). NOT a GRUNT-cap gap; the C13 change was REJECTED.
+
+The `schematic-checker` pass ran and **220n is confirmed on the primary** — but the fix was rejected
+anyway, because the measurement that motivated it turned out to be mis-attributed. Nothing shipped;
+`clipC12`/`clipC13` stay at 47n/220n. **ctest 16/16.**
+
+**(1) The schematic verdict** (full detail now in `circuit.md` "GRUNT cap C13", which is the durable
+record). Primary p.4's symbol reads `220n` unambiguously at 900 DPI (vector, not a scan; three
+evenly-kerned digits at the same offset as C11's `4n7`/C12's `47n`, and the same page renders C14's
+`220pf` identically two symbols away); primary BOM p.1 reads `C13 | 220n`. Three refinements matter
+more than the reading itself:
+- **Symbol + BOM are ONE source, not two** — the BOM carries the schematic's own idiosyncratic value
+  notation verbatim, has no independently-sourced column, and shows zero symbol↔BOM disagreement
+  across ~100 parts. So "schematic + BOM verified" = one data point. (The same PDF's hand-authored
+  p.3 *does* dissent on C33, which is what a genuinely separate voice looks like.)
+- **The backup's designators are shuffled**: backup C15 `4700pF` = primary C11, backup C14 `0.047uF` =
+  primary C12, backup C13 `0.022uF` = primary C13. Topology identical node-for-node; a single
+  one-decade delta on one part. That is equally consistent with a deliberate revision and with a
+  `0.022uF`→`0.22uF` re-entry slip — **the 10× factor is evidence for neither.**
+- 🚩 **Neither schematic describes the unit we captured** (a real Ultra; the primary is a clone of the
+  *original* B7K). So the pre-registered two-branch decision tree was incomplete — there is always a
+  third branch, "the document is right AND the captured unit differs", the same situation as the
+  `[ENG]` mid caps. This is the third time in three sessions.
+
+**(2) Why the fix was rejected anyway — the excess is not in the GRUNT caps.** New tool
+`analysis/grunt_span_probe.py` applies GAP #4's matched-pair SPAN method to GRUNT (three captures
+differing in nothing but the switch, so the whole rest of the chain cancels exactly), and
+`analysis/matrix_grade.py` reproduces the §4 aggregate tables. Four independent strands:
+
+| # | evidence | result |
+|---|---|---|
+| i | **The excess is fully present at GRUNT *Cut*** — C12 and C13 out of circuit entirely. `ref-od` vs `blend-0700` (full-OD vs full-clean, matched otherwise) | plugin is **+12.8 dB at 40 Hz, +14.8 at 50 Hz** hotter than the pedal; →0 by 202 Hz |
+| ii | **The error tracks BLEND, not GRUNT.** Mean Δ over 25–64 Hz along the blend ladder | pure clean **−0.47** → 0.25 **−0.16** → 0.50 **+0.64** → 0.75 **+2.59** → full OD **+9.51 dB**; clean path band-RMS **0.32** |
+| iii | **A proper 1-D `clipC13` scan is MONOTONE, no interior minimum** (grunt-boost rows, band-RMS) | 220n 11.25 / 47n 9.76 / 22n 8.18 / 10n 6.72 / 3n 5.55 / **0.5n 5.09** — the best "fit" is to DELETE the cap |
+| iv | **22n inverts the switch's measured ordering.** boost-minus-flat span at 100 Hz | pedal **+5.55 / +6.07 / +5.93 dB** (drive min/0930/noon, consistent); plugin at 220n **+3.62 / +2.75 / +0.48** (right sign); at 22n **−3.82 / −2.80** (**inverted**) |
+
+Strand (iii) is the same *"make the clipper see less"* degeneracy that killed the session-5/6 clipper
+fits and forced the rail voltages to be derived rather than fitted (`CLAUDE.md`) — the objective is
+not identifying a capacitance, it is asking for less bass anywhere it can get it. Strand (iv) is the
+GAP #4 trap exactly: an aggregate win bought by collapsing a switch position onto its neighbour, the
+same reason GAP #4's joint mid-cap fit was rejected for collapsing LO-MID "250" onto the 500 Hz cap.
+
+**(3) The SHAPE is wrong, so no cap value could have worked.** Pedal vs plugin GRUNT span (flat−cut,
+drive-min, per 1/3-oct band, dB):
+
+| band Hz | 25 | 32 | 40 | 50 | 64 | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 | 640 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **pedal** | −1.1 | −2.0 | −3.1 | −2.7 | +0.5 | +3.5 | +5.2 | **+6.0** | **+6.2** | **+6.2** | +5.6 | +3.5 | +3.8 | +3.2 |
+| **plugin** | +12.8 | +13.4 | **+13.8** | +13.8 | +13.5 | +13.0 | +12.2 | +11.0 | +9.3 | +7.0 | +4.6 | +2.3 | +1.6 | +1.4 |
+
+The pedal's span is a **bump centred 127–202 Hz** that goes to ~0/slightly negative below 50 Hz and
+holds a ~+3 dB plateau to 640 Hz. The plugin's is a **monotone high-pass shelf, maximal at DC**. A
+first-order coupling cap can only move a shelf's corner — **it can never turn a shelf into a bump**,
+at any value. Note the two AGREE at 202–254 Hz (+6.2/+7.0, +5.6/+4.6): where the OD path dominates
+the model's GRUNT is right, and it is only where the LF collapses that they part company. Note also
+the flat position's span error (9.49 dB RMS) is nearly as large as boost's (14.23) — **C12 is
+mis-tracking too, and C12 has no conflicting documentation at all**, which alone should have ruled
+out a C13-specific explanation.
+
+⇒ **3b is GAP #3/A3 seen through the GRUNT switch, not a gap of its own.** Both the ÷4 and the 22n
+candidates are degenerate proxies for the real error and neither should be shipped. Fold 3b into A3.
+
+#### ▶ A3 handover — the target is now QUANTIFIED, and one whole family of fixes is already ruled out
+
+Closing 3b handed A3 a precise target and a decisive constraint. **Measure at GRUNT cut / drive noon /
+BLEND max, against the `blend-0700` full-clean capture as the reference** (both are matched in
+everything but BLEND, so this is a clean differential — and the clean path itself is trustworthy at
+0.32 dB band-RMS, so the reference is sound).
+
+**The target.** `ref-od` minus `blend-0700`, per band, pedal vs plugin:
+
+| band Hz | 20 | 25 | 32 | 40 | 50 | 64 | 80 | 101 | 127 | 160 | 202 | 254 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| pedal | −17.8 | −18.2 | −19.1 | **−20.5** | **−21.2** | −19.2 | −15.7 | −12.8 | −10.7 | −9.4 | −8.8 | −9.9 |
+| plugin | −12.8 | −11.6 | −9.7 | **−7.7** | **−6.4** | −5.6 | −5.4 | −5.8 | −6.7 | −8.0 | −9.5 | −10.8 |
+| **Δ** | +5.0 | +6.6 | +9.4 | **+12.8** | **+14.8** | +13.6 | +10.3 | +7.0 | +4.0 | +1.4 | −0.7 | −1.0 |
+
+So the OD position needs **~13–15 dB less 40–64 Hz**, tapering to 0 by ~200 Hz and slightly NEGATIVE
+above it (i.e. do not simply attenuate the OD path broadband — the mids are already right to ~1 dB).
+Note the pedal's own curve is a **bump peaking at 202 Hz** with the deep bass 12 dB below it; the
+model's is nearly **flat** across 40–254 Hz. Same shape mismatch as the GRUNT span above, which is
+expected — they are two views of one error.
+
+**⛔ The constraint that rules out a whole family of fixes: attenuating the OD path CANNOT be
+sufficient.** Gate run (`--fit clipC11=0.01e-9`, i.e. mute the OD path's LF entirely at ref-od):
+killing it drops the model's 40 Hz by only **9.2 dB** (50 Hz by 10.5), leaving a flat residual floor
+at −13.5 dB — that floor is the **BLEND clean bleed** (`LevelBlend` at B = 1.0 still passes clean
+through the 100k track; sessions 7/8). Expressed against the full-clean reference that floor is
+**−16.9 dB, still 3.6 dB ABOVE the pedal's TOTAL 40 Hz output of −20.5 dB.** So even an infinitely
+aggressive OD-path LF cut overshoots: **the residual bleed's LF level (or its phase relative to the
+OD path) is necessarily part of A3.** Any candidate that only touches the OD path is
+*necessary-not-sufficient* — gate it against this number before building it.
+
+**Two live hypotheses, and how to separate them.** (a) The bleed's LF magnitude is too high — but the
+bleed is resistive/frequency-flat in the model, so a pure magnitude error would show at ALL
+frequencies, and the mids match to ~1 dB (it would have to be hidden by the OD path dominating
+there — check this explicitly rather than assuming). (b) The OD path and the bleed **cancel partially
+at LF in the real pedal** and add in the model — session 19's `blend_null_probe.cpp` measured them
+**in phase** in the model (+8.9° at 40 Hz), while the pedal's OD path picks up ~+87° of lead from its
+~896 Hz GRUNT-cut coupling corner, so the real sum could be substantially below either term.
+`blend_null_probe.cpp` is the right tool and (b) is the more interesting hypothesis, because it would
+explain the *shape* (a bump, not a shelf) rather than just the level. ⚠ Do NOT re-open the polarity
+question as a *sign* bug — session 19 settled that (OD/clean in-phase at LF is not a bug); this is
+about frequency-dependent phase near the coupling corner, which is a different claim.
+
+**Tools:** `analysis/grunt_span_probe.py` (matched-pair span, any position pair, any sweep),
+`analysis/matrix_grade.py` (OD/CLEAN/ALL band-RMS + row-movement counts), `analysis/od_tilt_metric.py`,
+`analysis/blend_null_probe.cpp`, `analysis/od_taps_probe.cpp`.
 
 ### ✅ GAP #4 — the switchable MID positions over-deliver RANGE. FOUND session 21, **FIXED session 22**.
 
