@@ -104,6 +104,53 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 24, 2026-07-25): ▶ PHASE 9 — user-initiated detour: tighten base-clean BEFORE
+> resuming A3 (rationale: A3's own target table is computed against a clean reference capture, so a
+> clean-path error confounds it). Two bad captures found + fixed, one real grading bug fixed, a
+> tolerance target agreed and NOT yet met. NOTHING in `src/` changed. ctest 16/16 (confirmed after a
+> full rebuild). Still on branch `phase9-session23-c13-closed`, one commit ahead of main — not merged.**
+> **(1) Two bad captures identified and user re-recorded them: `master-1700_gain-n12_base-clean.wav`**
+> (master=1.0 unity divider showed a 4-lobe wiggle incl. an isolated +6 dB spike at 4-5 kHz that
+> master=0.25/0.75 don't have — physically impossible for a passive divider) **and
+> `bass-1700_gain-n12_base-clean.wav`** (BASS-only knob move showing a −8 dB dip at 2.5 kHz, two
+> octaves outside anything a ~100 Hz shelf touches, sharing its shape with master-1700's anomaly —
+> the session-8 "bad take" signature). Both re-rendered and confirmed fixed: **master-1700 3.41→0.31
+> dB, bass-1700 3.78→0.70 dB.** ⚠ A cruder sign-flip-count heuristic was tried first and rejected — it
+> flagged half the mid-band captures as "bad" when they're actually real single-lobe range/centre
+> errors (see below); the real test is whether the residual reaches frequencies the knob under test
+> can't physically affect, and whether the anomaly shape repeats across unrelated captures.
+> **(2) Real bug fixed: `matrix_grade.py::is_od()`** silently graded `ref-od_gain-n12.wav` as CLEAN
+> (it matches neither `"base-od" in fname` nor `fname == "ref-od.wav"`) — fixed to
+> `fname.startswith("ref-od")`. Retroactively means every CLEAN/OD split number in sessions 18-23 had
+> one mislabelled OD capture in the CLEAN bucket; relative before/after deltas within a session are
+> unaffected (bug present both sides), absolute splits were slightly off. Not worth editing old
+> entries.
+> **(3) Methodology correction for all future clean-set grading:** each clean capture has 4 sweep
+> levels but for a linear (undistorted) chain they are bit-identical in SHAPE (verified: 0.000 dB
+> post-normalisation spread) — so **the clean set is 29 independent captures, not "124 rows"**; a
+> row-counted aggregate is ~4× inflated for the clean subset specifically (row-counting is still
+> correct for OD, which genuinely differs across drive level). Grade clean by capture from here.
+> **(4) Full re-baseline (`--no-cache`, ~30 min): OD 5.963 / CLEAN 1.194 / ALL 3.578 dB** band-RMS,
+> 240 rows (was 6.014/1.495/3.680 — the two recaptures + the `is_od()` fix account for the whole
+> move). `analysis/reports/comprehensive_data.json` is gitignored, not committed — re-generate if
+> resuming from a clean checkout (`python3 analysis/comprehensive_report.py`, needs `OfflineRender`
+> built first: `cmake --build build --target OfflineRender`).
+> **(5) Target agreed (user proposed ±0.5 dB / 20-20kHz, refined against the actual data):**
+> measurement floor supports the ambition (pedal take-to-take repeatability 0.144 dB RMS shape-
+> normalised, bypass round-trip 0.07 dB — ±0.5 is ~3× the noise floor, not noise-chasing), BUT the
+> band edges aren't capturable (25 Hz-12.9 kHz is the graded range; even the near-perfect ref-clean
+> is −1.3 dB at 25 Hz) and knob-position pointer error alone is worth >1 dB on a ±28 dB mid range.
+> **Agreed: mean clean band-RMS ≤0.7 dB / no capture over 1.5 dB, over 30 Hz-10 kHz**, tiered ±0.5
+> flat/interior (already met) / ±1.0 single-knob extremes / ±1.5 mid-freq-switch extremes. **Current:
+> mean 1.235 dB, 20/29 captures ≤1.5 dB. NOT met — no fitting work has started yet.**
+> **▶ NEXT: fit `treble-1700_gain-n12` (2.11 dB, a single smooth monotone tilt −3.8→+0.7 dB = a
+> Baxandall treble-boost RANGE error) using the GAP #4 method (5-point pot law through
+> 0700/0930/flat/1430/1700, NOT a per-position fit).** This is the clean starting point, not the two
+> current worst captures (`himidfreq-750_himid-0700` 3.53 dB, `lomidfreq-250_lomid-1700` 2.79 dB) —
+> both of those are mid-freq-switch captures already touched by GAP #4's `midWiperR` range-limiter
+> trade, so check whether they can move at all before spending fitting budget there. Full detail +
+> the per-capture table: `docs/phase9-validation.md` §4 "A2c — clean-baseline accuracy pass".
+> ── prior session ──
 > **CURRENT (session 23, 2026-07-25): ▶ PHASE 9 — GAP #3b CLOSED as MIS-ATTRIBUTED. The queued
 > `clipC13 = 22n` fix was investigated and REJECTED; NOTHING in `src/` changed except comments.
 > ctest 16/16. ONE voicing gap left: A3.**

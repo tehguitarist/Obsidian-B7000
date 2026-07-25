@@ -44,7 +44,7 @@ def band_idx(bands, lo, hi):
 
 
 def is_od(fname):
-    return "base-od" in fname or fname == "ref-od.wav"
+    return "base-od" in fname or fname.startswith("ref-od")
 
 
 def rows_of(path):

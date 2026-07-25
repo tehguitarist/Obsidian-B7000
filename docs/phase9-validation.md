@@ -4,14 +4,18 @@
 > captured Darkglass B7K Ultra, the gaps found (with dB), the fixes shipped, and what's left.
 > Read this + `docs/validation-and-capture.md` (method) + `.claude/rules/dsp.md` (fix rules).
 >
-> **Status (2026-07-25, session 23):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
+> **Status (2026-07-25, session 24):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
 > Phase 9 in progress. FIXED + committed: GAP #1 (low end), GAP #1b (bridged-T — investigated twice,
 > closed both times, non-issue), GAP #2 (treble notch), GAP #3a (rail clamp), GAP #4 (mid-band range),
-> plus the gain-n12 harness defect. **GAP #3b is now CLOSED as mis-attributed** (session 23): it is not
+> plus the gain-n12 harness defect. GAP #3b is CLOSED as mis-attributed (session 23): it is not
 > a GRUNT-cap gap, and neither the ÷4 nor the `C13 = 22n` candidate was shipped — see §4 "3b CLOSED".
-> **ONE voicing gap remains: A3, the OD/clean BLEND balance below ~200 Hz**, now quantified with a
-> hard constraint that rules out OD-path-only fixes — §4 "A3 handover". Current grade (240 rows):
-> **OD 6.014 / CLEAN 1.495 / ALL 3.680 dB** band-RMS.
+> **User-initiated detour (session 24): before resuming A3, nail the base-clean path** (no
+> nonlinearity, so a clean-path error is a confound sitting under every OD comparison) — see §4
+> "A2c — clean-baseline accuracy pass". Two bad captures found + fixed, a real grading bug fixed,
+> a tolerance target agreed and NOT yet met. **Two voicing items remain open: A2c (clean tightening,
+> in progress) and A3 (the OD/clean BLEND balance below ~200 Hz, quantified — §4 "A3 handover").**
+> Current grade (240 rows, re-baselined session 24): **OD 5.963 / CLEAN 1.194 / ALL 3.578 dB**
+> band-RMS.
 
 ---
 
@@ -76,10 +80,16 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   Leading hypothesis is frequency-dependent OD-vs-bleed **phase** near the ~896 Hz GRUNT-cut coupling
   corner (which would explain the bump-vs-shelf shape, not just the level) — `blend_null_probe.cpp`.
   ⚠ Not a polarity/sign bug; session 19 settled that. **START HERE.** §4 "A3 handover".
-- [ ] **A4. Write final GATE-9 numbers into §4.** ⚠ **No re-grade render is needed for session 23** —
-  nothing in `src/` changed, so the shipped baseline `reports/comprehensive_data.json` IS the current
-  grade: **OD 6.014 / CLEAN 1.495 / ALL 3.680 dB** band-RMS over 240 rows (`matrix_grade.py`). GATE-9
-  should wait for A3, which is the last documented gap materially moving these numbers.
+- [ ] **A4. Write final GATE-9 numbers into §4.** GATE-9 should wait for A3, which is the last
+  documented gap materially moving these numbers.
+- [~] **A2c. Clean-baseline accuracy pass — STARTED (session 24, 2026-07-25), user-initiated.**
+  Nail base-clean (BLEND=0, no nonlinearity) to a tight tolerance BEFORE resuming A3, on the theory
+  that a clean-path error is a confound sitting underneath every OD comparison. Two bad captures
+  found + fixed (`master-1700_gain-n12`/`bass-1700_gain-n12` re-recorded) and a real grading bug
+  fixed (`matrix_grade.py::is_od()` mis-classified `ref-od_gain-n12.wav` as CLEAN). Current: mean
+  clean band-RMS **1.235 dB** over 29 independent captures (not 124 "rows" — see caveat below),
+  target **≤0.7 dB mean / ≤1.5 dB worst-case**. See §4 "A2c — clean-baseline accuracy pass".
+  Baseline regenerated: **OD 5.963 / CLEAN 1.194 / ALL 3.578 dB** band-RMS over 240 rows.
 
 **B. Performance / quality pass (Phase 9 part 2):**
 - [ ] **B1. PerfBenchmark / FeatureProfile / OSFidelity probes** → the `hq` toggle decision (omega4 vs AccurateOmega is usually the only real lever) + README perf table. See §5.
@@ -788,6 +798,98 @@ is authoritative. This pedal's `[ENG]` mid-cap table was itself only ever a comp
 of the real Ultra's response (never schematic-verified — see circuit.md's `[ENG-caps]` tag), so there
 is no schematic ground truth to defer to here even in principle; a clean fit-to-capture is not a
 concession, it's the correct source of truth for this stage.
+
+### ▶ A2c — Clean-baseline accuracy pass. STARTED (session 24, 2026-07-25), user-initiated.
+
+**Why, before A3:** A3's target derivation (above) is itself computed *against* `blend-0700`, a
+clean capture, as the reference. If the clean path carries an uncorrected error, it leaks into every
+OD/clean differential built on it — A3's target table, GAP #4's span method, GAP #3b's strand (ii).
+User's framing: nail base-clean first so later distortion-side work isn't chasing a target computed
+against a wobbly reference. Agreed premise, not yet a fix.
+
+**⚠ Row-counting correction (methodology, applies to all past clean grading in this doc).** Each
+capture carries 4 sweep levels, but for a linear (undistorted) chain they are the IDENTICAL shape
+offset by exactly the level step — verified: post-normalisation band spread is 0.000 dB across all
+4 sweeps on every checked linear capture. So **the clean set is 29 independent captures (30 minus
+the silent `master-0700` zero-knob capture), not "124 rows"** — a `matrix_grade.py`-style row count
+is ~4× inflated for the clean subset (it's the right unit for OD rows, which really do differ across
+drive level). Grade clean captures by capture, not by row, from here on.
+
+**(1) Two bad captures found + fixed.** Diagnostic: does the residual go somewhere the knob under
+test can't physically reach, and does the anomaly shape repeat across unrelated captures (the
+session-8 "bad take" signature). A blunter sign-flip-count heuristic was tried first and rejected —
+it flags any ordinary peaking-filter residual (which legitimately crosses zero twice) as "bad", so it
+over-flagged half the mid-band captures.
+- **`master-1700_gain-n12_base-clean.wav`** (master=1.0, straight resistive divider, pot fully out of
+  circuit per circuit.md — the same physical situation as master=0.25/0.75, which both graded 0.31 dB).
+  Pre-fix: 3.41 dB, a 4-lobe wiggle including an isolated **+6.1/+5.4 dB spike at 4–5 kHz** nothing
+  else in the set shows. A passive unity divider cannot develop that at one tap point and not the
+  other two.
+- **`bass-1700_gain-n12_base-clean.wav`** (BASS pot, a ~100 Hz Baxandall shelf). Pre-fix: 3.78 dB,
+  with a **−8.1 dB dip centred at 2.5 kHz** and a rise to +3.2 dB at 8–13 kHz — two-plus octaves from
+  anything the BASS control touches, and sharing its odd-shaped ripple with `master-1700`'s.
+- User re-recorded both. Post-fix: **master-1700 → 0.31 dB** (now bit-similar in shape to its own
+  0.25/0.75 siblings), **bass-1700 → 0.70 dB** (single smooth monotone tilt, same shape family as the
+  other bass captures). Re-rendered with `--only master-1700,bass-1700` first to confirm before the
+  full re-baseline (cache correctly bypassed both times — "0 from cache").
+- **Checked and cleared** (real fittable single/double-lobe residuals, NOT bad takes — do not
+  recapture these): `himidfreq-750_himid-0700`/`_1700`, `lomidfreq-250_lomid-0700`/`_1700`,
+  `himid-0700`, `lomid-0700`, `lomid-1700_gain-n12`, `himid-1700_gain-n12`. Each shows ONE coherent
+  lobe centred on the frequency its own control affects (mirrored in sign between a cut- and a
+  boost-direction pair, exactly what a fixed-frequency/Q mismatch under a variable-gain peak should
+  look like) — this is GAP #4-shaped range/centre error on the mid-freq switch and mid pots, the next
+  real fitting target, not noise. `himidfreq-750_himid-0700` (3.53 dB) and `lomidfreq-250_lomid-1700`
+  (2.79 dB) are currently the two worst captures in the set.
+
+**(2) Real grading bug fixed: `matrix_grade.py::is_od()`.** `"base-od" in fname or fname ==
+"ref-od.wav"` — but `ref-od_gain-n12.wav` contains neither substring, so it was silently graded as
+CLEAN (at 6.23 dB, the worst "clean" row pre-fix). Fixed to `fname.startswith("ref-od")`. This
+retroactively means every CLEAN/OD split number quoted in sessions 18–23 included one mislabelled OD
+capture in the CLEAN bucket — **relative deltas within a single session's before/after comparison are
+unaffected** (the bug was present on both sides of every such diff), but the absolute CLEAN number
+those sessions quote was slightly inflated and the OD number slightly deflated. Not worth
+retroactively editing old entries; flagging here so a future reader doesn't over-trust the exact
+historical split.
+
+**(3) Full re-baseline (session 24, `--no-cache`, ~30 min — OfflineRender was freshly rebuilt so the
+render-binary-mtime cache key busted anyway):** **OD 5.963 / CLEAN 1.194 / ALL 3.578 dB** band-RMS,
+240 rows (down from OD 6.014 / CLEAN 1.495 / ALL 3.680 — the two recaptures plus the `is_od()` fix
+together account for the whole move; nothing in `src/` changed). ctest 16/16 confirmed post-rebuild.
+
+**(4) The ±0.5 dB target, evaluated against the actual data — agreed, with a correction.** User
+proposed ±0.5 dB (±1.5 min, ±1.0 preferred) across 20 Hz–20 kHz. Measurement floor supports the
+ambition: pedal take-to-take repeatability (`ref-clean` vs `ref-clean_gain-n12`, shape-normalised) is
+**0.144 dB RMS / 0.173 dB max**, and the bypass round-trip is **0.07 dB** — so ±0.5 dB is ~3× the
+noise floor, a real target, not noise-chasing. But two things the raw ±0.5 spec doesn't survive
+contact with:
+- **The band edges aren't capturable.** The grade already stops at 25 Hz–12.9 kHz (`matrix_grade.py`
+  `GRADE_LO/HI`) because 20 Hz and 16 kHz sit in the sweep/cab noise floor — even the near-perfect
+  `ref-clean` capture is −1.3 dB at 25 Hz. Spec the target over **30 Hz–10 kHz**, accept looser
+  (±1.5) outside it.
+- **Knob-position repeatability is not free.** On a ±28 dB mid-band range, a couple of degrees of
+  physical pointer error is worth >1 dB — visible in the `himid-0700`/`lomid-0700` interior-position
+  residuals. The GAP #4 fix method (a 5-point pot law through 0700/0930/flat/1430/1700, not
+  per-position) is the only way to separate "wrong range" from "wrong knob-position error", same
+  reasoning as that gap.
+
+**Agreed target (supersedes the raw ±0.5 spec): mean clean band-RMS ≤ 0.7 dB, no capture over
+1.5 dB, graded over 30 Hz–10 kHz.** Tiered by capture type: ±0.5 on flat/interior settings (already
+met — `ref-clean`, `master-*`, `bass/treble/lomid/himid` at 9:30/2:30 all sit at 0.3–0.9 dB), ±1.0 on
+single-knob full extremes, ±1.5 worst-case on the mid-freq switch extremes (the hardest captures,
+`himidfreq-750`/`lomidfreq-250`, given GAP #4 already spent one range-fit trade on these bands).
+
+**Current state vs target:** mean 1.235 dB (target ≤0.7), 20/29 captures ≤1.5 dB (target 29/29). Not
+met. **Not started:** the actual fitting work.
+
+**▶ NEXT.** `treble-1700_gain-n12` (2.11 dB) is the recommended starting point over the two current
+worst offenders (`himidfreq-750`/`lomidfreq-250`, both mid-freq-switch captures already touched by
+GAP #4's trade-off): its residual is a single **smooth monotone tilt, −3.8 dB at 25 Hz rising to
++0.7 dB at 12.9 kHz**, the clean signature of a Baxandall treble-boost RANGE error — same class of fit
+as GAP #4 (5-point pot law, not per-position), and untouched by any prior fit. After that, revisit
+whether the mid-freq-switch captures can move at all without reopening GAP #4's `midWiperR` trade
+(they may be near their achievable floor already — check before spending more fitting budget there).
+Tools: `matrix_grade.py` (now capture-independent-counted, see the row-counting note above — verify
+any per-capture aggregate script counts captures, not rows, for the clean subset).
 
 ### ▶ Remaining candidates (not yet investigated)
 
