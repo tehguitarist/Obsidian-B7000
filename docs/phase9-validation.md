@@ -58,9 +58,11 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   `midWiperRHi` 22k→18k, caps 15n/6.8n/1.8n and 10n/2.7n/0.68n.** Peak-frequency error **13.0 %→3.1 %**
   mean (the 1/3-oct grid had been hiding it — all six positions were 9–20 % low, not the two recorded);
   bandwidth ratio 1.54×→1.31×; CLEAN **1.152→1.023**, per capture **1.168→1.045 dB**, 5 rows better
-  >0.5 dB / 0 worse, OD bit-identical. All 8 values at interior minima. **A2c's ≤0.7 / ≤1.5 target is
-  NOT reachable** — the remaining width error needs C32 (schematic-verified, fixed) to vary per switch
-  position. Achievable floor recorded as ~1.0 dB mean / ~3.3 dB worst. §4 A2c-2.
+  >0.5 dB / 0 worse, OD bit-identical. All 8 values at interior minima. **A2c's ≤0.7 / ≤1.5 target was
+  NOT reachable under a shared-parameter fit** — the remaining width error needs C32 (schematic-
+  verified, fixed) to vary per switch position. Floor recorded as ~1.0 dB mean / ~3.3 dB worst.
+  **User authorized (2026-07-26) per-knob/per-switch-position fitting to push further — NOT YET DONE,
+  the next session's starting task.** §4 A2c-2.
 - [ ] **A3. OD/clean BLEND balance — now the BIGGEST residual.** The `grunt-boost`/`grunt-flat` captures stay 12–26 dB off after the notch fix: a sub-bass excess (20–40 Hz) where the pedal has a low-mid bump. Session 19 proved the 254 Hz null is NOT a polarity bug (OD/clean in-phase at LF) and C12/C13 don't fix it (level, not corner). Root suspect = the clean-bleed level/shape + grunt coupling in the clipping regime (kInputRef 0.87→3.377 move). **Start here for the next voicing gain.** Probes: `blend_null_probe.cpp`, `od_taps_probe.cpp`.
 - [x] **A3-next (0). `render_args()` now emits `--input-trim`** for `gainSessionDb`; baseline
   regenerated (session 21). Send-vs-record-gain settled three ways. §3.
@@ -1070,6 +1072,17 @@ pointer error alone is worth >1 dB on a ±28 dB mid range (§4 A2c item 4).
 and record the achievable floor as ~1.0 dB mean / ~3.3 dB worst**, rather than spending further
 budget. Reopening this needs NEW evidence about the switch's real topology (e.g. whether the Ultra's
 mid-frequency selector is 2-pole and switches the across-lug cap too), not another fit.
+
+**▶▶ USER AUTHORIZATION (2026-07-26, superseding the "do not fit it away" line above): the user has
+explicitly authorized per-knob/per-switch-position fitting to close the remaining gap further** — the
+same posture already used for `clipK`/`clipC11` (dsp.md "fit the corner"; user-authorised departures
+from a schematic-plausible shared element when the capture disagrees). This unlocks exactly the
+per-position free-fit family that was rejected above on principle (C32/C34 and/or R40/R41 varying
+*per switch position*, not shared across a band) — it reaches 0.17–0.44 dB per position, so it is a
+live candidate now, not a dead end. **Not yet implemented.** See the session-27 handover for the
+concrete next step. A2c-2's peak-frequency numbers (3.1 % mean / 8.7 % worst) should tighten further
+as a side effect of the same per-position fit, bounded by the ~6.1 % measurement floor established
+above (do not chase past it).
 
 ### ▶ Remaining candidates (not yet investigated)
 

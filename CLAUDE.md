@@ -167,9 +167,26 @@ high, execute routine work cheap) is what should persist.
 > into centre vs range vs irreducible by refitting (shift, scale) against the pedal's own stage shape.
 > `analysis/mid_shape_fit.py` / `mid_shape_hypotheses.py` — the shape objective + the structural
 > hypothesis comparison.
-> **▶ NEXT = A3, the last voicing gap** (OD/clean BLEND balance below ~200 Hz), per
-> `docs/phase9-validation.md` §4 "A3 handover" — unchanged by this session, and note the OD half of
-> the matrix is bit-identical so its numbers still stand. Full detail: §4 "A2c-2", §0 backlog.
+> **(7) ▶▶ USER AUTHORIZATION (2026-07-26): per-knob/per-switch-position fitting for the mid stage is
+> NOW AUTHORIZED**, superseding (5)'s "do not fit it away" — same posture as `clipK`/`clipC11`'s
+> user-authorised departure from a shared/schematic-plausible element. This unlocks the per-position
+> free-fit family (0.17–0.44 dB per position; needs C32/C34 and/or R40/R41 to vary PER SWITCH
+> POSITION, not shared across a band) that was rejected on principle in (5) — it is now a live
+> candidate, not a dead end. **NOT YET IMPLEMENTED — this is the next session's starting task.**
+> **▶ NEXT (session 27) — TWO THINGS, IN ORDER:**
+> **(a) Close the remaining A2c mid residual using the newly-authorized per-position fit.** Build a
+> per-position (not per-band-shared) fit over C32/C34 (currently fixed at 22n/6n8) and/or R40/R41
+> (currently fixed at 220k), keeping the already-good midWiperR/cap-table baseline as the starting
+> point, not re-deriving from scratch. Re-verify with `analysis/mid_shape_verify.py` (sub-band peak +
+> BW + curve RMS, NOT a band-grid argmax) before/after. Target: get as many of the 7 remaining >1.5 dB
+> mid-extreme captures under that bar as the per-position family allows; the ~6.1 % pedal
+> cut-vs-boost peak-frequency floor and the >1 dB knob-pointer-error floor (§4 A2c items) still apply
+> — don't chase past them. Full context: `docs/phase9-validation.md` §4 "A2c-2" final paragraph
+> ("USER AUTHORIZATION").
+> **(b) Then A3, the last voicing gap** (OD/clean BLEND balance below ~200 Hz), per
+> `docs/phase9-validation.md` §4 "A3 handover" — unaffected by session 26 or by (a) above (the OD half
+> of the matrix is bit-identical, so its numbers still stand).
+> Full detail: §4 "A2c-2", §0 backlog.
 > ── prior session ──
 > **CURRENT (session 25, 2026-07-25): ▶ PHASE 9 / A2c — FIRST CLEAN-PATH FIT SHIPPED. The TREBLE
 > range error is CLOSED; the clean target is still NOT met and what remains is entirely the mid-band
