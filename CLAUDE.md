@@ -918,8 +918,16 @@ high, execute routine work cheap) is what should persist.
 > mis-wiring. **A REAL BUG was found doing it (`926c0cc`): `RailClamp` uses `railNeg` as a
 > MAGNITUDE but `FitParams` shipped `-3.3`, so an ENABLED clamp returned a constant +3.3 V
 > for every sample below +2.95 V — it emitted DC, not audio.** Invisible since Phase 4
-> because rails default off and **no test exercises the enabled path** (that gap is the
-> root cause and is still open — a `RailClampTest` is still missing).
+> because rails default off and **no test exercises the enabled path** — that gap was the
+> root cause and is now **CLOSED (2026-07-22): `tests/RailClampTest.cpp`.** It is the ONLY test
+> that ENABLES the clamp (every stage test validates a linear oracle with rails off, which is
+> precisely why the bug hid). Covers dead-linear identity, mirror symmetry, boundedness,
+> C1-continuity + monotonicity of the parabolic knee, exact hard clamp, independent asymmetric
+> rails, and a **regression guard** asserting `setRailVoltages(-3.3, 3.3)` is bit-identical to
+> `(3.3, 3.3)` and that `process(-1.0) == -1.0`, not `+3.3`. Guard verified by mutation (reverting
+> the `std::abs` in `setRailVoltages` fails it and reproduces the +3.3 DC). ⚠ Keep `railNeg`/
+> `railPos` a `--fit` key hazard in mind: the guard tests the `|v|` normalisation, not just
+> today's `FitParams` value.
 > **✅✅ SESSION 7 (2026-07-23) — THE EVEN-HARMONIC LADDER WAS AN ARTEFACT. NO CODE
 > CHANGED; DO NOT RESHAPE THE SHAPER.** The blocker is the FIT OBJECTIVE.
 > `fit_nonlinear.py`'s premise — "harmonic RATIOS are level-independent, so this is
