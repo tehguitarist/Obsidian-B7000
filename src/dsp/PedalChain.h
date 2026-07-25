@@ -255,6 +255,9 @@ public:
         // applied through loMidCap() in applyParams(), which reads fit.midLoCap250.
         loMid.setWiperR(f.midWiperRLo);
         hiMid.setWiperR(f.midWiperRHi);
+
+        // Baxandall TREBLE range limiter (Phase 9 A2c).
+        baxandall.setTrebleWiperR(f.trebleWiperR);
     }
 
     const FitParams& getFitParams() const noexcept { return fit; }

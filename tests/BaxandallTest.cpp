@@ -38,12 +38,14 @@ static const std::vector<Cfg> kCfgs = {
       { +18.02554, +15.00051, +11.16363, +7.38405, +3.93953, +5.29887, +9.76572, +15.73895, +18.39102 } },
 };
 
-static double measureDb(double ab, double at, double freq, double fs)
+static double measureDb(double ab, double at, double freq, double fs, double r36 = -1.0)
 {
     Baxandall stage;
     stage.prepare(fs);
     stage.setBass(ab);
     stage.setTreble(at);
+    if (r36 > 0.0)
+        stage.setTrebleWiperR(r36);
 
     const double period = fs / freq;
     const int settle = static_cast<int>(std::max(0.25 * fs, 8.0 * period));
@@ -94,6 +96,55 @@ int main()
             const bool pass = e96 < e48 + 1e-9;
             std::printf("  %-18s f=%6.0f  err48=%.4f  err96=%.4f  %s\n",
                         c.name, kFreqs[i], e48, e96, pass ? "PASS" : "FAIL");
+            if (! pass)
+                ++failures;
+        }
+    }
+
+    // ---- Test 4: setTrebleWiperR — fitted point vs oracle, and R36=nominal is exact
+    // (Phase 9 A2c, session 24-25: R36 3.3k -> 4.7k fits the captured TREBLE span).
+    std::printf("\n=== setTrebleWiperR @ 48 kHz ===\n");
+    {
+        // R36 = 4.7k (fitted), oracle: eq_reference.baxandall_tf(f, 0.5, at, R36=4.7e3).
+        struct FitCfg { const char* name; double at; double db[kNF]; };
+        static const std::vector<FitCfg> kFitCfgs = {
+            { "treble boost (R36=4.7k)", 0.0,
+              { -0.73859, -0.94982, -0.95087, -0.02094, 2.47944, 5.55938, 9.77493, 14.62264, 16.33774 } },
+            { "treble cut (R36=4.7k)",   1.0,
+              { -0.54449, -0.13128, 0.17533, -0.49446, -2.84076, -5.87327, -10.06648, -14.90593, -16.63924 } },
+        };
+        for (const auto& c : kFitCfgs)
+        {
+            double worstLo = 0.0;
+            for (int i = 0; i < kNF; ++i)
+            {
+                if (kFreqs[i] > 2000.0) continue;
+                const double meas = measureDb(0.5, c.at, kFreqs[i], 48000.0, 4700.0);
+                worstLo = std::max(worstLo, std::abs(meas - c.db[i]));
+            }
+            const bool pass = worstLo <= 0.15;
+            std::printf("  %-24s worst err (<=2 kHz) %.4f dB  %s\n", c.name, worstLo, pass ? "PASS" : "FAIL");
+            if (! pass)
+                ++failures;
+        }
+
+        // setTrebleWiperR(3.3k) (== the compile-time nominal kR36) reproduces the
+        // UNMODIFIED stage's own output bit-exactly — the setter is not a parallel
+        // code path, it feeds the same rebuild(). Compare against the C++ stage
+        // itself (not the analytic oracle table, which already carries Test 1's
+        // small bilinear-warp deviation from the continuous-time model).
+        for (const auto& c : { kCfgs[3], kCfgs[4] })
+        {
+            double worst = 0.0;
+            for (int i = 0; i < kNF; ++i)
+            {
+                const double baseline = measureDb(0.5, c.at, kFreqs[i], 48000.0);
+                const double withSetter = measureDb(0.5, c.at, kFreqs[i], 48000.0, 3300.0);
+                worst = std::max(worst, std::abs(withSetter - baseline));
+            }
+            const bool pass = worst <= 1e-9;
+            std::printf("  %-24s setTrebleWiperR(3.3k) == unmodified stage, worst %.2e  %s\n",
+                        c.name, worst, pass ? "PASS" : "FAIL");
             if (! pass)
                 ++failures;
         }

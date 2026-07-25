@@ -104,6 +104,53 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 25, 2026-07-25): ▶ PHASE 9 / A2c — FIRST CLEAN-PATH FIT SHIPPED. The TREBLE
+> range error is CLOSED; the clean target is still NOT met and what remains is entirely the mid-band
+> group. ctest 16/16, AU+VST3 build clean. Branch `phase9-session23-c13-closed`.**
+> **(1) ✅ SHIPPED: `trebleWiperR` = R36 3.3k → 4.7k** (`FitParams::trebleWiperR`, new
+> `Baxandall::setTrebleWiperR`, wired in `PedalChain::setFitParams`, `--fit trebleWiperR=` in
+> OfflineRender, new `BaxandallTest` Test 4). `treble-1700_gain-n12` **2.106 → 0.651 dB** band-RMS,
+> `treble-0700` **0.948 → 0.418**; the two interior knob points regress **+0.04 dB** (inside the
+> 0.144 dB take-to-take floor = noise, not a trade). Full 63-capture re-baseline: **CLEAN 1.194 →
+> 1.152 / ALL 3.578 → 3.558 / OD 5.963 → 5.965 (nil)**, 240 rows, **6 rows better >0.5 dB, 0 worse**.
+> Per CAPTURE (the correct unit for the clean subset): **mean 1.235 → 1.168 dB, 20/29 → 21/29 ≤1.5**.
+> **(2) METHOD (GAP #4's, reused verbatim and it worked first time):** the matched-pair **boost-to-cut
+> SPAN** (whole rest of the chain cancels exactly) + the **5-point POT LAW** through
+> 0700/0930/flat/1430/1700 as an independent second axis, so the fit can't buy the extremes by
+> wrecking mid-travel. Span band-RMS vs the pedal **2.44 → 0.59 dB**, pot-law RMS **0.62 → 0.27**.
+> ⭐ **The degeneracy check was run FIRST and passed:** the 1-D R36 scan has a genuine **INTERIOR
+> minimum** (3.3k 2.44 / 4.4k 0.89 / 4.7k 0.59 / 5.0k 0.54 / 6k 1.60 / 10k 5.86) — the objective
+> pushes back from BOTH sides, unlike the GAP #3b C13 candidate and the session-5/6 clipper fits,
+> which were monotone "make it see less" degeneracies. Raw fit 4.86k; 4.7k is the E12 round (4.7k vs
+> 5.0k are indistinguishable, 0.645 vs 0.633 combined).
+> **(3) SURGICAL by construction:** R36 carries only the TREBLE leg's contribution to the shared
+> IC5_C virtual-ground node, so at treble-flat the change is **<0.004 dB at every band** — all four
+> BASS captures and both `ref-clean` takes move ≤0.024 dB and the entire OD half is untouched.
+> **(4) ⚠ TWO HONEST CAVEATS — do not quote this as "found the real circuit".** (a) **R36 = 3.3k is
+> schematic-verified** (pixel-zoom 2026-07-19 + the R1–R54 BOM reconciliation), so this is a
+> capture-vs-document disagreement landing on **session 23's "third branch"**: the captured unit is a
+> real Darkglass Ultra, the primary schematic is a clone of the *original* B7K. **Fourth time in five
+> sessions** — 4.7k is a behavioural match to *the unit we captured*. (b) **No `schematic-checker`
+> pass was run** — deliberate, not an oversight: GAP #4 needed one because it hypothesised a NEW
+> element and required a BOM census to prove no spare resistor existed, whereas R36 already exists in
+> both model and schematic at a verified value, and session 23 established that re-confirming a
+> reading does NOT settle a capture disagreement (C13 confirmed 220n and changed nothing). The
+> evidence the TOPOLOGY is right is that a pure value change flattens the span residual across the
+> whole band (2.44 → 0.59 over 25 Hz–12.9 kHz); a wrong topology would leave a frequency-dependent
+> shape residual. If that residual ever binds, check the treble leg (C28/C29 lug wiring, R36's node).
+> **▶ NEXT — A2c is NOT finished: mean 1.168 vs the ≤0.7 target, 21/29 vs 29/29 ≤1.5 dB. All nine
+> remaining >1.5 dB captures are LO-MID/HI-MID gain or mid-freq-switch captures** (`himidfreq-750_
+> himid-0700` 3.53, `himidfreq-750_himid-1700` 3.27, `lomidfreq-250_lomid-1700` 2.79,
+> `lomidfreq-250_lomid-0700` 2.55, `lomid-1700` 2.31, `himid-1700` 2.22, `himid-0700` 2.07,
+> `lomid-0700` 1.87, `lomidfreq-1k_lomid-0700` 1.45). **These are already touched by GAP #4's
+> `midWiperR` trade, whose two DOCUMENTED residuals plausibly ARE this** (one resistor must serve all
+> three switch positions of a band; Rw pulls peak CENTRES down — LO-MID 500 508→403 Hz, HI-MID 750
+> 806→640 Hz). So the first question is **"can these move at all without reopening that trade?"** —
+> decompose each into CENTRE error (which `midWiperR` caused, and a cap could fix — the mid-cap table
+> is `[ENG]`-computed, never schematic-verified, so no ground truth to defer to) vs RANGE error
+> (budget already spent) BEFORE fitting. Then A3, the last voicing gap.
+> Full detail + tables: `docs/phase9-validation.md` §4 "A2c-1", §0 A2c.
+> ── prior session ──
 > **CURRENT (session 24, 2026-07-25): ▶ PHASE 9 — user-initiated detour: tighten base-clean BEFORE
 > resuming A3 (rationale: A3's own target table is computed against a clean reference capture, so a
 > clean-path error confounds it). Two bad captures found + fixed, one real grading bug fixed, a

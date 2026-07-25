@@ -487,6 +487,25 @@ Boost = wiper toward the input-side lug (VR4.3 / VR5.3). Ideal-sim extremes (202
 bass ±16–17 dB @40 Hz (±11.5 @100 Hz), treble ±16 dB @5 kHz (±18.5 @10 kHz), both-flat ≈ 0 dB
 (−0.2 dB); the spec's "±12 dB" figures are conservative mid-rotation numbers, not the ideal extremes.
 
+> ⚠ **R36 (TREBLE wiper → (−)): schematic says 3k3; the MODEL SHIPS 4k7, fit to the capture**
+> (Phase 9 A2c-1, session 25 — `FitParams::trebleWiperR`, `Baxandall::setTrebleWiperR`). The value
+> reading itself is NOT in doubt: 3k3 is pixel-zoom verified in the 2026-07-19 node redraw above and
+> is covered by the R1–R54 BOM reconciliation. The captured unit simply delivers a **narrower TREBLE
+> boost-to-cut span** than 3k3 produces — matched-pair span band-RMS vs the pedal **2.44 dB at 3k3
+> → 0.59 dB at 4k7**, corroborated by an independent 4-point pot law (**0.62 → 0.27**), and the 1-D
+> scan has a genuine **interior minimum** (raw fit 4.86k), so it is not the "make the stage see less"
+> degeneracy that killed the session-5/6 clipper fits and the GAP #3b C13 candidate. Real renders:
+> `treble-1700` 2.11 → 0.65 dB, `treble-0700` 0.95 → 0.42; BASS and the OD half are untouched
+> (<0.004 dB at treble-flat) because R36 carries only the treble leg's contribution to the shared
+> IC5_C virtual ground.
+> 🚩 **This is the same "the document is right AND the captured unit differs" branch as C13 and the
+> [ENG] mid caps** — our primary schematic is a clone of the *original* B7K, the captured unit is a
+> real **Ultra**. Fourth occurrence in five sessions. Do NOT read 4k7 as a correction to the
+> schematic; it is a behavioural match to the unit we recorded. TOPOLOGY is unchanged and is the one
+> thing that would justify revisiting this (a wrong topology would leave a frequency-dependent shape
+> residual, not the uniform range error observed) — no `schematic-checker` pass was run, deliberately;
+> see `docs/phase9-validation.md` §4 "A2c-1" for that reasoning in full.
+
 ### LO-MID (IC5_D) / HI-MID (IC6_A) — ✅ **NODES VERIFIED (2026-07-19)**; identical topology
 Flat inverting-unity path + frequency-selective pot leg. LO-MID designators (HI-MID in parens):
 ```

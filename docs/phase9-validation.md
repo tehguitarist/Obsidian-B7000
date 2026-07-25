@@ -4,17 +4,19 @@
 > captured Darkglass B7K Ultra, the gaps found (with dB), the fixes shipped, and what's left.
 > Read this + `docs/validation-and-capture.md` (method) + `.claude/rules/dsp.md` (fix rules).
 >
-> **Status (2026-07-25, session 24):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
+> **Status (2026-07-25, session 25):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
 > Phase 9 in progress. FIXED + committed: GAP #1 (low end), GAP #1b (bridged-T — investigated twice,
 > closed both times, non-issue), GAP #2 (treble notch), GAP #3a (rail clamp), GAP #4 (mid-band range),
-> plus the gain-n12 harness defect. GAP #3b is CLOSED as mis-attributed (session 23): it is not
-> a GRUNT-cap gap, and neither the ÷4 nor the `C13 = 22n` candidate was shipped — see §4 "3b CLOSED".
-> **User-initiated detour (session 24): before resuming A3, nail the base-clean path** (no
+> **A2c-1 (TREBLE range, session 25)**, plus the gain-n12 harness defect. GAP #3b is CLOSED as
+> mis-attributed (session 23): it is not a GRUNT-cap gap, and neither the ÷4 nor the `C13 = 22n`
+> candidate was shipped — see §4 "3b CLOSED".
+> **User-initiated detour (session 24-25): before resuming A3, nail the base-clean path** (no
 > nonlinearity, so a clean-path error is a confound sitting under every OD comparison) — see §4
-> "A2c — clean-baseline accuracy pass". Two bad captures found + fixed, a real grading bug fixed,
-> a tolerance target agreed and NOT yet met. **Two voicing items remain open: A2c (clean tightening,
-> in progress) and A3 (the OD/clean BLEND balance below ~200 Hz, quantified — §4 "A3 handover").**
-> Current grade (240 rows, re-baselined session 24): **OD 5.963 / CLEAN 1.194 / ALL 3.578 dB**
+> "A2c". Session 24 fixed two bad captures + a grading bug and agreed the target; session 25 shipped
+> the first fit (`trebleWiperR`, R36 3.3k → 4.7k). **Two voicing items remain open: A2c (clean
+> tightening — target ≤0.7 dB mean NOT yet met at 1.168, and the entire remaining residual is the
+> mid-band group) and A3 (the OD/clean BLEND balance below ~200 Hz, quantified — §4 "A3 handover").**
+> Current grade (240 rows, re-baselined session 25): **OD 5.965 / CLEAN 1.152 / ALL 3.558 dB**
 > band-RMS.
 
 ---
@@ -86,10 +88,14 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   Nail base-clean (BLEND=0, no nonlinearity) to a tight tolerance BEFORE resuming A3, on the theory
   that a clean-path error is a confound sitting underneath every OD comparison. Two bad captures
   found + fixed (`master-1700_gain-n12`/`bass-1700_gain-n12` re-recorded) and a real grading bug
-  fixed (`matrix_grade.py::is_od()` mis-classified `ref-od_gain-n12.wav` as CLEAN). Current: mean
-  clean band-RMS **1.235 dB** over 29 independent captures (not 124 "rows" — see caveat below),
-  target **≤0.7 dB mean / ≤1.5 dB worst-case**. See §4 "A2c — clean-baseline accuracy pass".
-  Baseline regenerated: **OD 5.963 / CLEAN 1.194 / ALL 3.578 dB** band-RMS over 240 rows.
+  fixed (`matrix_grade.py::is_od()` mis-classified `ref-od_gain-n12.wav` as CLEAN). Target
+  **≤0.7 dB mean / ≤1.5 dB worst-case** over 29 independent captures (not 124 "rows" — see caveat
+  below). **Session 25: first fit shipped — `trebleWiperR` (R36 3.3k → 4.7k) closes the TREBLE range
+  error** (`treble-1700` 2.11 → 0.65 dB; 6 rows better >0.5, 0 worse; OD untouched). Mean clean
+  **1.235 → 1.168 dB**, **21/29** captures ≤1.5. **Target still not met**; the whole remaining
+  residual is the mid-band group, which GAP #4's `midWiperR` trade already touched — establish
+  whether those can move before spending more budget. See §4 "A2c" + "A2c-1".
+  Baseline: **OD 5.965 / CLEAN 1.152 / ALL 3.558 dB** band-RMS over 240 rows.
 
 **B. Performance / quality pass (Phase 9 part 2):**
 - [ ] **B1. PerfBenchmark / FeatureProfile / OSFidelity probes** → the `hq` toggle decision (omega4 vs AccurateOmega is usually the only real lever) + README perf table. See §5.
@@ -878,18 +884,88 @@ met — `ref-clean`, `master-*`, `bass/treble/lomid/himid` at 9:30/2:30 all sit 
 single-knob full extremes, ±1.5 worst-case on the mid-freq switch extremes (the hardest captures,
 `himidfreq-750`/`lomidfreq-250`, given GAP #4 already spent one range-fit trade on these bands).
 
-**Current state vs target:** mean 1.235 dB (target ≤0.7), 20/29 captures ≤1.5 dB (target 29/29). Not
-met. **Not started:** the actual fitting work.
+**State at session 24 close vs target:** mean 1.235 dB (target ≤0.7), 20/29 captures ≤1.5 dB (target
+29/29). Not met; no fitting work had started.
 
-**▶ NEXT.** `treble-1700_gain-n12` (2.11 dB) is the recommended starting point over the two current
-worst offenders (`himidfreq-750`/`lomidfreq-250`, both mid-freq-switch captures already touched by
-GAP #4's trade-off): its residual is a single **smooth monotone tilt, −3.8 dB at 25 Hz rising to
-+0.7 dB at 12.9 kHz**, the clean signature of a Baxandall treble-boost RANGE error — same class of fit
-as GAP #4 (5-point pot law, not per-position), and untouched by any prior fit. After that, revisit
-whether the mid-freq-switch captures can move at all without reopening GAP #4's `midWiperR` trade
-(they may be near their achievable floor already — check before spending more fitting budget there).
-Tools: `matrix_grade.py` (now capture-independent-counted, see the row-counting note above — verify
-any per-capture aggregate script counts captures, not rows, for the clean subset).
+#### ✅ A2c-1 — TREBLE range. FIXED + shipped (session 25, 2026-07-25).
+
+**Shipped: `trebleWiperR` = R36 3.3k → 4.7k** (`FitParams::trebleWiperR`, new
+`Baxandall::setTrebleWiperR`). ctest **16/16**, AU + VST3 build clean.
+
+`treble-1700_gain-n12`'s residual was a single smooth monotone tilt (−3.8 dB at 25 Hz → +0.7 dB at
+12.9 kHz), the signature of a Baxandall treble RANGE error rather than a corner/shape error. Fit with
+GAP #4's method — the **matched-pair boost-to-cut SPAN** (dsp.md's isolation technique: everything
+else in the chain cancels exactly) plus the **5-point pot law** through 0700/0930/flat/1430/1700, so
+the fit cannot buy the extremes by wrecking mid-travel. R36 (Wt → IC5_C virtual ground) is the
+treble leg's **own** series element, which is why it moves the range without touching BASS.
+
+| metric | shipped (R36 3.3k) | fitted (R36 4.7k) | pedal |
+|---|---|---|---|
+| boost-to-cut span, band-RMS 25 Hz–12.9 kHz | **2.44 dB** | **0.59 dB** | — |
+| 4-point pot-law RMS (5 bands × 4 knob points) | **0.62 dB** | **0.27 dB** | — |
+| span end-to-end tilt, 25 Hz → 12.9 kHz | 38.4 dB | **33.8 dB** | **33.6 dB** |
+
+Real `OfflineRender` A/B (not the oracle — the shipped chain, full 63-capture re-baseline):
+
+| capture | before | after |
+|---|---|---|
+| `treble-1700_gain-n12_base-clean` | **2.106** | **0.651** |
+| `treble-0700_base-clean` | **0.948** | **0.418** |
+| `treble-0930_base-clean` | 0.440 | 0.482 |
+| `treble-1430_gain-n12_base-clean` | 0.342 | 0.383 |
+
+**Surgical, by construction and by measurement.** R36 carries only the treble leg's contribution to
+the shared virtual-ground node, so at treble-flat the change is **<0.004 dB at every band** — the
+four BASS captures and both `ref-clean` takes move by ≤0.024 dB, and the whole OD half of the matrix
+is unchanged (**OD 5.963 → 5.965**, i.e. nil). Full matrix: **CLEAN 1.194 → 1.152**, **ALL 3.578 →
+3.558** (240 rows); **6 rows better by >0.5 dB, 0 worse.** Per capture (the correct unit for the
+clean subset — see the row-counting note above): **mean 1.235 → 1.168 dB, 20/29 → 21/29 ≤1.5 dB.**
+
+**Why this element, and why it is a real minimum rather than a degeneracy.** A 1-D scan of R36
+against the measured span has a clean **interior minimum** — 3.3k **2.44** / 4.4k **0.89** / 4.7k
+**0.59** / 5.0k **0.54** / 6.0k **1.60** / 10k **5.86** dB — i.e. the objective pushes back from
+*both* sides. That is the specific check that failed for the GAP #3b C13 candidate and the
+session-5/6 clipper fits (both were monotone "make it see less" degeneracies with the best score at
+the degenerate end), so it was run first. The raw fit lands at **4.86k**; 4.7k is the E12 round
+(4.7k and 5.0k are indistinguishable in practice, 0.645 vs 0.633 combined). The pot law is the
+independent second axis — GAP #4's lesson that extremes alone cannot separate "wrong range" from
+"wrong end-of-travel".
+
+**⚠ HONEST CAVEATS — read before quoting this as "found the real circuit".**
+- **R36 = 3.3k is schematic-verified** (pixel-zoom node redraw 2026-07-19, and the R1–R54 BOM
+  reconciliation covers it). So this is a capture-vs-document disagreement, and it lands on exactly
+  the **third branch session 23 flagged**: the captured unit is a real Darkglass B7K Ultra, while the
+  primary schematic is PCB Guitar Mania's clone of the *original* B7K. "The document is right AND the
+  captured unit differs" is now the **fourth** time in five sessions. 4.7k is a behavioural match to
+  *the unit we captured*, not a claim about what is on either board.
+- **No `schematic-checker` pass was run**, unlike GAP #4 — a deliberate, stated choice, not an
+  oversight. GAP #4 needed one because it hypothesised a **new** element and required a BOM census to
+  prove no spare resistor existed; R36 already exists in both the model and the schematic at a
+  verified value, so the only live question is topology, not the reading (and session 23 established
+  that re-confirming a reading does not settle a capture disagreement — C13 confirmed 220n and
+  changed nothing). The evidence that the **topology** is right is that a pure value change flattens
+  the span residual across the *whole* band (2.44 → 0.59 dB over 25 Hz–12.9 kHz): a wrong topology
+  would leave a frequency-dependent shape residual, not a uniform range error. If that residual ever
+  becomes the binding constraint, a checker pass on the treble leg (C28/C29 lug wiring, R36's node)
+  is the next step.
+- The two interior knob points regress by **+0.04 dB** — inside the 0.144 dB take-to-take
+  repeatability floor, so this is noise, not a trade.
+
+**Current state vs target:** mean **1.168** dB (target ≤0.7), **21/29** captures ≤1.5 dB (target
+29/29). **Still not met** — the residual is now almost entirely the mid-band group.
+
+**▶ NEXT.** The nine captures still >1.5 dB are **all** LO-MID/HI-MID gain or mid-freq-switch
+captures (worst: `himidfreq-750_himid-0700` 3.53, `himidfreq-750_himid-1700` 3.27,
+`lomidfreq-250_lomid-1700` 2.79, `lomidfreq-250_lomid-0700` 2.55, `lomid-1700` 2.31, `himid-1700`
+2.22, `himid-0700` 2.07, `lomid-0700` 1.87, `lomidfreq-1k_lomid-0700` 1.45). These are **already
+touched by GAP #4's `midWiperR` range-limiter trade**, whose two documented residuals (one resistor
+serving all three switch positions; Rw pulling peak CENTRES down — LO-MID 500 508→403 Hz, HI-MID 750
+806→640 Hz) plausibly *are* this residual. So the first question is not "fit harder" but **"can these
+move at all without reopening that trade?"** — check whether the residual is centre error (which
+`midWiperR` caused and a cap could fix) or range error (already spent), per position, before
+committing fitting budget. Note the mid-cap table is `[ENG]`-computed and never schematic-verified,
+so unlike R36 there is no ground truth to defer to there. Tools: `matrix_grade.py`,
+`analysis/mid_range_probe.py`.
 
 ### ▶ Remaining candidates (not yet investigated)
 

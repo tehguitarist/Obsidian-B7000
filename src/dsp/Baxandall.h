@@ -94,6 +94,31 @@ public:
     void setRailClampEnabled(bool e) noexcept { rail.setEnabled(e); }
     void setRailVoltages(double vNeg, double vPos) noexcept { rail.setRailVoltages(vNeg, vPos); }
 
+    // R36 (Wt -> (-), schematic-verified 3.3k, pixel-zoom 2026-07-19) — TREBLE's own
+    // wiper-leg series resistor. Phase 9 A2c (session 24-25): the captured unit's
+    // TREBLE boost-to-cut SPAN (matched-pair, dsp.md's isolation method) is ~5 dB
+    // narrower than the modelled network's at R36=3.3k; a plain scan of R36 against
+    // that span has a clean INTERIOR minimum (not the "make it see less" one-sided
+    // degeneracy that killed the session-5/6 clipper fits and the GAP #3b C13 fit) at
+    // ~4.7-5.0k, confirmed by the independent 4-point pot-law (not just the extremes,
+    // the same guard GAP #4 used). BASS is unaffected: R36 carries only the treble
+    // leg's contribution to the shared virtual-ground node, so at treble-flat the
+    // change is <0.004 dB at every band — measured, the four bass captures and both
+    // ref-clean takes move by <=0.024 dB (they already grade 0.31-0.70 dB).
+    // Unlike GAP #4's midWiperR this is not a NEW hypothetical element — R36 already
+    // exists in the model and the schematic — so this is a plain VALUE fit, same
+    // posture as c21R (10k -> 100k): the captured unit is a real Ultra, the primary
+    // schematic is a clone of the ORIGINAL B7K, and per dsp.md "fit the corner" the
+    // capture is authoritative. ** The TOPOLOGY was NOT independently re-checked (no
+    // schematic-checker pass); the evidence it is right is indirect — a pure VALUE
+    // change flattens the span residual across the whole band, where a wrong topology
+    // would leave a frequency-dependent shape residual. ** See FitParams.
+    void setTrebleWiperR(double rOhm) noexcept
+    {
+        const double r = rOhm > 0.0 ? rOhm : 0.0;
+        if (mna::differs(r, r36)) { r36 = r; dirty = true; }
+    }
+
     inline double process(double vin) noexcept
     {
         if (dirty)
@@ -148,9 +173,9 @@ private:
         // 4 T1: (gc29 + 1/Rtb) T1 − (1/Rtb) Wt − gc29 Vout
         Y[4][4] = gc29 + gRtb; Y[4][5] = -gRtb; Y[4][6] = -gc29;
         // 5 Wt: −(1/Rta) T3 − (1/Rtb) T1 + (1/Rta + 1/Rtb + 1/R36) Wt
-        Y[5][3] = -gRta; Y[5][4] = -gRtb; Y[5][5] = gRta + gRtb + 1.0 / kR36;
+        Y[5][3] = -gRta; Y[5][4] = -gRtb; Y[5][5] = gRta + gRtb + 1.0 / r36;
         // 6 (−)/Vout: (1/R35) Wb + (1/R36) Wt + (1/R37 + gc30) Vout   (into-node sign)
-        Y[6][2] = 1.0 / kR35; Y[6][5] = 1.0 / kR36; Y[6][6] = 1.0 / kR37 + gc30;
+        Y[6][2] = 1.0 / kR35; Y[6][5] = 1.0 / r36; Y[6][6] = 1.0 / kR37 + gc30;
 
         double tmp[7][7];
         if (mna::invert<7>(Y, tmp))
@@ -165,6 +190,7 @@ private:
 
     double gc25 = 0.0, gc26 = 0.0, gc28 = 0.0, gc29 = 0.0, gc30 = 0.0;
     double posBass = 0.5, posTreble = 0.5; // electrical pot fractions (0.5 = flat)
+    double r36 = kR36; // runtime-settable; see setTrebleWiperR
     double yinv[7][7] = {};
     double ieq25 = 0.0, ieq26 = 0.0, ieq28 = 0.0, ieq29 = 0.0, ieq30 = 0.0;
     bool dirty = true;

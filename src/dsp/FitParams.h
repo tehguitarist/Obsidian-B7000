@@ -327,4 +327,30 @@ struct FitParams
     // position onto ~10n, i.e. onto the 500 Hz position's cap — it destroys the
     // switch's frequency differentiation, so it was rejected. §4 GAP #4.)
     double midLoCap250 = 22.0e-9;
+
+    // ---- Baxandall TREBLE range limiter (Phase 9 A2c-1, session 25) -------------
+    // R36 (Wt -> IC5_C virtual ground) is schematic-verified at 3.3k, but the captured
+    // unit's TREBLE boost-to-cut SPAN (matched-pair, so the rest of the chain cancels
+    // exactly) is NARROWER than the modelled network delivers there: end to end over
+    // 25 Hz-12.9 kHz the pedal tilts 33.6 dB, the network at 3.3k tilts 38.4 dB — and
+    // at the fitted 4.7k it tilts 33.8 dB, i.e. straight onto the pedal. A 1-D
+    // scan against that span has a clean INTERIOR minimum near 4.7-5.0k — 3.3k 2.44 /
+    // 4.4k 0.89 / 4.7k 0.59 / 5.0k 0.54 / 6k 1.60 / 10k 5.86 dB band-RMS, i.e. the
+    // objective pushes back from BOTH sides, NOT the one-sided "make it see less"
+    // degeneracy that killed the session-5/6 clipper fits and the GAP #3b C13 fit.
+    // The independent 4-point pot law (0.62 -> 0.27 dB) confirms it isn't just buying
+    // the extremes at the cost of mid-travel.
+    // BASS is unaffected: R36 carries only the treble leg's contribution to the shared
+    // virtual-ground node, so at treble-flat the delta is <0.004 dB at every band —
+    // measured, the four bass captures + both ref-clean takes move by <=0.024 dB.
+    // Same posture as c21R (10k -> 100k): a plain VALUE fit on a schematic-verified
+    // part, because the captured unit is a real Ultra while the primary schematic is a
+    // clone of the ORIGINAL B7K — "the document is right AND the captured unit differs",
+    // the same branch as C13 and the [ENG] mid caps.
+    // ** NOT independently topology-checked: no schematic-checker pass was run (unlike
+    // GAP #4, which hypothesised a NEW element and needed a BOM census). The evidence
+    // the topology is right is indirect — a pure VALUE change flattens the span residual
+    // across the whole band, where a wrong topology would leave a frequency-dependent
+    // shape residual. See docs/phase9-validation.md §4 "A2c-1". **
+    double trebleWiperR = 4.7e3;  // fit ~4.86k, E12-rounded (was nominal 3.3k)
 };
