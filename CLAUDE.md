@@ -104,6 +104,71 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 27, 2026-07-26): ▶ PHASE 9 / A2c-3 — ✅✅ A2c IS CLOSED AND ITS TARGET IS MET.
+> The mid-frequency selector is modelled as a 2-POLE switch swapping a scaled cap PAIR. ctest 17/17,
+> AU+VST3 clean. Next gap = A3, and it is the LAST voicing gap.**
+> **(1) ⭐ TARGET MET, and the seven "unreachable" captures are gone.** Per clean capture over the
+> agreed 30 Hz–10 kHz band: **mean 0.955 → 0.485 dB (target ≤0.7 ✅) and 23/30 → 30/30 captures
+> ≤1.5 dB (✅), worst 3.54 → 1.01.** Every one of the seven mid-extreme captures session 26 recorded
+> as structurally unreachable is now **under 1.0 dB**; the worst clean capture in the whole set is no
+> longer a mid capture at all (`treble-1700`, 1.01). Full matrix: **CLEAN 1.023 → 0.544, ALL 3.494 →
+> 3.254, OD 5.965 unchanged** (checked strictly: largest plugin-dB change over all 128 OD rows is
+> **4.5e-11 dB**); **32 rows better >0.5 dB, 0 worse**.
+> **(2) ✅ SHIPPED: `midCapRatioLo/Hi = 10.0`** (new FitParams fields + `MidBand::setAcrossCap()`,
+> applied in `PedalChain::applyParams()`) — the across-lug cap C32/C34 is switched TOGETHER with the
+> series cap at a fixed ratio `C32 = 10 × C33`. Caps re-fitted: LO-MID **6n8 / 3n9 / 2n2** (across
+> 68n/39n/22n), HI-MID **2n7 / 1n5 / 680p** (across 27n/15n/6n8); `midWiperRLo/Hi` 22k/18k → **6k8
+> both**. New `MidBandTest` Test 6 (oracle match at the shipped pairs, `setAcrossCap(nominal)`
+> bit-identical to not calling it, + the scale-invariance identity).
+> **(3) ⭐ THE AUTHORISED PER-POSITION FIT WAS RUN — AND ITS ANSWER NEEDED NO PER-POSITION FREEDOM.**
+> Letting C32 vary freely at each of the six positions lands at a **near-constant C32/C33 ratio in
+> BOTH bands** (per-band joint refit 10.4 / 9.4). Pinning it to exactly 10.0 with ONE Rw for the whole
+> stage costs 0.001–0.009 dB against the free per-band values and ~0.01 dB against the fully
+> unconstrained per-position ceiling (F3 0.302/0.244). So the shipped model has **one more free
+> parameter per band than session 26 had, not six** — a shared-parameter structural change, not the
+> per-position fudge session 26 rejected. Per-position **Rw alone** only reaches 0.69/0.71: session 26
+> was right that Rw cannot do this job; the across-lug cap is the element that matters.
+> **(4) ⭐ WHY A FIXED RATIO IS RIGHT, structurally.** The leg admittances depend only on `s·C`, so
+> scaling every cap by k with the resistors fixed gives **exactly the same curve translated in
+> frequency by 1/k**. A fixed ratio therefore gives constant Q — hence constant boost/cut range — at
+> every switch position, with the switch moving only the centre. That is exactly what the captures
+> say the pedal does (~±12 dB everywhere, the GAP #4 observation), and it is circuit.md's own parked
+> constant-Q alternative. **Bandwidth ratio 1.30× → 0.99× (worst 1.74× → 1.05×)** — the width error
+> session 26 called structural is GONE, and peak GAIN error with it (±2.4–3.4 dB → +1.6/−0.1 dB).
+> **(5) ⭐ CORROBORATION THE OBJECTIVE COULD NOT SEE.** At ratio 10 each band's HIGHEST-frequency
+> position lands on its **documented pair**: LO-MID 1 kHz = **2n2 / 22n** (22n schematic-verified, 2n2
+> the [ENG] value) and HI-MID 3 kHz = **680p / 6n8** (BOTH schematic-verified — the stock board's
+> fixed HI-MID pair, itself a ratio of exactly 10). Reads as *"the stock network IS one switch
+> position; the other two scale that same pair up."* **Calibrate it honestly:** the raw optimum sits
+> ~7 % away and E12 rounding is what lands it exactly, and E12 quantisation gives any single hit a
+> prior of ~1/5–1/3. Two hits out of two possible is suggestive, NOT proof — but it is the only
+> independent evidence this gap has produced.
+> **(6) ⚠⚠ A DEFECT IN THE ACCEPTANCE TOOL — session 26's headline numbers were flattered.**
+> `mid_shape_verify.py` anchored every curve at a fixed 5.12 kHz band, which sits INSIDE the HI-MID
+> positions' own skirts: HI-MID 3k reported a meaningless "peak" at 101 Hz for pedal and plugin alike
+> (a flattering 0.0 % error that diluted the mean) and HI-MID 750's curve RMS read 1.77/2.16 dB when
+> it was really 4.08/4.61. Fixed to a peak-relative baseline (median of bands ≥2 octaves from the
+> peak). **Re-measured, the session-26 build reads 2.357 dB mean curve RMS / 4.4 % peak error, not the
+> recorded 1.819 / 3.1 %.** All session-27 numbers are under the corrected metric on both sides.
+> **(7) ⚠ ONE METRIC MOVED THE WRONG WAY, and it is E12 quantisation — deliberate, measured, and
+> reversible.** Peak-frequency error vs the pedal's own centre went **3.4 % → 6.4 %** (pedal
+> repeatability floor 3.0 %). Under this model `f ∝ 1/C` exactly, so an E12 step maps onto ~10 % of
+> centre frequency, and all six errors match their own cap's rounding to within 1 %. The raw
+> alternative was **rendered and measured, not estimated**: mid-capture mean 0.557 → 0.458, worst
+> 0.957 → 0.819 (~0.05 dB on the whole clean mean). **E12 kept anyway** — the target is already met,
+> E12 makes it a buildable switch, and (5)'s corroboration exists only in the rounded set. Exact
+> revert lever + its cost recorded in §4 A2c-3.
+> **(8) NEW/UPDATED TOOLS.** `analysis/mid_perpos_fit.py` — the per-position / cap-pair family
+> comparison (F0–F6) with interior-minimum scans; it also uses every captured knob point, so the two
+> default positions are fitted on four curves not two (the GAP #4 pot-law lesson, per position).
+> `analysis/mid_shape_verify.py` — corrected baseline; **still the acceptance check, and still: never
+> read a peak's frequency off the 1/3-octave grid.**
+> **▶ NEXT (session 28) = A3, the LAST voicing gap** — the OD/clean BLEND balance below ~200 Hz, per
+> `docs/phase9-validation.md` §4 "A3 handover". Completely unaffected by session 26 or 27 (the OD half
+> of the matrix is bit-identical, so every number in that handover still stands). After A3: A4
+> re-grade + the GATE-9 report, then B (perf/HQ), C (carry-forwards), D (release).
+> Full detail: §4 "A2c-3", §0 backlog.
+> ── prior session ──
 > **CURRENT (session 26, 2026-07-25): ▶ PHASE 9 / A2c-2 — MID-BAND SHAPE FIXED + SHIPPED, and A2c
 > then DELIBERATELY CAPPED (target unreachable, floor recorded). All branches merged; `main` = the
 > working branch. ctest 17/17 (RailClampTest merged in), AU+VST3 clean.**

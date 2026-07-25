@@ -61,8 +61,22 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   >0.5 dB / 0 worse, OD bit-identical. All 8 values at interior minima. **A2c's ≤0.7 / ≤1.5 target was
   NOT reachable under a shared-parameter fit** — the remaining width error needs C32 (schematic-
   verified, fixed) to vary per switch position. Floor recorded as ~1.0 dB mean / ~3.3 dB worst.
-  **User authorized (2026-07-26) per-knob/per-switch-position fitting to push further — NOT YET DONE,
-  the next session's starting task.** §4 A2c-2.
+  **User authorized (2026-07-26) per-knob/per-switch-position fitting to push further** — done in
+  A2c-3 below, and the floor above is superseded. §4 A2c-2.
+- [x] **A2c-3. The mid selector is a 2-POLE switched cap PAIR — SHIPPED; A2c CLOSED and its TARGET MET
+  (session 27).** The authorised per-position fit was run and its answer needed no per-position
+  freedom: the free per-position C32 optimum is a **near-constant C32/C33 ratio** in both bands, i.e.
+  one selector switching a scaled PAIR. Shipped `midCapRatioLo/Hi = 10.0` (new, + `MidBand::
+  setAcrossCap`), caps re-fitted to LO-MID **6n8/3n9/2n2** + HI-MID **2n7/1n5/680p** (across-lug
+  68n/39n/22n and 27n/15n/6n8), `midWiperR` 22k/18k → **6k8 both**. **Per clean capture over the
+  agreed 30 Hz–10 kHz band: mean 0.955 → 0.485 dB (target ≤0.7 ✓), 23/30 → 30/30 ≤1.5 dB (✓), worst
+  3.54 → 1.01.** All seven mid-extreme captures now < 1.0 dB. CLEAN 1.023 → 0.544, ALL 3.494 → 3.254,
+  **OD unchanged to 4.5e-11 dB**; 32 rows better >0.5, 0 worse. Bandwidth ratio **1.30× → 0.99×** —
+  the width error A2c-2 called structural is gone. Ratio, Rw and every cap at interior minima; a
+  fixed ratio makes the stage exactly scale-invariant, hence constant-Q/constant-range at every
+  position, matching the pedal. ⭐ Each band's top position lands on its documented pair (LO-MID
+  2n2/22n, HI-MID 680p/6n8). ⚠ Also fixed a real defect in `mid_shape_verify.py` (fixed 5.12 kHz
+  anchor sat inside the HI-MID skirts and flattered A2c-2's numbers). ctest 17/17. §4 A2c-3.
 - [ ] **A3. OD/clean BLEND balance — now the BIGGEST residual.** The `grunt-boost`/`grunt-flat` captures stay 12–26 dB off after the notch fix: a sub-bass excess (20–40 Hz) where the pedal has a low-mid bump. Session 19 proved the 254 Hz null is NOT a polarity bug (OD/clean in-phase at LF) and C12/C13 don't fix it (level, not corner). Root suspect = the clean-bleed level/shape + grunt coupling in the clipping regime (kInputRef 0.87→3.377 move). **Start here for the next voicing gain.** Probes: `blend_null_probe.cpp`, `od_taps_probe.cpp`.
 - [x] **A3-next (0). `render_args()` now emits `--input-trim`** for `gainSessionDb`; baseline
   regenerated (session 21). Send-vs-record-gain settled three ways. §3.
@@ -1083,6 +1097,149 @@ live candidate now, not a dead end. **Not yet implemented.** See the session-27 
 concrete next step. A2c-2's peak-frequency numbers (3.1 % mean / 8.7 % worst) should tighten further
 as a side effect of the same per-position fit, bounded by the ~6.1 % measurement floor established
 above (do not chase past it).
+
+#### ✅✅ A2c-3 — the mid selector is a 2-POLE SWITCHED CAP PAIR. A2c CLOSED; the target is MET (session 27, 2026-07-26).
+
+**Shipped:** the across-lug cap is switched together with the series cap, at a fixed ratio
+`C32 = 10 × C33` — new `FitParams::midCapRatioLo/Hi` (both **10.0**) and `MidBand::setAcrossCap()`,
+applied in `PedalChain::applyParams()` alongside the existing `setSeriesCap()`. With that in place
+the switched-cap table and the wiper R were re-fitted:
+
+| | 250 / 750 Hz | 500 / 1.5k | 1k / 3k |
+|---|---|---|---|
+| LO-MID series C33 | 15n → **6n8** | 6n8 → **3n9** | 1n8 → **2n2** |
+| LO-MID across C32 | 22n → **68n** | 22n → **39n** | 22n → **22n** |
+| HI-MID series C35 | 10n → **2n7** | 2n7 → **1n5** | 680p → **680p** |
+| HI-MID across C34 | 6n8 → **27n** | 6n8 → **15n** | 6n8 → **6n8** |
+
+and `midWiperRLo` 22k → **6k8**, `midWiperRHi` 18k → **6k8** (now the same value in both bands).
+ctest **17/17** (new `MidBandTest` Test 6), AU + VST3 clean.
+
+**⭐ THE HEADLINE: A2c's agreed target is met, and the seven failing captures are gone.** Per clean
+capture over the agreed 30 Hz–10 kHz band: **mean 0.955 → 0.485 dB** (target ≤ 0.7) and **23/30 →
+30/30 captures ≤ 1.5 dB** (target: none over 1.5), **worst 3.54 → 1.01 dB**. Over the full graded
+band the same numbers are 1.023 → 0.544, 23/30 → 30/30, worst 3.365 → 1.069. Every one of the seven
+mid-extreme captures A2c-2 recorded as unreachable now sits **below 1.0 dB**; the worst clean capture
+in the set is no longer a mid capture at all (`treble-1700`, 1.01 dB).
+
+Full matrix, 63 captures / 240 rows: **CLEAN 1.023 → 0.544**, **ALL 3.494 → 3.254**, **OD 5.965
+unchanged**. **32 rows better by > 0.5 dB, 0 worse**; 102 rows bit-identical. The OD half was checked
+strictly rather than assumed: over all 128 OD rows the largest change in plugin dB at any band is
+**4.5e-11 dB** (float noise) — surgical by construction, the mids sit post-BLEND and are flat in
+every OD capture.
+
+**⚠ A2c-2's headline numbers were flattered by a broken anchor, and this is the honest baseline.**
+`mid_shape_verify.py` subtracted each curve's value at a fixed 5.12 kHz band. That band sits inside
+the HI-MID positions' own skirts, so those rows were displaced wholesale — HI-MID 3k reported a
+"peak" at 101 Hz for pedal and plugin alike (hence a flattering 0.0 % error that diluted the mean),
+and HI-MID 750's curve RMS read 1.77/2.16 dB when it was really 4.08/4.61. Fixed to a peak-relative
+baseline (median of the bands ≥ 2 octaves from the peak). Re-measured, the **session-26 build** reads
+**2.357 dB mean curve RMS / 4.4 % peak error**, not the 1.819 / 3.1 % recorded. All A2c-3 numbers
+below are under the corrected metric, on both sides.
+
+| metric (12 curves = 6 positions × both knob extremes) | A2c-2 | A2c-3 |
+|---|---|---|
+| stage-curve RMS, mean / worst | 2.357 / 4.614 dB | **0.587 / 0.869 dB** |
+| bandwidth ratio plugin/pedal, mean / worst | 1.30× / 1.74× | **0.99× / 1.05×** |
+| peak GAIN error, worst | +3.4 / −2.4 dB | **+1.6 / −0.1 dB** |
+| peak FREQUENCY error vs the pedal's own centre, mean | 3.4 % | 6.4 % *(see below)* |
+
+**The width error is gone — 1.30× → 0.99×** — and with it the range error (peak gain now within
++1.6/−0.1 dB at every position, against ±2.4–3.4 dB before). That is the whole of what A2c-2 declared
+structurally unreachable.
+
+**HOW: not a per-position fudge in the end.** The user's authorisation unlocked a per-position free
+fit, and running it is what produced the answer — but the answer turned out not to need per-position
+freedom. Fitting C32 freely at each of the six positions lands at a **near-constant C32/C33 ratio in
+both bands** (per-band joint refit: 10.4 and 9.4), i.e. one 2-pole selector swapping a scaled PAIR.
+Constraining it that way costs essentially nothing against the unconstrained ceiling:
+
+| family (oracle RMS, per band) | LO-MID | HI-MID |
+|---|---|---|
+| F0 A2c-2 shipped (per-position C33, one Rw) | 0.890 | 0.893 |
+| F1 + per-position Rw | 0.694 | 0.707 |
+| F2 + per-position C32 | 0.397 | 0.301 |
+| F3 per-position C33 + C32 + Rw (the ceiling) | 0.302 | 0.244 |
+| F4 F3 + per-position R40/R41 | 0.301 | 0.236 |
+| **F5 cap PAIR: free ratio, one Rw per band** | **0.309** | **0.250** |
+| F5 with ratio pinned 10.0 **and Rw pinned 6k8 in both bands** | 0.311 | 0.260 |
+
+So the shipped model has **one more free parameter per band** than A2c-2 did, not six, and it reaches
+the fully-unconstrained per-position ceiling to within 0.01 dB. Note F1: per-position Rw *alone* only
+gets to 0.69/0.71 — the across-lug cap is the element that matters, and A2c-2 was right that Rw
+cannot do this job.
+
+**⭐ WHY A FIXED RATIO IS THE RIGHT CONSTRAINT, structurally.** The leg admittances depend only on the
+products `s·C`, so scaling every cap by k with the resistors fixed gives **exactly the same curve
+translated in frequency by 1/k**. A fixed ratio therefore makes Q — and hence boost/cut range —
+identical at every switch position, with the switch moving only the centre. That is precisely what
+the captures say the pedal does (~±12 dB at every position, the observation GAP #4 introduced a
+damping R to force by other means), and it is circuit.md's own parked constant-Q alternative for this
+stage. `MidBandTest` Test 6 asserts the identity directly (LO-MID 250 at f = HI-MID 3k at 10f, to
+0.024 dB at 384 kHz — residual is bilinear warp, 1e-5 dB at 20 Hz rising monotonically with the
+shifted frequency).
+
+**⭐ CORROBORATION THE OBJECTIVE COULD NOT SEE.** At ratio 10 the highest-frequency position of each
+band lands on that band's **documented pair**: LO-MID 1 kHz = C33 **2n2** / C32 **22n** (22n is
+schematic-verified; 2n2 is the [ENG] table's own value) and HI-MID 3 kHz = C35 **680p** / C34 **6n8**
+(both schematic-verified — the stock board's fixed HI-MID pair, itself a ratio of exactly 10). The
+fitted model reads as *"the stock network IS one switch position, and the other two scale that same
+pair up."* Nothing in the objective knew those values. **Calibrate it honestly, twice over:** the raw
+optimum sits ~7 % from each documented value and it is E12 rounding that lands it exactly, and E12
+quantisation gives any single hit a prior of roughly a fifth to a third. Two hits out of two possible,
+at the position you would design around, is suggestive — not proof. It is nonetheless the only
+independent evidence this gap has ever produced, and it is what distinguishes A2c-3 from the
+per-position fudge A2c-2 rejected (C32 at 26.8n/31.9n/7.2n with R40/R41 at 3.5–9.6×, corresponding to
+nothing).
+
+**Acceptance checks, all run before shipping.**
+* **Ratio — sharp interior minimum.** At the shipped cap set with Rw held: `1: 6.07 | 2: 4.85 |
+  4: 2.98 | 6: 1.69 | 8: 0.79 | 10: 0.51 | 12: 0.89 | 15: 1.50 | 20: 2.25 | 30: 3.10` dB. Refitting
+  Rw at each ratio gives the same answer (`8: 0.316 | 9: 0.301 | 10: 0.298 | 11: 0.304 | 12: 0.317`),
+  so it is not an artefact of holding Rw fixed.
+* **Rw — interior minimum, and much smaller than before.** At the shipped caps: `0k: 0.584 |
+  2.2k: 0.539 | 4.7k: 0.509 | 6.8k: 0.500 | 10k: 0.515 | 15k: 0.587 | 22k: 0.737 | 33k: 0.997` dB
+  (63 Hz–8 kHz; on 100 Hz–4.1 kHz 4.7k and 6.8k tie at 0.500/0.509). Once the pair carries the range,
+  Rw drops 22k/18k → 6k8 and stops being the band's Q control.
+* **Every cap — interior minimum on the E12 grid**, neighbours worse on both sides (e.g. LO-MID 250
+  `4.7n 2.17 | 5.6n 1.05 | 6.8n 0.59 | 8.2n 1.67 | 10n 2.85`). Full table in `FitParams.h`.
+  None of these is the monotone "make it see less" degeneracy that killed the session-5/6 clipper
+  fits and the GAP #3b C13 candidate.
+* **Not bought at mid-travel.** Unlike A2c-2, the objective uses every captured knob point, so the
+  two default positions (which have 0930/1430 captures as well as the extremes) are fitted on four
+  curves, not two — the GAP #4 pot-law lesson applied per position.
+* **Positions stay differentiated** (cap ratios 1.74×/1.77× and 1.80×/2.21×), so this is not the
+  session-22 collapse.
+
+**⚠ ONE METRIC MOVED THE WRONG WAY, and it is E12 quantisation.** Peak-frequency error against the
+pedal's own centre (the geometric mean of its cut and boost readings) went **3.4 % → 6.4 %**, against
+a pedal-repeatability floor of **3.0 %**. This is not measurement noise and should not be waved away:
+under this model `f ∝ 1/C` exactly, so an E12 step (~20 %) maps straight onto ~10 % of centre
+frequency, and every one of the six errors matches its own cap's E12 rounding to within 1 % (raw
+optimum → shipped: 6.45n→6n8 = −5.2 % predicted vs −5.1 % measured; 4.12n→3n9 = +5.8 % vs +6.6 %;
+2.05n→2n2 = −6.7 % vs −6.2 %; 2.87n→2n7 = +6.2 % vs +6.0 %; 1.39n→1n5 = −7.7 % vs −6.6 %;
+0.736n→680p = +8.2 % vs +7.7 %). Shipping the raw fitted values removes it.
+
+**The raw alternative was rendered and measured, not estimated** (`--fit` overrides over the 16 mid
+captures, no rebuild): raw caps give **mid-capture mean 0.557 → 0.458 dB, worst 0.957 → 0.819**, i.e.
+about **0.05 dB** on the whole clean-set mean (0.485 → ~0.43). Twelve of the sixteen improve, four
+regress slightly (worst `himidfreq-3k_himid-0700` +0.22). **E12 was shipped anyway, deliberately**:
+the E12 set already meets the agreed target with margin, E12 is what makes this a buildable switch
+rather than four significant figures of curve-fitting, and the documented-pair corroboration — the
+only independent evidence this gap has ever produced — exists only in the rounded set. Trading that
+for 0.05 dB would be a bad deal. **If a future session wants the last of it the lever is exact and
+its cost is measured: `--fit midLoCap250=6.446e-9 midLoCap500=4.120e-9 midLoCap1k=2.046e-9
+midHiCap750=2.868e-9 midHiCap1500=1.385e-9 midHiCap3k=0.736e-9 midWiperRLo=6590 midWiperRHi=6590`.**
+
+**A2c IS CLOSED.** The floor A2c-2 recorded (~1.0 dB mean / ~3.3 dB worst, "reopening needs new
+evidence about the switch's real topology, not another fit") was correct in its diagnosis and is now
+superseded by exactly that evidence. Remaining known limits, unchanged: the pedal's own cut-vs-boost
+peak-frequency spread (3.0 % mean against the geometric-mean centre, 7.7 % at HI-MID 3k) and knob
+pointer error worth > 1 dB on a ±28 dB range.
+
+**Tools:** `analysis/mid_perpos_fit.py` (the per-position / cap-pair family comparison, with
+interior-minimum scans); `analysis/mid_shape_verify.py` (acceptance — now with the corrected
+peak-relative baseline; **use this, not a band-grid argmax, for any peaking-stage claim**).
 
 ### ▶ Remaining candidates (not yet investigated)
 

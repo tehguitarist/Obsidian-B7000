@@ -337,28 +337,53 @@ only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
 | 10n | 496 Hz (500, −0.9%) | ±23.0 dB | | 3n3 | 1552 Hz (1.5k, +3.5%) | ±23.3 dB |
 | 2n2 | 1058 Hz (1k, +5.8%) | ±14.5 dB | | 820pF | 3116 Hz (3k, +3.9%) | ±15.6 dB |
 
-> ⚠ **THE MODEL NO LONGER SHIPS THIS TABLE — every value has been fitted to the captured unit**
-> (Phase 9 GAP #4 + A2c-2; `FitParams::midLoCap*` / `midHiCap*` / `midWiperRLo/Hi`, applied via
-> `PedalChain::loMidCap()/hiMidCap()`). Shipped: **LO-MID 15n / 6.8n / 1.8n** and **HI-MID 10n /
-> 2.7n / 0.68n**, alongside a fitted series R in each band's wiper leg (22k / 18k). The table above
-> stays as the [ENG] derivation of record and as `MidBand::kLoMid*`/`kHiMid*` (the per-stage tests'
-> nominal oracle) — it is NOT what the plugin runs.
-> **Why:** the captured unit's mid range is ~±12 dB at every position (not the ±14.5…±28 above), and
-> its peaks sit at 349 / 545 / 1090 Hz and 784 / 1613 / 3026 Hz. Fitting the range alone (GAP #4, a
-> wiper-leg damping R against the boost-to-cut SPAN) pulled every peak **9–20 % low** and left the
-> peaks **1.54× too broad**, because a damping R buys range by lowering Q. Re-fitting the caps and
-> that R **together** against the full stage SHAPE lands all six peaks within **3.1 % mean / 8.7 %
-> worst** and cuts the width error to 1.31×. All eight values sit at interior minima of the objective.
-> **Two cautions.** (1) This cap table is `[ENG]` — the 3-way selectors do not exist on our schematic
-> at all — so unlike R36/C13 there is no document being contradicted, only a computed table being
-> replaced by a measurement. (2) The earlier claim that LO-MID "250" = 22n was corroborated by the
-> STOCK board's schematic-verified C33 **does not survive**: that came from the nodal sim run with
-> **no** wiper R, and with the fitted R in the model 22n centres at 306 Hz vs the measured 349 Hz.
-> Coincidentally the fitted 3 kHz cap (0.68n) IS the stock C35 — treat that as equally meaningless.
-> A residual remains: the peaks are still ~1.31× too broad, and closing it would require C32/C34 (the
-> FIXED, schematic-verified across-lug caps) to differ per switch position — i.e. a 2-pole selector.
-> That is the open question if this is ever reopened; do not fit it away. `docs/phase9-validation.md`
-> §4 "A2c-2".
+> ⚠ **THE MODEL NO LONGER SHIPS THIS TABLE, AND THE SELECTOR IS MODELLED AS 2-POLE** — it switches
+> the ACROSS-LUG cap together with the series cap, as a scaled PAIR (Phase 9 GAP #4 → A2c-2 → A2c-3;
+> `FitParams::midLoCap*` / `midHiCap*` / `midCapRatioLo/Hi` / `midWiperRLo/Hi`, applied via
+> `PedalChain::loMidCap()/hiMidCap()` and `MidBand::setSeriesCap()/setAcrossCap()`). Shipped:
+>
+> | | 250 / 750 Hz | 500 / 1.5k | 1k / 3k |
+> |---|---|---|---|
+> | LO-MID series C33 | 6n8 | 3n9 | **2n2** |
+> | LO-MID across C32 | 68n | 39n | **22n** |
+> | HI-MID series C35 | 2n7 | 1n5 | **680p** |
+> | HI-MID across C34 | 27n | 15n | **6n8** |
+>
+> plus a series R in each band's wiper leg, now the same value in both (**6k8**; was 33k → 22k).
+> C32 = **10 ×** C33 at every position, one ratio for the whole stage. The table above stays as the
+> [ENG] derivation of record and as `MidBand::kLoMid*`/`kHiMid*` (the per-stage tests' nominal
+> oracle) — it is NOT what the plugin runs.
+>
+> **Why a PAIR.** The captured unit's mid range is ~±12 dB at every position (not the ±14.5…±28
+> above) and its peaks sit at 349 / 545 / 1090 Hz and 784 / 1613 / 3026 Hz. Fitting the range alone
+> (GAP #4: one wiper-leg damping R against the boost-to-cut SPAN) pulled every peak 9–20 % low.
+> Re-fitting caps and R together against the whole SHAPE (A2c-2) fixed the centres but left the peaks
+> ~1.3× too broad, because with a single R per band, range and width are set by the same element —
+> damping buys range by lowering Q, so you cannot have both. Switching the across-lug cap too breaks
+> that trade. **And with the ratio held fixed the stage becomes exactly scale-invariant**: the leg
+> admittances depend only on the products `s·C`, so scaling every cap by k with the resistors fixed
+> gives the identical curve translated in frequency by 1/k. That means constant Q and constant
+> boost/cut range at every switch position — which is exactly what the captures say the pedal does,
+> and what GAP #4's damping R was introduced to force by other means. (`MidBandTest` Test 6 asserts
+> this identity directly: LO-MID 250 at f equals HI-MID 3k at 10f.)
+>
+> ⭐ **Corroboration the fit could not see:** at ratio 10 the highest-frequency position of each band
+> lands exactly on that band's documented pair — **LO-MID 1 kHz = C33 2n2 / C32 22n** (22n is
+> schematic-verified; 2n2 is the [ENG] table's own value) and **HI-MID 3 kHz = C35 680p / C34 6n8**
+> (both schematic-verified — the stock board's fixed HI-MID pair, itself a ratio of exactly 10). So
+> the fitted model reads as "the stock network IS one switch position, and the other two scale that
+> same pair up". Nothing in the objective knew those values. Calibrate this honestly: it is 2 hits
+> out of 2 possible, at the position you would design around, but E12 quantisation gives each hit a
+> prior of roughly a fifth to a third, so it is suggestive, not proof.
+>
+> **Cautions.** (1) This whole sub-circuit is `[ENG]` — the 3-way selectors do not exist on our
+> schematic at all — so nothing here contradicts a document; but equally, no document confirms the
+> switch is 2-pole. It remains a fit. (2) The earlier claim that LO-MID "250" = 22n was corroborated
+> by the STOCK board's schematic-verified C33 does **not** survive and was retired in A2c-2: it came
+> from the nodal sim run at Rw = 0. (3) A2c-2's own headline numbers (peak error 3.1 % mean, curve
+> RMS 1.82 dB) were measured with a fixed 5.12 kHz anchor that sits inside the HI-MID positions' own
+> skirts and flattered them; re-measured with a peak-relative baseline the same build reads 4.4 % and
+> 2.36 dB. `docs/phase9-validation.md` §4 "A2c-3".
 
 > ✅ **Validated by full nodal sim of the verified topology (2026-07-19, open item c), and the sim
 > itself is cross-validated against the p.3 MEASURED tables** (triple-check pass): every table row

@@ -82,10 +82,12 @@ static const std::vector<Cfg> kCfgs = {
 };
 
 static double measureDb(const MidBand::Values& v, double cSeries, double a, double freq, double fs,
-                        double wiperR = 0.0)
+                        double wiperR = 0.0, double acrossCap = 0.0)
 {
     MidBand stage;
     stage.configure(v, cSeries);
+    if (acrossCap > 0.0)
+        stage.setAcrossCap(acrossCap); // A2c-3 scaled cap pair; 0 = leave Values::c32
     stage.prepare(fs);
     stage.setPosition(a);
     stage.setWiperR(wiperR);
@@ -220,6 +222,82 @@ int main()
         std::printf("  %-26s worst |dev| = %.1e dB  %s\n", "Rw=0 is exactly ideal", worst0,
                     ok0 ? "PASS" : "FAIL");
         if (! ok0)
+            ++failures;
+    }
+
+    // ---- Test 6: the A2c-3 SCALED CAP PAIR (setAcrossCap) -------------------
+    // The mid-frequency selector switches the across-lug cap TOGETHER with the series
+    // cap at a fixed ratio (FitParams::midCapRatioLo = 10). Checks (a) the shipped
+    // pairs against the oracle, (b) that setAcrossCap(nominal) is bit-identical to not
+    // calling it, so Tests 1-5 stay valid, and (c) the STRUCTURAL property the whole
+    // model rests on: with every cap scaled by k and the resistors fixed, the leg
+    // admittances depend only on the products s*C, so the stage's response is EXACTLY
+    // the same curve translated in frequency by 1/k. That is what makes a fixed ratio
+    // give constant Q and constant boost/cut range at every switch position — the
+    // pedal's measured ~+-12 dB everywhere. LO-MID 250 (6n8/68n) and HI-MID 3k
+    // (680p/6n8) are exactly a decade apart, so they are exact translates.
+    {
+        std::printf("\n=== A2c-3 scaled cap PAIR (setAcrossCap) ===\n");
+        struct PCfg { const char* name; const MidBand::Values& v; double c33, c32, a;
+                      double db[kNF]; };
+        const std::vector<PCfg> pcfgs = {
+            { "LO-MID 250 pair boost", MidBand::kLoMid, 6.8e-9, 68.0e-9, 0.0,
+              { +0.21117, +1.20462, +3.80724, +9.46177, +13.32477, +10.50926, +4.39398, +1.43364 } },
+            { "LO-MID 250 pair cut",   MidBand::kLoMid, 6.8e-9, 68.0e-9, 1.0,
+              { -0.21117, -1.20462, -3.80724, -9.46177, -13.32477, -10.50926, -4.39398, -1.43364 } },
+            { "HI-MID 3k pair boost",  MidBand::kHiMid, 0.68e-9, 6.8e-9, 0.0,
+              { +0.00215, +0.01344, +0.05356, +0.21117, +0.46420, +1.20462, +3.80724, +9.46177 } },
+            { "HI-MID 3k pair cut",    MidBand::kHiMid, 0.68e-9, 6.8e-9, 1.0,
+              { -0.00215, -0.01344, -0.05356, -0.21117, -0.46420, -1.20462, -3.80724, -9.46177 } },
+        };
+        for (const auto& c : pcfgs)
+        {
+            double worst = 0.0;
+            for (int i = 0; i < kNF; ++i)
+                worst = std::max(worst, std::abs(measureDb(c.v, c.c33, c.a, kFreqs[i], 48000.0,
+                                                           6.8e3, c.c32) - c.db[i]));
+            const bool ok = worst < 0.15; // same tolerance as Tests 1/5 (bilinear warp only)
+            std::printf("  %-26s worst |dev| = %.4f dB  %s\n", c.name, worst, ok ? "PASS" : "FAIL");
+            if (! ok)
+                ++failures;
+        }
+
+        // (b) setAcrossCap(nominal) must be bit-identical to never calling it.
+        double worstN = 0.0;
+        for (int i = 0; i < kNF; ++i)
+            worstN = std::max(worstN,
+                              std::abs(measureDb(MidBand::kLoMid, MidBand::kLoMid10n, 0.0, kFreqs[i],
+                                                 48000.0, 0.0, MidBand::kLoMid.c32)
+                                       - measureDb(MidBand::kLoMid, MidBand::kLoMid10n, 0.0,
+                                                   kFreqs[i], 48000.0)));
+        const bool okN = worstN == 0.0;
+        std::printf("  %-26s worst |dev| = %.1e dB  %s\n", "nominal C32 is exact", worstN,
+                    okN ? "PASS" : "FAIL");
+        if (! okN)
+            ++failures;
+
+        // (c) decade scale-invariance: LO-MID 250 at f == HI-MID 3k at 10f.
+        double worstS = 0.0;
+        for (int i = 0; i < kNF; ++i)
+        {
+            // Run this one at the chain's oversampled rate. The identity is exact in
+            // the CONTINUOUS network (the oracle agrees to 1e-15 dB at every point),
+            // but the two sides discretise frequencies a decade apart, so their
+            // bilinear warp differs: at 48 kHz that swamps the identity (0.4 dB even
+            // with the shifted point held under 5 kHz). At 384 kHz the residual is
+            // 1e-5 dB at 20 Hz and rises monotonically with the SHIFTED frequency to
+            // 0.024 dB at 20 kHz — the warp signature, not a topology error.
+            const double fs = 384000.0;
+            worstS = std::max(worstS,
+                              std::abs(measureDb(MidBand::kLoMid, 6.8e-9, 0.0, kFreqs[i], fs,
+                                                 6.8e3, 68.0e-9)
+                                       - measureDb(MidBand::kHiMid, 0.68e-9, 0.0, kFreqs[i] * 10.0,
+                                                   fs, 6.8e3, 6.8e-9)));
+        }
+        const bool okS = worstS < 0.05;
+        std::printf("  %-26s worst |dev| = %.4f dB  %s\n", "decade scale-invariance", worstS,
+                    okS ? "PASS" : "FAIL");
+        if (! okS)
             ++failures;
     }
 

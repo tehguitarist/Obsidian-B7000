@@ -329,8 +329,66 @@ struct FitParams
     // 0k 2.00 / 15k 1.07 / 22k 0.97 / 33k 1.09 / 68k 1.83 dB; HI-MID 0k 2.04 /
     // 12k 1.13 / 18k 1.04 / 22k 1.06 / 68k 2.09 — so the objective pushes back from
     // both sides, unlike the "make it see less" degeneracies of sessions 5/6 + GAP #3b.
-    double midWiperRLo = 22.0e3;   // LO-MID (IC5_D) wiper leg; was 33k (GAP #4)
-    double midWiperRHi = 18.0e3;   // HI-MID (IC6_A) wiper leg; was 22k (GAP #4)
+    // ⚠ SUPERSEDED BY A2c-3 (session 27, see midCapRatioLo below): once the across-lug
+    // cap is switched as a scaled PAIR with the series cap, Rw no longer has to buy the
+    // range on its own and both bands drop to the SAME, much smaller value. The scan at
+    // the shipped A2c-3 cap set is a clean interior minimum and is now shared by both
+    // bands: 0k 0.544 / 2.2k 0.511 / 4.7k 0.500 / 6.8k 0.509 / 15k 0.654 / 33k 1.117 dB
+    // (0.584 / 0.539 / 0.509 / 0.500 / 0.587 / 0.997 over the wider 63 Hz-8 kHz window,
+    // where 6.8k is the minimum). 4.7k and 6.8k are indistinguishable; 6.8k is taken as
+    // the value the raw joint fit landed on (6.42k / 6.59k on the two windows).
+    // The A2c-2 numbers quoted below applied to the shared-C32 network and no longer
+    // describe the shipped one — kept because they are the record of why Rw exists.
+    double midWiperRLo = 6.8e3;    // LO-MID (IC5_D) wiper leg; 33k (GAP #4) -> 22k (A2c-2)
+    double midWiperRHi = 6.8e3;    // HI-MID (IC6_A) wiper leg; 22k (GAP #4) -> 18k (A2c-2)
+
+    // ---- Mid across-lug cap ratio (Phase 9 A2c-3, session 27) -------------------
+    // C32 (LO-MID) / C34 (HI-MID) is switched TOGETHER with the series cap, as a
+    // SCALED PAIR: C32_position = midCapRatio * C33_position. MidBand::setAcrossCap.
+    //
+    // WHAT THIS RESOLVES. A2c-2 capped A2c with the peaks still ~1.31x too broad and
+    // recorded the reason: with one wiper-leg R per band, range and width are set by
+    // the same element, so you cannot have both. It also recorded what reopening would
+    // take — "NEW evidence about the switch's real topology (is the mid-frequency
+    // selector 2-pole, switching the across-lug cap too?), not another fit." That is
+    // exactly what this is. The user authorised per-position fitting on 2026-07-26,
+    // and the per-position optimum then turned out NOT to need per-position freedom:
+    // fitting C32 freely at each of the six positions lands at a near-constant ratio
+    //   LO-MID  53.3/6.91 = 7.7 ... 15.9/2.34 = 6.8   (joint refit: 10.4)
+    //   HI-MID  22.7/3.31 = 6.9 ... 6.07/0.80 = 7.6   (joint refit:  9.4)
+    // and pinning BOTH bands to exactly 10.0 costs 0.001 / 0.009 dB against the free
+    // per-band values, and 0.007 / 0.006 dB against a fully unconstrained per-position
+    // fit (C33 + C32 + Rw all free per position, the ceiling A2c-2 measured at
+    // 0.17-0.44 dB). So the shipped model has ONE MORE free parameter per band than
+    // A2c-2 did, not six, and it reaches the unconstrained ceiling.
+    //
+    // The ratio is a sharp interior minimum, scanned at the shipped cap set with Rw
+    // held (this is the acceptance check, not the fit):
+    //   ratio   1     2     4     6     8    10    12    15    20    30
+    //   RMS  6.07  4.85  2.98  1.69  0.79  0.51  0.89  1.50  2.25  3.10  dB
+    // and refitting Rw at each ratio gives the same answer (8: 0.316, 9: 0.301,
+    // 10: 0.298, 11: 0.304, 12: 0.317) — it is not an artefact of holding Rw.
+    //
+    // ⭐ CORROBORATION THE OBJECTIVE COULD NOT SEE. At ratio 10 the HIGHEST-frequency
+    // position of each band lands exactly on that band's DOCUMENTED pair:
+    //   LO-MID 1 kHz  -> C33 2n2  / C32 22n    (C32 = 22n is schematic-verified;
+    //                                           2n2 is the [ENG] table's own value)
+    //   HI-MID 3 kHz  -> C35 680p / C34 6n8    (BOTH schematic-verified — they are the
+    //                                           stock board's fixed HI-MID pair)
+    // i.e. the model that came out of the fit is "the stock network is one switch
+    // position, and the other two scale that same pair up" — and 6n8/680p is itself a
+    // ratio of exactly 10. Nothing in the objective knew about those values. This is
+    // the one piece of independent evidence in this whole gap, so weigh it: it is what
+    // separates A2c-3 from A2c-2's rejected per-position fudge (C32 at 26.8n/31.9n/7.2n
+    // with R40/R41 at 3.5-9.6x, which corresponded to nothing).
+    //
+    // ⚠ Still a FIT, not a documented circuit. The 3-way selectors are [ENG] — they do
+    // not exist on our schematic — so nothing here contradicts a document; but neither
+    // is there a document confirming the switch is 2-pole. Per-band fields (rather than
+    // one shared) only so a future capture can differentiate them; both are 10.0 and a
+    // free per-band fit (10.39 / 9.38) is not better.
+    double midCapRatioLo = 10.0;   // C32 = midCapRatioLo * C33  (LO-MID, IC5_D)
+    double midCapRatioHi = 10.0;   // C34 = midCapRatioHi * C35  (HI-MID, IC6_A)
 
     // ---- Switched mid-frequency cap table (Phase 9 A2c-2, session 26) -----------
     // circuit.md's [ENG-caps] table was COMPUTED (f ~ 1/sqrt(C_series)) and has never
@@ -368,14 +426,33 @@ struct FitParams
     // circuit.md's nodal sim, which was run at Rw = 0; with the fitted wiper-leg R in
     // the model, 22n centres at 306 Hz against the pedal's measured 349 Hz. The value
     // was only ever a behavioural match, so it does not survive a change to the rest
-    // of the network. (Coincidentally the 3 kHz position lands on 0.68n, which IS the
-    // stock board's C35 — treat that as no more meaningful than the 22n coincidence.)
-    double midLoCap250 = 15.0e-9;   // 250 Hz  ([ENG] table said 47n; GAP #4 shipped 22n)
-    double midLoCap500 = 6.8e-9;    // 500 Hz  ([ENG] table said 10n)
-    double midLoCap1k = 1.8e-9;     // 1 kHz   ([ENG] table said 2n2)
-    double midHiCap750 = 10.0e-9;   // 750 Hz  ([ENG] table said 15n)
-    double midHiCap1500 = 2.7e-9;   // 1.5 kHz ([ENG] table said 3n3)
-    double midHiCap3k = 680.0e-12;  // 3 kHz   ([ENG] table said 820p)
+    // of the network. (A2c-2 also noted its 3 kHz position landing on 0.68n = the stock
+    // C35, and dismissed it as a coincidence of the same kind. A2c-3 below revives that
+    // observation on stronger evidence — it lands the stock PAIR, C35 680p AND C34 6n8
+    // together, and does the same thing at LO-MID 1 kHz — but a single value matching
+    // remains weak evidence and A2c-2's dismissal was right on what it had.)
+    //
+    // ⚠ RE-FITTED BY A2c-3 (session 27) once the across-lug cap joined the switch as a
+    // scaled pair (midCapRatioLo above) — the values below are A2c-3's, not A2c-2's.
+    // Every one is an E12 value and a clean interior minimum of the shape objective
+    // with its E12 neighbours worse on BOTH sides, scanned at ratio 10 / Rw 6.8k:
+    //   LO-MID 250   4.7n 2.17 | 5.6n 1.05 | 6.8n 0.59 | 8.2n 1.67 | 10n  2.85
+    //   LO-MID 500   2.7n 2.18 | 3.3n 1.18 | 3.9n 0.35 | 4.7n 0.73 | 5.6n 1.61
+    //   LO-MID 1k    1.5n 2.11 | 1.8n 0.93 | 2.2n 0.57 | 2.7n 1.92 | 3.3n 3.21
+    //   HI-MID 750   1.8n 3.14 | 2.2n 1.86 | 2.7n 0.47 | 3.3n 1.01 | 3.9n 2.16
+    //   HI-MID 1.5k  1n   1.57 | 1.2n 0.77 | 1.5n 0.48 | 1.8n 1.35 | 2.2n 2.33
+    //   HI-MID 3k    0.47n 2.25| 0.56n 1.51| 0.68n 0.62| 0.82n 0.77| 1n   1.83
+    // (the HI-MID 3 kHz row is quoted over 63 Hz-8 kHz: at the narrower 100 Hz-4.1 kHz
+    // window the position's upper skirt is truncated and 0.68n/0.82n tie at 0.56/0.56,
+    // while 0.68n wins on every window that contains the whole skirt.)
+    // Since C32 = 10 x C33 and a decade shift preserves the E12 series, the across-lug
+    // values are E12 too: LO-MID 68n/39n/22n, HI-MID 27n/15n/6n8.
+    double midLoCap250 = 6.8e-9;    // 250 Hz  ([ENG] 47n; GAP #4 22n; A2c-2 15n)
+    double midLoCap500 = 3.9e-9;    // 500 Hz  ([ENG] 10n; A2c-2 6.8n)
+    double midLoCap1k = 2.2e-9;     // 1 kHz   ([ENG] 2n2 — back onto the [ENG] value)
+    double midHiCap750 = 2.7e-9;    // 750 Hz  ([ENG] 15n; A2c-2 10n)
+    double midHiCap1500 = 1.5e-9;   // 1.5 kHz ([ENG] 3n3; A2c-2 2.7n)
+    double midHiCap3k = 680.0e-12;  // 3 kHz   ([ENG] 820p — = the STOCK board's C35)
 
     // ---- Baxandall TREBLE range limiter (Phase 9 A2c-1, session 25) -------------
     // R36 (Wt -> IC5_C virtual ground) is schematic-verified at 3.3k, but the captured

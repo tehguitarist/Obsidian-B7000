@@ -104,6 +104,27 @@ public:
         if (mna::differs(c, cSeries)) { cSeries = c; gc33 = cSeries * twoOverT; dirty = true; }
     }
 
+    // ACROSS-LUG cap (LO-MID C32 / HI-MID C34), switched TOGETHER with the series cap
+    // as a scaled PAIR (Phase 9 A2c-3, session 27). configure()'s Values::c32 remains
+    // the nominal; this overrides it, so a stage that never calls this is unchanged.
+    //
+    // WHY THE PAIR. A2c-2 fitted the switched series cap and ONE wiper-leg R per band
+    // and capped there, because the peaks stayed ~1.31x too broad and the only way to
+    // fix width with those parameters is Rw, which pays for it in range. Letting C32
+    // move per position (user-authorised 2026-07-26) removes that trade — and the
+    // per-position optimum comes out at a near-CONSTANT C32/C33 ratio at all six
+    // positions in both bands (10.4 / 9.4 fitted; pinning both to exactly 10.0 costs
+    // 0.001 dB). So this is not a per-position fudge at all: it is ONE 2-pole selector
+    // swapping a scaled cap pair, which is precisely the constant-Q alternative
+    // circuit.md parked for this stage. Holding the ratio fixed makes the stage's Q —
+    // and hence its boost/cut range — identical at every switch position, which is
+    // what the captures say the pedal does (~+-12 dB everywhere, the GAP #4 finding
+    // that Rw was introduced to force). See FitParams::midCapRatioLo.
+    void setAcrossCap(double c) noexcept
+    {
+        if (c > 0.0 && mna::differs(c, val.c32)) { val.c32 = c; gc32 = val.c32 * twoOverT; dirty = true; }
+    }
+
     // Range-limiting series resistance in the WIPER leg (Phase 9 GAP #4, session 22).
     // Sits between the wiper and the switched cap C33/C35, so the leg is a series
     // R+C from node W to the 0 V virtual ground — stamped as ONE branch via the same

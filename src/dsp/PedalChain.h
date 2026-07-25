@@ -187,8 +187,10 @@ public:
         baxandall.setTreble(p.hi);
         loMid.setPosition(p.loMid);
         loMid.setSeriesCap(loMidCap(p.loMidFreq));
+        loMid.setAcrossCap(fit.midCapRatioLo * loMidCap(p.loMidFreq));
         hiMid.setPosition(p.hiMid);
         hiMid.setSeriesCap(hiMidCap(p.hiMidFreq));
+        hiMid.setAcrossCap(fit.midCapRatioHi * hiMidCap(p.hiMidFreq));
         masterOut.setMaster(p.master);
     }
 
@@ -251,9 +253,10 @@ public:
         hiMid.setRailClampEnabled(f.railEnabled);
         masterOut.setRailClampEnabled(f.railEnabled);
 
-        // Mid-stage range limiter (Phase 9 GAP #4). The switched-cap value itself is
-        // applied through loMidCap()/hiMidCap() in applyParams(), which read the
-        // capture-fitted switched-cap table (fit.midLoCap* / fit.midHiCap*).
+        // Mid-stage range limiter (Phase 9 GAP #4). Both switched CAPS are applied in
+        // applyParams() instead, because they depend on the switch position: the series
+        // cap through loMidCap()/hiMidCap() (fit.midLoCap* / fit.midHiCap*) and the
+        // across-lug cap as fit.midCapRatio* x that, the A2c-3 scaled PAIR.
         loMid.setWiperR(f.midWiperRLo);
         hiMid.setWiperR(f.midWiperRHi);
 

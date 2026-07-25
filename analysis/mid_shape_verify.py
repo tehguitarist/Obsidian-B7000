@@ -39,8 +39,26 @@ EVAL_LO, EVAL_HI = 100.0, 4100.0
 NORM_HZ = 5120.0
 
 
-def anchored(bands, curve):
-    return curve - curve[int(np.argmin(np.abs(bands - NORM_HZ)))]
+def anchored(bands, curve, m):
+    """Shift the curve so the stage's FLAT region reads 0 dB.
+
+    ⚠ This used to subtract the value at a fixed 5.12 kHz band, which is wrong for
+    the HI-MID 3 kHz position: 5.12 kHz is inside that position's own skirt, so the
+    whole curve was displaced by ~11 dB, its |max| landed on the lowest evaluated
+    band, and the row reported a meaningless "peak" at 101 Hz for pedal and plugin
+    alike (and therefore a flattering 0.0 % peak error, which diluted the summary).
+    A peaking stage is flat on BOTH sides of its centre, so take the baseline as the
+    median over the bands at least two octaves away from the peak instead — that is
+    position-independent and needs no per-band constant.
+    """
+    c = curve - np.median(curve)
+    f0 = bands[m][int(np.argmax(np.abs(c[m])))]
+    far = (bands < f0 / 4.0) | (bands > f0 * 4.0)
+    if np.count_nonzero(far) < 3:
+        far = (bands < f0 / 2.5) | (bands > f0 * 2.5)
+    if np.count_nonzero(far) < 3:
+        return curve - curve[int(np.argmin(np.abs(bands - NORM_HZ)))]
+    return curve - float(np.median(curve[far]))
 
 
 def peak(bands, curve, m):
@@ -83,8 +101,8 @@ def rows(path):
         _c32, positions = BANDS[band]
         for label, _c33, f_cut, f_bst in positions:
             for knob, fn in (("cut", f_cut), ("bst", f_bst)):
-                ped = anchored(bands, stage_shape(bands, by_file, fn, "pedal_db"))
-                plg = anchored(bands, stage_shape(bands, by_file, fn, "plugin_db"))
+                ped = anchored(bands, stage_shape(bands, by_file, fn, "pedal_db"), m)
+                plg = anchored(bands, stage_shape(bands, by_file, fn, "plugin_db"), m)
                 d = plg[m] - ped[m]
                 out.append(dict(
                     pos=f"{band} {label}", knob=knob, file=fn, bands=bands, m=m,
