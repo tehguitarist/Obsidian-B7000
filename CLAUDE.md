@@ -104,6 +104,137 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 29, 2026-07-26): ▶ PHASE 9 / A3 — ⭐ ROOT CAUSE FOUND, NOT YET FIXED. A3 IS NOT
+> A LEVEL ERROR: the pedal has an LF CANCELLATION NULL the model cannot produce. Analysis only —
+> NOTHING in `src/` changed, ctest 17/17 unaffected.**
+> **(1) ⭐ THE FINDING. Below ~80 Hz the real pedal's OD path is ANTI-PHASE with the clean BLEND
+> bleed; the model has them IN PHASE at every frequency and every drive.** Decisive evidence came
+> from sweeping the **DRIVE axis**, which no prior session did — every A3 measurement had been taken
+> at drive noon alone. Each drive setting minus `blend-0700` (full clean), gain un-applied, at 40 Hz:
+> **pedal −18.0 → −18.4 → −20.5 → −31.8 → −14.7** (min → 9:30 → noon → 2:30 → max) vs **plugin
+> −13.1 → −11.3 → −7.7 → −4.1 → −6.0**. The pedal's 40 Hz output FALLS as drive rises, collapses into
+> a **−31.8 dB null at 2:30**, then recovers — only possible if the OD subtracts. ⭐ Corroboration it
+> is a genuine magnitude-matched cancellation and not a one-band artefact: **the null MIGRATES DOWN in
+> frequency** — at max drive 40 Hz has recovered to −14.7 while 20/25 Hz have collapsed to
+> −21.7/−22.5, i.e. it moved to ~22 Hz, exactly where |OD| now equals |bleed|. Identical trend at all
+> three sweep levels. The plugin rises monotonically and nulls nowhere.
+> **(2) NOT a polarity bug — session 19 STANDS.** Crossover is ~80 Hz; ABOVE it the pedal adds
+> (127 Hz −15.3 → −14.1 → −10.8). A global inversion would subtract at all frequencies. This is
+> frequency-dependent rotation, the different claim the A3 handover explicitly reserved.
+> **(3) THE TARGET: the OD path needs ≈90–120° MORE LF LEAD** (~140–180° @40 Hz decaying to ~0 by
+> 200 Hz). Model's measured OD-vs-bleed phase: +104° @20, +58° @40, +24° @64, +8° @80, −7° @101,
+> −37° @202 — it already crosses zero near 90 Hz so the shape is roughly right, but it never nears
+> anti-phase, so it can only add. ⚠ A single first-order corner CANNOT do this (saturates at 90° and
+> is nearly phase-flat over 20–250 Hz) — which is why the ~896 Hz GRUNT-cut corner was never going to
+> explain a crossover at 80 Hz. A 2nd-order-ish HP cornering near 80–100 Hz has the right shape.
+> **(4) ⛔ EVERY OD-ATTENUATION CANDIDATE IS NOW DEAD, not merely insufficient** — `clipC11/C12/C13`
+> scaling, a broadband OD trim, any "make the clipper see less" lever. **Attenuation cannot create a
+> null at any value.** This retires the whole family the handover called necessary-not-sufficient.
+> **(5) ⚠⚠ TWO HANDOVER CORRECTIONS — both change what to work on.** (a) **The bleed LEVEL is ~1 dB
+> off, NOT 3.6.** At drive-min the pedal is FLAT at −17.4…−18.3 dB across 20–64 Hz (the exact
+> resistive-bleed signature) vs the model's measured −16.93. The old 3.6 dB gate was measured against
+> the pedal's **drive-noon** total, which is itself depressed by the cancellation — **it read a phase
+> effect as a level error.** So hypothesis (a) is largely dead and the PHASE is what is "necessarily
+> part of A3". (b) **A3's target is UNCHANGED by session 28's `c21R` move** — C21 is shared
+> post-BLEND so it cancels exactly in the `ref-od` − `blend-0700` difference; the handover table
+> reproduces to **0.2–0.3 dB on both rows** on the current build. (It was computed at
+> `sweep_drv_-18`; that was never recorded and now is.)
+> **(6) ⚠ A METHOD ERROR I MADE AND CORRECTED — do not repeat.** My first geometry solve concluded
+> that because the model's bleed exceeds the pedal's total at 20–64 Hz, NO OD phasor could reach the
+> target ("impossible"). Wrong: with **both** magnitude and phase free, |1 + m·e^{iθ}| sweeps
+> [|1−m|, 1+m], which over all m covers [0, ∞) — every target is reachable. What the geometry actually
+> forces is the **SIGN**: T < 1 ⟹ cosθ < −m/2 < 0 ⟹ **θ > 90°**. That is the stronger, correct claim.
+> **Lesson: free BOTH magnitude and angle before declaring a two-phasor target unreachable** — pinning
+> one turns "not at this level" into a false impossibility.
+> **(7) ⚠ A SETTINGS BUG INHERITED FROM `blend_null_probe.cpp`:** it sets `attackIdx = 1` and labels
+> it "Boost centre (ref-od baseline)", but `captures.py::_REF_OD` is ATTACK **Flat (idx 0)**. Near-
+> inert at LF (C8 = 220 pF) but it moves the clipper's operating point at drive noon. Fixed in the new
+> probe; **do not copy that line.** Session 19's numbers were taken at the wrong ATTACK position.
+> **(8) NEW TOOLS.** `analysis/a3_blend_decompose.cpp` — exact BLEND-node decomposition
+> (`full = od + bleed`, superposition self-checked to <−280 dB) at arbitrary grunt/drive/level, with a
+> BLEND=0 full-clean reference pass so its dB compare directly to the A3 table; raw phasors on stdout.
+> `analysis/a3_solve.py` — the geometry solve.
+> **▶ NEXT, IN ORDER: (1) localise the missing phase PER OD STAGE** with `analysis/od_taps_probe.cpp`
+> (taps jfet/treble/drive/clipper/recovery/skB/skA) — measure each boundary's phase vs the clean tap
+> over 20–250 Hz and find which stage owes the 90–120°. **Do this BEFORE proposing an element**;
+> sessions 19/20 both mis-attributed a gap by reasoning from a stage transfer instead of measuring.
+> **(2) Gate every candidate on the NULL, not band-RMS** — it must reproduce a null near 40 Hz at
+> drive 2:30 migrating to ~22 Hz by max; that pins LF phase AND magnitude at once. A candidate that
+> improves band-RMS without a moving null has not fixed this. **(3) Only then** revisit the residual
+> ~1 dB bleed level — fitting it first would absorb the phase error. Then A4 re-grade + GATE-9, B
+> (perf/HQ), C (carry-forwards), D (release). Full detail: `docs/phase9-validation.md` §4 "A3 ROOT
+> CAUSE", §0 backlog.
+> ── prior session ──
+> **CURRENT (session 28, 2026-07-26): ▶ PHASE 9 / A2d — ✅ THE SUB-60 Hz CLEAN DEFICIT IS FIXED
+> (user-reported). Two more user-reported items QUANTIFIED but NOT fixed (A2e >10 kHz, A2f ±0.2 dB
+> shape). The A/B harness is now PARALLEL: full 63-capture run ~30 min → 5m42s. ctest 17/17.**
+> **(1) ✅ SHIPPED: `c21R` 100k → 220k** (C21 coupling corner 15.9 → 7.2 Hz). User A/B'd the clean
+> captures and found the plugin uniformly quiet below ~40–60 Hz — "critical for a bass plugin", and
+> they were right. **⭐ THE CONTROL THAT SETTLED IT IS `bypass.wav`: it round-trips at −0.03 dB at
+> EVERY band 20–63.5 Hz**, so the deficit is the plugin, not the capture chain (and a chain rolloff
+> would push the error the other way — it lands in `pedal_db`). Bypass-corrected flat-EQ residual was
+> **−1.31 dB @20 Hz / −0.75 @31.7 / −0.38 @40 / 0.00 @63.5**, IDENTICAL in all 30 clean captures ⇒
+> shared post-BLEND path, and C21 is the only audible-band HP there (everything else corners ≤1.6 Hz).
+> **Per clean capture: 20 Hz–10 kHz mean 0.589 → 0.415, worst 1.101 → 0.985; 30 Hz–10 kHz
+> 0.465 → 0.416; CLEAN row-counted 0.544 → 0.465.** 22/30 captures improve. **Interior minimum
+> verified BOTH sides** (≤63 Hz RMS: 100k 0.849 / 180k 0.319 / **220k 0.261** / 270k 0.248 / 470k
+> 0.287) — NOT the monotone "delete the element" degeneracy that killed the session-5/6 clipper fits.
+> **(2) ⚠⚠ OD GOT WORSE AND THAT IS EXPECTED — DO NOT "FIX" IT. OD 5.965 → 6.221, ALL 3.254 → 3.343,
+> 28 rows worse >0.5 dB / 0 better.** C21 is SHARED post-BLEND and A3 is an OD LF *excess*
+> (+12.8 dB @40 Hz), so adding low end must worsen it. Decomposed per band it is two things, neither
+> a new error: **below 50 Hz genuine UNMASKING** (+0.93 dB @20 Hz — at 100k the clean deficit was
+> partially CANCELLING A3's excess, exactly the compensating-error pair session 24's "nail base-clean
+> first" was meant to expose), and **above 63 Hz a constant −0.33 dB at every band out to 16 kHz**,
+> which is the report's per-row **gain-match** re-solving (a measurement-frame shift — same trap as
+> session 23's `grunt_span_probe` note). **Judge `c21R` on the CLEAN set vs the bypass anchor, never
+> on the OD/ALL aggregate**; A3's fix must REMOVE 13–15 dB of OD LF, at which point this reverses.
+> **(3) ⚠ CAVEATS.** Implied corner is NOT constant (9.1/7.1/7.3/9.8 Hz at 20/25/31.7/40) so it is a
+> corner APPROXIMATION, not proof C21 is the element; 220k is **22× the nominal 10k stack input Z**,
+> so the physical story is thin — same third branch as R36/C13/the [ENG] mid caps (our schematic is a
+> clone of the ORIGINAL B7K; the captured unit is an Ultra). `schematic-checker` on C21 still owed.
+> **One capture regresses monotonically: `bass-0930` 0.424 → 0.554** — the Baxandall BASS *cut* is
+> ~1 dB too shallow at 40 Hz, a separate smaller gap. Do NOT fix it with `c21R`.
+> **(4) ▶ RE-AGREE THE GRADING BAND before A4/GATE-9.** The whole deficit lived at **20–31.7 Hz**,
+> below the agreed 30 Hz edge — which is exactly why A2c could be declared closed on target with it
+> still present. On 30 Hz–10 kHz the scan is nearly flat 150k–270k; only 20 Hz–10 kHz resolves the
+> optimum. 5-string low B = 30.9 Hz.
+> **(5) ▶ A2e — >10 kHz, QUANTIFIED NOT FIXED. ⭐ BILINEAR WARP IS RULED OUT BY MEASUREMENT**
+> (`base_rate_warp_measure.py`, 48k vs 96k: **±0.13 dB, no trend**) — this CLOSES the standing
+> Phase-6 carry-forward for the clean path at flat EQ. Two parts: **(a)** flat EQ −0.29 dB @10 kHz /
+> −0.38 @16 k (near the 0.144 dB floor); **(b)** the real one — mid boost/cut extremes, where the
+> matched-pair SPAN error grows monotonically above each centre: LO-MID 250 −0.66, HI-MID 750 −1.37,
+> HI-MID 1.5k −3.17, **HI-MID 3k −6.03 dB @16 kHz**, against a ~0 LF plateau. **The plugin's mid
+> peaks have steeper HF skirts than the pedal's.** ⛔ Wiper-leg R RULED OUT against the oracle (the
+> model's span correctly asymptotes to ~0 both sides). **Element NOT identified** — reopening A2c for
+> a band above where bass content lives should wait behind A3.
+> **(6) ▶ A2f — the ±0.2 dB shape, PARKED.** Bypass-corrected it is **one gentle tilt, not a peak +
+> dip**: +0.20 dB across 80–500 Hz, zero-crossing ~900 Hz, −0.20…−0.29 dB from 2.5–10 kHz. ~3× the
+> take-to-take floor. ⚠ Part of the apparent "8 kHz dip" is the RIG: `bypass.wav` itself reads
+> **+0.19 dB @8.1 kHz**, −0.20 @16 k. Always bypass-correct before reading shape off a clean chart.
+> ⚠ Flat-EQ replicates are effectively **2 independent shapes, not 5** (the three master captures +
+> `ref-clean_gain-n12` agree to <0.001 dB — MASTER is a flat divider, so they are ONE shape).
+> **(7) ⚙ HARNESS: `comprehensive_report.py` IS NOW PARALLEL** (`--jobs/-j`, default min(8, cores−2)).
+> Process pool; reference loaded once per worker by the initialiser (not pickled per task); results
+> re-indexed to capture order; cache writes made ATOMIC (tmp + `os.replace`). **Verified
+> bit-identical to serial, including capture order.** 63 captures **5m42s @768 % CPU** (was ~30 min);
+> 4-capture A/B 116 s → 39 s. `--jobs 1` restores serial for debugging.
+> **(8) ⚠⚠ METHOD TRAP, COST ME A GOOD RUN: WALL-CLOCK IS NOT RUNTIME ON THIS LAPTOP.** I killed a
+> healthy full run after reading "10 captures in 87 min" as a 9–17× regression. It wasn't: `pmset -g
+> log` showed **`Entering Sleep state due to 'Clamshell Sleep'`** 08:16→09:38 (lid closed, on
+> battery), only ~2 s DarkWake blips between. Cache-file mtimes showed the truth — an exact **29 s per
+> capture BEFORE and AFTER** the sleep window. **Diagnose with per-capture cache mtimes + `pmset -g
+> log`, not elapsed wall-clock**, and prefix long runs with `caffeinate -ims` (which still won't stop
+> clamshell sleep on battery).
+> **(9) E12 QUESTION ANSWERED (no change made).** Reverting the mid caps to raw fitted values buys
+> **mid-capture mean 0.557 → 0.458 dB, worst 0.957 → 0.819** ≈ **0.05 dB** on the clean mean — a third
+> of the take-to-take floor. Cost: the only independent corroboration the mid gap ever produced (at
+> E12 each band's top position lands exactly on its documented pair). No middle path exists — under
+> this model centre ∝ 1/C exactly and the six rounding errors alternate sign within a band, so no
+> shared resistor absorbs them. **Recommended: leave E12.** Exact revert lever in §4 A2c-3.
+> **▶ NEXT = A3, still the last big voicing gap** (`docs/phase9-validation.md` §4 "A3 handover").
+> Its numbers are unchanged in substance — but re-read them against the NEW baseline, since A2d moved
+> the OD rows (see (2)). Then A4 re-grade + GATE-9, B (perf/HQ), C (carry-forwards), D (release).
+> ── prior session ──
 > **CURRENT (session 27, 2026-07-26): ▶ PHASE 9 / A2c-3 — ✅✅ A2c IS CLOSED AND ITS TARGET IS MET.
 > The mid-frequency selector is modelled as a 2-POLE switch swapping a scaled cap PAIR. ctest 17/17,
 > AU+VST3 clean. Next gap = A3, and it is the LAST voicing gap.**
