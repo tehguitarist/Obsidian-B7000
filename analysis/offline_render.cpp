@@ -226,6 +226,8 @@ static const FitField kFitFields[] = {
     {"masterTaperExp", &FitParams::masterTaperExp},
     {"c21R", &FitParams::c21R},
     {"trebleLadderDampR", &FitParams::trebleLadderDampR},
+    {"trebleC7", &FitParams::trebleC7},
+    {"clipC15", &FitParams::clipC15},
     {"btR22", &FitParams::btR22},
     {"btR23", &FitParams::btR23},
     {"btC16", &FitParams::btC16},

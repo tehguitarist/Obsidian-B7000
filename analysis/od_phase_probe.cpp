@@ -83,6 +83,7 @@ int main(int argc, char** argv)
     const struct { const char* name; double FitParams::* member; } kFitKeys[] = {
         {"jfetGm", &FitParams::jfetGm}, {"jfetRo", &FitParams::jfetRo},
         {"jfetRq2", &FitParams::jfetRq2}, {"trebleLadderDampR", &FitParams::trebleLadderDampR},
+        {"trebleC7", &FitParams::trebleC7},
         {"clipC11", &FitParams::clipC11}, {"clipA0", &FitParams::clipA0},
         // Rails: session 33 needs these to test whether the model's LF OD
         // magnitude stops growing at high drive because IC2_A is rail-clipping

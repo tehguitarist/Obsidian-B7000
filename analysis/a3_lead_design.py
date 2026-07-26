@@ -2,6 +2,26 @@
 """a3_lead_design -- Phase 9 / A3 step 2 (session 33): design the missing OD-path
 element against a CORRECTED target, and test whether one can exist at all.
 
+⚠ READ THIS FIRST (session 34). The narrative below is session 33's and describes
+the model AS IT WAS THEN. Since then `trebleC7` (C7 100n -> 680p) fixed the
+drive-axis magnitude defect, and that changes two of the conclusions stated below:
+
+  * "the requirement is a broad PLATEAU of +115..+136 deg out to 254 Hz, so a
+    lead network's shape no longer follows" was an artefact OF THE BROKEN DRIVE
+    AXIS, not of the sign fix. Re-measured on the fixed model the residual
+    requirement is +30..+36 deg at 40-127 Hz falling to ~0 by 160-254 and going
+    NEGATIVE at 20-25 -- a bump that returns to zero at both ends, i.e. a
+    lead-network shape after all. The SIGN CORRECTION ITSELF STILL STANDS.
+  * "the target is not designable at all (40-101 Hz drive-fit residual 2-5 dB at
+    every beta)" is fixed: it is now 0.1-0.5 dB, and beta is sharply identified
+    at ~ -16.5..-17.0 instead of being flat across the scan.
+
+Every VERDICT this tool prints is now computed from the live scan rather than
+asserted in a string -- because these two paragraphs are exactly the failure mode
+(a conclusion narrated in prose outlives the condition it described). Run it with
+--csv-prefix pointing at the candidate's CSVs and believe the printed numbers,
+not the prose. See docs/phase9-validation.md §4 "A3 step 3a".
+
 WHY THIS FILE EXISTS: THE TARGET WAS WRONG ABOVE ~90 Hz.
 -------------------------------------------------------
 `a3_phase_solve.py` part 3 printed `abs(theta_mdl)` (its solved `theta_ped` is a
@@ -253,6 +273,8 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sweep", default="sweep_drv_-18")
+    ap.add_argument("--csv-prefix", default="build/a3_dec_drv",
+                    help="a3_blend_decompose CSV prefix (swap in a candidate render)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -260,7 +282,7 @@ def main():
         selftest()
         return
 
-    model = ps.load_model([d for d, _ in ps.DRIVES])
+    model = ps.load_model([d for d, _ in ps.DRIVES], args.csv_prefix)
     pedal = ps.load_pedal(args.sweep)
     beta = ps.fit_beta(pedal, model)
     res = ps.solve(pedal, model, beta)
@@ -420,29 +442,70 @@ def main():
     print("   mean/worst/shortRMS = how far a minimum-phase element falls short of the")
     print("              lead the captures demand. Negative is impossible for ANY causal")
     print("              element -- non-minimum-phase content only subtracts phase.")
-    print("\n   READ THIS TABLE AS A DISAGREEMENT, NOT AS A FIT. driveRMS is minimised")
-    print("   near beta = -15.5 and causality wants beta <= -18.5; they pull opposite")
-    print("   ways. And shortRMS never falls below ~28 deg ANYWHERE, so no beta makes")
-    print("   the requirement cleanly realisable -- at best the mean crosses zero while")
-    print("   individual bands stay +/-30-50 deg out. That is not a candidate.")
+    # ⚠ COMPUTED, never narrated. Session 33 hard-coded "driveRMS is minimised near
+    # beta = -15.5, causality wants <= -18.5, they pull opposite ways, and shortRMS
+    # never falls below ~28 deg ANYWHERE". After trebleC7 shipped, all three numbers
+    # were wrong (the two criteria now agree to within ~1 dB) and the sentence sat
+    # above a table contradicting it -- the third time this file has done exactly
+    # what its own docstring warns about. Derive it from `scan` or do not print it.
+    b_drive = min(scan, key=lambda r: r["drive"])
+    b_caus = min(scan, key=lambda r: abs(r["mean"]))
+    b_short = min(scan, key=lambda r: r["rmsshort"])
+    gap = abs(b_drive["beta"] - b_caus["beta"])
+    print("\n   THE TWO CRITERIA, LOCATED FROM THE SCAN ITSELF:")
+    print("   driveRMS (how well beta explains the 5-point drive sweep) is minimised at")
+    print("   beta = %+.1f (%.2f dB); causality (mean phase shortfall -> 0) lands at"
+          % (b_drive["beta"], b_drive["drive"]))
+    print("   beta = %+.1f. They disagree by %.1f dB." % (b_caus["beta"], gap))
+    if gap <= 1.5:
+        print("   => that is AGREEMENT within the scan's own resolution. The 3 dB standoff")
+        print("   session 33 recorded (least-squares -15.5 vs causality <= -18.5) has")
+        print("   CLOSED; beta is now identified, not merely bounded.")
+    else:
+        print("   => still a genuine standoff; beta is bounded, not identified. Do not")
+        print("   pick one criterion and call it measured.")
+    print("   Best shortRMS anywhere in the scan: %.0f deg (at beta = %+.1f)."
+          % (b_short["rmsshort"], b_short["beta"]))
+    if b_short["rmsshort"] > 25.0:
+        print("   No beta makes the requirement cleanly realisable by a min-phase element.")
+    else:
+        print("   ⚠ Read this per band, not as a scalar: a mean/RMS near zero can still")
+        print("   hide +40/-30 band by band. Part 5's table is the one to judge on.")
 
     # driveRMS is deliberately NOT a filter: it sits at 1.8-2.6 dB at EVERY beta
     # because the model's mu_d is non-monotone on the drive axis and the pedal's
     # is not (session 31 item 6). Its variation across the whole beta range is
     # 0.8 dB on a ~2 dB floor, so it discriminates beta only weakly -- which is
     # why the session-31 least-squares landing at -15.4 is not strong evidence.
-    print("\n   PER-BAND DRIVE-FIT RESIDUAL vs beta -- the reason none of this is")
-    print("   designable yet. The bands that carry the null are the bands that do not")
-    print("   fit, AT EVERY beta:\n")
+    print("\n   PER-BAND DRIVE-FIT RESIDUAL vs beta -- whether the target is designable")
+    print("   at all. The bands that carry the null (40-101 Hz) are the ones to read:\n")
     print("      %8s %s" % ("beta", "".join("%6d" % b for b in bands if b <= CORE_HI)))
     for r in scan[::3]:
         print("      %8.1f %s" % (r["beta"], "".join(
             "%6.1f" % r["rms"][i] for i, b in enumerate(bands) if b <= CORE_HI)))
-    print("\n   40-101 Hz sits at 2-5 dB regardless of beta. That is session 31 item 6:")
-    print("   the model's mu_d PEAKS at drive 2:30 and falls by max, while the pedal's")
-    print("   must grow monotonically straight through the null. The solve fits (s,")
-    print("   theta) against that wrong drive shape, so the phase target inherits it")
-    print("   exactly where A3 lives.")
+
+    # ⚠ This verdict is COMPUTED, never asserted. Session 33 shipped a hard-coded
+    # "40-101 Hz sits at 2-5 dB regardless of beta" here; once the drive axis was
+    # fixed (session 34, trebleC7) the same sentence sat directly above a printed
+    # table of 0.2 dB. A conclusion narrated in a string outlives the condition it
+    # described -- the same class of error as the transcribed target this whole
+    # file exists to correct. Derive it from `scan` or do not print it.
+    nullIdx = [i for i, b in enumerate(bands) if 40 <= b <= 101]
+    worst_over_beta = min(max(r["rms"][i] for i in nullIdx) for r in scan)
+    best_row = min(scan, key=lambda r: max(r["rms"][i] for i in nullIdx))
+    print("\n   Best achievable 40-101 Hz drive-fit residual over the whole beta scan:")
+    print("   %.1f dB (at beta = %+.1f)." % (worst_over_beta, best_row["beta"]))
+    if worst_over_beta > 1.5:
+        print("   ⛔ The (s, theta) solve there is fitting against the model's own mu_d,")
+        print("   which is wrong on the drive axis (session 31 item 6): mu_d PEAKS at")
+        print("   drive 2:30 and falls by max, while the pedal's grows straight through")
+        print("   the null. The phase target inherits that error exactly where A3 lives,")
+        print("   so DO NOT design against it yet -- fix the drive axis first.")
+    else:
+        print("   ✅ Below 1.5 dB, so the drive-axis defect that made this target")
+        print("   untrustworthy (session 33 item 5) is no longer binding and the phase")
+        print("   target below IS worth designing against. Note beta is now sharply")
+        print("   identified by this scan -- it was flat to within 0.8 dB before.")
 
     ok = [r for r in scan if abs(r["mean"]) < 15.0 and r["magrms"] < 1.5]
     if not ok:
@@ -474,12 +537,21 @@ def main():
         print("   %6d %9.1f %9.1f %9.1f %9.1f %8.2f"
               % (b, best["gd"][i], 20 * math.log10(abs(hh[i])),
                  best["ph"][i], math.degrees(np.angle(hh[i])), best["rms"][i]))
-    print("\n   ⛔ DO NOT BUILD THIS. It is the best a causal element can do against a")
-    print("   target that is itself unreliable at 40-101 Hz (drive-fit residual 2-5 dB")
-    print("   at every beta), and it still misses individual bands by 30-50 deg. Fix")
-    print("   the drive-axis magnitude defect first -- see the session-33 entry in")
-    print("   docs/phase9-validation.md -- then re-run this and the target will be worth")
-    print("   designing against.")
+    # Same rule as above: the verdict is computed from what was just fitted.
+    short = max(abs(best["ph"][i] - math.degrees(np.angle(hh[i])))
+                for i, b in enumerate(bands) if b <= CORE_HI)
+    if worst_over_beta > 1.5:
+        print("\n   ⛔ DO NOT BUILD THIS. It is the best a causal element can do against")
+        print("   a target that is itself unreliable at 40-101 Hz (best drive-fit")
+        print("   residual %.1f dB), and it still misses individual bands by up to" % worst_over_beta)
+        print("   %.0f deg. Fix the drive-axis magnitude defect first -- see the" % short)
+        print("   session-33/34 entries in docs/phase9-validation.md.")
+    else:
+        print("\n   The target is now trustworthy (drive-fit residual %.1f dB), and this"
+              % worst_over_beta)
+        print("   element is the best causal fit to it: worst per-band phase shortfall")
+        print("   %.0f deg. Judge it on the NULL (a3_drive_axis.py + the migrating null)," % short)
+        print("   never on band-RMS, and re-fit beta jointly with it -- never after.")
 
 
 if __name__ == "__main__":

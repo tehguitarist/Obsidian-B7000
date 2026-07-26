@@ -179,8 +179,39 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | C8 | 220pF | HF cap whose **bottom plate is the ATTACK switch pole**; top plate fixed to node P (post-R8). Boost→bottom to M (bridges R8); Cut→bottom to GND (shunt at P); Flat→bottom open. See correction below. |
 | **ATTACK (SW1)** | **SP3T / On-Off-On** | **3-way Boost/Flat/Cut** [ENG]. Sets treble content into the clipper. |
 | R11 | 470k | to GND at IC2_A input side |
-| C7 | 100n | coupling into IC2_A |
+| C7 | 100n | coupling into IC2_A — ⚠ **the MODEL SHIPS 680 pF, fit to the capture** (see note below) |
 | R13 | 1M | bias IC2_A (+) to VD |
+
+> ⚠ **C7: schematic says 100n; the MODEL SHIPS 680 pF** (`FitParams::trebleC7`,
+> `TrebleAttack::setC7`; Phase 9 A3 step 3a, session 34). The reading is not in doubt — 100n is on p.4
+> and in the BOM, and is covered by the R1–R54/C1–C39 reconciliation. What the captures contradict is
+> the **drive axis**. At 100n this cap corners at ~1.2 Hz (see the R-total note below) and is inert across the audio
+> band, so the OD path's response *into* IC2_A peaks at 32–40 Hz (−8.5 dB re the clean tap) and falls
+> to −20.5 dB by 320 Hz. At a −18 dBFS bass signal and max DRIVE the unclamped IC2_A output at 40 Hz
+> is ≈8 V into a ±2.7/2.9 V rail, so **IC2_A hard-clips at LF first and the top half of the DRIVE knob
+> does nothing at 40–101 Hz**: the model's |OD| turned over at drive 2:30 and FELL by max, where the
+> pedal's grows +5…+6 dB (measured from the captures — `analysis/a3_drive_axis.py`). 680 pF puts a
+> first-order highpass at ~183 Hz right at IC2_A's input and restores the headroom.
+> **Results:** drive-axis step-profile RMS vs the pedal **4.72 → 0.647 dB**; the 40–101 Hz drive-fit
+> residual in `a3_phase_solve` **4.4/4.2/3.8/3.1/2.2 → 0.16/0.19/0.28/0.46/0.46 dB**; full matrix
+> **OD 6.221 → 3.931, ALL 3.343 → 2.198, OD bass-tilt 9.10 → 1.20 dB**, CLEAN bit-identical (C7 is in
+> the OD path; the clean tap splits at IC1_A). Interior minimum verified both sides (4.72 at 100n →
+> 0.647 at 680p → 4.62 at 220p), so this is **not** the "make the clipper see less" degeneracy.
+> ⚠ **DO NOT SAY "THE DRIVE AXIS IS FIXED"** (session 34's entry did; corrected session 35). 680 pF
+> clears gate **G1** — |OD| monotone in drive at 40–101 Hz, FAIL at 5/5 bands → PASS — but does **not**
+> clear **G2** containment: the 2:30→max step goes from **7.89 dB SHORT to 1.75 dB OVER** at 50 Hz
+> (6.82 short → 0.98 over at 64 Hz). Large, and in the right direction; not closed. The residual
+> overshoot is what the step-3b lead network is fitted against, jointly with the bleed level β.
+> ⚠ Also: session 34 recorded this as shipped while `FitParams::trebleC7` still read 100 n — the value
+> only reached the source in **session 35**. Check the constant, not the prose.
+> 🚩 **BUT 147× is a much bigger discrepancy than any previous capture-vs-document case** (R36 3k3→4k7,
+> C21 10×, C13's one decade). Read this as: *a first-order highpass at ~183 Hz is REQUIRED somewhere in
+> the OD path ahead of IC2_A*, and C7 is the cheapest place to put it — **not** as evidence that the
+> fitted unit's C7 is 680 pF. Same third branch as always (our schematic is a clone of the *original*
+> B7K; the captured unit is an Ultra), but here the physical story is genuinely thin.
+> ▶ **A `schematic-checker` pass on C7 / R11 / R13 and the node-P network is OWED** — this is the one
+> outstanding candidate for the fit landing on the wrong element. `docs/phase9-validation.md` §4
+> "A3 step 3a".
 
 > **UI switch-position map (user-confirmed 2026-07-20), top(up)→bottom(down):**
 > **ATTACK** = up **Flat** (pole floating), mid **Boost** (C8 bridges R8), down **Cut** (C8 shunts
@@ -264,9 +295,9 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 ### Recovery + bandlimiting (IC2_B, IC4_B, IC4_A)
 | Ref | Value | Function |
 |-----|-------|----------|
-| C15 | 2u2 | coupling from clipper out |
-| R20 | 10k | series into IC2_B (+) |
-| R21 | 1M | bias IC2_B (+) to VD |
+| C15 | 2u2 | coupling from clipper out — ⚠ **MODEL SHIPS 5.2 nF, fit to the captures** (see note below) |
+| R20 | 10k | series into IC2_B (+) — schematic-verified, NOT fit (see note below) |
+| R21 | 1M | bias IC2_B (+) to VD — schematic-verified, NOT fit (see note below) |
 | IC2_B | TL072ACP | ⚠ **UNITY-GAIN BUFFER** — pin6(−) is tied directly to pin7(out) (verified pixel-zoom on BOTH primary p.4 AND backup; no component in the −→out path). **NOT** a +12 dB active gain stage. See correction note below. |
 | R22 / R23 / C17 / C16 | 100k / 33k / 22n / 680pF | **passive bridged-T network** hanging off the buffer output (see node graph), NOT an op-amp feedback/gain leg |
 | IC4_B | TL072ACP | **2nd-order Sallen-Key LPF ≈ 10.7 kHz** (unity buffer) |
@@ -276,6 +307,33 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 | R26 / R27 | 22k / 47k | IC4_A SK resistors |
 | C20 / C19 | 1n / 2n2 | IC4_A SK caps (C20 to GND, C19 feedback) |
 
+> ⚠ **C15/R20/R21 — NOT MODELLED AT ALL until Phase 9 A3 step 3b (session 36).** `PedalChain` fed the
+> clipper output straight into the recovery buffer with nothing between them — this coupling network was
+> simply absent, not merely treated as inert. Added as `PedalChain::OdCoupling`, a first-order highpass:
+> R20+R21 combine into one effective series R (R20 has no other branch at its near node) fixed at the
+> schematic-verified **1.01 MΩ** — a pixel-zoom pass (900 DPI, primary p.4) confirmed R20=`10k`/R21=`1m`
+> and closed off any resistance-side explanation for the A3 residual (even R21→0 only reaches 7.2 Hz, and
+> would tie the node to VD, killing the signal). Only **C15 is fittable**
+> (`FitParams::clipC15`). At the schematic 2u2 the corner is 0.072 Hz (audibly inert); the model ships
+> **5.2 nF → fc ≈ 30.3 Hz**, a **~423×** departure. C15 sits *after* the CD4049 clipper, so unlike
+> `trebleC7` there is no oracle-floor argument singling out this node — several other post-clipper
+> positions could carry an identical transfer function, so this placement is a convenient carrier, not a
+> load-bearing physical claim. Shipped on explicit user authorisation: accuracy against the captures over
+> physical plausibility for this element.
+>
+> ⚠ **SESSION 36 SHIPPED 1.5 nF AND SESSION 37 REVERTED IT — the selection is instructive, so do not
+> re-derive the value from matrix band-RMS.** 1.5 nF was chosen on a 96-row band-RMS aggregate, which was
+> contaminated twice: (a) the apparent HF preference (2.794 → 3.823 dB across 1.5 → 10 nF) is **entirely
+> the report's per-row gain-match re-solving** — re-anchored to those bands it is flat at 2.579–2.597 dB
+> at every value, and HF is 15 of the 26 graded bands; (b) what remained was **entirely the GRUNT
+> flat/boost rows**, where the model carries the separate unfixed GAP #3b (the pedal's GRUNT span is a
+> *bump* at 127–202 Hz, the model's a monotone *shelf*), so C15 was being used to attenuate that shelf —
+> a compensating error. At GRUNT **cut**, LF band-RMS bottoms at 4–5.2 nF and 1.5 nF is the worst value
+> tested, worse than deleting the element. **Gate this value on the migrating NULL and the raw-capture
+> fit, never on matrix band-RMS:** at 5.2 nF the raw captures are explained to 0.904 dB with no added
+> element and no level correction (k = 0.995), against 3.339 dB and +5.6 dB of wanted gain at 1.5 nF;
+> null band 12/15 vs 0/15 over 3 stimulus levels × 5 drives. `docs/phase9-validation.md` §4 "A3 step 3c".
+>
 > ⚠ **IC2_B CORRECTION (2026-07-19 verification).** An earlier reading called IC2_B a "non-inv
 > high-shelf recovery, ~4× (+12 dB) above ~220 Hz." **That is WRONG** — it was inferred from the
 > R22/R23/C17 *values* assuming the textbook active-shelf topology, but the actual wiring (verified at

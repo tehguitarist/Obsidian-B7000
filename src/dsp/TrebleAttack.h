@@ -105,7 +105,7 @@ public:
         gc5 = kC5 * twoOverT;
         gc9 = kC9 * twoOverT;
         gc6 = kC6 * twoOverT;
-        gc7 = kC7 * twoOverT;
+        gc7 = c7 * twoOverT;        // c7 is fittable (defaults to kC7 exactly)
         gc8 = kC8 * twoOverT;
 
         prepared = true;
@@ -131,6 +131,39 @@ public:
         ladderDampR = (rOhm > 0.0) ? rOhm : 0.0;
         if (prepared)
             rebuild();
+    }
+
+    // C7, the coupling cap from node P into IC2_A(+) — the LAST element of the OD
+    // path before the DRIVE stage, and therefore the only place a highpass can sit
+    // that both (a) reduces what IC2_A sees at LF and (b) is still upstream of it.
+    //
+    // WHY IT IS FITTABLE (Phase 9 / A3 step 3a, session 34). At the schematic 100n
+    // this cap corners at ~1.2 Hz (into R_src+R_load ~= 1.28M) and is inert across the audio
+    // band, so the OD path's response into IC2_A PEAKS at 32-40 Hz (-8.5 dB re the
+    // clean tap) and falls to -20.5 dB by 320 Hz. IC2_A therefore rails at LF first
+    // at high drive, which eats the whole top half of the DRIVE knob at 40-101 Hz:
+    // the model's |OD| turns over at drive 2:30 and FALLS by max, where the pedal's
+    // grows +5..6 dB (measured, analysis/a3_drive_axis.py). A smaller C7 puts a
+    // first-order highpass exactly there and restores the headroom.
+    //
+    // ⚠ This is a fit against the CAPTURED UNIT, not a correction to the schematic
+    // (which reads 100n and is BOM-reconciled). Same third branch as trebleWiperR /
+    // c21R / the [ENG] mid caps: our schematic is a clone of the ORIGINAL B7K, the
+    // captured unit is an Ultra. c7 = kC7 reproduces the shipped stage EXACTLY.
+    void setC7(double farads) noexcept
+    {
+        const double next = (farads > 0.0) ? farads : kC7;
+        // Bit-compare, like setSourceZ: this is an exact "did it move?" check that
+        // skips three matrix inversions when setFitParams re-sends the same value
+        // every block, without tripping -Wfloat-equal.
+        if (std::memcmp(&next, &c7, sizeof(double)) == 0)
+            return;
+        c7 = next;
+        if (prepared)
+        {
+            gc7 = c7 * twoOverT;
+            rebuild();
+        }
     }
 
     // The J201 drain network (JfetStage::getSourceZ): Zout(s) = [ro + Rp||Cp] || Rq2.
@@ -328,6 +361,7 @@ private:
     // Notch-damping (lossy C5): series resistance Rd, and the derived branch
     // factor c5damp = 1/(1+gc5*Rd) with g5eff = gc5*c5damp (see setNotchDamp()).
     double ladderDampR = 0.0, c5damp = 1.0, g5eff = 0.0;
+    double c7 = kC7;   // fittable coupling cap into IC2_A (see setC7)
     // Capacitor history (equivalent-source) currents.
     double ieqC5 = 0.0, ieqC9 = 0.0, ieqC6 = 0.0, ieqC7 = 0.0, ieqC8 = 0.0, ieqCp = 0.0;
     // One precomputed nodal-matrix inverse per ATTACK position (Boost/Flat/Cut).

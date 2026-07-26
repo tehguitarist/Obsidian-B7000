@@ -288,6 +288,105 @@ struct FitParams
                             // ruled out) is a schematic-checker follow-up, but dsp.md makes the
                             // capture authoritative on the notch depth (like c21R's 10x corner).
 
+    // ---- C7, the coupling cap into IC2_A (TrebleAttack.h::setC7) ------------
+    // Phase 9 / A3 step 3a (session 34, SHIPPED session 35). At the schematic 100n
+    // this cap corners at ~1.2 Hz (R_src+R_load ~= 1.28M) and is inert everywhere in band,
+    // which leaves the OD path's response into IC2_A peaking at 32-40 Hz and
+    // falling 12 dB by 320 Hz. IC2_A then rails at LF first, so at 40-101 Hz the
+    // model's |OD| turns over at drive 2:30 and FALLS by max where the pedal's
+    // grows +5..6 dB (analysis/a3_drive_axis.py — the A3 step-3a gate).
+    // 680p puts a 1st-order HP at ~183 Hz ahead of IC2_A and restores that headroom.
+    //
+    // WHAT THE GATE ACTUALLY SAYS (read this, not "the drive axis is fixed"):
+    //   G1 monotone |OD| in drive at 40-101 Hz: FAIL at 5/5 bands -> PASS.
+    //   G2 the 2:30->max step: 50 Hz model -2.33 -> +7.30 against a pedal
+    //      +5.56..+6.31, i.e. 7.89 dB SHORT -> 1.75 dB OVER; 64 Hz 6.82 short ->
+    //      0.98 over. So G2 still fails CONTAINMENT, in the opposite direction.
+    // The value was selected on the step-profile RMS over 50-254 Hz (4.72 -> 0.647
+    // dB), with an interior minimum verified both sides (4.62 at 220p) — NOT the
+    // "make the clipper see less" degeneracy. The residual overshoot is what the
+    // step-3b lead network is fitted against, jointly with beta.
+    //
+    // ⚠ 680p against a schematic-AND-BOM-verified 100n is a factor of 147 — by far
+    // the weakest physical story of any fit in this file (trebleWiperR is 1.4x,
+    // c21R 10x). Same third branch as those (our schematic is a clone of the
+    // ORIGINAL B7K; the captured unit is an Ultra), but do NOT read this as having
+    // found the real circuit. What is established is that a 1st-order HP at ~183 Hz
+    // is REQUIRED somewhere in the OD path ahead of IC2_A; C7 is the cheapest
+    // placement, not a proven one.
+    // ▶ A schematic-checker pass on C7 / R11 / R13 / the node-P network is OWED.
+    double trebleC7 = 680.0e-12;  // farads; schematic/BOM value is 100n (see above)
+
+    // ---- C15, the clipper-output coupling cap into IC2_B (PedalChain::OdCoupling)
+    // Phase 9 / A3 step 3b (session 36). NOT MODELLED AT ALL until this session —
+    // PedalChain fed the clipper output straight into RecoveryBridgedT with no
+    // coupling stage in between; C15 (2u2) / R20 (10k) / R21 (1M) were simply
+    // absent, not merely treated as inert. circuit.md: C15 -> R20 -> node X ->
+    // IC2_B(+), R21 X->VD. R20 has no other branch at its near node, so R20+R21
+    // combine into ONE effective series R for this first-order HP (same reduction
+    // C21Highpass already uses), fixed at the schematic-verified 1.01 MΩ — the
+    // step-3b pixel-zoom pass (docs/phase9-validation.md §4) closed off any
+    // resistance-side explanation: even R21->0 leaves R20's 10k = 7.2 Hz, and
+    // that would also tie the node to VD and kill the signal.
+    //
+    // ⚠⚠ SESSION 36 SHIPPED 1.5 nF AND SESSION 37 REVERTED IT TO 5.2 nF. Read this
+    // before touching the value again — the 1.5 nF selection is instructive.
+    // Session 36 chose 1.5 nF on the band-RMS aggregate over a 96-row matrix subset
+    // (0.3/0.7/1.0/1.5/2.0/3.0/5.2/10 nF -> 4.734/4.048/3.698/3.475/3.490/3.568/
+    // 3.839/4.187, off = 4.508), over the ~30 Hz that the single-condition fit gave.
+    // That selection was wrong on TWO counts, both already-documented traps:
+    //   (a) THE PER-ROW GAIN-MATCH REFRAME. The HF bands (320 Hz-12.9 kHz = 15 of
+    //       the 26 graded bands) appeared to prefer 1.5 nF strongly, 2.794 -> 3.823
+    //       dB across 1.5 -> 10 nF. But a first-order corner at 105 vs 30 Hz is
+    //       indistinguishable above 320 Hz, and re-anchoring the gain match to those
+    //       bands collapses it to FLAT 2.579-2.597 dB at EVERY value. It was the
+    //       report's broadband scalar re-solving, and it dominated the aggregate.
+    //   (b) THE REMAINDER IS ENTIRELY THE GRUNT flat/boost ROWS, WHICH CARRY A
+    //       SEPARATE UNFIXED DEFECT (GAP #3b). LF 25-80 Hz band-RMS split by GRUNT:
+    //       at CUT (68 rows) it bottoms at 4-5.2 nF (3.835/3.839) and 1.5 nF is the
+    //       WORST tested (5.083, worse than off at 4.378); only flat/boost prefer
+    //       1.5 nF. Session 23 measured the pedal's GRUNT span as a BUMP at
+    //       127-202 Hz against the model's monotone SHELF maximal at DC, and
+    //       recorded that a first-order coupling cap can never turn a shelf into a
+    //       bump. So 1.5 nF was a COMPENSATING ERROR for GAP #3b, chosen by letting
+    //       the defective row group vote.
+    // THE GATES THAT ACTUALLY TARGET A3 ALL PREFER ~5.2 nF, and they agree:
+    //   * raw-capture fit (a3_lead_fit, true H=1 after the fix_k bug fix below):
+    //     4.0/4.7/5.2/6.0 nF -> 1.115/0.979/0.904/1.022 dB, interior minimum at 5.2,
+    //     where the free-gain row also wants k = 0.995 (NO level correction). At
+    //     1.5 nF the same metric reads 3.339 dB — worse than deleting the element —
+    //     and asks for +5.6 dB of broadband OD gain to patch it.
+    //   * the migrating NULL over 3 stimulus levels x 5 drives (a3_level_axis.py):
+    //     5.2 nF 12/15 bands matched, 3.0 nF 12/15, 8.0 nF 5/15, 1.5 nF 0/15,
+    //     off 0/15 — worse in BOTH directions from ~3-5 nF.
+    //   * beta identifiability: -17.38 at 5.2 nF, 0.45 dB from the model's own
+    //     -16.93; at 1.5 nF beta only resolves once a free gain absorbs the error.
+    // FULL 63-CAPTURE COST OF THE REVERT, measured, and it splits on GRUNT exactly
+    // as (b) predicts: GRUNT cut (76 rows) 2.478 -> 2.284, GRUNT cut gain-n12 (16)
+    // 6.837 -> 5.843, GRUNT flat (12) 2.191 -> 4.055, GRUNT boost (16) 2.850 ->
+    // 5.449, ALL OD 3.080 -> 3.357, CLEAN bit-identical, OD tilt -0.72 -> -0.11.
+    // 92 of 120 OD rows improve; the aggregate regresses only because the 28
+    // flat/boost rows vote. ⚠ DO NOT "FIX" THOSE 28 WITH C15 — they need GAP #3b.
+    // (Same posture as session 28's c21R: "OD got worse and that is EXPECTED".)
+    // User decision 2026-07-27: ship the mechanism-correct value now.
+    // Full detail: docs/phase9-validation.md §4 "A3 step 3c".
+    //
+    // At schematic 2u2 the corner is 0.072 Hz (audibly inert); reaching ~30 Hz
+    // needs C15 ~= 5.2 nF, a ~423x departure from 2u2 — far LARGER than trebleC7's
+    // 147x, and WITHOUT trebleC7's structural argument (C7 sits ahead of IC2_A's
+    // own rail-clip nonlinearity, so no downstream linear element can substitute
+    // for it — the oracle-floor test proved that. C15 is AFTER the CD4049 clipper,
+    // so a change here is a plain linear multiplier; several other post-clipper
+    // positions could carry an identical transfer function, so this placement is a
+    // convenient carrier, not a load-bearing physical claim).
+    // ⚠ SHIPPED ON EXPLICIT USER AUTHORISATION (2026-07-26): "if changing the C15
+    // change will make the plugin more accurate, lets do it, I don't care how off
+    // it is" — same posture as clipK/clipC11's user-authorised departures from a
+    // shared/schematic-plausible element (session 17 note, Clipper.h).
+    double clipC15 = 5.2e-9;     // farads; schematic C15 = 2u2 (2.2e-6). fc ~30.3 Hz
+                                  // into R20+R21=1.01M. Gated on the NULL + the raw
+                                  // captures, NOT on matrix band-RMS (see above).
+
     double btR22 = 100.0e3;
     double btR23 = 33.0e3;
     double btC16 = 680.0e-12;

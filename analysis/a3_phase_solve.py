@@ -76,11 +76,11 @@ PROBE_BANDS = [20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254,
                320, 403, 508, 640, 806]
 
 
-def load_model(drive_vals):
+def load_model(drive_vals, prefix="build/a3_dec_drv"):
     """{drive: {band: (mu, theta_model_rad, bleed_db_rel_ref)}} from a3_blend_decompose."""
     out = {}
     for d in drive_vals:
-        path = "build/a3_dec_drv%s.csv" % d
+        path = "%s%s.csv" % (prefix, d)
         if not os.path.exists(path):
             sys.exit("missing %s -- see this file's docstring for the command" % path)
         rows = {}
@@ -121,6 +121,26 @@ def load_pedal(sweep):
         i = min(range(len(bands)), key=lambda k: abs(bands[k] - b))
         out[b] = [c[i] - ref[i] for c in cols]
     return out
+
+
+def identifiable_theta(deg):
+    """Fold a phase onto the range the magnitudes can actually identify: [0, 180].
+
+    `model[d][b][1]` is a DIFFERENCE of two cmath.phase values, so it lives in
+    (-360, 360] and is NOT a principal value -- at 20 Hz it reads +183.02 deg.
+    Magnitudes identify theta only modulo 360 AND up to sign (conjugating theta
+    leaves every |.| unchanged), which is why fit_band searches [0, pi]. So the
+    reference the self-test compares against has to be folded the same way, or a
+    true value that crosses anti-phase is scored against a solver that cannot
+    represent it: 183.02 was compared to the correct answer 177.00 and called a
+    6.0 deg failure.
+
+    ⚠ This is a test-reference bug, NOT a licence to loosen the gate -- after the
+    fold the same band agrees to 0.02 deg. It stayed hidden until trebleC7 moved
+    the model's LF phase past 180 deg, which is exactly when it started to matter.
+    """
+    t = float(deg) % 360.0
+    return 360.0 - t if t > 180.0 else t
 
 
 def model_db(beta_db, s, mu, theta):
@@ -195,10 +215,12 @@ def main():
     ap.add_argument("--sweep", default="sweep_drv_-18")
     ap.add_argument("--beta-db", type=float, default=None,
                     help="pedal bleed level rel. its full-clean capture; default = fitted")
+    ap.add_argument("--csv-prefix", default="build/a3_dec_drv",
+                    help="a3_blend_decompose CSV prefix (swap in a candidate render)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
-    model = load_model([d for d, _ in DRIVES])
+    model = load_model([d for d, _ in DRIVES], args.csv_prefix)
     bleed_model = model[0.50][40][2]
 
     if args.selftest:
@@ -212,7 +234,7 @@ def main():
         print("%6s %10s %10s %8s %8s" % ("f", "theta_true", "theta_fit", "s_fit", "rms"))
         worst_t = worst_s = 0.0
         for b in PROBE_BANDS:
-            true = abs(math.degrees(model[0.50][b][1]))
+            true = identifiable_theta(math.degrees(model[0.50][b][1]))
             r = res[b]
             worst_t = max(worst_t, abs(r["theta"] - true))
             worst_s = max(worst_s, abs(r["s"] - 1.0))

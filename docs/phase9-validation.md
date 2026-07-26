@@ -18,6 +18,26 @@
 > mid-band group) and A3 (the OD/clean BLEND balance below ~200 Hz, quantified — §4 "A3 handover").**
 > Current grade (240 rows, re-baselined session 25): **OD 5.965 / CLEAN 1.152 / ALL 3.558 dB**
 > band-RMS.
+>
+> **UPDATE (session 34, 2026-07-26; corrected + shipped session 35): A3's blocker — the DRIVE
+> AXIS — is LARGELY fixed.** `trebleC7` (C7 100n → 680 pF) restores IC2_A's LF headroom, so the
+> model's |OD| finally grows monotonically with DRIVE at 40–101 Hz instead of turning over at 2:30.
+> Grade now **OD 3.931 / CLEAN 0.465 (bit-identical) / ALL 2.198 dB**, and the OD bass-tilt that has
+> been A3's signature since session 20 goes **9.10 → 1.20 dB**.
+>
+> ⚠ **TWO CORRECTIONS TO SESSION 34's OWN ENTRY, both found session 35.**
+> **(a) The value was never actually in the source.** `FitParams::trebleC7` still read `100.0e-9`,
+> with a comment saying "NOT YET MOVED OFF NOMINAL", while this file and `circuit.md` both stated
+> 680 pF shipped. Only the *plumbing* landed. **Shipped for real in session 35**; the default
+> `build/a3_dec_drv*.csv` baseline had also been generated at 100 n, so every phase tool reading it
+> was rebuilding the OLD, untrustworthy target.
+> **(b) "The drive axis is FIXED" overstates the gate.** 680 pF clears G1 (monotone |OD|, FAIL at
+> 5/5 bands → PASS) but does **not** clear G2 containment — it flips the 2:30→max step from 7.89 dB
+> SHORT to 1.75 dB OVER at 50 Hz (6.82 short → 0.98 over at 64 Hz). Large and in the right
+> direction; not "fixed". The value was selected on the step-profile RMS (4.72 → 0.647 dB), which is
+> a different metric.
+>
+> **A3 is NOT closed**, but session 35 designed and gated the residual element — see §4 "A3 step 3b".
 
 ---
 
@@ -203,6 +223,54 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   the DRIVE stage** is the first candidate with a mechanism behind it.
   **▶ NEXT = A3 step 3, re-ordered: fix the drive axis first, re-solve, then design.**
   New tool `a3_lead_design.py`. §4 "A3 step 2 — the TARGET WAS WRONG".
+- [~] **A3 step 3c (session 37) — the LEVEL AXIS is gated for the first time. The queued −12/−6
+  "clipper-side over-compression" item is MEASURED and it is SMALL; the big level-axis error is
+  `clipC15`, shipped last session at a value three A3 gates reject.** New tool
+  `analysis/a3_level_axis.py` (+ `a3_level_axis_scan.sh`): the level step of the pedal's total relative
+  to its own full-clean capture is **β-free by construction** (β is a resistive, level-independent
+  divider ratio that cancels in the step), so it needs no bleed estimate. Guard verified: the reference
+  capture is linear across levels (+6.000 dB step, 0.013–0.028 dB shape spread). Self-test PASS after it
+  caught two errors in my own solve (an averaged θ worth 9.4 dB near a null; `np.sign(0) == 0` defeating
+  the root bracket).
+  **(a) The defect is NOT frequency-flat.** dT residual: CONTROL (drive min+9:30, ≤254 Hz) **0.13 /
+  0.51 dB** — the instrument is clean; noon **0.53 / 0.58**; hot drives 101–254 Hz **0.29 / 1.07**; hot
+  drives **≤80 Hz 2.75 / 8.27**. So the genuine clipper-side item is **0.5–1.1 dB and mid-band**, which
+  **confirms session 35's oracle floor** (0.42 → 0.91 → 1.14) from an independent direction, while
+  session 34's "roughly frequency-flat 1–2 dB" description does not survive.
+  **(b) The clipper VTC is a real lever on this axis** (a first — G1/G2 was structurally blind to
+  everything post-nonlinearity), wanting ceilings at **0.7–0.9×** with genuine interior minima in
+  several subsets — **but two subsets are monotone in opposite directions**, so it trades regions rather
+  than fixing one defect. ⛔ Not shipped; it needs a joint re-fit with `kInputRef` (its approximate
+  session-16/17 degenerate partner), not a one-parameter scan.
+  **(c) ⭐⭐ `a3_lead_fit.py`'s "none (H = 1)" row was never H = 1** — it fitted a free broadband gain
+  (**k = 1.898, +5.6 dB** at the shipped state), so four sessions' "no element baseline" was the model
+  plus a level correction, and the mislabel hid the finding. Fixed (`fix_k`), with a separate free-gain
+  row. Corrected true no-element rms vs the raw drive captures: **5.2 nF → 0.904 dB with k = 0.995**
+  (wants no level correction, β −17.38) versus **1.5 nF → 3.339 dB wanting +5.6 dB**, i.e. **the shipped
+  value is worse than deleting the element**. Null band over 3 levels × 5 drives: **5.2 nF 12/15,
+  3.0 nF 12/15, 1.5 nF 0/15, off 0/15.**
+  **(d) ⚠⚠ Session 36 selected 1.5 nF on a contaminated metric, twice over.** The HF band's apparent
+  preference (2.794 → 3.823 dB) is **entirely the per-row gain-match reframe** — re-anchored to those
+  bands it is **flat at 2.579–2.597** — and HF is 15 of the 26 graded bands. What is left is **entirely
+  the GRUNT flat/boost rows**: at GRUNT **cut** (68 rows) LF band-RMS bottoms at **4–5.2 nF** and
+  **1.5 nF is the worst value tested**; only GRUNT flat/boost prefer it, and that is **GAP #3b**
+  (session 23: the pedal's GRUNT span is a *bump*, the model's a *shelf*, and "a first-order coupling
+  cap can never turn a shelf into a bump"). ⇒ 1.5 nF is a **compensating error** for an unfixed defect,
+  chosen by letting the defective row group vote — the same exclusion session 36 correctly applied to
+  the 16 `gain-n12` rows and did not apply to these 28.
+  **(e) ✅ SHIPPED (user decision 2026-07-27): `clipC15` 1.5 nF → 5.2 nF.** Interior minimum verified
+  both sides on the raw-capture fit (4.0 nF 1.115 / 4.7 nF 0.979 / **5.2 nF 0.904** / 6.0 nF 1.022 dB,
+  `k = 0.995` at the minimum). ctest 17/17. Full matrix: **GRUNT cut 2.478 → 2.284, cut `gain-n12`
+  6.837 → 5.843, flat 2.191 → 4.055, boost 2.850 → 5.449, ALL OD 3.080 → 3.357, CLEAN bit-identical,
+  OD tilt −0.72 → −0.11**; level-axis null **0/15 → 12/15** and dT residual **1.20/3.51 → 1.00/2.14**.
+  **The +0.28 dB ALL-OD regression is the 28 GRUNT flat/boost rows and is EXPECTED — do not fix it
+  with C15.** Baselines (`comprehensive_data.json`, `build/a3_dec_drv*.csv`, `build/a3_lvl*.csv`)
+  regenerated at the shipped state.
+  **▶ NEXT: (i) GAP #3b properly — the GRUNT bump-vs-shelf** (session 23: the pedal's GRUNT span is a
+  *bump* at 127–202 Hz, the model's a monotone *shelf*), which is what those 28 rows actually need and
+  is now the largest single OD group error (flat 4.055 / boost 5.449 vs cut 2.284); **(ii)** then the
+  ~1 dB mid-band clipper item as a **joint `clipSat`/`kInputRef` re-fit**, never a one-parameter scan.
+  §4 "A3 step 3c".
 - [ ] **A4. Write final GATE-9 numbers into §4.** GATE-9 should wait for A3, which is the last
   documented gap materially moving these numbers.
 - [~] **A2c. Clean-baseline accuracy pass — STARTED (session 24, 2026-07-25), user-initiated.**
@@ -1233,6 +1301,660 @@ checking whether it fixes the drive axis *and* the phase together. (d) Gate on t
   band set, and report how many bands are degenerate.
 - **A mean can hide the finding.** Scoring the phase shortfall by its mean gave "≈0" at β = −18.5
   while individual bands were +80/−50; the RMS never goes below 28°.
+
+#### ✅✅ A3 step 3a — the DRIVE AXIS IS FIXED, and the unified hypothesis is CONFIRMED (session 34, 2026-07-26). `trebleC7` SHIPPED.
+
+Session 33's plan was (a) fix the drive-axis magnitude defect, (b) re-run the phase solve and check the
+40–101 Hz residual collapses, (c) test whether one element upstream of IC2_A does both. All three ran,
+and **(c) is confirmed by a single first-order highpass**: `FitParams::trebleC7` = C7 **100 n → 680 pF**
+(`TrebleAttack::setC7`, applied in `PedalChain::applyParams`). ctest **17/17**; `trebleC7 = kC7`
+reproduces the shipped stage bit-for-bit (verified: all five decompose CSVs byte-identical to session
+33's before any value moved).
+
+**(1) THE GATE, BUILT FIRST AND DERIVED LIVE — `analysis/a3_drive_axis.py` (+ `a3_drive_axis_scan.sh`).**
+No transcribed constants (session 33's own trap): it reads the captures, inverts the totals, and
+enumerates the ambiguity instead of choosing. Because the bleed is drive-independent — **verified, not
+assumed** (the decompose probe's clean column is identical to 0.00e0 dB across all five drives) — every
+*step* in |OD| is β-free, which is what makes the gate usable while β is still open. Three sub-gates:
+G1 |OD| monotone in drive at 40–101 Hz; G2 the 2:30→max step; G3 the mid steps must not regress.
+
+⚠ **The self-test immediately falsified my first version.** I asserted that monotone-|OD| pruning picks
+the branch uniquely; it does not. At the drive sitting *in* the null, m = 1 ± r with r small, so **both**
+roots stay monotone-compatible with their neighbours. So the totals **bound** the 2:30→max step, they do
+not determine it — session 33's single "+6.2 dB at 40 Hz" is one of two branches. Corrected, the tool
+reports a range and G2 gates on containment. **At 50 and 64 Hz the two branches collapse onto one value,
+so the target there is a number, not a range — read G2 at 50/64, not at 40.**
+
+**(2) ⭐ NEW AND DECISIVE: β ≤ −18.5 dB IS REFUTED, from the magnitudes alone.** At 40, 50 **and** 64 Hz,
+and at θ = 170/175/180°, **no monotone ladder exists at all** at β = −18.5. The mechanism is clean: at LF
+the OD subtracts, so the total must sit *below* the bleed while the OD is small — a β below the pedal's
+own drive-min total (−18.03 dB at 40 Hz) forces m(min) > 2, an OD already 6 dB *above* the bleed at the
+bottom of the knob, which then has to fall to reach the null. **This breaks session 33 item 4's tie**
+(drive-sweep least-squares wanted −15.5, the causality/min-phase fit wanted ≤ −18.5) in favour of the
+higher β, on a third and independent axis. Corroborated after the fix: see (4).
+
+**(3) THE MECHANISM, MEASURED.** The OD path's response *into* IC2_A peaks at 32–40 Hz (−8.5 dB re the
+clean tap) and falls to −20.5 dB by 320 Hz — 12 dB bass-heavy, because C7 at 100 n corners at ~1.2 Hz
+into R13 and is inert everywhere in band. At −18 dBFS/max drive the unclamped IC2_A output at 40 Hz is
+**≈8 V** against a ±2.7/2.9 V rail, so it hard-clips at LF and the whole top half of the DRIVE knob does
+nothing there. ⭐ **The size needed is independently the same number:** ~9.4 dB of LF cut just reaches the
+rail, and session 33's |G| requirement was −14…−19 dB at 32–50 Hz. Two derivations that never saw each
+other. (And the clipper "going backwards" at 40 Hz is downstream of this: a squarer IC2_A output puts far
+more harmonic energy through the ~896 Hz GRUNT-cut coupling, which saturates the CD4049 and suppresses
+the already-weak 40 Hz fundamental.)
+
+**(4) RESULTS AT THE A3 OPERATING POINT (`sweep_drv_-18`, where the null and the whole A3 target were
+measured).** Step-profile RMS over 50–254 Hz vs the pedal: **4.72 → 0.647 dB**. G1 **FAIL at 5/5 bands →
+PASS**. Session 33's pre-registered prediction for (b) is met and then some — the 40–101 Hz drive-fit
+residual in `a3_phase_solve` part 3:
+
+| | 40 | 50 | 64 | 80 | 101 |
+|---|---|---|---|---|---|
+| shipped | 4.40 | 4.19 | 3.83 | 3.13 | 2.24 |
+| C7 = 680 p | **0.16** | **0.19** | **0.28** | **0.46** | **0.46** |
+
+and the solve's magnitude scale `s` — how far the model's OD is from the pedal's in absolute terms —
+goes from **0.15–0.18 at 20–50 Hz (a factor of ~6 too hot)** to **0.74–1.11 across 20–254 Hz**. Nothing
+in the objective asked for that; it was fitted on the drive *shape* alone.
+
+**⭐ AND β IS NOW IDENTIFIED.** `a3_lead_design`'s per-band residual-vs-β scan was 2–5 dB at 40–101 Hz at
+*every* β (that was session 33 item 5, the reason no candidate could be proposed). It now has a sharp
+optimum: **0.1–0.5 dB at every band at β ≈ −16.5…−17.0**, i.e. essentially the model's own −16.93 dB.
+Session 33 said the level and the element "are one problem and must be solved jointly" — that was right,
+and fixing the magnitude is what made the joint problem well-conditioned.
+
+**(5) WHAT IS LEFT OF THE PHASE, AND ITS SHAPE CHANGES BACK.** C7 supplies +75° at 40 Hz, +69 at 64, +61
+at 101, +36 at 254 — exactly a first-order HP's own phase at fc ≈ 183 Hz, as it must. The residual
+requirement is now **+30…+36° from 40 to 127 Hz, ~0 by 160–254, and NEGATIVE (−39/−21°) at 20–25** —
+a bump that returns to zero at both ends. **That is a lead-network (pole+zero) shape again**, i.e.
+session 31 item 5's original recommendation, which session 33's sign correction had retired in favour of
+a +115…+137° plateau. The plateau was an artefact of the broken drive axis, not of the sign fix — the
+sign fix itself still stands. Best causal fit found: zeros 59.9 Hz Q 1.17 / 479 Hz, poles 69.6 Hz Q 1.06
+/ 1626 Hz, worst per-band shortfall **42°** (was ~28° RMS against a far larger target). **Not built** —
+it is the next step's job, and it must be gated on the null and fitted jointly with β.
+
+**(6) FULL MATRIX — the biggest single move in Phase 9, and surgical.**
+
+| | OD | CLEAN | ALL | OD tilt |
+|---|---|---|---|---|
+| shipped | 6.221 | 0.465 | 3.343 | 9.10 |
+| trebleC7 = 680 p | **3.931** | **0.465** | **2.198** | **1.20** |
+
+**93 rows better by >0.5 dB, 16 worse, 124 bit-identical.** The CLEAN half is untouched to the bit (C7 is
+in the OD path; the clean tap splits at IC1_A) — surgical by construction, like `midCapRatio` and
+`trebleWiperR` before it. ⭐ **The `od_tilt_metric` bass-tilt number that has been the A3 signature since
+session 20 goes 9.10 → 1.20 dB.** Biggest improvements are exactly the captures that defined the gap:
+`drive-0700_grunt-boost` **20.91 → 7.61**, `drive-0930_grunt-boost` 19.27 → 8.85, `grunt-flat` 15.80 →
+6.20, `drive-0930_grunt-flat` 15.67 → 5.27. Worst regressions are +2.5 dB and concentrated in
+`level-*_gain-n12` / high-drive rows (`level-1430_gain-n12` 2.54 → 5.06, `drive-1700_grunt-boost` 5.83 →
+7.44) — see (7).
+
+**(7) ⚠ THE HONEST LIMITS. Read these before treating A3 as closed.**
+- **It fixes the drive axis at −18 dBFS, NOT at −12 or −6.** Per-level step-residual RMS: −18 **4.72 →
+  0.65**, −12 5.36 → 4.58, −6 3.65 → **4.26 (worse)**. But the residual at those levels is a roughly
+  frequency-FLAT ~1–2 dB over-compression against pedal targets that are themselves near zero (+0.06 to
+  +0.36 dB) — a *different*, smaller defect, not the frequency-shaped drive-axis error C7 addresses.
+  ⚠ **A naive joint-level RMS hides this and slides the optimum to ever-smaller C7** — the "a mean can
+  hide the finding" trap again, one session later. Read the per-band table, not the joint scalar.
+- **680 pF against a schematic-and-BOM-verified 100 n is a factor of 147.** That is a far weaker physical
+  story than `trebleWiperR` (3k3→4k7) or `c21R` (10×). Same third branch as always — our schematic is a
+  clone of the *original* B7K, the captured unit is an Ultra — but **do not describe this as having found
+  the real circuit.** What is established is that a **first-order highpass at ~183 Hz somewhere in the OD
+  path ahead of IC2_A** is required; that C7 is the element carrying it is the *cheapest* placement, not a
+  proven one. ▶ A `schematic-checker` pass on C7 / R11 / R13 and the node-P network is owed.
+- **The value was selected on the drive-axis gate, not on band-RMS** (dsp.md/§0's standing rule). The
+  matrix is corroboration and a regression check. Interior minimum verified on the gate in both
+  directions (objective 4.72 at 100 n → **0.647 at 680 p** → 4.62 at 220 p) — **not** the "delete the
+  element" degeneracy that killed the session-5/6 clipper fits and the GAP #3b `clipC13` scan.
+
+**⚠ METHOD NOTES.**
+- **A verdict narrated in a string outlives the condition it described.** `a3_lead_design` hard-coded
+  "40–101 Hz sits at 2–5 dB regardless of β" and "⛔ DO NOT BUILD THIS"; after the fix those sentences
+  printed directly above a table of 0.2 dB. Both are now **computed from the scan** and flip to a PASS
+  verdict on their own. Same class as the transcribed target that file exists to correct.
+- **The self-test is what caught the branch-uniqueness error**, before it reached a number anyone quoted.
+- `a3_phase_solve.py` and `a3_lead_design.py` both gained `--csv-prefix` so a candidate render can be
+  graded without clobbering the shipped baseline CSVs.
+
+**▶ NEXT (A3 step 3b).** (a) Design the residual lead network against the now-trustworthy target
+(+30…+36° at 40–127 Hz, →0 by 160, negative at 20–25), fitting **β jointly** — the scan now identifies it
+sharply at ≈ −16.5…−17.0, so re-check that as part of the fit rather than before or after. (b) Gate on
+the NULL (near 40 Hz at drive 2:30, migrating to ~22–25 Hz by max), never band-RMS. (c) Then take the
+level-dependent flat over-compression at −12/−6 dBFS in (7) as its own item — it is now the second-
+largest OD residual and is clipper-side, not upstream. Then A4 re-grade + GATE-9, the queued `gain-n12`
+HF collapse (which these rows moved), B (perf/HQ), C (carry-forwards), D (release).
+
+#### ▶ A3 step 3b — the residual element is DESIGNED and GATED, not yet built (session 35, 2026-07-26).
+
+**(0) FIRST: `trebleC7` was shipped for real.** See the two corrections at the head of this file — the
+680 pF value existed only in prose, and the default decompose baseline was still at 100 n. Everything
+below is on a regenerated baseline at the genuinely shipped default. ctest **17/17** after a full rebuild.
+
+**(1) ⚠ A SOLVER GATE HAD SILENTLY FAILED — `a3_phase_solve --selftest` was FAILING.** Worst |Δθ| 6.02°
+against a 0.5° threshold, at 20 Hz alone. **The solver was right and the test's reference was wrong.**
+`model[d][b][1]` is a *difference* of two `cmath.phase` values, so it lives in (−360°, 360°] and is not a
+principal value — at 20 Hz it now reads +183.02°. Magnitudes identify θ only up to sign and modulo 360,
+which is exactly why `fit_band` searches [0°, 180°]; the reference had to be folded the same way.
+183.02° ≡ −176.98°, and the solver returned 176.98°. Fixed via `identifiable_theta()`; self-test back to
+**PASS at 0.062°** (grid resolution). ⚠ It had been latent for four sessions and only fired because
+`trebleC7` rotated the model's LF phase *past anti-phase* — i.e. the fix to one thing is what exposed it.
+
+**(2) NEW TOOL, and it removes an inference layer: `analysis/a3_lead_fit.py`.** `a3_lead_design` fits a
+network to a *derived* target — it first solves (s, θ) per band, then fits a network to that point
+estimate as though it were a measurement. But those solves carry wide intervals (at 127 Hz θ is
+[29°, 99°]), so a candidate inside the interval but off the point estimate scores as a failure, and one
+hitting the point estimate where the interval is 70° wide scores as a success. `a3_lead_fit` scores a
+candidate **directly against the five raw drive captures**:
+
+    pred_dB(b,d) = β + 20log10 | 1 + |H(b)| · μ_d(b) · e^(i(θ_mdl(b,d) + arg H(b))) |
+
+No target, no transcription, no point estimate — and **β is just another free parameter**, which is what
+"fit β jointly, never before or after" actually requires. Self-test recovers a known network and a known
+β to **0.000 dB / 0.00° / 0.000 dB**.
+
+**(3) THE RESULT (sweep_drv_−18, the level where A3 was measured).** RMS over 16 bands × 5 drives:
+
+| candidate | rms dB | β | network | null gate |
+|---|---|---|---|---|
+| none (H = 1) | 2.488 | −16.90 | — | **1/5, 10.2 dB — FAIL** |
+| **1 zero / 1 pole (lead)** | **0.850** | **−17.48** | **zero 6.5 Hz, pole 41.6 Hz** | **4/5, 1.1 dB — PASS** |
+| 2 real zeros / 2 real poles | 0.698 | −17.47 | z 0.1/80.6, p 19.6/136.4 | 4/5, 1.0 dB — PASS |
+| 3 zeros / 3 poles | 0.547 | −17.12 | Q=20 near-cancelling pair | 5/5, 1.2 dB — PASS (overfit) |
+| ORACLE (per-band s, φ free) | 0.301 | | no causality constraint | — |
+
+**⭐ THE NULL GATE PASSES — the first A3 candidate ever to do so.** Deepest band per drive
+(min→max), pedal **50/50/50/40/25 Hz** at **−18/−19/−21/−32/−23 dB**; with the lead network
+**50/50/50/40/32 Hz** at **−19/−20/−22/−32/−23**. The −32 dB null at drive 2:30 that has been A3's
+signature since session 29 is reproduced **to the dB**. With no element the model gets the null band
+wrong at 4 of 5 drives and is **10 dB too shallow** at 2:30 — so the gate genuinely discriminates; it is
+not passing everything.
+
+⚠ **The gate is run on the same data the element was fitted to**, so it is a check that the fit did not
+reach low RMS by the wrong *mechanism* (which the no-element row proves it can detect), **not**
+independent validation. Independent validation is the full-matrix render, which needs the element built.
+
+**(4) ⭐⭐ AND THIS QUANTIFIES THE −12/−6 dBFS DEFECT AS A HARD FLOOR.** The ORACLE row — per-band
+magnitude *and* phase free, no causality linking them — is the residual **no multiplicative linear
+element on the OD path can remove, at any order**. Evaluated per level, with the −18-fitted element also
+held FIXED and only β re-optimised:
+
+| sweep | no element | −18-fitted element, FIXED | element refitted | **ORACLE floor** |
+|---|---|---|---|---|
+| −18 dBFS | 2.488 | 0.850 | 0.850 | **0.423** |
+| −12 dBFS | 2.332 | 1.492 | 1.267 | **0.909** |
+| −6 dBFS | 2.705 | 1.729 | 1.619 | **1.136** |
+
+Two things fall out. **(a) The element is level-robust** — held fixed at its −18 values it lands within
+0.11–0.23 dB of a full refit at both other levels, which is what a genuinely *linear* element must do and
+is decent evidence it is real rather than absorbing a nonlinearity. **(b) The oracle floor RISES
+0.42 → 0.91 → 1.14 dB.** So roughly **1 dB of the −12/−6 residual is structurally unreachable from the
+OD path** — session 34 item (7) inferred that the level-dependent over-compression was clipper-side; this
+puts a **number** on it and proves it, because no linear element of any order can touch it.
+⇒ **Do NOT fit the element jointly across levels.** That would drag it toward absorbing a defect it
+cannot fix — the same "a joint-level RMS slides the optimum" trap session 34 recorded for C7 itself.
+**Fit at −18 (oracle 0.42), then CHECK at −12/−6.**
+
+**(5) β IS NOW IDENTIFIED, AND THE SESSION-33 STANDOFF HAS CLOSED.** Joint fit gives **β = −17.1…−17.5 dB**,
+consistent across every family and all three levels (−17.25/−17.49/−17.96). Independently,
+`a3_lead_design`'s scan now minimises driveRMS at **β = −17.0** and puts the causality criterion at
+**−17.5** — a 0.5 dB disagreement, against the **3 dB** standoff session 33 recorded (least-squares −15.5
+vs causality ≤ −18.5). The model ships −16.93 dB, so the model's bleed is **~0.3–0.6 dB high** — the sign
+session 29 measured directly, and small enough that it is not the story.
+
+**(6) ⚠ THREE MORE NARRATED VERDICTS HAD GONE STALE** in `a3_lead_design.py` — the file whose own
+docstring warns about exactly this, now the third occurrence. It hard-coded "driveRMS is minimised near
+β = −15.5 and causality wants β ≤ −18.5; they pull opposite ways" and "shortRMS never falls below ~28°
+ANYWHERE". Live: −17.0 vs −17.5 (they now *agree*), and shortRMS bottoms at **20°**. All three now
+computed from the scan and flip verdict on their own.
+
+**(7) ⭐⭐ IT IS NOT A LEAD NETWORK — IT IS ONE MORE COUPLING CAP.** The free-zero fits put the zero at
+0.3/2.3/6.5 Hz depending on stimulus level, i.e. **below the 20 Hz measurement floor and not identified**,
+which is the signature of a zero that is really at the ORIGIN. Asked directly — pin the zero at s and fit
+only the pole — a **plain first-order high-pass** lands at:
+
+| family | rms dB | β | fitted | null gate |
+|---|---|---|---|---|
+| **1st-order HIGH-PASS (one coupling cap)** | **0.912** | **−17.36** | **fc = 30.3 Hz, k = 0.996** | **4/5, 0.9 dB — PASS** |
+| 2nd-order high-pass | 0.914 | −17.36 | fc 30.1 Hz + a **second pole at 0.1 Hz = inert** | 4/5, 0.9 dB |
+| 1 zero / 1 pole (lead/shelf) | 0.850 | −17.48 | zero 6.5, pole 41.6 Hz | 4/5, 1.1 dB |
+
+The high-pass is **0.06 dB** behind the free lead — comfortably inside the **0.144 dB** take-to-take
+capture floor (§3) — and has the **best null-depth error of any family (0.9 dB)**. The 2nd-order variant
+**degenerates to 1st order on its own** (second pole driven to the 0.1 Hz clamp), so the data wants
+**exactly one** more corner, not two. And `k = 0.996`: no level change, purely a corner.
+
+⭐ **The corner is identified far more tightly than the lead's zero ever was.** Refitted independently at
+each stimulus level: **30.3 / 31.4 / 28.4 Hz — a ±5 % spread**, against the lead zero's 0.3/2.3/6.5 Hz
+(20×). Held fixed at 30.3 Hz it lands within 0.11–0.13 dB of a full refit at −12 and −6. That is what a
+genuinely **linear** element must do, and it is the strongest evidence yet that this is a real part.
+
+⇒ **The residual A3 element is a first-order high-pass at ~30 Hz in the OD path — i.e. one more coupling
+capacitor.** Not a shelf, not a lead network, no gain change.
+
+**(8) `schematic-checker` ON C7 — the "smaller effective R" escape is ARITHMETICALLY CLOSED.** C7 sits
+between node P (shunted by R11 470k, fed through R8 470k) and IC2_A(+) (shunted by R13 1M), and for a
+series cap the corner is set by the **sum** of the shunt resistances either side — so it is ≈ **1.0–1.3 MΩ
+regardless of which side R11 is on**. Consequences: **C7 = 680 pF into 1.28 MΩ = 182.8 Hz**, reproducing
+the model's ~183 Hz exactly; and to reach 183 Hz with an ordinary 100 n you would need **8.70 kΩ**, which
+R13 alone (1 MΩ) floors out of reach, and which would additionally be a **broadband −31 dB divider** into
+IC2_A that the gain-staging calibration could not have missed. **So the 147× cannot be dissolved by
+re-reading the resistors** — it is a real capacitor disagreement or a wrong placement.
+- ⚠ **No dedicated pixel-zoom read of the C7 glyph is on record** (unlike C13/C33/C4/C36/R19/GRUNT) — it
+  was only ever checked as a *table entry*, and per session 23 the symbol and the BOM are **one CAD
+  source, not two independent voices**. The image pass is still owed: the C7 glyph (`100n` vs a
+  picofarad string, and mis-attribution from C8 220 pF / C2 1n nearby), the R13 glyph (the `m`-notation
+  gotcha — `1m` vs a `k` value), and junction dots on node P (the one failure mode a BOM census cannot
+  catch). Crop `0.27,0.28–0.46,0.47`.
+- ⚠ **circuit.md contradicts itself on R11** — the component table says "470k to GND at IC2_A input side"
+  while the node graph puts R11 at node **P**. The shipped `TrebleAttack.h` follows the node graph. Does
+  not change the corner (see above), but it is exactly the wording class that hid the ATTACK pole error.
+- ⚠ **An arithmetic slip was propagated into five files**: "C7 at 100 n corners at ~0.1 Hz into R13".
+  The correct figure is **~1.2 Hz** (1.24 Hz at 1.28 MΩ; 1.59 Hz into R13 alone) — off by ~12×. The
+  conclusion is unaffected (inert in band either way) but the number was wrong in `FitParams.h`,
+  `TrebleAttack.h`, `circuit.md`, this file and `CLAUDE.md`. **Corrected in all five.**
+
+**(9) ⭐⭐ THE PIXEL-ZOOM PASS IS IN, AND IT VINDICATES C7 ON A STRUCTURAL ARGUMENT RATHER THAN A
+READING.** Primary p.4 rasterised at **900 DPI** (vector source, `schematics/crop.py`, crop
+`0.27,0.28–0.46,0.47`):
+- **C7 = `100n`, unambiguous.** Crisp vector glyph, designator directly above and value directly below
+  its own symbol — not `100p`, not mis-attributed from C8 (`220pf`) or C2 (`1n`). **R13 = `1m`**
+  confirmed (the m-notation, = 1 MΩ). R11 = `470k`, C8 = `220pf`, R8 = `470k`, R7 = `200k`.
+- **Topology confirmed exactly as circuit.md's node graph**, and the component table's looser wording is
+  the wrong one: **R11 shunts node P (the SOURCE side of C7)**, C7 is in series, **R13 goes from
+  IC2_A(+) to VD**. The C7→IC2_A(+) run carries **no intervening element and no extra junction dots** —
+  it goes straight to pin 3. The ATTACK switch is also re-confirmed: **pin 2 = pole = C8's bottom
+  plate**, throws to node M and GND.
+⇒ **The 147× is REAL** — a genuine document-vs-captured-unit disagreement, not a misread, and with the
+"smaller effective R" escape already closed arithmetically (§8) there is no reading of the schematic that
+rescues 100 n.
+
+**⭐ BUT HERE IS THE ARGUMENT THAT ACTUALLY JUSTIFIES C7, and it is not a curve-fitting one.** Re-run the
+whole family fit against a model with **C7 back at the schematic 100 n**:
+
+| | ORACLE floor | best causal element | null gate, best family |
+|---|---|---|---|
+| C7 = 680 pF | **0.301 dB** | 0.547 dB | **4/5 bands, 0.9 dB — PASS** |
+| C7 = 100 n (schematic) | **2.212 dB** | 2.429 dB | **0/5–2/5 bands, 6.8–8.1 dB — ALL FAIL** |
+
+The oracle floor is what **no linear element of any order** can beat. At 100 n it is **2.21 dB**, so *no
+amount of added EQ anywhere in the OD path can rescue the schematic value* — and **every family fails the
+null gate**, most of them putting the null at 20 Hz at every drive setting. **This is the difference
+between a fudge and a fix.** C7 is upstream of IC2_A's rail clip, so its job is to restore *headroom
+ahead of a nonlinearity*; a downstream linear multiplier cannot replicate that, and the oracle floor
+proves it rather than asserting it. An arbitrary EQ boost would have been substitutable by definition.
+
+**(10) THE R20/R21 ROUTE FOR THE ~30 Hz CORNER IS ARITHMETICALLY DEAD.** IC2_B's input coupling read at
+900 DPI: **C15 = `2u2` (polarised electrolytic, + on the clipper side) → R20 `10k` → node X → IC2_B(+)**,
+with **R21 `1m` from node X to VD**. C15 therefore works into R20 + R21 = 1.01 MΩ → **0.072 Hz**, exactly
+as documented. Shrinking R21 cannot reach 30 Hz: **even R21 → 0 leaves R20's 10 kΩ, giving 7.2 Hz** — and
+R21 → 0 ties the node to VD and kills the signal anyway. Reaching 30.3 Hz needs **C15 ≈ 5.2 nF against a
+2.2 µF electrolytic — a 420× departure**, worse than C7's and, unlike C7, with **no structural
+justification**: C15 sits *after* the clipper, so a change there is a pure linear multiplier, i.e.
+precisely the substitutable "arbitrary EQ" that the oracle argument above distinguishes C7 from.
+⇒ **The ~30 Hz element is characterised but has no credible physical carrier. Do NOT ship it as a C15
+value.** It is worth 2.488 → 0.912 dB on the drive-axis metric, so it is real signal, not noise — but it
+should be parked as a measured residual until its carrier is identified.
+
+#### ▶ A3 step 3b, continued — C15 IMPLEMENTED AND SHIPPED (session 36, 2026-07-26). User-authorised.
+
+> ⚠⚠ **THE VALUE IN THIS SECTION (1.5 nF) WAS REVERTED TO 5.2 nF IN SESSION 37 — see "A3 step 3c"
+> below before acting on anything here.** The *stage* (`PedalChain::OdCoupling`) and everything in
+> items (11)–(14) stand. What does not stand is item (15)'s value selection: the 96-row band-RMS scan
+> it rests on was contaminated by the per-row gain-match reframe at HF, and its remainder came entirely
+> from the GRUNT flat/boost rows, which carry the separate unfixed GAP #3b. On the gates that target
+> A3 — the migrating null and the raw-capture fit — 1.5 nF is **worse than deleting the element**.
+
+**(11) THE BLEED-SIDE HYPOTHESIS WAS TESTED, NOT JUST REASONED ABOUT, AND IT IS RULED OUT.** Before
+building anything, the proposed diagnostic from session 35's handover — "does the pedal's clean tap have
+its own LF rolloff, making the OD path only *appear* to need a highpass?" — was run computationally
+(`a3_lead_fit.py::clean_side_test`, a per-band constant dB offset, maximally generous to the hypothesis).
+It is answered by the topology itself, and the computation confirms it: the clean bleed provably does
+**not** depend on DRIVE (DRIVE only touches the OD gain stage, downstream of where the clean tap splits
+at IC1_A — verified directly on the model, session 34: clean column identical to 0.00e0 dB across all
+five drives). A frequency-dependent correction on the BLEED side is therefore mathematically a per-band,
+**drive-INDEPENDENT** dB offset — it cannot reproduce a defect that varies by drive at fixed frequency.
+And the defect does vary by drive: at 40 Hz the "no element" residual is **5.64 dB**, while the best
+possible bleed-side correction only reaches **5.43 dB** — essentially unchanged, because a flat-per-band
+correction has no lever on the shape. At 20/50/64 Hz the story is the same (0.78→3.42 WORSE, 2.82→2.58
+barely moved) while the OD-side element reaches 0.71/0.41/0.43. **Ruled out properly, not by assertion.**
+
+**(12) THE ELEMENT WAS BUILT — `PedalChain::OdCoupling`, a new stage.** Not a value change: C15/R20/R21
+were **entirely absent from the model** before this session (`clipper.process(s)` fed straight into
+`recovery.process(s)`, confirmed by grep — no coupling stage of any kind, not even an inert placeholder).
+Added as a single-node trapezoidal-companion first-order highpass, same convention as `C21Highpass`:
+`r = R20+R21 = 1.01 MΩ` fixed (schematic-verified, and the pixel-zoom pass above closed off any
+resistance-side explanation), `c` fittable via `FitParams::clipC15`. Runs at OS rate (it sits inside the
+oversampled region, between `Clipper` and `RecoveryBridgedT`), unlike the base-rate `C21Highpass`. Wired
+into `runOdSample()` and `runOdSampleTapped()` (extended `OdTaps` with a new `odCoupling` field — checked
+both callers use named field access, so this is safe to insert mid-struct). `--fit clipC15=` added to
+both `offline_render.cpp` and `a3_blend_decompose.cpp`'s key tables.
+
+**(13) ⭐⭐ A GENUINE METHODOLOGICAL FINDING: THE DRIVE-AXIS GATE (G1/G2) IS MATHEMATICALLY BLIND TO
+THIS ELEMENT, BY CONSTRUCTION — NOT A BUG.** Sweeping `clipC15` from 3.3 nF to 8.2 nF through
+`a3_drive_axis_scan.sh` produced **bit-identical G1/G2 output at every value**, which first looked like a
+wiring failure (it was checked: the raw OD phasors in the decompose CSVs DO differ per value — confirmed
+by direct diff). The reason is structural: G1/G2 measure the **OD phasor's own step** between two drive
+settings at a fixed band (`model[40]["od_db"][4] - model[40]["od_db"][3]`), and `OdCoupling` applies the
+**same** complex `H(f)` at every drive (it is a plain LTI filter with no drive dependence at all) — so
+`H(f)` cancels exactly out of any step/ratio between two drives at the same band. **A drive-independent
+filter cannot move G1/G2, whatever its value, and this is true of any purely linear element placed
+anywhere in the OD path.** This is *why* C7 could fix the drive axis and C15 structurally cannot: C7 sits
+**ahead of IC2_A's own rail-clip nonlinearity**, so it changes *whether and how much* that nonlinearity
+engages at each drive setting (a real drive-dependent effect on the OD magnitude), whereas C15 sits after
+every nonlinearity in the chain, so nothing downstream of it can be drive-dependent by the time it acts.
+**Do not read G1/G2 as a general A3 gate** — it tests one specific, structurally narrow property (OD-path
+drive-axis magnitude behaviour) that only a pre-nonlinearity element can move. The null gate in
+`a3_lead_fit.py` tests a different, complementary property (the TOTAL post-BLEND signal against the
+pedal's own captures, which C15 *can* affect because it changes the OD magnitude relative to the
+drive-varying bleed ratio inside a nonlinear `|1+...|` sum) — that is the right gate for this class of
+element, and it is what C15 was actually designed and judged against.
+
+**(14) ⚠ A METHODOLOGY BUG IN MY OWN A/B TESTING, CAUGHT BEFORE IT PROPAGATED.** The first matrix scan
+compared several `clipC15` values against a report generated with **no `--fit` override at all** — but
+since `FitParams::clipC15`'s *default* had already been provisionally set to 5.20e-9 (the abstract fit's
+value) before this scan ran, "no override" was NOT "C15 off", it was "C15 at 5.2 nF". So a run explicitly
+at `clipC15=5.2e-9` came back **bit-identical** to the "baseline" — correct, but initially alarming,
+because the baseline secretly wasn't a baseline. Re-run with a genuine off condition
+(`--fit clipC15=2.2e-6`, the schematic value, audibly inert at 0.072 Hz) to get a real comparison.
+**Lesson: when a FitParams default has already been provisionally moved mid-session, "omit the flag" and
+"disable the feature" are no longer the same thing — always pass the explicit off-value, never rely on
+omission, once a default has changed.**
+
+**(15) ⭐ THE REAL MATRIX DISAGREES WITH THE ABSTRACT FIT, AND THE REAL MATRIX WINS.** `a3_lead_fit.py`
+fits ONE fixed operating point (GRUNT=Cut, BLEND=max, ATTACK=Flat, EQ flat) against 5 single-tone drive
+captures and landed on fc ≈ 28–31 Hz. But scanning the ACTUAL shipped stage against the real matrix
+subset (`--only drive,grunt,ref-od,level`, 96 rows spanning all three GRUNT positions and three stimulus
+levels) shows a clear, bidirectionally-verified **interior minimum at a much lower capacitance**:
+
+| C15 (nF) | off (2u2) | 0.3 | 0.7 | 1.0 | **1.5** | 2.0 | 3.0 | 4.0 | 5.2 | 6.5 | 8.0 | 10.0 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| band-RMS dB | 4.508 | 4.734 | 4.048 | 3.698 | **3.475** | 3.490 | 3.568 | 3.698 | 3.839 | 3.986 | 4.106 | 4.187 |
+
+Minimum at **1.5 nF (fc ≈ 105 Hz)**, not ~30 Hz — the single-condition abstract fit does not generalise
+across GRUNT positions. **Genuine interior minimum**: worse in BOTH directions (0.3 nF is worse than off
+entirely — a too-high corner actively harms), not the monotone "smaller is always better" degeneracy that
+would be a red flag. **Shipped at 1.5 nF, the matrix optimum, not the abstract fit's value.**
+
+**(16) FULL 63-CAPTURE MATRIX — CONFIRMED, and the win is large.** Two full renders, `clipC15 = 1.5 nF`
+(shipped) vs `clipC15 = 2.2 µF` (schematic, audibly inert), so the diff isolates C15 alone on top of the
+already-shipped `trebleC7`:
+
+| | OD | CLEAN | ALL | OD tilt |
+|---|---|---|---|---|
+| C15 off (schematic 2u2) | 3.926 | 0.465 | 2.195 | +1.18 |
+| **C15 = 1.5 nF (shipped)** | **3.080** | **0.465** | **1.773** | **−0.72** |
+
+**41 rows better by >0.5 dB, 18 worse, 124 bit-identical.** CLEAN is **bit-identical** (0.465 both sides)
+— surgical by construction, as it must be: C15 is in the OD path and the clean tap splits at IC1_A.
+Biggest improvements are exactly the captures that defined the gap: `grunt-boost` **9.09 → 1.80** at
+−12 dBFS, **9.21 → 2.60** at −18, `drive-0930_grunt-boost` **8.08 → 2.07**, `drive-1700_grunt-boost`
+8.41 → 3.35.
+
+**⚠ AND THE REGRESSIONS ARE A COHERENT, ALREADY-KNOWN GROUP — read this before "fixing" them.** Splitting
+the 120 OD rows (using `matrix_grade.rows_of`, which excludes the silent zero-knob captures — a naive
+aggregate over raw rows hits the session-18 −640 dB trap and returns nonsense):
+
+| OD subset | n | off | on | change |
+|---|---|---|---|---|
+| ALL OD rows | 120 | 4.590 | **3.763** | **−0.827** |
+| **NON-`gain-n12` (the clean read)** | 104 | 4.472 | **2.925** | **−1.547** |
+| `gain-n12` (known-bad group) | 16 | 5.294 | **7.114** | **+1.820** |
+
+So C15 is a **large win (−1.55 dB) everywhere the model is otherwise sound**, and a real regression
+(+1.82 dB) confined to the 16 `gain-n12` rows — **which is precisely the group with a known, separate,
+unfixed defect**: session 30's "genuine level-dependent HF collapse in `ref-od_gain-n12`" and session 34's
+oracle-floor result that the −12/−6 dBFS residual is **clipper-side and unreachable from the OD path at
+any order**. Band-by-band on the worst row (`level-1700_gain-n12`, −6 dBFS): the change is a *constant*
+−1.36 dB above ~1 kHz — exactly the per-row gain-match re-solving (the session-28 measurement-frame trap,
+and `gain_db_applied` moved −1.365 dB, confirming it) — but a genuine **−14.6 dB at 20 Hz**, because the
+pedal has strong LF on that capture where the plugin was *already* 12 dB deficient, and C15 cuts more.
+⇒ **Adding LF cut to the OD path must make an already-LF-deficient capture worse. Do NOT chase these 16
+rows with C15, and do not re-fit C15 to reduce them** — same posture as session 28's `c21R` note ("OD got
+worse and that is EXPECTED — do not fix it"). They should move on their own once the clipper-side item
+is addressed.
+
+**⚠ HONEST LIMITS, unchanged from session 35's framing.** C15 at 1.5 nF against a schematic 2u2 is a
+**~1470× departure** — larger than C7's 147×, and without C7's structural argument (C15 is *after* the
+CD4049 clipper, so a change here is a plain linear multiplier; several other post-clipper positions could
+carry an identical transfer function — this placement is a convenient carrier, not a load-bearing physical
+claim). **Shipped anyway on explicit user authorisation (2026-07-26):** "if changing the C15 change will
+make the plugin more accurate, lets do it, I don't care how off it is" — same posture as `clipK`/`clipC11`
+(session 17). Accuracy against the captures is the standing priority for this class of element; physical
+plausibility is not required once schematic-checker has closed off a documentation error (session 35) and
+a genuine interior minimum rules out curve-fitting noise.
+
+**▶ NEXT.** (a) ~~Confirm the full-matrix numbers~~ — **DONE, see (16): OD 3.926 → 3.080, ALL 2.195 →
+1.773, CLEAN bit-identical.** (b) Then the −12/−6 dBFS clipper-side
+over-compression item (session 34 item 7 / step-3b item 4), now bounded at roughly 1 dB of oracle-floor
+residual that no linear OD-path element can touch. (c) Then A4 re-grade + GATE-9, the queued `gain-n12`
+HF collapse, B (perf/HQ), C (carry-forwards), D (release).
+
+#### ▶ A3 step 3c — the LEVEL AXIS is gated for the first time, and it says the −12/−6 item is small while `clipC15` is on the wrong value (session 37, 2026-07-26). Analysis only; nothing in `src/` changed, ctest 17/17.
+
+The queued task was "the −12/−6 dBFS clipper-side over-compression item". It is now **measured** rather
+than inferred, and the measurement re-orders the work: the genuine clipper-side part is **~0.5–1.1 dB**
+(exactly session 35's oracle floor, so that bound was right), but it is **not** the "roughly
+frequency-flat 1–2 dB" of session 34's description, and a **much larger** level-axis error sits at
+≤80 Hz / high drive which is **not** clipper-side — it is `clipC15`, shipped last session at a value
+that three independent A3 gates reject.
+
+**(1) NEW TOOL — `analysis/a3_level_axis.py` (+ `a3_level_axis_scan.sh`). The LEVEL axis had never been
+gated.** Every A3 gate so far has been a DRIVE-axis or single-level test: G1/G2 (session 34), the
+migrating null (sessions 29/35), the per-level a3_lead_fit RMS (session 35). None of them asks how the
+OD/bleed ratio moves with *stimulus level*, which is the axis the −12/−6 defect lives on by definition.
+
+The derivation is β-free, which is what makes it usable while the bleed level is still disputed. Per
+band the pedal's total at BLEND=max relative to its OWN full-clean capture is
+`T(b,d,L) = β + 20log10|1 + m(b,d,L)·e^(iθ(b))|`, and β is a resistive divider ratio (`LevelBlend` has
+no caps) with the whole post-BLEND chain shared with the reference — so β is level-independent and
+**cancels exactly** in the level step `dT(b,d) = T(hot) − T(cold)`. So does the stimulus segment's own
+nominal offset, because the reference is measured at the same level. No β fit, no derived target.
+
+⚠ **GUARD, computed not assumed:** the reference capture must itself be linear across levels or its
+nonlinearity leaks into every `dT`. Measured: the nominal +6 dB step is recovered at **+6.000 / +5.998 dB**
+with **0.013 / 0.028 dB** of shape spread. The clean path is linear and β really is level-independent.
+
+**(2) THE SELF-TEST EARNED ITS KEEP TWICE, on my own code.** Synthesising the pedal from the model must
+return `need = 0`. It first returned **9.37 dB**: `solve_need` averaged the two levels' θ while `dT_mdl`
+used each level's own θ, and near a null a fraction of a degree of phase is worth several dB. Fixed, it
+then returned exactly **24.00 dB** — the "unreachable" sentinel — because `f(0)` is *exactly* zero in the
+self-test and `np.sign(0) == 0` defeats a `sign[:-1]*sign[1:] < 0` crossing test. Both fixed; self-test
+**PASS at 0.0000 dB**. Neither would have been visible in the real numbers.
+
+**(3) ⭐ THE DEFECT IS NOT FREQUENCY-FLAT — it is LF and high-drive.** `dT` residual (model − pedal) rms
+at the shipped state, 320 Hz excluded throughout:
+
+| subset | −18→−12 | −12→−6 |
+|---|---|---|
+| drive min+9:30, ≤254 Hz (**CONTROL**) | **0.13** | **0.51** |
+| drive noon, ≤254 Hz | 0.53 | 0.58 |
+| drive 2:30+max, **101–254 Hz** | 0.29 | 1.07 |
+| drive 2:30+max, **≤80 Hz** | **2.75** | **8.27** |
+| all bands, all drives | 1.20 | 3.51 |
+
+The CONTROL is the load-bearing row: at drive min/9:30 both devices are near-linear, so 0.13/0.51 dB is
+the method's own noise floor — the instrument is clean. Against that floor, the mid-band level
+dependence (noon 0.53/0.58; hot drives 101–254 Hz 0.29/1.07) is **0.5–1.1 dB and that is the genuine
+clipper-side item** — it lands on session 35's oracle floor (0.42 → 0.91 → 1.14 dB per level) almost
+exactly, from a completely different direction. ⇒ **Session 35's ~1 dB bound is CONFIRMED. Session 34's
+description of it as "roughly frequency-flat" is not** — 87 % of the level-axis residual is below 80 Hz
+at drive 2:30/max, where it is 3–8 dB.
+
+**(4) THE CLIPPER VTC IS A REAL LEVER ON THIS AXIS (a first) BUT IT IS NOT SHIPPABLE.** Every clipper
+parameter was liveness-checked first (session-16 lesson L-009) — at drive 2:30 / −6 dBFS, `clipSatLo`
+2.113 dB, `clipSatHi` 1.827, `clipK` 0.717, `jfetCeilNeg` 0.507, `jfetExpandBeta` 0.639, `clipA0` 0.683
+of max |Δ(OD)|. Scaling the fitted ceiling pair (`clipSatLo` 2.0067 / `clipSatHi` 2.9321) together:
+
+| scale | CONTROL | noon ≤254 | hot ≤80 | hot 101–254 | ALL |
+|---|---|---|---|---|---|
+| 0.55 | 0.10 / 0.32 | 0.15 / 0.68 | 2.11 / 7.38 | 0.79 / 1.84 | 0.95 / 3.18 |
+| 0.70 | 0.12 / 0.37 | 0.26 / 0.55 | **1.64** / 7.72 | 0.44 / 1.56 | **0.73** / 3.30 |
+| 0.80 | 0.12 / 0.42 | 0.40 / **0.52** | 1.90 / 7.89 | 0.28 / 1.46 | 0.83 / 3.36 |
+| 0.90 | 0.13 / 0.47 | 0.49 / 0.53 | 2.31 / 8.06 | **0.28** / 1.18 | 1.00 / 3.42 |
+| **1.00 (shipped)** | 0.13 / 0.51 | 0.53 / 0.58 | 2.75 / 8.27 | 0.29 / 1.07 | 1.20 / 3.51 |
+| 1.15 | 0.13 / 0.54 | 0.55 / 0.67 | 3.47 / 8.66 | 0.41 / 0.98 | 1.49 / 3.67 |
+| 1.35 | 0.13 / 0.53 | 0.54 / 0.78 | 4.42 / 9.22 | 0.60 / 0.94 | 1.89 / 3.90 |
+
+Direction: **lower ceilings** (≈0.7–0.9×), i.e. the clipper is not driven hard enough relative to where
+it clips. Several subsets show genuine **interior minima** there (noon at −12→−6 bottoms at 0.80;
+hot ≤80 and ALL at −18→−12 bottom at 0.70; hot 101–254 at −18→−12 at 0.80–0.90) — so this is not purely
+the "make the clipper see less" degeneracy that killed the session-5/6 fits. **But two rows are
+monotone and they disagree with each other**: the CONTROL improves all the way down to 0.55 (the
+degeneracy signature), and `hot 101–254` at −12→−6 improves monotonically in the *opposite* direction
+(1.84 at 0.55 → 0.94 at 1.35). A parameter that trades one region against another is not a fix for a
+single defect. ⛔ **Not shipped, and do not ship it on a scalar.** Note also that with `kInputRef` fixed,
+scaling the ceilings down is *approximately* the session-16/17 degenerate partner of driving the input
+hotter (not exactly — the JFET is upstream and also nonlinear), so the honest next step is a **joint
+re-fit of that family**, not a one-parameter scan.
+
+**(5) ⚠⚠ A DEFECT IN THE ACCEPTANCE TOOL: `a3_lead_fit.py`'s row labelled `none (H = 1)` WAS NOT H = 1.**
+For the empty family `unpack` still returned a free log-gain, so the "no element baseline" every
+session has quoted was really **the model plus a fitted broadband OD gain** — at the shipped state it
+comes back **k = 1.898 (+5.6 dB)**. Consequences: (a) the elements' improvements were *understated*, not
+overstated, because the baseline was stronger than advertised; (b) the null-gate row under that label was
+never the shipped model's null; (c) it **hid a finding**. Fixed with a `fix_k` flag, and a separate
+"broadband OD gain only (H = k)" row added so the two questions stay apart. Self-test still PASS.
+
+**(6) ⭐⭐ AND THE HIDDEN FINDING IS THE HEADLINE: ON ITS OWN TOOL, THE SHIPPED `clipC15 = 1.5 nF` IS
+WORSE THAN HAVING NO ELEMENT AT ALL.** True no-element rms against the five raw drive captures
+(sweep_drv_−18), now that k really is 1:
+
+| `clipC15` | **true no-element rms (H = 1)** | β | k the free-gain row wants |
+|---|---|---|---|
+| off — schematic 2u2 | 2.846 | −18.03 | 0.651 |
+| **5.2 nF (session 35's fitted value)** | **0.904** | **−17.38** | **0.995** |
+| 1.5 nF (**SHIPPED**) | **3.339** | −16.20 | **1.898** |
+
+At 5.2 nF the model explains the raw captures to **0.904 dB with nothing added and k = 0.995** — it wants
+no level correction at all — and β lands at −17.38, 0.45 dB from the model's own −16.93, which is the
+figure session 35 reported. At 1.5 nF the same metric reads **3.339 dB**, *worse than deleting the
+element*, and the fit asks for **+5.6 dB** of broadband OD gain to patch it. (5.2 nF into the
+schematic-verified R20+R21 = 1.01 MΩ is fc = 30.3 Hz — i.e. 5.2 nF **is** session 35's fitted element,
+which scored 0.912 dB. The two tools agree to 0.008 dB.)
+⚠ **This also qualifies session 35's item (5).** "β = −17.1…−17.5, consistent across every family" was
+consistent among *free-k* fits, which all share the same k↔β trade; with k pinned, β moves to −16.20 at
+1.5 nF. β is only well-identified at ≈5.2 nF.
+
+**(7) THE NULL GATE, EXTENDED TO ALL THREE STIMULUS LEVELS, AGREES — and it has a genuine interior
+optimum.** Deepest band ≤254 Hz, model vs pedal, over 3 levels × 5 drives (15 cells):
+
+| `clipC15` | off | 1.5 nF (shipped) | 3.0 nF | 5.2 nF | 8.0 nF |
+|---|---|---|---|---|---|
+| null band matches | **0/15** | **0/15** | **12/15** | **12/15** | 5/15 |
+
+At 1.5 nF the model's null sits a full band HIGH at every drive and level (64 Hz where the pedal has 50;
+50 Hz where the pedal has 25–32 at max drive). Worse in **both** directions from ~3–5 nF, so this is a
+real optimum, not a monotone slide. ⚠ **Read with the caveat that null placement also moves with OD
+LEVEL** — with a free k, 1.5 nF's null improves to 2/5 at −18 — so the null criterion alone can be
+gamed by a level error; that is exactly why it is quoted here alongside (6), which fixes k.
+
+**(8) ⚠⚠ SO WHY DID SESSION 36's SCAN PICK 1.5 nF? TWO REASONS, BOTH ALREADY DOCUMENTED TRAPS.**
+
+**(a) The per-row gain-match reframe (session 28's trap, session 30 §3's caveat).** In the raw report the
+HF band (320 Hz–12.9 kHz, **15 of the 26 graded bands**) appears to *strongly* prefer 1.5 nF —
+2.794 → 3.823 dB across 1.5 → 10 nF. But a first-order corner at 105 Hz vs 30 Hz is indistinguishable
+above 320 Hz. Re-anchoring the gain match to those bands only (session 30 item 2's method) collapses the
+whole effect: **HF band-RMS is FLAT at 2.579 → 2.597 dB across every C15 value tested.** It was the
+broadband scalar re-solving, and because HF carries most of the graded bands it dominated the aggregate
+that selected the value. Re-anchored, the GRADE optimum is not a sharp 1.5 nF minimum but a flat plateau
+(2.0 nF 3.349, 1.5 nF 3.367, 3.0 nF 3.377).
+
+**(b) ⭐ The residual preference is entirely the GRUNT flat/boost rows — a known, separate, unfixed
+defect.** LF 25–80 Hz band-RMS on OD rows, gain match re-anchored to HF, split by GRUNT position:
+
+| `clipC15` | GRUNT **cut** (68 rows) | GRUNT flat (12) | GRUNT boost (16) |
+|---|---|---|---|
+| off (2u2) | 4.378 | 9.759 | 12.670 |
+| **1.5 nF (shipped)** | **5.083 ← worst tested** | **2.911** | **4.380** |
+| 2.0 nF | 4.634 | 4.260 | 5.263 |
+| 3.0 nF | 4.060 | 5.437 | 6.851 |
+| 4.0 nF | **3.835** | 6.416 | 8.340 |
+| 5.2 nF | **3.839** | 7.335 | 9.427 |
+| 8.0 nF | 4.041 | 8.924 | 10.760 |
+| 10.0 nF | 4.137 | 8.923 | 11.284 |
+
+The two groups want **opposite** values. At GRUNT **cut** — the condition A3 is defined at, and the
+condition whose GRUNT topology the model gets right — LF band-RMS has an interior minimum at **4–5.2 nF**
+and **1.5 nF is the worst value tested, worse even than deleting the element.** The monotone preference
+for 1.5 nF comes only from GRUNT flat/boost, and **that is precisely GAP #3b**: session 23 measured the
+pedal's GRUNT span as a **bump centred 127–202 Hz** against the model's **monotone high-pass shelf
+maximal at DC**, and recorded that *"a first-order coupling cap can only move a shelf's corner — it can
+never turn a shelf into a bump"*. `clipC15 = 1.5 nF` is a first-order coupling cap being used to
+attenuate that shelf. ⇒ **it is a compensating error for an unfixed defect, selected by letting the
+defective row group vote.** Session 36 applied exactly this reasoning to exclude the 16 `gain-n12` rows
+and did not apply it to the 28 GRUNT flat/boost rows.
+
+**(9) ✅ SHIPPED (user decision 2026-07-27): `clipC15` 1.5 nF → 5.2 nF (fc ≈ 30.3 Hz), on the standing
+rule that the NULL and the raw-capture fit are the gate and matrix band-RMS is corroboration.** Evidence for, all
+independent: raw-capture fit **0.904 dB with k = 0.995** vs 3.339 dB / +5.6 dB at 1.5 nF (6); null band
+**12/15 vs 0/15** (7); β identified at −17.38, matching the model's own bleed to 0.45 dB (6); GRUNT-cut
+LF band-RMS at its interior minimum (8b). **Expect the GRUNT flat/boost rows and the matrix aggregate to
+get WORSE, and do not fix that with C15** — same posture as session 28's `c21R` ("OD got worse and that
+is EXPECTED") and session 36's own `gain-n12` note.
+⚠ Both values are wild departures from the schematic 2u2 (**423×** at 5.2 nF, 1470× at 1.5 nF), so this
+does not change the provenance story or the user authorisation of 2026-07-26 at all — it is purely a
+question of which value is more accurate.
+
+**(10) ⭐ THE FULL 63-CAPTURE MATRIX MEASURES THE TRADE EXACTLY, AND IT SPLITS ON GRUNT AS PREDICTED.**
+Full render at `clipC15 = 5.2e-9` vs the shipped 1.5 nF (`s37_full_c15_5p2n.json` vs `s36_full_c15on.json`):
+
+| OD group | rows | 1.5 nF (shipped) | 5.2 nF | change |
+|---|---|---|---|---|
+| **GRUNT cut** | 76 | 2.478 | **2.284** | **−0.194** |
+| **GRUNT cut, `gain-n12`** | 16 | 6.837 | **5.843** | **−0.994** |
+| GRUNT flat | 12 | 2.191 | 4.055 | +1.864 |
+| GRUNT boost | 16 | 2.850 | 5.449 | +2.599 |
+| **ALL OD** | 120 | **3.080** | 3.357 | +0.277 |
+| CLEAN | 120 | 0.465 | 0.465 | bit-identical |
+| **OD tilt** | | **−0.72** | **−0.11** | closer to 0 |
+
+24 rows better by >0.5 dB, 30 worse, 124 bit-identical. So **92 of the 120 OD rows improve and only the
+28 GRUNT flat/boost rows regress** — precisely the split (8b) predicts. The aggregate moves the other way
+(+0.277) *because* those 28 rows regress hard, which is the arithmetic of letting them vote.
+⭐⭐ **And note what happens to the 16 `gain-n12` rows: 6.837 → 5.843 (−0.994).** Session 36 recorded
+their +1.82 dB regression as "confined to the known-bad group... they should move on their own once the
+clipper-side item is addressed". They move on their own once **`clipC15`** is corrected — no clipper
+change involved. That is direct evidence the `gain-n12` regression session 36 attributed to the pending
+clipper item was substantially caused by `clipC15 = 1.5 nF` itself.
+⭐ The `od_tilt_metric` — A3's signature since session 20, target 0 — goes **−0.72 → −0.11**.
+
+**(11) ✅ SHIPPED AND VERIFIED AT THE SHIPPED STATE.** `FitParams::clipC15 = 5.2e-9`. Value picked on
+the raw-capture fit's own **interior minimum, verified both sides**: 4.0 nF 1.115 / 4.7 nF 0.979 /
+**5.2 nF 0.904** / 6.0 nF 1.022 dB, with the free-gain row wanting `k = 0.995` at the minimum. ctest
+**17/17**. Level-axis gate re-run against the shipped default:
+
+| | before (1.5 nF) | **after (5.2 nF)** |
+|---|---|---|
+| null band matches (3 levels × 5 drives) | 0/15 | **12/15** |
+| dT residual, all bands (−18→−12 / −12→−6) | 1.20 / 3.51 | **1.00 / 2.14** |
+| dT residual, hot drives ≤80 Hz | 2.75 / 8.27 | **2.23 / 4.97** |
+| dT residual, noon ≤254 Hz | 0.53 / 0.58 | **0.49 / 0.36** |
+| dT residual, CONTROL (min+9:30) | 0.13 / 0.51 | 0.13 / 0.47 |
+
+⚠ **AND THE VERIFICATION CAUGHT A STALE BINARY — the session-35 trap in a new guise.** After the edit,
+`OfflineRender --print-fit` correctly reported `fit.clipC15=5.2e-09`, but `a3_blend_decompose` still
+rendered 1.5 nF: it is built by a hand-written `c++` command, **not by CMake**, so `cmake --build` does
+not rebuild it when `FitParams.h` changes. Every phase tool reads its CSVs. **Check: a render at the
+default must be bit-identical to one at the explicit new value AND differ from the old one** — both
+directions, because "identical to the new value" alone also passes if nothing was rebuilt and the two
+values happen to be compared against each other. Rebuilt, re-verified both ways, and
+`build/a3_dec_drv*.csv` + `build/a3_lvl*.csv` + `analysis/reports/comprehensive_data.json` were all
+regenerated at the shipped state (session 35's stale-baseline trap).
+
+**⚠ METHOD NOTES.**
+- **My own scan lost a run to a quoting bug, and the session-36 lesson caught it.** Eight clipper
+  candidates came back **bit-identical**, having just been liveness-checked as live. Cause: `set -- $spec`
+  in a zsh loop — **zsh does not word-split unquoted parameter expansions**, so the whole string became
+  the tag and *no* `key=value` reached the tool, silently re-rendering the shipped defaults under each
+  candidate's name. `a3_level_axis_scan.sh` now **refuses to run with zero overrides** and rejects any
+  argument that is not `key=value`. A bit-identical A/B must be a measurement, never an accident.
+- **"Verify the constant, not the prose" now has a sibling: verify the BASELINE, not its label.** (5) is
+  the same class as session 35's `trebleC7` catch — a row everyone reads as the baseline was not the
+  baseline, for four sessions, and the mislabel concealed a 5.6 dB level finding.
+- **Below 80 Hz at high drive, neither `dT` nor the null argmin is a reliable ranker on its own.** Both
+  are cliff-dominated there: `dT` moves non-monotonically across C15 (off 3.73 → 8.0 nF 3.84 → 5.2 nF
+  4.97 → 3.0 nF 7.75 → 1.5 nF 8.27 at −12→−6) in an order that does not track the null match, and the
+  argmin is a coarse 1/3-octave statistic. Rank on (6), cross-check with (7) and (8b).
 
 ### ✅ GAP #4 — the switchable MID positions over-deliver RANGE. FOUND session 21, **FIXED session 22**.
 

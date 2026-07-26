@@ -32,6 +32,7 @@
 #include <cmath>
 #include <complex>
 #include <vector>
+#include <string>
 
 static constexpr double kPi = 3.14159265358979323846;
 
@@ -75,9 +76,42 @@ int main(int argc, char** argv)
     const double fs = 48000.0;
     const double amp = GainStaging::kInputRefNominal * std::pow(10.0, dbfs / 20.0);
 
+    // Trailing key=value pairs override FitParams, so a candidate element can be
+    // swept across the whole DRIVE axis without a rebuild (session 34, A3 step 3a:
+    // the gate is a drive SWEEP, so every candidate needs all five CSVs).
+    FitParams fp {};
+    const struct { const char* name; double FitParams::* member; } kFitKeys[] = {
+        {"trebleC7", &FitParams::trebleC7},
+        {"clipC15", &FitParams::clipC15},
+        {"trebleLadderDampR", &FitParams::trebleLadderDampR},
+        {"clipC11", &FitParams::clipC11}, {"clipA0", &FitParams::clipA0},
+        {"railNeg", &FitParams::railNeg}, {"railPos", &FitParams::railPos},
+        {"jfetGm", &FitParams::jfetGm},
+        // The clipper VTC + JFET shaper, added session 37 so the LEVEL axis can be
+        // swept: the -12/-6 dBFS residual is level-dependent, so only a
+        // nonlinearity can move it and these are the parameters that shape one.
+        {"clipSatLo", &FitParams::clipSatLo}, {"clipSatHi", &FitParams::clipSatHi},
+        {"clipK", &FitParams::clipK},
+        {"jfetSatPos", &FitParams::jfetSatPos}, {"jfetSatNeg", &FitParams::jfetSatNeg},
+        {"jfetCeilPos", &FitParams::jfetCeilPos}, {"jfetCeilNeg", &FitParams::jfetCeilNeg},
+        {"jfetExpandBeta", &FitParams::jfetExpandBeta},
+        {"driveTaperExp", &FitParams::driveTaperExp},
+    };
+    for (int i = 4; i < argc; ++i)
+    {
+        const std::string a = argv[i];
+        const auto eq = a.find('=');
+        if (eq == std::string::npos) { std::fprintf(stderr, "expected key=value, got '%s'\n", argv[i]); return 1; }
+        const std::string k = a.substr(0, eq);
+        bool hit = false;
+        for (const auto& fk : kFitKeys)
+            if (k == fk.name) { fp.*(fk.member) = std::atof(a.c_str() + eq + 1); hit = true; }
+        if (! hit) { std::fprintf(stderr, "unknown fit key '%s'\n", k.c_str()); return 1; }
+    }
+
     PedalChain ch;
     ch.prepare(fs, fs);   // 1x: no OS latency, clean tap already aligned
-    ch.setFitParams(FitParams {});
+    ch.setFitParams(fp);
 
     PedalChain::Params p;
     p.drive = drive;

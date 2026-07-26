@@ -17,6 +17,12 @@ analysis/pedal_results*/
 # the tracked analysis/reports/*.example.* files are the committed samples)
 analysis/reports/comprehensive_data*.json
 analysis/reports/cache/
+# Per-session scratch reports from --out (candidate scans, A/B pairs). These are
+# regenerable and large (~580 KB each; a single session's cap scan is easily 15 MB),
+# so they must never be committed. Session 22 widened the line above from an exact
+# filename to a glob for the same reason; --out lands OUTSIDE that glob, so match the
+# session-tag convention explicitly.
+analysis/reports/s[0-9][0-9]_*.json
 
 # Generated schematic rasters (regenerate via schematics/crop.py; sources are PDFs)
 schematics/*.png

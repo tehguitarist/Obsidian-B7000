@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstring>
 
 #include "FitParams.h"
 #include "InputBuffer.h"
@@ -141,6 +142,7 @@ public:
         treble.prepare(osRate);
         drive.prepare(osRate);
         clipper.prepare(osRate);
+        odCoupling.prepare(osRate);
         recovery.prepare(osRate);
         skB.configure(SallenKeyLPF::kIC4B);
         skB.prepare(osRate);
@@ -157,6 +159,7 @@ public:
         treble.reset();
         drive.reset();
         clipper.reset();
+        odCoupling.reset();
         recovery.reset();
         skB.reset();
         skA.reset();
@@ -222,6 +225,8 @@ public:
             treble.setSourceZ(z.ro, z.rq2, z.rp, z.cp);
         }
         treble.setNotchDamp(f.trebleLadderDampR); // session-19: shallow the 322 Hz notch
+        treble.setC7(f.trebleC7);                 // session-34: A3 step-3a, IC2_A LF headroom
+        odCoupling.setC(f.clipC15);                // session-36: A3 step-3b, C15 coupling into IC2_B
 
         drive.setTaperExp(f.driveTaperExp);
         levelBlend.setTaperExp(f.levelTaperExp);
@@ -280,6 +285,7 @@ public:
         s = treble.process(s);
         s = drive.process(s);
         s = clipper.process(s);
+        s = odCoupling.process(s);
         s = recovery.process(s);
         s = skB.process(s);
         s = skA.process(s);
@@ -290,7 +296,7 @@ public:
     // the identical stage order as runOdSample() but records each boundary output,
     // so a probe can localise WHICH OD stage shapes a given band. Not used by the
     // plugin or OfflineRender; state advances exactly like runOdSample().
-    struct OdTaps { double jfet, treble, drive, clipper, recovery, skB, skA; };
+    struct OdTaps { double jfet, treble, drive, clipper, odCoupling, recovery, skB, skA; };
     inline OdTaps runOdSampleTapped(double buf) noexcept
     {
         OdTaps t;
@@ -298,7 +304,8 @@ public:
         t.treble = treble.process(t.jfet);
         t.drive = drive.process(t.treble);
         t.clipper = clipper.process(t.drive);
-        t.recovery = recovery.process(t.clipper);
+        t.odCoupling = odCoupling.process(t.clipper);
+        t.recovery = recovery.process(t.odCoupling);
         t.skB = skB.process(t.recovery);
         t.skA = skA.process(t.skB);
         return t;
@@ -327,6 +334,57 @@ public:
     }
 
 private:
+    // ---- C15/R20/R21 clipper-output coupling: first-order highpass ----------
+    // Phase 9 / A3 step 3b (session 36). NOT modelled before this session — the
+    // clipper output fed straight into RecoveryBridgedT with nothing between them,
+    // i.e. C15 (2u2) / R20 (10k) / R21 (1M) were entirely absent, not merely
+    // treated as inert. circuit.md: C15 -> R20 -> node X -> IC2_B(+), R21 X->VD;
+    // R20 carries no other branch at its near node, so R20+R21 combine into ONE
+    // effective series R (same reduction as C21Highpass below), fixed at the
+    // schematic value 1.01 MΩ — ruled OUT as a fit target by the step-3b pixel-
+    // zoom pass (docs/phase9-validation.md §4): even R21->0 only reaches 7.2 Hz.
+    // Only the capacitance is fittable (FitParams::clipC15) — see that field's
+    // comment for the null-gate evidence and the honesty caveats on this element.
+    // Same trapezoidal-companion single-node convention as C21Highpass; runs at
+    // OS RATE (it sits inside the oversampled region, between Clipper and
+    // RecoveryBridgedT), unlike C21Highpass which is base-rate/post-BLEND.
+    struct OdCoupling
+    {
+        static constexpr double kR = 10.0e3 + 1.0e6; // R20 + R21, schematic-verified
+
+        void prepare(double fs) noexcept
+        {
+            fsSeen = fs;
+            gc = c * 2.0 * fs;
+            reset();
+        }
+        void reset() noexcept { ieq = 0.0; }
+
+        inline double process(double x) noexcept
+        {
+            const double v = (gc * x - ieq) / (gc + 1.0 / kR);
+            ieq = 2.0 * gc * (x - v) - ieq;
+            return v;
+        }
+
+        // Bit-compare guard, like TrebleAttack::setC7: skips the coefficient
+        // recompute when setFitParams re-sends the same value every block.
+        void setC(double farads) noexcept
+        {
+            const double next = (farads > 0.0) ? farads : kC15Nominal;
+            if (std::memcmp(&next, &c, sizeof(double)) == 0)
+                return;
+            c = next;
+            if (fsSeen > 0.0)
+                gc = c * 2.0 * fsSeen;
+        }
+
+        static constexpr double kC15Nominal = 2.2e-6; // schematic value (inert in-band)
+        double gc = 0.0, ieq = 0.0;
+        double c = kC15Nominal;
+        double fsSeen = 0.0;
+    };
+
     // ---- C21 (100n) inter-stage coupling: first-order highpass --------------
     // Excluded from the isolated EqPreGain/Baxandall oracles (their boundary);
     // circuit.md/build-plan: C21 into the ~10k tone-stack input is a ~150 Hz HP
@@ -409,6 +467,7 @@ private:
     TrebleAttack treble;       // 3  treble+ATTACK
     DriveStage drive;          // 4  IC2_A DRIVE │ oversampled
     Clipper clipper;           // 5  IC3 + GRUNT │ region
+    OdCoupling odCoupling;     // 5b C15/R20/R21 │ (session-36, A3 step 3b)
     RecoveryBridgedT recovery; // 6  IC2_B       │
     SallenKeyLPF skB;          // 7a IC4_B 10.7k │
     SallenKeyLPF skA;          // 7b IC4_A 3.3k  ┘
