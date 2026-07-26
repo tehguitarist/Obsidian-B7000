@@ -104,6 +104,164 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 32, 2026-07-26): ▶ PHASE 9 / A3 STEP 2 — the first "what KIND of element"
+> question was asked and came back NEGATIVE. Analysis only — NOTHING in `src/` changed, ctest
+> unaffected. New tool `analysis/a3_extra_tf_probe.py`; `docs/phase9-validation.md` §4 "A3 step 2".**
+> **(1) THE QUESTION.** After step 1 (no existing stage can supply the missing LF lead), the sharpest
+> next question is whether the missing transfer is **minimum-phase**. If it were not, the search would
+> have to move to right-half-plane zeros — a genuine two-path cancellation in the OD chain — instead
+> of any ordinary passive network. Fitting candidate families (1st/2nd-order HP, shelf, resonant HP,
+> HP+all-pass) to the required complex `G(f) = s(f)·e^{i(θ_ped−θ_mdl)}` fails as step 1 predicted:
+> magnitude-optimal fits are 20–70° short in phase, phase-optimal fits blow magnitude by 20+ dB. That
+> constrains **those families**, not minimum-phase.
+> **(2) ⚠⚠ THE ESCALATION TO A BODE CEILING IS AN ARTEFACT — this is the session's finding, and it is
+> a NEGATIVE result that stops a wrong pivot.** For a fixed magnitude the minimum-phase realisation
+> gives the MAXIMUM lead of any causal LTI network, so reconstructing φ from the measured `s(f)` looks
+> like a topology-free ceiling. Run naively it appears decisive: **36–84° short at every band 20–80 Hz,
+> and the shortfall SURVIVES a monotone repair of the two weakest points** (40 Hz −84 → −37°). It is
+> still wrong. **The phase at 40 Hz is bought mostly by the magnitude slope BELOW 20 Hz, which no
+> capture in the matrix measures**, and the tails were extrapolated FLAT. Self-test on networks with
+> closed-form phase: integral itself 0.03–0.05°, 12-band grid 3.7–9.7°, **FLAT tail −36…−91° at
+> 20–40 Hz** — the entire size of the "surviving" shortfall. Declare a 12 dB/oct tail on the repaired
+> curve and 40 Hz goes **−37° → +1°**.
+> ⚠ And the rationale originally written into the probe — that flat tails are "most generous to the
+> candidate at 40 Hz" — is **BACKWARDS** for a curve falling toward LF: a highpass keeps falling below
+> 20 Hz and that continued slope is exactly what buys lead at 40 Hz, so truncating it destroys the
+> lead rather than conceding it.
+> **(3) CORROBORATION FROM THE OTHER SIDE (what makes it conclusive, not merely doubtful).** The
+> probe's own explicit candidates contradict its ceiling: **coincident 2nd-order highpasses at
+> fc = 70–85 Hz CLEAR the 40 Hz depth bound (+8.5 / +17.6°)**. A real ceiling cannot be beaten by a
+> construction satisfying it. ⇒ **do NOT record "no passive network can do this" and do NOT pivot to
+> two-path/RHP-zero candidates on this basis.**
+> **(4) WHAT SURVIVES = session 31 item (5) with numbers: the binding constraint is SHAPE, not
+> attainable lead.** The coincident HP that clears 40 Hz is 20–45° short at 64–80 Hz while running
+> 8–16 dB hot at 20–25 Hz. The requirement is a **HUMP**; one corner frequency cannot place it. Step
+> 1's pole+zero (lead-network) recommendation is **unchanged**.
+> **(5) ⚠ GENERAL METHOD TRAP WORTH KEEPING: a Hilbert/Bode phase reconstruction over a BAND-LIMITED
+> magnitude is not assumption-free, however model-free it looks.** The unmeasured tails dominate the
+> answer at the band edges — exactly where a bass problem lives. Never quote such a ceiling without
+> (a) a self-test against closed-form networks and (b) an explicit tail sweep. `min_phase()` now takes
+> the tail slopes as REQUIRED arguments instead of defaulting to flat, `selftest()` runs on every
+> invocation, and the tool prints its own VERDICT. Same lesson class as session 31 item (8) — the
+> self-test is the only thing that catches this.
+> **▶ NEXT = A3 step 2 proper, unchanged in direction by the above:** gate candidates on the NULL
+> (near 40 Hz at drive 2:30, migrating to ~22–25 Hz by max) AND on not over-rotating past 90° at
+> 202–254 Hz, never on band-RMS; pursue a pole+zero / lead-network shape rather than "more highpass".
+> `od_phase_probe` at drive-min is the cheap inner loop (the gap is linear); `a3_phase_solve` against
+> a candidate render is the acceptance check. Then A4 re-grade + GATE-9, the queued `gain-n12` HF
+> collapse, B (perf/HQ), C (carry-forwards), D (release).
+> ⚠ UNCOMMITTED at session close: `analysis/a3_extra_tf_probe.py`, `analysis/a3_phase_solve.py`,
+> `analysis/od_phase_probe.cpp` (all untracked), plus `CLAUDE.md` + `docs/phase9-validation.md`.
+> ── prior session ──
+> **CURRENT (session 31, 2026-07-26): ▶ PHASE 9 / A3 STEP 1 DONE — the missing LF phase is LOCALISED,
+> and the answer is a NEGATIVE result that redirects step 2: NO EXISTING STAGE CAN SUPPLY IT. Analysis
+> only — NOTHING in `src/` changed, ctest unaffected.**
+> **(1) ⭐ THE OD PHASE IS DRIVE-INDEPENDENT (<0.1° across the whole DRIVE knob, every band) — so A3's
+> phase gap is a LINEAR problem.** Develop and gate the fix at drive-min where the chain is linear; a
+> candidate that produces its phase shift *through* a nonlinearity is the wrong shape of fix. Also
+> confirms session 29's reading of the null migration: the null moves because |OD| grows past |bleed|
+> at ever-lower frequencies, not because anything rotates.
+> **(2) THE PER-STAGE PHASE BUDGET, MEASURED** (new `analysis/od_phase_probe.cpp`; GRUNT cut / BLEND
+> max / ATTACK flat; per-stage increment vs the clean tap, inversions removed). At 40 Hz: **jfet
+> +76.9 / treble −76.4 / drive −0.2 / clipper +87.4 / recovery −28.7 / skB −0.5 / skA −1.0 = +57.6**.
+> ⭐ The probe is VALIDATED: because `LevelBlend` is purely resistive and everything after it is
+> shared, its skA column IS the OD-vs-bleed phase at the BLEND node, and it reproduces session 29's
+> row (+104/+58/+24/+8/−7/−31/−37) exactly. **Both leads are first-order HPs already within 3–13° of
+> their 90° asymptote** — the JFET input HP (C2 1n into R4+R5 1.1M, 144.7 Hz) and the clipper's
+> GRUNT-cut coupling (~896 Hz, atan(896/40) = 87.4° exact).
+> **(3) THE REQUIREMENT IS NOW A BOUND, NOT AN ESTIMATE** (new `analysis/a3_phase_solve.py`). Since
+> |1 + m·e^{iθ}| traces a ray from 1 whose closest approach to the origin is |sin θ|, the DEEPEST
+> total at any drive gives **θ ≥ 180° − asin(min_d t_d / β)** — one capture per band, NO model of how
+> the OD grows with drive, and 1/3-oct banding can only fill a null so it is conservative. **θ(40 Hz)
+> ≥ 168° at EVERY plausible bleed level** (deficit ≥111°), and θ ≥ 97–130° at 80–127 Hz
+> (deficit ≥76–112°). Sharpens session
+> 29's "~140–180°" to the top of its own range. ⚠ **"Decaying to ~0 by 200 Hz" is WRONG** — ≈85–88°
+> still at 202–254 Hz (the pedal's totals rise monotonically with drive there, which needs θ<90°, not
+> θ≈0).
+> **(4) ⛔⛔ AND NO EXISTING STAGE CAN SUPPLY IT — the load-bearing result.** The treble lag
+> **saturates**: `jfetRo` 200k→20k buys +28°, deleting the C5 ladder (`trebleLadderDampR`→3 MΩ) +26°,
+> `jfetRq2` 1M→100k +18°. **With all three at absurd extremes SIMULTANEOUSLY the model reaches only
+> 94.0° at 40 Hz** vs the required ≥168 — still ≥74° short. Arithmetic agrees: the two HP leads sum to
+> +164° at 40 Hz and that needs ALL lag at zero, including the recovery bridged-T's −28.7°, which is
+> schematic-verified on both schematics AND capture-confirmed (GAP #1b, 116 OD rows) so it is not on
+> the table. Realistic headroom ≈ +65° against ~+110° needed. ⇒ **Stop looking for a mis-parameterised
+> stage; look for LF structure the OD path does not have.**
+> **(5) SHAPE CONSTRAINT — it is NOT "more highpass".** The deficit is a HUMP falling at both ends
+> (~35–54° at 20–25 Hz, ≥111 at 40, ≥103–112 at 80–101, ~76 at 127, ~50 at 202–254). Two cascaded
+> first-order HPs steep enough for 171° at 40 Hz (fc≈545 Hz each) leave **139° at 202 Hz where the
+> pedal still ADDS** and needs θ<90°. A pole+zero (lead-network / bandpass) character has the right
+> shape; the candidate must also not over-rotate past 180° at 20–40 Hz where the model already carries
+> +104°/+58°.
+> **(6) SEPARATE NEW FINDING — the model's OD magnitude vs DRIVE is NON-MONOTONE and the pedal's
+> cannot be.** Model μ_d = |od|/|bleed| at 40 Hz across min→max: **0.79 / 1.22 / 2.30 / 3.84 / 2.87**
+> — peaks at 2:30, FALLS by max. The pedal's must keep growing straight through the null and out the
+> far side (−31.8 dB at 2:30 → −14.7 at max requires m to pass 1 and continue). Independent of the
+> phase gap (it is why the least-squares residual is ~4 dB at 40–101 Hz and nowhere else), likely the
+> clipper compressing too early at max drive (GAP #3a territory). **Needs its own gate — do not fold
+> it into the phase fix.**
+> **(7) ⚠ THE BLEED LEVEL IS NOT SETTLED, AND SESSION 29'S OWN LESSON RECURSES.** The least-squares
+> fits β = **−15.2 dB** vs the model's −16.93, i.e. the model's bleed is ~1.7 dB **LOW** — opposite in
+> sign to session 29, which read the pedal's drive-min total (−17.4…−18.3) as the bleed. Both are
+> defensible; they disagree because **the drive-min total is itself already pulled down by the same
+> cancellation** (θ≈180° at LF makes even a small OD subtract) — exactly the trap session 29 caught at
+> drive-noon, one notch weaker and unnoticed. Treat the bleed as ±2 dB and unresolved; the plan
+> already said not to fit it until the phase is right.
+> **(8) ⚠ METHOD TRAP WORTH KEEPING: a two-phasor magnitude solve is BIMODAL in the magnitude.** My
+> first `a3_phase_solve` used a golden section over m and returned a 7° error at 20 Hz on data
+> SYNTHESISED FROM THE MODEL ITSELF (where the residual must be 0). At fixed θ with cos θ<0 the
+> predicted level dips *through* the cancellation and rises again, so a unimodal search silently picks
+> the wrong branch. **Grid both axes**, and keep the self-test — it is what caught it.
+> **▶ NEXT = A3 step 2, revised by (4)/(5): gate candidates on the NULL** (near 40 Hz at drive 2:30,
+> migrating to ~22–25 Hz by max) **AND on not over-rotating past 90° at 202–254 Hz**, never on
+> band-RMS. `od_phase_probe` at drive-min is the cheap inner loop (the gap is linear, per (1));
+> `a3_phase_solve` against a candidate render is the acceptance check. Then A4 re-grade + GATE-9,
+> the queued A3-adjacent `gain-n12` HF collapse, B (perf/HQ), C (carry-forwards), D (release).
+> Full detail: `docs/phase9-validation.md` §4 "A3 step 1", §0 backlog.
+> ── prior session ──
+> **CURRENT (session 30, 2026-07-26): ▶ PHASE 9 / A3 — user chart-review CORROBORATES session 29's
+> root cause independently, finds a report-methodology trap, and surfaces ONE NEW unlocalized open
+> item. Analysis only — NOTHING in `src/` changed, ctest 17/17 unaffected. `main` was also merged
+> this session (fast-forward, no other branches pending) and now carries through session 29's commit
+> `0a1f67c`.**
+> **(1) Independent corroboration of the A3 root cause, from raw FR charts rather than a phasor
+> decomposition.** User read `ref-od`'s FR chart directly: pedal dips at 40–50 Hz then peaks at
+> 160–200 Hz; plugin rises monotonically and peaks at 63–80 Hz instead, no dip. Exactly the signature
+> the session-29 missing cancellation null predicts — confirmed against `comprehensive_data.json` +
+> a fresh render on current `main`. Nothing new, but a second, independent read of the same
+> still-unfixed gap.
+> **(2) ⭐ REPORT-METHODOLOGY TRAP FOUND: the report's single broadband gain-match can manufacture a
+> FAKE "increasing HF rolloff" while A3 is open — this affects how every current/future chart should
+> be read, not just this one.** `fr_at_bands()`'s one scalar-per-capture least-squares gain-match
+> (`null_depth()`, whole-sweep time-domain fit) gets dragged down by the plugin's LF excess, which
+> then paints an illusory rolloff onto everything above it. Proved by re-anchoring the match to
+> bands ≥200 Hz only: an apparent −3…−6 dB "shortfall" growing to −10 dB by 6 kHz on `ref-od`
+> collapses to ≤~1–2 dB, while the real LF error is exposed as the plugin running **+8…+10 dB too
+> hot** at 40–63 Hz (consistent with (1)). New caveat recorded in `docs/phase9-validation.md` §3 —
+> read it before trusting any "increasing shortfall with frequency" observation before A3 ships.
+> **(3) The 320→400→~800 Hz dip/peak/dip structure the user also flagged is a re-confirmation, at
+> finer resolution, of two already-known/partially-fixed items** — GAP #2's TrebleAttack notch
+> (session 19's fix was explicitly "modest": model's 320 Hz dip is ~0.3–0.4 dB vs the pedal's real
+> ~1.6 dB) and GAP #1b's bridged-T scoop (closed on a 116-row aggregate median, not checked at this
+> single-capture resolution before). Worth a fresh look after A3 changes the BLEND-node level
+> feeding this region — not urgent on its own.
+> **(4) ⭐ NEW, UNLOCALIZED — a genuine level-dependent HF collapse in `ref-od_gain-n12` that
+> `ref-od` does NOT have.** After correcting for (2)'s artifact, a real ~2–4 dB dip persists at
+> 400–1000 Hz plus a much bigger **~10–12 dB narrowband collapse at 5.1–6.4 kHz**, tapering into a
+> −5…−6 dB shelf through 8–16 kHz. Checked it isn't just measurement noise: coherence drops to
+> 0.59–0.78 in-band (vs 0.90+ neighbouring) but the plugin's absolute band-limited RMS is genuinely
+> ~12 dB lower too (−50.5 vs −38.4 dBFS, 4.8–7 kHz) — real missing energy. Present ONLY at the
+> reduced (`gainSessionDb=-12`) stimulus level, ruling out a static filter/EQ cause (not
+> level-dependent) and pointing at gain-staging or a nonlinear operating-point difference instead.
+> **Not localised, not in any prior session's findings.** Recorded in `docs/phase9-validation.md`
+> §0 backlog ("A3-adjacent") and §4 "A3 chart-review corroboration" — **deliberately parked for
+> AFTER A3 ships**, since A3's fix changes the gain-staging feeding this same region.
+> **▶ NEXT is unchanged from session 29's order (still the live plan) PLUS the new item queued
+> behind it:** (1) localise the missing OD-vs-bleed phase per stage with `od_taps_probe.cpp`; (2)
+> gate any candidate on reproducing the migrating NULL, not band-RMS; (3) only then revisit the
+> ~1 dB residual bleed level. **Then** investigate item (4) above (the gain-n12 HF collapse) — do
+> it after A3 ships, not before, since A3 changes the operating point that likely feeds it. Then A4
+> re-grade + GATE-9, B (perf/HQ), C (carry-forwards), D (release).
+> ── prior session ──
 > **CURRENT (session 29, 2026-07-26): ▶ PHASE 9 / A3 — ⭐ ROOT CAUSE FOUND, NOT YET FIXED. A3 IS NOT
 > A LEVEL ERROR: the pedal has an LF CANCELLATION NULL the model cannot produce. Analysis only —
 > NOTHING in `src/` changed, ctest 17/17 unaffected.**
