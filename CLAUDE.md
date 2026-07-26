@@ -104,6 +104,65 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 38, 2026-07-27): ▶ PHASE 9 — ⭐ GAP #3b IS DISSOLVED, NOT SOLVED: its premise had
+> EXPIRED, and the GRUNT span turns out to be an A3 *instrument* rather than a gap of its own. Sessions
+> 34–37 also COMMITTED (`bc2b1fd`, 17 files, ctest verified 17/17 first). Analysis only — NOTHING in
+> `src/` changed, ctest 17/17. Full detail in `docs/phase9-validation.md` §4 "GAP #3b DISSOLVED".**
+> **(1) ⚠⚠ THE HANDOVER'S "BIGGEST REMAINING OD GAP" RESTED ON A 14-SESSION-OLD MEASUREMENT THAT NO
+> LONGER HELD.** Session 23 recorded the pedal's GRUNT span (flat−cut, drive-min) as a **bump** at
+> 127–202 Hz against the model's **monotone shelf maximal at DC** (+13.8 dB @40 Hz), and concluded *"a
+> first-order coupling cap can never turn a shelf into a bump."* Re-measured at the shipped state the
+> pedal row reproduces **exactly** (it is a capture) and the model row is **completely different**: it is
+> now a **bump peaking +10.3 dB at 90–101 Hz, going negative below 50**. Nobody worked on GRUNT —
+> **`trebleC7` (s34/35) and `clipC15` (s36/37) did it as a side effect.** ⭐ **LESSON, one level up from
+> s35's "verify the CONSTANT, not the prose" and s37's "verify the BASELINE, not its LABEL": VERIFY THE
+> PREMISE, not the prior session's framing of it — a stale premise is the most expensive kind, because it
+> selects the whole next workplan.** Nine of the "▶ NEXT" line's words were doing all the steering.
+> **(2) ⭐⭐ THE MECHANISM — AND IT IS THE GAP #1b CATEGORY ERROR, ONE GAP OVER.** Exact BLEND-node
+> decomposition (`a3_blend_decompose`, `full = od + bleed`, self-checked <−280 dB) separates them: **the
+> OD path's own GRUNT span is a monotone shelf in BOTH builds and is essentially UNCHANGED** (19.12→5.27
+> dB pre-C7/C15, 19.17→5.50 post). So the cap never had to convert anything — **the BLEND SUM does it for
+> free**: the total is `OD + bleed`, so once |OD| drops below the flat bleed at LF the span is squeezed
+> toward 0 there and a monotone OD shelf *presents* as an output bump. Session 23 compared the model's
+> **OD-path** shape against the pedal's **OUTPUT** shape — exactly session 21's GAP #1b finding
+> ("compared the isolated stage transfer against the pedal's OUTPUT shape"), recurring one gap later.
+> ⇒ **whenever the observable is post-BLEND, the bleed is part of the transfer.**
+> **(3) WHAT REMAINS, MEASURED PROPERLY** (parabolic peak on the log-f axis — never off the 1/3-oct grid):
+> **flat: pedal 178 Hz @ +6.27 dB vs model 96 Hz @ +10.27 (0.89 oct LOW, 4.00 dB TALL); boost: pedal
+> 144 Hz @ +11.23 vs model 70 Hz @ +16.39 (1.04 oct, 5.16 dB).** Flat and boost agree to 0.15 oct /
+> 1.2 dB ⇒ **ONE coherent error**, and both quantities are properties of the **OD/bleed crossover = A3**.
+> **(4) ⛔ AND THE CAPS PROVABLY CANNOT REACH IT — sharper than s23's "no interior minimum".** The s23
+> scan predated C7/C15 so it could NOT be carried forward; re-run at the shipped state it is still
+> monotone (mean span-err 6.55 → 5.08 at C12 ×0.5 → 4.77 at ×0.25; 7.72/8.61 the other way). The decisive
+> statement is the **locus**, since one cap moves height and frequency together: **C12 47n → 90 Hz/+10.28,
+> 24n → 110/+7.11, 12n → 126/+4.30, 6n → 137/+2.40, 3n → 142/+1.28, 1n5 → 147/+0.65.** It runs **right and
+> DOWN**, asymptoting near ~150 Hz with the height collapsing through zero; **the pedal's point (178 Hz,
+> +6.27 dB) is right and UP — off the curve in BOTH coordinates at once, so no cap value reaches it.**
+> ⇒ **3b needs no GRUNT-side fix. Session 23's own "fold it into A3" verdict STANDS**; the session-37
+> handover's re-elevation of it to "the biggest remaining OD gap, needs its own structural fix" does not.
+> **(5) ⚠⚠ A DEFECT IN `grunt_span_probe.py`'s OWN PREMISE, AND IT HAD ALREADY MISLED A DECISION.** Its
+> docstring claimed the position-to-position difference *"cancels the entire rest of the chain EXACTLY —
+> the clean/OD blend balance, every EQ band, the gain-match, the output makeup."* The EQ/gain-match/makeup
+> DO cancel (post-BLEND **multipliers**); **the blend balance does NOT** — the bleed is **additive**,
+> inside the log, so it survives any ratio. Measured consequence: on this metric **`clipC15 = 1.5 nF`
+> scores 3.654/1.755 vs the shipped 5.2 nF's 6.862/4.507** — it *prefers the value session 37 rejected on
+> β-free evidence*, for the reason s37 identified (it rewards anything that attenuates the OD path).
+> ⇒ **never use the GRUNT span to select a SHARED OD-path element** — only GRUNT-side ones (C11/C12/C13,
+> R16). Docstring corrected. `a3_blend_decompose` gained `--fit clipC12=/clipC13=`.
+> **(6) ⭐ THE PAYOFF — A NEW A3 GATE THAT MEASURES SOMETHING NONE OF THE OTHERS DO.** A3's gates read
+> null DEPTH (`a3_lead_fit`), the DRIVE axis (G1/G2) and the LEVEL axis (`a3_level_axis`). **None reads
+> the CROSSOVER FREQUENCY** — where |OD| overtakes the bleed — and that is exactly what the span's bump
+> peak locates, amplified by sitting on the cancellation. **NEW A3 SUB-GATE: the model's GRUNT-span bump
+> must peak within ~1/6 octave of 178 Hz (flat) / 144 Hz (boost) at drive-min; it is currently ~1 octave
+> LOW and ~4–5 dB TALL.** A candidate that improves null depth while leaving the crossover an octave low
+> has not fixed A3.
+> **▶ NEXT: (a) the ~1 dB mid-band clipper-side item as a JOINT `clipSat`/`kInputRef` re-fit** (session 37
+> item 4 — never a one-parameter scan: the VTC is a real lever on the level axis but two subsets are
+> monotone in OPPOSITE directions, so it trades regions unless fitted with its degenerate partner), now
+> carrying **(6)'s crossover sub-gate** as an acceptance check alongside the null/level gates. **(b)** Then
+> A4 re-grade + GATE-9, the queued `gain-n12` HF collapse, B (perf/HQ), C (carry-forwards), D (release).
+> ✅ **Sessions 34–37 are COMMITTED as `bc2b1fd`.** Session 38's own edits are uncommitted at this line.
+> ── prior session ──
 > **CURRENT (session 37, 2026-07-26): ▶ PHASE 9 / A3 STEP 3c — ⭐ THE LEVEL AXIS IS GATED FOR THE FIRST
 > TIME. The queued −12/−6 dBFS "clipper-side over-compression" item is now MEASURED and it is SMALL
 > (~0.5–1.1 dB, mid-band); the DOMINANT level-axis error is `clipC15`, which session 36 shipped at

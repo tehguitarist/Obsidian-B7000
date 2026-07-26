@@ -3,9 +3,33 @@
 
 The GAP #4 method, applied to GRUNT. The capture matrix holds three captures that
 differ in NOTHING but the GRUNT position (same drive/level/blend/EQ/attack, same
-input), so a position-to-position DIFFERENCE cancels the entire rest of the chain
-EXACTLY -- the clean/OD blend balance, every EQ band, the gain-match, the output
-makeup. Whatever is left is the GRUNT coupling network alone:
+input), so a position-to-position DIFFERENCE cancels every POST-BLEND multiplier
+EXACTLY -- every EQ band, the gain-match, the output makeup.
+
+⚠⚠ IT DOES **NOT** CANCEL THE CLEAN/OD BLEND BALANCE, and an earlier version of
+this docstring claimed it did (corrected session 38). The measured total is
+`OD(pos) + bleed` -- the bleed is ADDITIVE, inside the log, so it does not divide
+out of a position-to-position ratio the way a post-BLEND gain does. Consequences,
+both load-bearing:
+
+  * the span at the OUTPUT is NOT the GRUNT network's own response. The OD path's
+    GRUNT span is a monotone high-pass SHELF at every value (verified by exact
+    decomposition, `a3_blend_decompose`), but once |OD| falls below the bleed at
+    LF the OUTPUT span presents as a BUMP. Session 23 read the model's shelf
+    against the pedal's output bump and concluded "no cap can convert one into
+    the other" -- true of the OD path, but the BLEND sum does the conversion, and
+    once trebleC7/clipC15 fixed the OD/bleed ratio the model's output span became
+    a bump on its own with the GRUNT caps untouched. Same category error as GAP
+    #1b (session 21: isolated stage transfer vs the pedal's output shape).
+  * ⛔ this metric MUST NOT be used to select a SHARED OD-path element. It is
+    sensitive to the OD/bleed ratio, i.e. to A3, so it scores an element that
+    attenuates the OD path as an improvement. Measured directly: it prefers
+    `clipC15 = 1.5 nF` (3.654/1.755) over the shipped 5.2 nF (6.862/4.507) -- the
+    value session 37 rejected on beta-free evidence. Use it ONLY for GRUNT-side
+    elements (C11/C12/C13, R16), where the position-to-position difference really
+    is the differential.
+
+Whatever is left, read with those caveats, is the GRUNT coupling network:
 
     span(pos) = transfer(pos) - transfer(cut)        per 1/3-oct band
 

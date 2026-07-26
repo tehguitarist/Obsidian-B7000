@@ -132,6 +132,20 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   **inverts** the switch's measured boost-over-flat ordering (−3.8 dB vs the pedal's +5.9) — the same
   trap that got GAP #4's joint fit rejected. The pedal's GRUNT span is a 127–202 Hz **bump**, the
   model's a monotone **shelf**: no cap value converts one into the other. §4 "3b CLOSED".
+  **⭐ RE-OPENED AND DISSOLVED (session 38) — the "shelf vs bump" premise was STALE and the conclusion
+  is now stronger, not weaker.** The premise died on its own: at the shipped state the model's OUTPUT
+  span **is** a bump (peak +10.3 dB at 90–101 Hz, negative below 50), because `trebleC7` + `clipC15`
+  changed the OD/bleed ratio. The **OD path's own span is still a monotone shelf and is essentially
+  unchanged** (19.12→5.27 dB pre, 19.17→5.50 post, by exact decomposition) — nothing touched the GRUNT
+  network; **the BLEND sum does the shelf→bump conversion for free** once |OD| drops below the bleed at
+  LF. So session 23 compared an OD-path shape against an OUTPUT shape — the GAP #1b category error
+  (session 21) one gap over. **The cap scan was re-run at the shipped state anyway** (it could not be
+  carried forward) and is still monotone with no interior minimum; sharper, the (peak-frequency,
+  peak-height) locus C12 traces — 47n 90 Hz/+10.3 → 12n 126/+4.3 → 1n5 147/+0.7 — moves right and
+  **DOWN**, while the pedal's point (178 Hz/+6.3) is right and **UP**: **off the curve in both
+  coordinates at once, so no cap value can reach it.** ⇒ **3b needs no GRUNT-side fix; session 23's own
+  "fold it into A3" verdict stands.** What is new is that the span is a *magnifier* of A3's crossover
+  and yields a sub-gate no other A3 gate provides — see §4 "GAP #3b DISSOLVED".
 - [x] **A2d. The sub-60 Hz clean deficit — FIXED + shipped (session 28), user-reported.** `c21R`
   100k → **220k** (corner 15.9 → 7.2 Hz). `bypass.wav` round-trips at −0.03 dB across 20–63.5 Hz, so
   the deficit was the plugin, not the rig; it was identical in all 30 clean captures (shared
@@ -266,11 +280,10 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   **The +0.28 dB ALL-OD regression is the 28 GRUNT flat/boost rows and is EXPECTED — do not fix it
   with C15.** Baselines (`comprehensive_data.json`, `build/a3_dec_drv*.csv`, `build/a3_lvl*.csv`)
   regenerated at the shipped state.
-  **▶ NEXT: (i) GAP #3b properly — the GRUNT bump-vs-shelf** (session 23: the pedal's GRUNT span is a
-  *bump* at 127–202 Hz, the model's a monotone *shelf*), which is what those 28 rows actually need and
-  is now the largest single OD group error (flat 4.055 / boost 5.449 vs cut 2.284); **(ii)** then the
-  ~1 dB mid-band clipper item as a **joint `clipSat`/`kInputRef` re-fit**, never a one-parameter scan.
-  §4 "A3 step 3c".
+  **▶ NEXT: ~~(i) GAP #3b properly — the GRUNT bump-vs-shelf~~ — RESOLVED session 38, and it needs NO
+  GRUNT-side fix; see the A3-next (iii) entry above and §4 "GAP #3b DISSOLVED". (i) is now the joint
+  `clipSat`/`kInputRef` re-fit** (never a one-parameter scan), carrying the new GRUNT-derived crossover
+  sub-gate. §4 "A3 step 3c".
 - [ ] **A4. Write final GATE-9 numbers into §4.** GATE-9 should wait for A3, which is the last
   documented gap materially moving these numbers.
 - [~] **A2c. Clean-baseline accuracy pass — STARTED (session 24, 2026-07-25), user-initiated.**
@@ -2651,6 +2664,98 @@ off a clean chart.
 `master-1700_gain-n12` and `ref-clean_gain-n12` have deltas identical to <0.001 dB — MASTER is a
 flat divider so all four are ONE shape. Flat-EQ evidence is effectively **2 independent shapes**
 (that group + `ref-clean.wav`, which differs by ~0.18 dB = the take-to-take floor), not 5.
+
+### ⭐ GAP #3b DISSOLVED (session 38, 2026-07-27) — the premise was stale, and the GRUNT span turns out to be an A3 *instrument*, not a gap
+
+Analysis only. **NOTHING in `src/` changed**, so ctest is untouched at 17/17. The only code change is two
+extra `--fit` keys (`clipC12`/`clipC13`) on `a3_blend_decompose`, plus a docstring correction on
+`grunt_span_probe.py` (a real defect — see item 5).
+
+**(1) THE HANDOVER'S "BIGGEST REMAINING OD GAP" RESTED ON A 14-SESSION-OLD MEASUREMENT, AND IT HAD
+EXPIRED.** Session 23 recorded: pedal GRUNT span (flat−cut, drive-min) is a **bump** centred 127–202 Hz;
+plugin is a **monotone high-pass shelf maximal at DC** (+13.8 dB at 40 Hz); *"a first-order coupling cap
+can only move a shelf's corner — it can never turn a shelf into a bump."* Re-measured at the shipped
+state, the pedal row reproduces **exactly** (it is a capture) and the plugin row has completely changed:
+
+| band Hz | 25 | 32 | 40 | 50 | 64 | 80 | 101 | 127 | 160 | 202 | 254 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| pedal | −1.1 | −2.0 | −3.1 | −2.7 | +0.5 | +3.5 | +5.2 | **+6.0** | **+6.2** | **+6.2** | +5.6 |
+| plugin (s23) | +12.8 | +13.4 | **+13.8** | +13.8 | +13.5 | +13.0 | +12.2 | +11.0 | +9.3 | +7.0 | +4.6 |
+| plugin (NOW) | −3.8 | −9.2 | −5.9 | +3.6 | +8.3 | +10.0 | **+10.3** | +9.6 | +8.5 | +6.9 | +5.1 |
+
+**The model now makes a bump.** Nobody worked on GRUNT — `trebleC7` (s34/35) and `clipC15` (s36/37) did
+it as a side effect. Same lesson class as *"verify the CONSTANT, not the prose"* (s35) and *"verify the
+BASELINE, not its LABEL"* (s37), one level up: **verify the PREMISE, not the prior session's framing of
+it.** A stale premise is the most expensive kind, because it selects the next session's whole workplan.
+
+**(2) ⭐⭐ AND THE MECHANISM SHOWS SESSION 23's INFERENCE WAS A CATEGORY ERROR — THE GAP #1b TRAP, ONE GAP
+OVER.** The exact BLEND-node decomposition (`a3_blend_decompose`, `full = od + bleed` self-checked to
+<−280 dB) separates the two. The **OD path's own GRUNT span is a monotone shelf in BOTH builds and is
+essentially unchanged**:
+
+| flat−cut span, drive-min | 25 | 32 | 40 | 101 | 202 | 403 | 640 |
+|---|---|---|---|---|---|---|---|
+| **OD path**, PRE (C7 100n, C15 inert) | 19.12 | 18.88 | 18.26 | 14.06 | 12.64 | 9.39 | 5.27 |
+| **OD path**, POST (shipped) | 19.17 | 19.11 | 19.00 | 17.38 | 14.08 | 9.78 | 5.50 |
+| **OUTPUT**, PRE | 12.81 | 13.48 | 13.31 | 8.87 | 4.79 | 1.44 | 0.61 |
+| **OUTPUT**, POST | −2.97 | −10.65 | −5.52 | 10.18 | 6.24 | 2.49 | 1.03 |
+
+⇒ *"a coupling cap can never turn a shelf into a bump"* is **true, and irrelevant**: the cap never had
+to. **The BLEND sum does the conversion for free** — the total is `OD + bleed`, so once |OD| falls below
+the flat bleed at LF the span is squeezed toward 0 there and a monotone OD shelf presents as an output
+bump. Session 23 compared the model's **OD-path** shape against the pedal's **OUTPUT** shape. That is
+precisely GAP #1b's error (session 21: *"session 20 compared the model's isolated stage transfer against
+the pedal's OUTPUT shape"*), recurring one gap later. **Whenever the observable is post-BLEND, the bleed
+is part of the transfer.**
+
+**(3) WHAT ACTUALLY REMAINS, MEASURED PROPERLY.** Peak located by parabolic interpolation on the log-f
+axis, never off the 1/3-octave grid (the standing rule):
+
+| position | pedal peak | model peak | error |
+|---|---|---|---|
+| flat | **178 Hz @ +6.27 dB** | 96 Hz @ +10.27 dB | **0.89 oct LOW, 4.00 dB TALL** |
+| boost | **144 Hz @ +11.23 dB** | 70 Hz @ +16.39 dB | **1.04 oct LOW, 5.16 dB TALL** |
+
+Flat and boost agree to 0.15 oct and 1.2 dB ⇒ **ONE coherent error, not two**, and both quantities are
+properties of the **OD/bleed crossover** — i.e. A3 — not of the GRUNT network.
+
+**(4) ⛔ AND THE CAPS PROVABLY CANNOT REACH IT — a sharper result than session 23's "no interior
+minimum".** The s23 scan predated C7/C15 so it could not be carried forward; re-run at the shipped state
+it is still monotone (mean span-err 6.55 shipped → 5.08 at C12 ×0.5 → 4.77 at ×0.25, and 7.72/8.61 going
+the other way; C13 likewise 8.07 → 5.94 → 4.23). But the decisive statement is the **locus**, because one
+cap moves peak height and peak frequency *together*:
+
+| C12 | 47n (ship) | 24n | 12n | 6n | 3n | 1n5 |
+|---|---|---|---|---|---|---|
+| flat-span peak | 90 Hz / **+10.28** | 110 / +7.11 | 126 / +4.30 | 137 / +2.40 | 142 / +1.28 | 147 / **+0.65** |
+
+The locus runs **right and DOWN**, asymptoting near ~150 Hz with the height collapsing through zero. The
+pedal's point is **178 Hz at +6.27 dB — right and UP.** It is off the curve **in both coordinates at
+once**, so *no* value of C12 reaches it; the monotone "smaller is better" score is the familiar
+degeneracy (shrink the element until it stops contributing), buying frequency by throwing away height.
+Same for C13 on the boost row. ⇒ **GAP #3b needs no GRUNT-side fix. Session 23's own verdict — "3b is
+GAP #3/A3 seen through the GRUNT switch, not a gap of its own; fold it into A3" — stands.** The session-37
+handover's re-elevation of it to *"the biggest remaining OD gap, needs its own structural fix"* does not.
+
+**(5) ⚠⚠ A DEFECT IN `grunt_span_probe.py`'s OWN PREMISE, AND IT HAD ALREADY MISLED A DECISION.** Its
+docstring claimed the position-to-position difference *"cancels the entire rest of the chain EXACTLY —
+the clean/OD blend balance, every EQ band, the gain-match, the output makeup."* The EQ bands, gain-match
+and makeup do cancel (post-BLEND **multipliers**). **The blend balance does not** — the bleed is
+**additive**, inside the log, so it survives any ratio. Consequence, measured: on this metric
+`clipC15 = 1.5 nF` scores **3.654 / 1.755** against the shipped 5.2 nF's **6.862 / 4.507** — the metric
+*prefers the value session 37 rejected on β-free evidence*, for exactly the reason session 37 identified
+(it rewards anything that attenuates the OD path). ⇒ **the GRUNT span must never be used to select a
+SHARED OD-path element** — only GRUNT-side ones (C11/C12/C13, R16), where the difference genuinely is the
+differential. Docstring corrected.
+
+**(6) ⭐ THE PAYOFF: THE SPAN IS A MAGNIFIER OF A3's CROSSOVER, AND IT MEASURES SOMETHING NO OTHER A3
+GATE DOES.** A3's existing gates read null *depth* (`a3_lead_fit`), the *drive* axis (G1/G2) and the
+*level* axis (`a3_level_axis`). None reads the **crossover frequency** — where |OD| overtakes the bleed —
+and that is exactly what the span's bump peak locates, amplified by sitting on the cancellation. **New A3
+sub-gate: the model's GRUNT-span bump must peak within ~1/6 octave of 178 Hz (flat) / 144 Hz (boost) at
+drive-min. It is currently ~1 octave low, and it is ~4–5 dB too tall.** Carry this into the joint
+`clipSat`/`kInputRef` re-fit as an acceptance check — a candidate that improves the null depth while
+leaving the crossover an octave low has not fixed A3.
 
 ### ▶ Remaining candidates (not yet investigated)
 

@@ -85,6 +85,10 @@ int main(int argc, char** argv)
         {"clipC15", &FitParams::clipC15},
         {"trebleLadderDampR", &FitParams::trebleLadderDampR},
         {"clipC11", &FitParams::clipC11}, {"clipA0", &FitParams::clipA0},
+        // The switched GRUNT caps, added session 38 so the GRUNT SPAN can be scanned
+        // at the shipped state. Session 23's "no interior minimum" scan predates
+        // trebleC7/clipC15, so it had to be re-run rather than carried forward.
+        {"clipC12", &FitParams::clipC12}, {"clipC13", &FitParams::clipC13},
         {"railNeg", &FitParams::railNeg}, {"railPos", &FitParams::railPos},
         {"jfetGm", &FitParams::jfetGm},
         // The clipper VTC + JFET shaper, added session 37 so the LEVEL axis can be
