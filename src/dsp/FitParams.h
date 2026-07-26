@@ -222,15 +222,44 @@ struct FitParams
     // tone stack's effective INPUT impedance, which is a nominal ~10k estimate,
     // not a single schematic part. It sets a ~159 Hz highpass that audibly shapes
     // bass, so it is a real fit knob (fit alongside the tone stack).
-    double c21R = 100.0e3;  // session-18 Phase-9 A/B fit (was nominal 10k). The clean-sweep
-                            // capture shows the tone-stack coupling corner is ~16 Hz, NOT the
-                            // 159 Hz the 10k estimate gave: the plugin was 6-15 dB bass-light
-                            // below ~100 Hz (identical clean & driven -> shared post-BLEND HP).
-                            // Fit on ref-clean (flat EQ) + validated across 34 EQ/blend captures:
-                            // low-band RMS deficit 9.8 -> 0.69 dB, no overshoot. Implies C21's
-                            // effective RC is ~10x nominal (C21 > 100n OR stack input Z > 10k) —
-                            // ⚠ C21's schematic value/placement is worth a schematic-checker pass;
-                            // the capture is authoritative on the corner (dsp.md fit-the-corner).
+    double c21R = 220.0e3;  // session-28 A2d (was 100k, session-18; nominal 10k). Corner ~7.2 Hz.
+                            //
+                            // Session 18 moved 10k -> 100k (159 -> 15.9 Hz) and closed most of a
+                            // 6-15 dB bass deficit. Session 28 found the REST of it: over the 30
+                            // clean captures the plugin was still uniformly bass-light below
+                            // ~63 Hz — bypass-corrected flat-EQ residual -1.31 dB @20 Hz, -0.75
+                            // @31.7, -0.38 @40, 0.00 @63.5. It is NOT the measurement chain:
+                            // bypass.wav round-trips at -0.03 dB across every one of those bands.
+                            // It is in the SHARED post-BLEND path (identical in all 30 captures),
+                            // and C21 is the only audible-band highpass there — everything else in
+                            // the clean path corners at <=1.6 Hz.
+                            //
+                            // NOT the "delete the element" degeneracy that killed the session-5/6
+                            // clipper fits and the GAP #3b C13 candidate: the 8-capture clean scan
+                            // has an INTERIOR minimum with pushback on both sides, on all three
+                            // metrics (<=63 Hz RMS: 100k 0.849 / 150k 0.421 / 180k 0.319 /
+                            // 220k 0.261 / 270k 0.248 / 330k 0.260 / 470k 0.287; 20 Hz-10 kHz mean
+                            // minimises AT 220k, 0.471 -> 0.283). 220k lands 20 Hz dead on
+                            // (-1.28 -> -0.02 dB) and is within 0.001 dB of optimum on the agreed
+                            // 30 Hz-10 kHz band, where the curve is nearly flat from 150k-270k.
+                            //
+                            // ⚠ TWO CAVEATS, do not read this as "found the real circuit".
+                            // (a) The implied corner is not perfectly constant across the LF bands
+                            // (7-10 Hz over 20-40 Hz), so this is a corner APPROXIMATION; a purely
+                            // first-order mismatch would give one number. The residual +0.20 dB
+                            // low-mid tilt (see docs/phase9-validation.md A2d) contaminates the
+                            // solve above ~50 Hz. (b) 220k is 22x the nominal stack input Z, so
+                            // the physical story for C21 is thin — same posture as 10k -> 100k, and
+                            // the same third branch as R36/C13/the [ENG] mid caps: our schematic is
+                            // a clone of the ORIGINAL B7K, the captured unit is an Ultra. This is a
+                            // behavioural match to the unit we recorded. C21's schematic
+                            // value/placement is STILL worth a schematic-checker pass; the capture
+                            // is authoritative on the corner (dsp.md fit-the-corner).
+                            //
+                            // ⚠ ONE CAPTURE REGRESSES, monotonically with c21R: bass-0930 (BASS
+                            // cut) 0.424 -> 0.554 dB band-RMS. It is already +1.0 dB relative at
+                            // 40 Hz before this change — the Baxandall bass CUT is ~1 dB too
+                            // shallow there, a separate and smaller gap. Do not fix it with c21R.
 
     // ---- Bridged-T recovery network (RecoveryBridgedT.h) -------------------
     // Risk register #1. The ideal-value response is a ~-28 dB notch at ~717 Hz,

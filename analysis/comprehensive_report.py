@@ -6,11 +6,18 @@ and writes a JSON report consumable by dashboard_gen.py, report_audit.py, gap_au
 cascade_analysis.py and capture_outlier_scan.py.
 
 Run from repo root:
-    python3 analysis/comprehensive_report.py [--os 8] [--keep-renders DIR]
+    python3 analysis/comprehensive_report.py [--os 8] [--keep-renders DIR] [--jobs N]
+
+Captures are INDEPENDENT (each is one render + one analysis against a shared
+read-only reference), so the run is embarrassingly parallel and defaults to
+several worker processes — a full 63-capture run goes from ~30 min to ~5 min on
+a 10-core machine. Use `--jobs 1` for the old serial behaviour when debugging;
+results are identical either way (capture order in the JSON is preserved).
 
 Output: analysis/reports/comprehensive_data.json
 """
 import argparse
+import concurrent.futures as cf
 import json
 import os
 import subprocess
@@ -41,6 +48,10 @@ OUTPUT_JSON = "analysis/reports/comprehensive_data.json"
 # Bump CACHE_VERSION when analyse_one's MATH changes (the args/binary won't).
 CACHE_DIR = "analysis/reports/cache"
 CACHE_VERSION = "1"
+# Leave 2 cores for the OS/editor; cap at 8 because each worker peaks ~600 MB
+# (reference + capture + render + FFT buffers) and 8 x 600 MB is comfortable on
+# a 16 GB machine while 10+ starts competing for memory bandwidth.
+DEFAULT_JOBS = max(1, min(8, (os.cpu_count() or 2) - 2))
 
 
 def _file_sig(path):
@@ -69,9 +80,20 @@ def _cache_load(key):
 
 
 def _cache_store(key, record):
+    # Atomic write: several worker processes write here concurrently, and an
+    # interrupted run must not leave a half-written record that _cache_load
+    # would later treat as a valid (but truncated) result.
     os.makedirs(CACHE_DIR, exist_ok=True)
-    with open(os.path.join(CACHE_DIR, key + ".json"), "w") as fh:
-        json.dump(record, fh)
+    final = os.path.join(CACHE_DIR, key + ".json")
+    fd, tmp = tempfile.mkstemp(dir=CACHE_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(record, fh)
+        os.replace(tmp, final)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 DRIVEN_SWEEPS = ("sweep_drv_-18", "sweep_drv_-12", "sweep_drv_-6")
 ALL_SWEEP_LEVELS = ("sweep_clean",) + DRIVEN_SWEEPS
 FARINA_CEILING_HZ = A.thd_max_measurable_hz(max_order=2)
@@ -281,6 +303,76 @@ def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_so
             os.unlink(out_path)
 
 
+# ---- parallel execution -------------------------------------------------
+# Each capture is one render + one analysis against a shared, read-only
+# reference signal, so captures are fully independent. The reference is loaded
+# ONCE PER WORKER by the initialiser rather than pickled with every task (it is
+# a 4M-sample array — pickling it 63 times would cost more than the analysis).
+
+_W = {}
+
+
+def _worker_init(binpath, os_factor, keep_dir, bands, band_source_map, extra_fit, use_cache,
+                 orig=None):
+    _W.update(orig=A.load(A.ORIG) if orig is None else orig, binpath=binpath,
+              os_factor=os_factor, keep_dir=keep_dir, bands=bands,
+              band_source_map=band_source_map, extra_fit=extra_fit, use_cache=use_cache)
+
+
+def _worker_task(item):
+    idx, path, parsed = item
+    try:
+        res, cached = analyse_one(path, parsed, _W["orig"], _W["binpath"], _W["os_factor"],
+                                  _W["keep_dir"], _W["bands"], _W["band_source_map"],
+                                  extra_fit=_W["extra_fit"], use_cache=_W["use_cache"])
+        return idx, res, cached, None
+    except Exception as exc:  # a bad capture must not abort the whole run
+        return idx, None, False, f"{type(exc).__name__}: {exc}"
+
+
+def run_captures(caps, jobs, orig, binpath, os_factor, keep_dir, bands, band_source_map,
+                 extra_fit, use_cache):
+    """Analyse every capture, returning results in capture order."""
+    results = [None] * len(caps)
+    n_cached = 0
+
+    def report(i, res, cached, err):
+        sys.stderr.write(f"[{i + 1}/{len(caps)}] {short_id(caps[i][1])} ... ")
+        if err:
+            sys.stderr.write(f"FAILED ({err})\n")
+        else:
+            sys.stderr.write("cached\n" if cached else "done\n" if res else "FAILED\n")
+        sys.stderr.flush()
+
+    init_args = (binpath, os_factor, keep_dir, bands, band_source_map, extra_fit, use_cache)
+
+    if jobs <= 1:
+        # Serial path runs _worker_task in THIS process, so seed the globals here
+        # (reusing the reference the caller already loaded rather than re-reading it).
+        _worker_init(*init_args, orig=orig)
+        for i, (path, parsed) in enumerate(caps):
+            _, res, cached, err = _worker_task((i, path, parsed))
+            results[i] = res
+            n_cached += bool(res and cached)
+            report(i, res, cached, err)
+        return results, n_cached
+
+    done = 0
+    with cf.ProcessPoolExecutor(max_workers=jobs, initializer=_worker_init,
+                                initargs=init_args) as pool:
+        futures = [pool.submit(_worker_task, (i, p, d)) for i, (p, d) in enumerate(caps)]
+        for fut in cf.as_completed(futures):
+            i, res, cached, err = fut.result()
+            results[i] = res
+            n_cached += bool(res and cached)
+            done += 1
+            # Completion order is nondeterministic under parallelism; print the
+            # capture that finished plus a running count, not a position index.
+            sys.stderr.write(f"({done}/{len(caps)}) ")
+            report(i, res, cached, err)
+    return results, n_cached
+
+
 def compute_summary(results, bands):
     """Per-revision aggregate scores (derives revisions from the data)."""
     by_rev = defaultdict(list)
@@ -333,6 +425,9 @@ def main():
     ap.add_argument("--out", default=OUTPUT_JSON,
                     help="output JSON path (use a scratch path for subset/candidate runs so the "
                          "baseline report is not overwritten)")
+    ap.add_argument("--jobs", "-j", type=int, default=DEFAULT_JOBS,
+                    help=f"worker processes (default {DEFAULT_JOBS} = cores-2, capped at 8; each "
+                         "holds ~600 MB). --jobs 1 runs serially, same results, easier to debug")
     a = ap.parse_args()
 
     if not os.path.exists(a.bin):
@@ -359,18 +454,9 @@ def main():
                      f"{' | cache OFF' if not use_cache else ''}\n")
     sys.stderr.write(f"  THD coverage: {sum(1 for _, s in band_source_map if s != 'na')}/{len(bands)} bands\n\n")
 
-    results, n_cached = [], 0
-    for i, (path, parsed) in enumerate(caps):
-        sys.stderr.write(f"[{i + 1}/{len(caps)}] {short_id(parsed)} ... ")
-        sys.stderr.flush()
-        res, cached = analyse_one(path, parsed, orig, a.bin, a.os, a.keep_renders, bands,
-                                  band_source_map, extra_fit=fit_args, use_cache=use_cache)
-        if res:
-            n_cached += cached
-            sys.stderr.write("cached\n" if cached else "done\n")
-        else:
-            sys.stderr.write("FAILED\n")
-        results.append(res)
+    jobs = max(1, min(a.jobs, len(caps)))
+    results, n_cached = run_captures(caps, jobs, orig, a.bin, a.os, a.keep_renders, bands,
+                                     band_source_map, fit_args, use_cache)
 
     ok = [r for r in results if r]
     sys.stderr.write(f"\n{len(ok)}/{len(results)} captures analysed ({n_cached} from cache).\n")
