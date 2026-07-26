@@ -102,8 +102,14 @@ int main(int argc, char** argv)
     const int nWarm = (int) (fs * 4.0);
     const int nMeas = (int) (fs * 0.5);
 
-    // The A3 target table's own band centres.
-    const double freqs[] = {20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254};
+    // The A3 target table's own band centres, extended to 806 Hz (session 33).
+    // The upper bands are NOT decoration: with the required extra phase corrected
+    // for the model's SIGN it runs ~+120 deg all the way out to 254 Hz, and
+    // whether that is minimum-phase-realisable is decided by what |G| does ABOVE
+    // the band. Session 32's lesson was that an unmeasured tail decides the
+    // answer at the band edge — so measure this one instead of declaring it.
+    const double freqs[] = {20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254,
+                            320, 403, 508, 640, 806};
 
     const char* gname = gruntArg == 0 ? "BOOST" : gruntArg == 1 ? "CUT" : "FLAT";
     std::printf("# a3_blend_decompose grunt=%s drive=%.3f dBFS=%.1f amp=%.6f V fs=%.0f\n",

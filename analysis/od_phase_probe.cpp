@@ -84,6 +84,11 @@ int main(int argc, char** argv)
         {"jfetGm", &FitParams::jfetGm}, {"jfetRo", &FitParams::jfetRo},
         {"jfetRq2", &FitParams::jfetRq2}, {"trebleLadderDampR", &FitParams::trebleLadderDampR},
         {"clipC11", &FitParams::clipC11}, {"clipA0", &FitParams::clipA0},
+        // Rails: session 33 needs these to test whether the model's LF OD
+        // magnitude stops growing at high drive because IC2_A is rail-clipping
+        // (its input is bass-heavy, so it rails at LF first).
+        {"railNeg", &FitParams::railNeg}, {"railPos", &FitParams::railPos},
+        {"clipSatLo", &FitParams::clipSatLo}, {"clipSatHi", &FitParams::clipSatHi},
     };
     std::vector<std::string> overrides;
     for (int i = 4; i < argc; ++i)

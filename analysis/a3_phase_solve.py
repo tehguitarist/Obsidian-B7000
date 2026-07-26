@@ -72,7 +72,8 @@ DRIVES = [
 CLEAN_REF = "blend-0700_base-od.wav"          # BLEND fully counter-clockwise = full clean
 
 # The decompose probe's bands; matched to the report's 1/3-oct centres by nearest.
-PROBE_BANDS = [20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254]
+PROBE_BANDS = [20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254,
+               320, 403, 508, 640, 806]
 
 
 def load_model(drive_vals):
@@ -263,11 +264,14 @@ def main():
                 first = th if first is None else min(first, th)
             else:
                 cells.append("%10s" % "-")
-        mdl = abs(math.degrees(model[0.50][b][1]))
+        mdl = math.degrees(model[0.50][b][1])
         bound[b] = first
         print("%6d %s   %10.1f %9s"
               % (b, "".join(cells), mdl, "-" if first is None else ">= %.0f" % (first - mdl)))
     print("\n   'deficit' uses the WEAKEST beta in the row, so it too is a lower bound.")
+    print("   ⚠ theta_mdl is SIGNED and goes NEGATIVE above ~90 Hz. Sessions 31/32 printed")
+    print("   |theta_mdl| here and differenced that, which understates the extra phase the")
+    print("   model needs by 2|theta_mdl| — 15 deg at 101 Hz rising to 76 deg at 202-254.")
 
     # ---- 3. the least-squares (secondary) -----------------------------------
     beta_db = args.beta_db if args.beta_db is not None else fit_beta(pedal, model)
@@ -279,12 +283,15 @@ def main():
     print("=> the model's bleed sits %.2f dB %s than the pedal's.\n"
           % (abs(bleed_model - beta_db), "LOWER" if bleed_model < beta_db else "HIGHER"))
     print("theta = |OD-vs-bleed phase|; its SIGN is not identifiable from magnitudes.")
-    print("[lo,hi] = every theta fitting within +0.5 dB RMS of the optimum.\n")
+    print("[lo,hi] = every theta fitting within +0.5 dB RMS of the optimum.")
+    print("theta_mdl is SIGNED (it crosses zero near 90 Hz); 'extra' = theta_ped - theta_mdl")
+    print("is the phase an added OD-path element must supply, on the branch where the")
+    print("pedal's theta stays POSITIVE — see the branch discussion in a3_lead_design.py.\n")
     print("%6s %9s %14s %8s %8s %10s %9s"
-          % ("f", "theta_ped", "[lo, hi]", "rms_dB", "s", "theta_mdl", "deficit"))
+          % ("f", "theta_ped", "[lo, hi]", "rms_dB", "s", "theta_mdl", "extra"))
     for b in PROBE_BANDS:
         r = res[b]
-        mdl = abs(math.degrees(model[0.50][b][1]))
+        mdl = math.degrees(model[0.50][b][1])
         print("%6d %9.1f  [%5.1f,%6.1f] %8.2f %8.2f %10.1f %9.1f"
               % (b, r["theta"], r["lo"], r["hi"], r["rms"], r["s"], mdl, r["theta"] - mdl))
 

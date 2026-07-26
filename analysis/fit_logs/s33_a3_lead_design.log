@@ -1,0 +1,205 @@
+A3 lead design -- the CORRECTED extra-transfer target, and whether any
+causal element can supply it.   sweep=sweep_drv_-18, pedal bleed beta=-15.40 dB
+
+1. THE TARGET.  G(f) = s . e^(i.extra) is what the model's OD path must be
+   MULTIPLIED BY.  theta_mdl is SIGNED -- that is the correction.
+
+     f     mu   |G| dB    th_ped    th_mdl   extraP   extraM      rms     band
+    20   1.15     -9.5     147.8     104.2     43.6   -251.9     0.83     core
+    25   1.50    -10.1     151.1      90.0     61.1   -241.1     0.90     core
+    32   1.93    -14.0     180.0      73.3    106.7   -253.3     0.77     core
+    40   2.30    -13.9     180.0      57.6    122.4   -237.6     4.04     core
+    50   2.61    -13.7     129.2      41.5     87.7   -170.8     4.35     core
+    64   2.81     -5.3     138.2      23.7    114.6   -161.9     3.80     core
+    80   2.82     -3.2     133.4       8.0    125.3   -141.4     3.08     core
+   101   2.66     -1.6     126.1      -7.3    133.4   -118.8     2.19     core
+   127   2.36     -0.4     115.9     -20.7    136.5    -95.2     1.27     core
+   160   1.95      0.5     102.8     -31.5    134.2    -71.3     0.47     core
+   202   1.51      0.9      85.1     -37.9    123.1    -47.2     0.11     core
+   254   1.15      0.9      82.0     -37.6    119.6    -44.4     0.28     core
+   403   0.79      3.7     110.0     -23.6    133.6    -86.4     0.15     weak
+   508   0.60      5.6     106.1     -23.8    129.9    -82.3     0.07     weak
+   640   0.37      8.7     113.8     -12.5    126.2   -101.3     0.05     weak
+   806   0.38      8.1     118.6      26.2     92.5   -144.8     0.18     weak
+
+   'weak' = mu < ~1, so the total is bleed-dominated there and (s, theta)
+   trade off; those bands anchor the magnitude TAIL, not the fit.
+   320 Hz excluded: TrebleAttack-notch band, a known separate gap (GAP #2).
+
+
+2. WHICH SIGN BRANCH.  The solve returns |theta_ped|, so +theta and -theta
+   fit identically; continuity permits only the two global branches below.
+   TEST: any causal H = (minimum-phase) x (all-pass), and an all-pass's
+   phase is MONOTONICALLY NON-INCREASING in f.  So
+        excess(f) = arg(H) - phi_minphase(f)
+   must be non-increasing.  A rising excess is impossible for ANY causal
+   LTI element, whatever its order.
+
+     f  phi_minph     excess P     excess M
+    20       92.2          0.0          0.0
+    25       61.7         48.1         41.3
+    32       55.7         99.6         35.1
+    40       69.5        101.6         37.1
+    50       92.9         43.5         80.5
+    64      101.3         61.9         80.9
+    80       82.2         91.7        120.5
+   101       70.9        111.1        154.4
+   127       61.7        123.4        187.2
+   160       53.5        129.3        219.3
+   202       47.4        124.3        249.5
+   254       47.6        120.6        252.1
+   403       51.7        130.5        206.0
+   508       51.0        127.5        210.8
+   640       39.6        135.3        203.3
+   806       24.8        116.3        174.6
+
+   branch M rises by +175 deg end to end -> IMPOSSIBLE for any causal element.
+   branch P rises by +116 deg end to end.
+   => work in branch P (theta_ped positive throughout).
+
+
+3. CONSTRUCTIVE CEILING.  Fit a MINIMUM-PHASE rational to |G| ALONE; its
+   phase is then not ours to choose.  Non-minimum-phase content can only
+   SUBTRACT phase, so any shortfall here cannot be recovered by any causal
+   element -- unlike a Bode integral, this needs no tail assumption.
+
+  === 1 zero / 1 pole  (lead network)
+      k=2.51 | zeros: f=35.5 | poles: f=404.4
+      mag err dB :   -2.4   -1.3   +3.4   +4.2   +5.3   -1.7   -2.3   -2.2   -1.8   -1.0   +0.2   +1.7   +1.3   +0.3   -2.1   -1.1
+      phase short:    -17    -30    -69    -80    -40    -63    -70    -77    -80    -78    -70    -70    -94    -95    -97    -68
+      vs interval:     -8    -22    -45    -63    +89    -31    -42    -48    -50    -51    -38    +12    -74    -67    -67    +50   (negative = below even the LOOSEST theta that fits)
+      core bands, trustworthy fit only: mean phase shortfall -59 deg
+
+  === 2 zeros / 2 poles, real
+      k=2.56 | zeros: f=22.1; f=22.1 | poles: f=416.2; f=0.1
+      mag err dB :   -1.7   -1.1   +3.2   +4.0   +5.0   -2.0   -2.5   -2.4   -1.9   -1.1   +0.2   +1.7   +1.3   +0.3   -2.0   -0.9
+      phase short:    -52    -57    -90    -96    -52    -71    -77    -82    -83    -81    -71    -71    -94    -96    -97    -68
+      vs interval:    -43    -50    -66    -79    +77    -40    -48    -53    -54    -54    -40    +11    -74    -67    -67    +50   (negative = below even the LOOSEST theta that fits)
+      core bands, trustworthy fit only: mean phase shortfall -72 deg
+
+  === 2 zeros / 2 poles, complex pairs
+      k=1.67 | zeros: f=37.6 Q=1.64 | poles: f=62.2 Q=0.32
+      mag err dB :   +0.6   -0.9   +0.2   -0.3   +2.4   -2.4   -1.7   -1.0   -0.4   +0.2   +1.0   +1.8   -0.1   -1.6   -4.5   -3.8
+      phase short:    -67    -81   -110    -95    -36    -54    -65    -76    -84    -88    -83    -86   -111   -111   -111    -81
+      vs interval:    -58    -74    -86    -78    +93    -23    -36    -47    -55    -61    -52     -4    -91    -83    -81    +38   (negative = below even the LOOSEST theta that fits)
+      core bands, trustworthy fit only: mean phase shortfall -86 deg
+
+  === 3 zeros / 3 poles
+      k=318 | zeros: f=43.5 Q=2.51; f=279.8 | poles: f=65.8 Q=0.91; f=100000.0
+      mag err dB :   -0.2   -0.6   +1.2   -1.6   +1.2   -1.0   +0.2   +0.3   -0.1   -0.4   -0.1   +0.7   +0.1   -0.3   -1.7   +0.6
+      phase short:    -47    -63   -102    -94    -15    -35    -56    -74    -83    -83    -71    -65    -71    -63    -55    -18
+      vs interval:    -38    -56    -79    -77   +114     -4    -28    -45    -54    -56    -39    +17    -51    -34    -25   +100   (negative = below even the LOOSEST theta that fits)
+      core bands, trustworthy fit only: mean phase shortfall -73 deg
+
+  === 4 zeros / 4 poles
+      k=1.72 | zeros: f=505.0 Q=0.94; f=42.1 Q=2.29 | poles: f=68.5 Q=0.72; f=630.4 Q=1.67
+      mag err dB :   +0.0   -0.6   +0.9   -1.5   +1.6   -1.3   -0.0   +0.3   +0.2   -0.2   -0.1   +0.2   -0.6   +0.3   -0.1   +0.1
+      phase short:    -51    -68   -106    -94    -21    -42    -60    -79    -90    -94    -86    -82    -89    -85    -98    -84
+      vs interval:    -42    -60    -82    -77   +108    -10    -32    -50    -61    -67    -54     -0    -69    -56    -68    +34   (negative = below even the LOOSEST theta that fits)
+      core bands, trustworthy fit only: mean phase shortfall -82 deg
+
+  (A 'joint' fit is not shown: it can only buy phase by abandoning the
+   magnitude, and the magnitude is the half the captures pin hardest.)
+
+
+4. IDENTIFYING THE BLEED LEVEL FROM CAUSALITY.
+   The solve fits (s, theta) per band at a GIVEN beta, and beta is the
+   parameter session 31 left unresolved at +/-2 dB. It is not innocent:
+   raising beta by 2.6 dB moves the required extra phase at 254 Hz from
+   +38 to +120 deg. So beta and the missing element are COUPLED and cannot
+   be settled one at a time -- which is why 'fit the phase first, the level
+   later' has no fixed point.
+   But magnitude and phase are not independent for a causal element, and
+   THAT is an equation the levels alone do not provide. Scan beta; at each
+   one fit a minimum-phase rational to |G| and ask how far its phase falls
+   short. The beta where a causal element can actually do the job is the
+   physically admissible one.
+
+ beta dB  driveRMS   edge    magRMS  shortRMS      mean     worst    slope
+   -21.5      2.64      7      2.26        64        44        -5     35.3
+   -21.0      2.55      7      0.75        41        15       -23     15.7
+   -20.5      2.46      7      1.86        28         1       -25     13.0
+   -20.0      2.37      7      1.20        38         7       -30     11.5
+   -19.5      2.28      7      1.38        37         5       -32     10.4
+   -19.0      2.19      6      1.41        46         0       -43      9.6
+   -18.5      2.10      6      1.01        47       -12       -51      8.9
+   -18.0      2.03      5      0.76        44       -18       -57      8.3
+   -17.5      1.96      5      4.10        42        -9       -55      7.8
+   -17.0      1.90      5      0.85        52       -40       -68      7.4
+   -16.5      1.86      3      0.75        54       -46       -70      6.9
+   -16.0      1.84      2      1.01        58       -52       -82      6.6
+   -15.5      1.84      2      0.60        61       -58       -83      6.3
+   -15.0      1.86      2      0.72        69       -67       -86      6.0
+   -14.5      1.89      1      0.60        79       -77      -110      5.7
+   -14.0      1.94      1      0.40        83       -82      -106      5.2
+
+   driveRMS = how well that beta explains the 5-point DRIVE SWEEP at all
+              12 core bands (the evidence that identifies s and theta).
+   edge     = how many of those 12 had theta pin at 0 or 180, i.e. a
+              DEGENERATE solve; those are excluded from the columns right
+              of it, so a low beta is scored on fewer real measurements.
+   mean/worst/shortRMS = how far a minimum-phase element falls short of the
+              lead the captures demand. Negative is impossible for ANY causal
+              element -- non-minimum-phase content only subtracts phase.
+
+   READ THIS TABLE AS A DISAGREEMENT, NOT AS A FIT. driveRMS is minimised
+   near beta = -15.5 and causality wants beta <= -18.5; they pull opposite
+   ways. And shortRMS never falls below ~28 deg ANYWHERE, so no beta makes
+   the requirement cleanly realisable -- at best the mean crosses zero while
+   individual bands stay +/-30-50 deg out. That is not a candidate.
+
+   PER-BAND DRIVE-FIT RESIDUAL vs beta -- the reason none of this is
+   designable yet. The bands that carry the null are the bands that do not
+   fit, AT EVERY beta:
+
+          beta     20    25    32    40    50    64    80   101   127   160   202   254
+         -21.5    2.7   2.8   3.2   5.8   4.2   3.9   3.2   2.3   1.4   0.6   0.6   0.9
+         -20.0    2.1   2.2   2.5   5.4   4.2   3.9   3.2   2.3   1.4   0.6   0.3   0.5
+         -18.5    1.4   1.5   1.8   4.9   4.1   3.9   3.2   2.3   1.4   0.6   0.1   0.2
+         -17.0    0.8   1.0   1.1   4.4   4.2   3.8   3.1   2.2   1.3   0.5   0.1   0.2
+         -15.5    0.8   0.9   0.8   4.1   4.3   3.8   3.1   2.2   1.3   0.5   0.1   0.3
+         -14.0    1.2   1.1   1.3   3.9   4.6   3.8   3.0   2.1   1.2   0.4   0.2   0.4
+
+   40-101 Hz sits at 2-5 dB regardless of beta. That is session 31 item 6:
+   the model's mu_d PEAKS at drive 2:30 and falls by max, while the pedal's
+   must grow monotonically straight through the null. The solve fits (s,
+   theta) against that wrong drive shape, so the phase target inherits it
+   exactly where A3 lives.
+
+   beta with the mean shortfall within 15 deg of 0: -21.0, -20.0, -19.5, -19.0, -18.5
+   Model bleed is -16.93 dB, so causality leans toward the model's bleed being
+   ~2.1 dB HIGHER than the pedal's -- the SIGN session 29 measured directly from
+   the drive-min LF total (-17.4..-18.3 dB), and the OPPOSITE of the session-31
+   least-squares (-15.2). Do not promote this to a measurement: it leans on
+   bands whose theta is pinned at 180, and driveRMS moves only 1.84 -> 2.10 dB
+   across the whole range, so the least-squares was never strong evidence
+   either. What is settled is that the bleed level is STILL open, and that it
+   cannot be settled after the phase, because the phase target depends on it.
+
+5. BEST-CASE ELEMENT at beta = -19.0 dB -- shown to be READ, not built.
+
+   k=1.86 | zeros: f=49.1 Q=4.41; f=0.1 | poles: f=72.8 Q=2.75; f=215.8
+        f   |G| req    |H| dB   phi req     phi H      rms
+       20     -27.2     -23.1      75.8      84.6     1.61
+       25     -22.7     -21.7      90.0      84.0     1.72
+       32     -19.2     -21.0     106.7      84.6     2.01
+       40     -17.4     -21.8     122.4      92.1     5.03
+       50     -23.6     -22.4     -41.5     150.6     4.13
+       64      -4.4      -6.7      85.3     176.0     3.87
+       80      -1.2       0.9     103.5     119.7     3.19
+      101       0.9       0.9     114.0      85.3     2.30
+      127       2.2       1.2     113.7      70.9     1.37
+      160       3.0       1.9     100.2      60.8     0.60
+      202       3.1       2.7      46.4      52.1     0.14
+      254       3.3       3.4      37.6      44.2     0.32
+      403       2.4       4.4      40.9      30.4     0.32
+      508       4.3       4.7      23.8      24.8     0.21
+      640       5.2       5.0      14.7      20.0     0.16
+      806       2.7       5.1     -18.4      16.1     0.17
+
+   ⛔ DO NOT BUILD THIS. It is the best a causal element can do against a
+   target that is itself unreliable at 40-101 Hz (drive-fit residual 2-5 dB
+   at every beta), and it still misses individual bands by 30-50 deg. Fix
+   the drive-axis magnitude defect first -- see the session-33 entry in
+   docs/phase9-validation.md -- then re-run this and the target will be worth
+   designing against.

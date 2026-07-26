@@ -104,6 +104,79 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 33, 2026-07-26): ▶ PHASE 9 / A3 STEP 2 — THE TARGET HAD A SIGN ERROR, AND THE
+> REAL BLOCKER IS THE DRIVE AXIS. No candidate proposed, deliberately. Analysis only — NOTHING in
+> `src/` changed, ctest unaffected. New tool `analysis/a3_lead_design.py`; `docs/phase9-validation.md`
+> §4 "A3 step 2 — the TARGET WAS WRONG".**
+> **(1) ⭐⭐ SESSIONS 31 AND 32 BOTH READ THE REQUIREMENT OFF AN `abs()`.** `a3_phase_solve.py` solves
+> for `|theta_ped|` (the sign is unobservable from magnitudes) and printed the MODEL's phase as
+> `abs(theta_mdl)` so the columns would look comparable — but **the model's OD-vs-bleed phase is
+> SIGNED and crosses zero near 90 Hz** (−7.3 at 101 Hz, −20.7 at 127, −31.5 at 160, −37.9 at 202).
+> So the `deficit` column, and `a3_extra_tf_probe.py`'s `DPHI` which transcribes it, **understate the
+> phase an added element must supply by 2|θ_mdl| — 15° at 101 Hz rising to 76° at 202–254.** Verified
+> against `build/a3_dec_drv0.5.csv`; both tools now print the signed value and label it `extra`.
+> ⚠ **WHAT THIS RETIRES: "the deficit is a HUMP falling to ~50° at 202–254, so a pole+zero / lead
+> network has the right shape"** (session 31 item 5, reaffirmed by 32 item 4). Corrected, the
+> requirement is a broad **PLATEAU** — ~+44° at 20 Hz, +107 at 32, **+115…+137 continuously from 64
+> to 254 Hz**. A lead network's phase returns to zero, so that recommendation no longer follows.
+> **Both sessions' NEGATIVE results stand unharmed** (no existing stage can supply the lead; the Bode
+> ceiling was decided by its unmeasured tails) — only the shape of the fix changes.
+> **(2) BAND SET EXTENDED TO 806 Hz** (`a3_blend_decompose.cpp` + `PROBE_BANDS`), so the tail that
+> decides whether a +120° plateau at 254 Hz is realisable is now MEASURED — session 32's lesson
+> applied at the other end. 320 Hz is excluded from every fit (TrebleAttack-notch band, known separate
+> gap, and a lone outlier: s = 0.57 against 1.10 and 1.54 either side).
+> **(3) ⚠⚠ THE STANDING ORDER OF WORK HAS NO FIXED POINT.** "Gate the phase first, revisit the bleed
+> level after" (session 29 item 3, repeated by 31) cannot work: the phase target is a FUNCTION of β.
+> Extra phase at 254 Hz is **+120° at β=−15.4, +89 at −16.9, +38 at −18.0** — 82° of swing across the
+> ±2 dB β is unresolved by. They are one problem and must be solved jointly.
+> **(4) CAUSALITY IS THE MISSING EQUATION AND IT IS TAIL-FREE.** Fitting a MINIMUM-PHASE rational to
+> |G| alone (its phase is then not ours to choose) is a constructive ceiling needing no tail
+> assumption — usable where session 32's Bode integral was not, since non-minimum-phase content can
+> only SUBTRACT phase. It wants **β ≤ −18.5** while the drive-sweep least-squares wants **−15.5**.
+> Neither is decisive: `driveRMS` moves only 1.84 → 2.10 dB across the whole range (so session 31's
+> β = −15.2 was never strong evidence), and the low-β end leans on bands whose θ has **pinned at 180°**
+> (6–7 of 12). ⇒ **the bleed stays OPEN**, sign now leaning back to session 29's (model ~1.5 dB HIGH).
+> **(5) ⛔⛔ NO CANDIDATE PROPOSED, AND THAT IS THE POINT: the bands that carry the null are the bands
+> that do not fit, AT EVERY β.** Drive-sweep residual is **2–5 dB at 40–101 Hz** for every β in
+> −21.5…−14.0 (0.1–1.8 dB everywhere else). The `(s, θ)` solve there is fitting against the model's
+> `μ_d`, which session 31 item 6 showed is wrong on the drive axis — **the phase target inherits that
+> error exactly where A3 lives.** The best min-phase element at the best β still misses individual
+> bands by 30–50° (`shortRMS` never below ~28°). A candidate fitted to this would be fitted to a
+> known defect.
+> **(6) ⭐ SO SESSION 31 ITEM 6 IS THE BLOCKER, NOT A SIDE ISSUE — AND IT IS NOW LOCALISED TO IC2_A's
+> RAIL CLAMP** (it guessed "presumably the clipper"). Measured per stage, drive 2:30 → max: **rails as
+> shipped, DriveStage gains +0.40 dB at 40 Hz / +0.51 at 64 / +0.89 at 101 but +4.67 at 202 and +6.99
+> at 320; with the rails effectively off it is a frequency-uniform +7.78 dB at EVERY band**, exactly
+> as a linear gain stage must be, and the clipper stops going backwards too. IC2_A's input is
+> bass-heavy so it rails at LF first and eats the whole knob movement there. Level-dependent: the
+> model's 40 Hz OD grows monotonically to +25 dB at −36/−30 dBFS but peaks at 2:30 and falls at −18.
+> **Size: the pedal needs +6.2 dB over the 2:30→max step at 40 Hz (−31.8 → −14.7 through the null);
+> the model delivers −2.5 dB. An 8.7 dB error on one drive step, in the band that defines the null.**
+> ⚠ **Do NOT read this as "lower the rail voltages"** — `railNeg 2.9 / railPos 2.7` were DERIVED in
+> session 21 precisely because the capture objective on them is monotone with no interior minimum (the
+> "make the clipper see less" degeneracy). The rails are probably right; the signal reaching them is
+> probably too bass-heavy.
+> **⭐ WHICH UNIFIES A3.** An LF excess UPSTREAM of IC2_A would (i) make the drive stage rail at LF
+> preferentially, producing exactly the non-monotone μ_d, and (ii) BE the missing lead. The corrected
+> |G| (−14…−19 dB at 32–50 Hz rising to 0 dB by 160) is the shape of a **2nd-order highpass at
+> ~100–160 Hz**, and placing it **BEFORE the DRIVE stage** would do both jobs at once — the first A3
+> candidate with a mechanism rather than a curve fit.
+> **▶ NEXT = A3 STEP 3, RE-ORDERED: (a) fix the drive-axis magnitude defect FIRST** (model |OD| must
+> grow monotonically with drive at 40–101 Hz; gate on the pedal's +6.2 dB over 2:30→max, NOT on
+> band-RMS); **(b) re-run `a3_phase_solve` + `a3_lead_design`** — the 40–101 Hz drive-fit residual
+> should collapse from 2–5 dB, and only then is the phase target worth designing against; **(c) test
+> the unified hypothesis** by placing a 2nd-order HP ahead of IC2_A and checking it fixes the drive
+> axis AND the phase together; **(d) gate on the NULL** (near 40 Hz at drive 2:30 → ~22–25 Hz by max)
+> and re-fit β **jointly, never after**. Then A4 re-grade + GATE-9, the queued `gain-n12` HF collapse,
+> B (perf/HQ), C (carry-forwards), D (release).
+> **⚠ METHOD TRAPS: (i) the error was in a TRANSCRIBED CONSTANT** — `a3_extra_tf_probe.py` hard-codes
+> the target as arrays copied from another tool's printout and the sign was lost in the copy;
+> `a3_lead_design.py` imports `a3_phase_solve` and rebuilds it live. **(ii) `abs()` on a quantity whose
+> sign is unobservable is fine; differencing it against one whose sign IS observable is not.**
+> **(iii) A SELF-SELECTING SCORE:** the β scan first ranked each β on "bands whose drive fit is
+> trustworthy", which drops bands as β falls — β=−21 scored best on 4 bands while fitting worse at all
+> 12. **(iv) A MEAN CAN HIDE THE FINDING:** mean shortfall "≈0" at β=−18.5 concealed +80/−50 per band.
+> ── prior session ──
 > **CURRENT (session 32, 2026-07-26): ▶ PHASE 9 / A3 STEP 2 — the first "what KIND of element"
 > question was asked and came back NEGATIVE. Analysis only — NOTHING in `src/` changed, ctest
 > unaffected. New tool `analysis/a3_extra_tf_probe.py`; `docs/phase9-validation.md` §4 "A3 step 2".**
