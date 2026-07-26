@@ -1,0 +1,71 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+Capture targets (tone_220): harmonic-to-harmonic ratios (dB) are the objective;
+H2 re-fund shown for reference only (NOT fit — it is bleed-contaminated).
+  drive    H3-H2   H4-H2   H5-H2    (H2reF)
+  min      -23.2   -33.9   -50.4      -36.0
+  9:30     -21.0   -37.2   -49.1      -34.4
+  noon     -10.6   -19.7   -25.4      -31.4
+  2:30       1.3    -6.5    -0.8      -31.9
+  max        1.0    -5.8     1.2      -30.0
+Phase target: drive-min ψ3 @ 1000 Hz = -132.9 deg (weight 0.05/deg^2; 220/440 down-weighted to 0 — bridged-T notch)
+
+Nominal cost = 3357.6
+** clipA0 FENCED to [20, 30] — session-17 fenced refit (GRUNT-corner measurement: the low cut corner is real; carry it in C11) **
+** kInputRef FENCED to [0.4, 1.509]  (was [0.4, 6]) **
+** clipSatLo FENCED to [0.3, 4]  (was [1.5, 4]) **
+** clipSatHi FENCED to [0.3, 4]  (was [1.5, 4]) **
+  ⚠ start kInputRef=2.4 is OUTSIDE its bound [0.4, 1.509] — will be clipped
+  ⚠ start kInputRef=3.4 is OUTSIDE its bound [0.4, 1.509] — will be clipped
+/Users/leighpierce/Git/Obsidian-B7000/analysis/fit_nonlinear.py:539: OptimizeWarning: Initial guess is not within the specified bounds
+  res = minimize(cost, start, args=(targets,), method="Nelder-Mead",
+  start [0.3, 1.7, 1.4, 0.5, 1.8, 25, 3.1, 3.1, 1.5, 2.4, 22.0] -> cost 111.5
+  start [0.3, 1.8, 1.4, 0.5, 1.6, 28, 3.5, 3.5, 1.3, 3.4, 12.0] -> cost 56.5
+  start [0.3, 2.5, 1.0, 0.5, 2.0, 22, 2.5, 3.0, 2.0, 0.9, 4.7] -> cost 45.8
+
+Best cost = 45.8  (nominal 3357.6)
+Fitted params:
+  jfetSatPos        0.67246   (nominal 0.3)
+  jfetSatNeg         1.4426   (nominal 4)
+  jfetCeilPos       0.69618   (nominal 1)
+  jfetCeilNeg        1.4194   (nominal 0.5)
+  jfetExpandBeta      0.72609   (nominal 1.8)
+  clipA0             20.027   (nominal 25)
+  clipSatLo         0.65997   (nominal 3.15)
+  clipSatHi         0.76302   (nominal 3.85)
+  clipK              2.0648   (nominal 1.5)
+  kInputRef          1.4347   (nominal 0.87)
+  clipC11            4.3381   (nominal 4.7)
+  held: jfetGm=0.0001, jfetRo=200000, jfetRq2=1e+06, levelTaperExp=2.25, driveTaperExp=1.98
+
+Acceptance checks (phase7-calibration-handover.md, step 4):
+  |a|*s          = 0.9701   (monotonicity coupling; a fitted a should be single-digit)
+  min slope      = +5.553e-06   (>= 0; a fold-back is infeasible)
+  clipA0         = 20.027   (circuit.md says 20-30)
+  clipSatLo+Hi   = 1.423 V   (25 % of the DERIVED 5.64 V rail, clipper_rail_selfconsistent.py) ** below the 3 V soft floor (25 % of the rail) — SOFT flag: needs a mechanism, is not a supply violation **
+  kInputRef      = 1.435 V/FS  -> 0.72 V peak at the -6 dBFS 'hot bass' rung (passive ~0.1-1 V, hot active ~1-2 V)
+  FAMILY verdict = PHYSICAL (with a SOFT flag — see clipSat line)   (clipSat AND implied input volts must BOTH be sane — never clipSat with K pinned)
+  clipC11        = 4.34 nF   (schematic 4.7 nF; user-authorised to move)
+  2*a*ceilNeg    = 4.095   (square law says ~1.0 — NOT constrained in the fit, so this is a real check)
+  ceilNeg / s    = 2.11   (monotonicity needs >~ 1; resting AT 1 means the ceiling is on a constraint)
+  jfetExpandBeta = 0.726   (EXPANSIVE cubic; must be > 0 — a <= 0 is the compressive regime the gate rejects)
+  ψ3 @ 1000Hz    = model -133.7 vs capture -132.9 deg (|err| 0.8; small = JFET H3 in-phase, the branch-B claim)
+  held jfetGm    = 0.100 mS   (session-4 anchor; --gm-scan checks LOW-drive ratio flatness, band 0.09-0.15)
+  ** clipA0 is RESTING ON ITS BOUND (20.0268 in [20, 30]) — the optimum is outside the box, so this value is a property of the box, not the pedal. **
+
+FITTED plug vs capture (tone_220): harmonic-to-harmonic ratios c/p (the objective),
+plus H2 re-fund c/p for reference (NOT fit — bleed-contaminated).
+drive  |     H3-H2 c/p |     H4-H2 c/p |     H5-H2 c/p |   (H2reF) c/p
+min    | -23.2/-23.8 | -33.9/-35.3 | -50.4/-48.5 | -36.0/-42.9
+9:30   | -21.0/-22.7 | -37.2/-35.9 | -49.1/-44.4 | -34.4/-40.1
+noon   | -10.6/-13.1 | -19.7/-24.8 | -25.4/-20.9 | -31.4/-36.9
+2:30   |   1.3/  2.6 |  -6.5/ -7.0 |  -0.8/  2.2 | -31.9/-34.6
+max    |   1.0/ -0.5 |  -5.8/ -6.1 |   1.2/ -0.4 | -30.0/-30.9
+
+Step-4 gm-sensitivity of the fitted point (should be ~flat):
+
+gm sensitivity of the fitted point (LOW-drive ratios flat = bleed-confound check):
+   gm(mS) |    cost | min H3-H2/H4-H2 | 9:30 H3-H2/H4-H2 | noon H3-H2/H4-H2 | 2:30 H3-H2/H4-H2 | max H3-H2/H4-H2
+    0.090 |    66.8 | -23.7/-34.9 | -23.0/-35.6 | -15.4/-27.3 |  +2.1/ -7.4 |  +1.2/ -6.0
+    0.120 |   109.2 | -23.8/-36.3 | -21.7/-35.4 |  -8.5/-20.6 |  +3.3/ -6.6 |  -2.9/ -6.3
+    0.150 |   326.6 | -23.6/-37.3 | -19.4/-32.9 |  -3.6/-15.6 |  +4.2/ -6.2 |  -4.8/ -6.5

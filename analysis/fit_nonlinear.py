@@ -307,7 +307,7 @@ def render_phase(params):
     """Render the short 1 kHz tone at DRIVE-MIN through the plug; return model ψ3 (deg)."""
     extra, own = _split_flags(params)
     parsed = parse_capture(DRIVE_MIN_CAP)
-    o = "/tmp/fit_phase1k.wav"
+    o = f"/tmp/fit_phase1k_{os.getpid()}.wav"
     subprocess.run([RENDER_BIN, PHASE_IN, o, "--os", "8"] + own + render_args(parsed, extra),
                    check=True, capture_output=True)
     r = A.load(o)
@@ -322,7 +322,10 @@ def render_profiles(params):
     out = {}
     for cap, lbl in DRIVE_CAPS:
         parsed = parse_capture(cap)
-        o = f"/tmp/fit_{lbl.replace(':','')}.wav"
+        # ⚠ PID-qualified: these render outputs are per-EVALUATION scratch, and two fit runs
+        # (e.g. an A/B of a fenced vs unfenced bound) would otherwise clobber each other's
+        # renders through fixed filenames and silently score each other's parameter points.
+        o = f"/tmp/fit_{lbl.replace(':','')}_{os.getpid()}.wav"
         subprocess.run([RENDER_BIN, SHORT_IN, o, "--os", "8"] + own + render_args(parsed, extra),
                        check=True, capture_output=True)
         r = A.load(o)
@@ -506,6 +509,32 @@ def main():
             BOUNDS[FIT_KEYS.index("clipA0")] = (lo, hi)
             print(f"** clipA0 FENCED to [{lo:g}, {hi:g}] — session-17 fenced refit "
                   f"(GRUNT-corner measurement: the low cut corner is real; carry it in C11) **")
+        if arg.startswith("--fence="):
+            # ** SESSION-42 (A5): generic bound override, `--fence KEY=lo,hi` (repeatable). **
+            # The A5 re-fit needs to fence kInputRef (the clean path's SUPPLY bound — a hard
+            # circuit fact IC5_B cannot violate, see clean_headroom_bound.py) while simultaneously
+            # RELAXING clipSatLo/Hi off the [1.5, 4.0] fence that session 15 imposed. Both at once
+            # is the point: fencing K without freeing clipSat just drives the fit into the corner
+            # where the two constraints are jointly infeasible, and the result is uninterpretable —
+            # you cannot tell "no good fit exists" from "the box forbade it".
+            # ⚠ Judge physicality on the FAMILY afterwards (implied input volts AND the implied
+            # CD4049 rail), never on either half alone — GainStaging.h's standing rule.
+            spec = arg.split("=", 1)[1]
+            key, rng = spec.split("=", 1) if "=" in spec else (spec, "")
+            if key not in FIT_KEYS:
+                sys.exit(f"--fence: '{key}' is not a fitted key. FIT_KEYS = {FIT_KEYS}")
+            lo, hi = (float(v) for v in rng.split(","))
+            if not lo < hi:
+                sys.exit(f"--fence {key}: need lo < hi, got [{lo:g}, {hi:g}]")
+            old = BOUNDS[FIT_KEYS.index(key)]
+            BOUNDS[FIT_KEYS.index(key)] = (lo, hi)
+            print(f"** {key} FENCED to [{lo:g}, {hi:g}]  (was [{old[0]:g}, {old[1]:g}]) **")
+    # A start outside the (possibly re-fenced) box is silently clipped by Nelder-Mead, which
+    # would quietly turn a deliberate CONTROL seed into a duplicate of the fence edge. Say so.
+    for start in starts:
+        for k, v, (lo, hi) in zip(FIT_KEYS, start, BOUNDS):
+            if not lo <= v <= hi:
+                print(f"  ⚠ start {k}={v:g} is OUTSIDE its bound [{lo:g}, {hi:g}] — will be clipped")
     for start in starts:
         res = minimize(cost, start, args=(targets,), method="Nelder-Mead",
                        bounds=BOUNDS, options=dict(maxiter=400, xatol=0.02, fatol=0.3))
@@ -537,15 +566,45 @@ def main():
     # printed together, and BOTH must be physical for the point to be acceptable.
     K = g["kInputRef"]
     satsum = g["clipSatLo"] + g["clipSatHi"]
-    satok = "" if 3.0 <= satsum <= 8.0 else " ** OUTSIDE the ~7 V R19-dropped rail envelope **"
+    # ** SESSION 42: the ceiling is DERIVED, not a round number. ** This check previously read
+    # `3.0 <= satsum <= 8.0` against "the ~7 V R19-dropped rail" — a figure NO calculation ever
+    # produced (circuit.md's "~0.5-3 V drop" was a plausibility range, and session 17 judged its
+    # accepted fit against the optimistic end of it). The rail is a fixed point,
+    # VDD = 8.65 - I_DD(VDD)*R19, solvable in closed form from the DAFx-2020 fitted CD4049 model:
+    # analysis/clipper_rail_selfconsistent.py returns VDD = 5.636 V (drop 3.01 V, I 3.01 mA), given
+    # the schematic-verified fact that IC3's five spare sections have their inputs GROUNDED and so
+    # draw no crowbar current. satLo/satHi are output swing toward the two rails and a CMOS inverter
+    # swings essentially rail-to-rail, so their SUM cannot exceed VDD. That makes the ceiling HARD.
+    RAIL_SELFCONSISTENT = 5.636
+    # The floor is a SOFT flag and is deliberately labelled as such: the rail argument bounds
+    # satsum from ABOVE only. A sum well under the rail is not forbidden by the supply — it means
+    # the fitted VTC saturates before the device's own output stage would, which needs a mechanism
+    # rather than being impossible. Do not reject a candidate on this line alone.
+    SAT_SOFT_FLOOR = 3.0
+    if satsum > RAIL_SELFCONSISTENT:
+        satok = (f" ** EXCEEDS the self-consistent rail {RAIL_SELFCONSISTENT:.2f} V "
+                 f"({100 * satsum / RAIL_SELFCONSISTENT:.0f} %) — IMPOSSIBLE, not merely unlikely **")
+    elif satsum < SAT_SOFT_FLOOR:
+        satok = (f" ** below the {SAT_SOFT_FLOOR:g} V soft floor ({100 * satsum / RAIL_SELFCONSISTENT:.0f} %"
+                 f" of the rail) — SOFT flag: needs a mechanism, is not a supply violation **")
+    else:
+        satok = ""
+    sat_hard_fail = satsum > RAIL_SELFCONSISTENT
     # The test signal's -6 dBFS rung is documented as "hot bass" (gen_test_signal.py), so the
     # physically-checkable voltage is K/2, not K at a never-played 0 dBFS.
     vhot = K / 2.0
     vok = "" if 0.3 <= vhot <= 2.5 else " ** implausible for a bass pickup **"
-    print(f"  clipSatLo+Hi   = {satsum:.3f} V   (R19-dropped rail ~7 V){satok}")
+    print(f"  clipSatLo+Hi   = {satsum:.3f} V   ({100 * satsum / RAIL_SELFCONSISTENT:.0f} % of the "
+          f"DERIVED {RAIL_SELFCONSISTENT:.2f} V rail, clipper_rail_selfconsistent.py){satok}")
     print(f"  kInputRef      = {K:.3f} V/FS  -> {vhot:.2f} V peak at the -6 dBFS 'hot bass' rung "
           f"(passive ~0.1-1 V, hot active ~1-2 V){vok}")
-    print(f"  FAMILY verdict = {'PHYSICAL' if not (satok or vok) else 'NOT PHYSICAL'}   "
+    if sat_hard_fail or vok:
+        family = "NOT PHYSICAL"
+    elif satok:
+        family = "PHYSICAL (with a SOFT flag — see clipSat line)"
+    else:
+        family = "PHYSICAL"
+    print(f"  FAMILY verdict = {family}   "
           f"(clipSat AND implied input volts must BOTH be sane — never clipSat with K pinned)")
     # clipC11 (session 17) — the GRUNT=Cut coupling cap, fit in nF (schematic 4.7). A value near a
     # bound is DIAGNOSTIC, not a fitted answer: a rest at 47 nF means the Cut corner wants a value

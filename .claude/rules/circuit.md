@@ -291,6 +291,46 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > full +9V rail (the inverter output can no longer reach it). The fit-to-capture VTC absorbs the
 > static drop; the dynamic sag is an optional second-order refinement (flag in
 > `docs/nonlinear-component-modeling.md`).
+>
+> ⭐ **THE R19-DROPPED RAIL IS 5.64 V, AND IT IS DERIVED, NOT A PRIOR (session 42, 2026-07-27).**
+> The "~0.5–3 V drop" above is a range-of-plausibility; session 17 then judged the fitted clipper
+> against a round **"~7 V rail" that no calculation ever produced**. It is computable, because the
+> drop and the current determine each other:
+>
+>     VDD = 8.65 − I_DD(VDD) · R19        (implicit — I_DD is itself a function of VDD)
+>
+> Using the DAFx-2020 fitted two-MOSFET model (`docs/nonlinear-component-modeling.md` §1: n-ch
+> α 5.1021e-3 / vT 1.5702, p-ch α 8.2246e-4 / |vT| 0.48476, λ 0.06) and solving Id_n(Vm) = Id_p(Vm)
+> at the shunt-feedback self-bias point, `analysis/clipper_rail_selfconsistent.py` gives
+> **VDD = 5.636 V, I = 3.01 mA, drop 3.01 V, trip point Vm = 2.657 V.** The feedback is
+> **self-limiting** — the crowbar current is super-quadratic in VDD (10.9 mA at 8.65 V → 0.20 mA at
+> 3 V → 0 below ~2.05 V), so a low rail cannot sustain the current that would be needed to produce
+> it. A fixed-drop prior cannot express that, which is why the number was never right.
+>
+> ⚠ **This rests on the five SPARE sections being grounded — VERIFIED at 600 DPI (session 42).**
+> **IC3B (in 5, out 4), IC3C (7/6), IC3D (9/10), IC3E (11/12), IC3F (14/15) all have their INPUTS
+> tied to one another and to GND** (single rail, junction dots at pins 7/9/11, one GND symbol) —
+> correct CMOS practice, drawn explicitly on primary p.4 to the right of the power column. So they
+> sit at a rail and draw only the datasheet's 0.02 µA quiescent, NOT crowbar current. This matters
+> enormously and is not a detail: if those inputs FLOATED at mid-rail, all six sections would draw
+> and the self-consistent rail would collapse to **2.70 V**, at which the shipped `clipSat` sum of
+> 4.94 V is not merely implausible but **impossible (183 % of the available swing)**.
+> ✅ **AND THE BACKUP SCHEMATIC INDEPENDENTLY AGREES (session 43, 600 DPI)** — so this is now
+> triple-checked, not single-sourced. The backup draws the five spares as an explicit row across
+> the TOP-LEFT of its single page (region A, columns 3–6), designators **U3B–U3F** (backup U3 =
+> primary IC3; the section letters happen to line up, with U3A the active clipper section at
+> region C). **Inputs pin 5 (U3B), 7 (U3C), 9 (U3D), 11 (U3E), 14 (U3F) all drop onto ONE
+> horizontal net — junction dots at pins 5/7/9/11, the net's left end terminating at a GND
+> symbol** — and every spare OUTPUT (4/6/10/12/15) is left dangling, which is exactly right
+> (tying a CMOS output is the error; tying its input is the requirement). Node-for-node identical
+> to primary p.4. ⇒ **n = 1 in the rail solve is confirmed on both sources; the 2.70 V collapse
+> case is ruled out, not merely thought unlikely.**
+>
+> **Consequence for `clipSat`.** `Clipper.h`'s satLo/satHi are OUTPUT SWING toward the GND and +VDD
+> rails, and a CMOS inverter swings essentially rail-to-rail (datasheet VOL ≈ 0.05 V,
+> VOH ≈ VDD − 0.05), so **their SUM is bounded by ≈ VDD = 5.64 V**. The shipped sum 4.939 V is
+> **88 %** of that — physically consistent. Also note the datasheet's RECOMMENDED VCC range is
+> **3–18 V**, so any candidate implying a rail under 3 V is outside the device's own spec.
 
 ### Recovery + bandlimiting (IC2_B, IC4_B, IC4_A)
 | Ref | Value | Function |
