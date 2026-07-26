@@ -9,33 +9,24 @@ CAPTURE LEVELS (sweep_clean RMS, gain-n12 corrected)
 ------------------------------------------------------------------------------------------
   master 0.00  master-0700_base-clean.wav                RMS  -52.83 dBFS (gain-corr +0.0 dB)
   master 0.25  master-0930_base-clean.wav                RMS  -41.43 dBFS (gain-corr +0.0 dB)
-  master 0.50  ref-clean.wav                             RMS  -32.18 dBFS (gain-corr +0.0 dB)
   master 0.75  master-1430_gain-n12_base-clean.wav       RMS  -22.54 dBFS (gain-corr +12.1 dB)
-  master 1.00  master-1700_gain-n12_base-clean.wav       RMS  -18.20 dBFS (gain-corr +12.1 dB)
+  master 1.00  master-1700_gain-n12_base-clean.wav       RMS  -16.62 dBFS (gain-corr +12.1 dB)
 
 ------------------------------------------------------------------------------------------
 (1) masterTaperExp p   [ divRatio(m) = m^p ;  p = ln(R(m)/R(1.0)) / ln(m) ]
 ------------------------------------------------------------------------------------------
-  m=0.25: R(m)/R(1.0) = 0.0690 = -23.22 dB  ->  p = 1.929
-  m=0.50: R(m)/R(1.0) = 0.2000 = -13.98 dB  ->  p = 2.322
-  m=0.75: R(m)/R(1.0) = 0.6073 = -4.33 dB  ->  p = 1.734  (both gain-n12 -> correction CANCELS, cleanest)
-  => single-point estimates 1.929 / 2.322 / 1.734 (mean 1.995)
-  => LEAST-SQUARES over all interior points: p = 1.998
-
-                   candidate p  err @0.25  err @0.50  err @0.75    worst
-              m=0.25 point fit      +0.00      +2.37      -0.49     2.37
-              m=0.50 point fit      -4.73      -0.00      -1.47     4.73
-              m=0.75 point fit      +2.35      +3.54      +0.00     3.54
-           least squares (all)      -0.84      +1.95      -0.66     1.95
-     SHIPPED (= levelTaperExp)      -3.87      +0.43      -1.29     3.87
-  => on whole-travel error the best of these is least squares (all) (p = 1.998, worst 1.95 dB)
+  m=0.25: R(m)/R(1.0) = 0.0575 = -24.81 dB  ->  p = 2.061
+  m=0.75: R(m)/R(1.0) = 0.5059 = -5.92 dB  ->  p = 2.369  (both gain-n12 -> correction CANCELS, cleanest)
+  => two estimates 2.061 / 2.369; PREFER the gain-n12-cancelling 0.75/1.0: p = 2.369  (mean 2.215)
+  shipped interim was 1.43; A-taper pots typically p ~ 2-3. A pin-free interior value that
+  both knobs agree on is the accept condition.
 
 ------------------------------------------------------------------------------------------
 (2) kOutputMakeup   [ render CLEAN at master=1.0, makeup=1, match the capture ]
 ------------------------------------------------------------------------------------------
-  R_cap(1.0)          =  -18.20 dBFS
-  R_mdl(1.0,makeup=1) =  -26.50 dBFS
-  => kOutputMakeup = R_cap/R_mdl = 2.5987  (+8.30 dB)
+  R_cap(1.0)          =  -16.62 dBFS
+  R_mdl(1.0,makeup=1) =  -27.94 dBFS
+  => kOutputMakeup = R_cap/R_mdl = 3.6840  (+11.33 dB)
   (calibration §2: makeup MAY exceed 1.0 — do NOT pad for headroom.)
 
 ------------------------------------------------------------------------------------------
@@ -43,14 +34,13 @@ CAPTURE LEVELS (sweep_clean RMS, gain-n12 corrected)
     target absolute level here, so agreement is real corroboration)
 ------------------------------------------------------------------------------------------
    master |   capture     model  err dB
-     0.25 |   -41.43   -42.27   -0.84
-     0.50 |   -32.18   -30.23   +1.95
-     0.75 |   -22.54   -23.20   -0.66
-     1.00 |   -18.20   -18.20   -0.00
-  worst |err| = 1.95 dB  (CHECK — taper/makeup mismatch)
+     0.25 |   -41.43   -45.14   -3.71
+     0.75 |   -22.54   -22.54   -0.00
+     1.00 |   -16.62   -16.62   +0.00
+  worst |err| = 3.71 dB  (CHECK — taper/makeup mismatch)
 
 ==========================================================================================
 RESULT — write these into the shipped defaults
 ==========================================================================================
-  MasterOut.h  kMasterTaperExp  : 1.43 -> 1.998
-  GainStaging.h kOutputMakeupNominal : 0.90 -> 2.599
+  MasterOut.h  kMasterTaperExp  : 1.43 -> 2.369
+  GainStaging.h kOutputMakeupNominal : 0.90 -> 3.684

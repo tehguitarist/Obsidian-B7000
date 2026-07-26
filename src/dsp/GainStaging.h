@@ -62,5 +62,23 @@ static constexpr double kInputRefNominal = 3.377;
 // path, so this is independent of the kInputRef change above. calibration §2: makeup
 // MAY exceed 1.0 and must NOT be padded down for headroom (output above 0 dBFS at
 // high drive+volume is faithful behaviour, not a fault).
-static constexpr double kOutputMakeupNominal = 3.684;
+//
+// ** SESSION-41 RE-CALIBRATED — 3.684 -> 2.599 (+11.33 dB -> +8.30 dB). ** The session-17 value
+// was 3.03 dB HOT, i.e. the shipped plugin has been 3 dB louder than the pedal at matched settings
+// this whole time. Invisible to every Phase-9 grade by construction: `fr_at_bands` gain-matches
+// each capture before differencing, so the entire matrix measures SHAPE and absolute level is a
+// separate axis (§ "Deltas are SHAPE, not loudness"). Two independent causes, both staleness:
+//   • 1.58 dB — `master-1700_gain-n12_base-clean.wav`, the single capture this constant is
+//     level-matched against, was a BAD TAKE at session-17 time; session 24 re-recorded it
+//     (sweep_clean RMS -16.62 -> -18.20 dBFS) and nothing re-ran the calibration.
+//   • 1.44 dB — the clean path itself has moved since: trebleWiperR (s25), the mid cap table +
+//     midWiperR + midCapRatio (s26/27), c21R (s28). Every one of those changes the clean chain's
+//     broadband gain, and the makeup that level-matches it was never re-derived.
+// Confirmed two ways that agree to 0.01 dB: master_taper_makeup.py's sweep_clean RMS match
+// (3.684 -> 2.5987) and a direct model-vs-pedal peak comparison on the 1 kHz `lvl_` ladder
+// (model +3.016 dB hot at lvl_-12, where the clean path is still linear).
+// ⚠ This is a post-chain scalar (outputGain = makeup/kInputRef), so it moves NO nonlinear
+// operating point and invalidates no OD fit. It DOES shift the idle floor — recheck the VU
+// idle-noise gate (backlog C1) against it.
+static constexpr double kOutputMakeupNominal = 2.599;
 } // namespace GainStaging

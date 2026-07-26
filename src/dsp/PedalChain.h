@@ -324,6 +324,33 @@ public:
         return masterOut.process(s);
     }
 
+    // Diagnostic-only per-stage taps of the POST-BLEND path (session 41, Phase 9
+    // item A5). Exact sibling of runOdSampleTapped above: identical stage order to
+    // processPostBlend(), each boundary recorded, state advancing the same way, and
+    // used by no production path. Its purpose is to answer "which op-amp output
+    // actually reaches its rail" — with the RailClamps DISABLED every tap is the
+    // stage's UNCLAMPED output, i.e. the voltage that op-amp would have to swing,
+    // which is exactly what a headroom re-derivation needs.
+    //
+    // ⚠ Two nodes are deliberately NOT tapped, and neither hides anything:
+    //  • EqPreGain's IC5_A buffer output is unity, so it equals the `c21` tap.
+    //  • MasterOut's IC6_B output is `ntop * divRatio` with divRatio <= 1 and C36
+    //    cornering at 0.72 Hz, so it can only ever be SMALLER than the `hiMid` tap
+    //    — if IC6_A is inside the rail window, IC6_B necessarily is too.
+    struct PostTaps { double blend, c21, eqPre, baxandall, loMid, hiMid, master; };
+    inline PostTaps processPostBlendTapped(double cleanDelayed, double odDown) noexcept
+    {
+        PostTaps t;
+        t.blend = levelBlend.process(cleanDelayed, odDown);
+        t.c21 = c21.process(t.blend);
+        t.eqPre = eqPreGain.process(t.c21);
+        t.baxandall = baxandall.process(t.eqPre);
+        t.loMid = loMid.process(t.baxandall);
+        t.hiMid = hiMid.process(t.loMid);
+        t.master = masterOut.process(t.hiMid);
+        return t;
+    }
+
     // Fused base-rate convenience path (no oversampling, no clean-tap delay) —
     // used by the console integration test and a 1× fallback.
     inline double processSample(double x) noexcept

@@ -104,6 +104,202 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 41, 2026-07-27): ▶ PHASE 9 / A5 STEP 1 — ⭐⭐ THE CLEAN-PATH RAIL IS LOCALISED
+> (IC5_B) AND THE LEVEL IT RAILS AT IS ARITHMETICALLY IMPOSSIBLE FOR THIS PEDAL'S SUPPLY, WHICH
+> BREAKS THE `kInputRef`/`clipSat` DEGENERACY FROM OUTSIDE — and the two answers DISAGREE, so
+> NOTHING was shipped for it. Separately ✅✅ SHIPPED: the output-level calibration had gone STALE
+> and the plugin was 3 dB TOO LOUD — `kOutputMakeup` 3.684 → 2.599, `masterTaperExp` 2.25 → 1.998.
+> ctest 17/17. New tools `analysis/clean_rail_probe.cpp` (+ `PedalChain::processPostBlendTapped`),
+> `clean_headroom_probe.py`, `clean_headroom_bound.py`. Full detail `docs/phase9-validation.md`
+> §4 "A5 step 1", §0 A5/A5b.**
+> **(1) ⭐ THE OFFENDER IS IC5_B, AND NO KNOB CAN CHANGE THAT.** With the clamps off the DIST-off
+> path is exactly linear (self-test: node gains identical to **0.000000 dB** at two probe levels
+> 12 dB apart), so ONE render gives every node's rail onset at once. At 1 kHz, flat EQ: BLEND wiper
+> and C21 passive at 0.00 dB; **IC5_B +6.85 dB (×2.2)**; IC5_C/IC5_D/IC6_A all +6.66; IC6_B can only
+> be smaller (MASTER divider ≤ 1). **IC5_B is the highest node in the whole clean chain AND upstream
+> of every EQ band**, so the onset is **−8.79 dBFS (hard) / ≈ −10.0 dBFS (the 0.35 V RailClamp knee,
+> where distortion actually starts)** in all six EQ cases — flat, every single-band boost extreme,
+> MASTER max. Reproduces session 39's "bit-clean through −12, 0.97 % at −9" from the other side.
+> **(2) ⭐⭐ AND IT IS NOT A RAIL-VOLTAGE QUESTION — `kInputRef = 3.377 V/FS` IS IMPOSSIBLE ON A 9 V
+> PEDAL.** Two schematic facts: IC5_B's gain is `−R29/R28 = −2.2`, fixed and always in circuit; the
+> supply is 9 V → D3 (~0.35 V) → 8.65 V with VD = 4.325 V, so **no node here can swing beyond
+> ±4.325 V**, whatever op-amp is fitted. At the ladder's hottest rung (−3 dBFS, where the pedal
+> reads **0.0000 %**) 3.377 puts **2.391 V pk at the jack → 5.260 V at IC5_B = 1.70 dB ABOVE the
+> supply ceiling.** Ceilings on `kInputRef`: **≤ 2.777** (supply, unbeatable), **≤ 1.734** (session-21
+> TL07x limit), **≤ 1.509** (TL07x knee = what "no measurable THD at −3 dBFS" requires).
+> **(3) THE LADDER AND THE CONTROL BOTH AGREE.** Model THD% at −9/−6/−3 on `ref-clean`: **3.377 →
+> 1.05 / 13.03 / 22.91**; 2.400 → 0 / 1.13 / 13.16; 1.700 → 0 / 0 / 1.14; **1.200 and 0.870 → 0.0000
+> at every rung, exactly like the pedal.** Control: the onset moves **dB-for-dB** with `kInputRef`
+> (worst error **0.00 dB**) ⇒ the only nonlinearity on this path really is a fixed-voltage clamp,
+> which is what makes the bound argument valid. The pedal's own ladder steps **3.000 dB** twelve
+> times, worst deviation **0.0005 dB** over 33 dB — it genuinely does not compress.
+> **(4) ⚠⚠ SO THE DEGENERACY IS BROKEN AND THE TWO ANSWERS CONFLICT — nothing shipped, deliberately.**
+> `GainStaging.h` records that `kInputRef` is degenerate with the clip ceiling under audio-only
+> captures; session 17 fitted the pair jointly and chose 3.377 on FAMILY physicality (at 0.87 the
+> clipper ceiling fell to ~1.3 V/side vs a ~7 V R19-dropped rail). **The clean path has no clipper in
+> it, so it is a third constraint the joint fit never saw — and it says ≤ 1.5**, which drags
+> `clipSat` sum 4.94 → ~2.2 V, back into the regime session 17 rejected. A real contradiction between
+> two physical arguments, not a value to nudge. ⛔ **Do NOT lower `kInputRef` alone** — it anchors
+> every nonlinear fit since session 17. Independent hint in the same direction: session 40 item (6a)
+> found rails-OFF *improves* the OD level axis, i.e. the model rails where it should not in the OD
+> path too.
+> **(5) ✅✅ SHIPPED — THE PLUGIN WAS 3 dB TOO LOUD, and every Phase-9 number was blind to it by
+> construction** (§1: each capture is gain-matched before differencing, so the whole matrix measures
+> SHAPE; absolute level is a separate axis). Found while converting dBFS to volts for (2). Four
+> causes, all staleness: **(a)** a **12 dB double-count** `master_taper_makeup.py` inherited from
+> session 21's correct `--input-trim` harness fix — it already corrects the CAPTURE up by +12.071 dB,
+> so the render was trimmed down by the same amount and the lot landed in the makeup (re-run as-was
+> it returns **10.43**); **(b)** its one reference capture `master-1700_gain-n12_base-clean` was a
+> **session-24 re-record** (−16.62 → −18.20 dBFS) = **1.58 dB**; **(c)** four clean-path fixes shipped
+> since (trebleWiperR s25, mid caps/Rw/ratio s26–27, c21R s28) = **1.44 dB** — and 1.58 + 1.44 = 3.02
+> against a directly-measured **+3.016 dB**, so the decomposition closes to 0.01 dB; **(d)**
+> `ref-clean.wav` **IS** the master = 0.50 member of the same series (it just has no `master-` token),
+> so the taper fit never saw the MIDDLE of the knob — exactly where it was worst.
+> **(6) THE MASTER TAPER IS NOT A POWER LAW.** Per-point exponents **1.929 / 2.322 / 1.734** at
+> m = 0.25/0.50/0.75 — non-monotone, so no exponent fits all three (same as the DRIVE C-taper,
+> session 16). Worst whole-travel error: **2.25 (shipped) 3.87 dB | 2.322 4.73 | 1.734 3.54 | 1.929
+> 2.37 | 1.998 (least squares) 1.95** → shipped the LS value. Post-ship absolute level, model−pedal:
+> master **0.25 −0.85 / 0.50 +2.00 / 0.75 −0.67 / 1.00 −0.01 dB** (was ≈ +2.4/+3.5/+3.0/+3.0). Both
+> constants are post-EQ scalars, so **no nonlinear operating point moves and no OD fit is
+> invalidated** — but the idle floor shifts, so **backlog C1 (VU idle gate) must be re-checked
+> against 2.599**.
+> **⭐ THE METHOD LESSON: A FAILING ACCEPTANCE CHECK IS NOT A FOOTNOTE.** `master_taper_makeup.py`
+> printed `worst |err| = 3.71 dB (CHECK — taper/makeup mismatch)` in session 17 and the values were
+> shipped anyway; that one line would have caught all of (5) three sessions before the captures were
+> even re-recorded. Sibling lesson: **a harness fix can silently break a tool that is not part of the
+> harness** — nothing re-ran this script between session 17 and now, and `--input-trim` had changed
+> under it.
+> **▶ NEXT: (a)** A5's remaining question is **not** "which stage" — answered — but the `kInputRef`
+> contradiction in (4): a **joint re-fit of `kInputRef` WITH the clipper family**, carrying the clean
+> path's supply bound as a HARD constraint alongside the OD harmonic targets. Do not fit either half
+> alone. **(b)** the A3 **crossover sub-gate** is still A3's largest measured unexplained error
+> (~1 octave, ~4–5 dB) — `grunt_span_probe.py::crossover_gate()` is its acceptance tool. **(c)** the
+> 254 Hz notch-skirt confirmation against GAP #2. Then A4 re-grade + GATE-9, the queued `gain-n12`
+> HF collapse, B (perf/HQ), C (carry-forwards), D (release).
+> ⚠ **NOTHING IS COMMITTED.** Working tree carries sessions 39 + 40 + 41.
+> ── prior session ──
+> **CURRENT (session 40, 2026-07-27): ▶ PHASE 9 / A3 STEP 3d — ⭐⭐ THE "−12/−6 dBFS MID-BAND CLIPPER
+> ITEM" DOES NOT SURVIVE ITS OWN AUDIT AND IS CLOSED AS NOT MEASURABLE. The joint
+> `clipSat`/`kInputRef` re-fit was RUN (5×5 grid, 25 candidates, liveness-guarded) and NO CANDIDATE
+> IS PROPOSED — deliberately. Analysis + tooling only, NOTHING in `src/` changed, ctest 17/17. New
+> tool `analysis/a3_clipper_joint_scan.py`; `grunt_span_probe.py` gained the session-38 crossover
+> sub-gate as a real tool. Full detail `docs/phase9-validation.md` §4 "A3 step 3d", §0 backlog.**
+> **(1) ⭐⭐ 82 % OF THE METRIC WAS ONE BAND, AND THE CLIPPER CANNOT REACH IT.** `mf_hot` (0.94 dB)
+> splits as **101 Hz 0.45 / 127 0.40 / 160 0.54 / 202 0.35 / 254 1.90** — **254 Hz alone is 82.4 % of
+> the mean-square.** Every "0.5–1.1 dB mid-band clipper item" figure in sessions 34/37 is this
+> aggregate. **Two candidate excuses were tested and BOTH refuted: it is NOT a cliff** (amplification
+> S = 0.27 at 254 Hz, the LOWEST of the band set vs 101 Hz's 0.47; m ≈ 0.43, θ ≈ 45–53°, nowhere near
+> anti-phase — so session 37's reason for demoting `lf_hot` does not transfer), **and NOT a capture
+> artefact** (`bypass.wav` — a wire — and `ref-clean.wav` both step **exactly +6.00 dB at 254 Hz,
+> deviation 0.00 to 2 dp**; reference `blend-0700` −0.02).
+> **(2) ⭐⭐ THE DECISIVE TEST IS THE CONTROL DRIVES.** A clipper-side compression error MUST vanish at
+> drive min/9:30 — that is the entire basis for using `ctrl` as the control. The 254 Hz residual at
+> −12→−6 is **min +1.60 / 9:30 +1.41 / noon +0.98 / 2:30 +1.21 / max +2.40 dB**: full size at the
+> control, own-control rms **1.51 vs hot 1.90**. Independently, matching the pedal there at max needs
+> **>24 dB of OD cut** (hits `solve_need`'s ±24 sentinel) with only **0.09 dB of headroom** against
+> muting the OD path entirely. ⇒ **no clipper VTC parameter at any value is responsible.**
+> ⚠ `need = +24.00` is the UNREACHABLE SENTINEL, not a value — check the span before quoting it.
+> **(3) WHAT 254 Hz PROBABLY IS (hypothesis, consistent but NOT proven).** In the pedal's raw
+> level-step it is a **lone spike flanked by clean neighbours**: at drive min, 202 Hz **+0.30**,
+> 254 **−1.34**, 320 **+0.06**; curvature 2.68/3.01 vs the model's 0.44–0.48. And **320 Hz — the
+> already-EXCLUDEd TrebleAttack-notch band — is the only band POSITIVE in every OD capture.**
+> ⇒ 254 Hz likely sits on the **skirt of the pedal's ~300 Hz TrebleAttack two-path cancellation
+> notch** (GAP #2, measured ~322 Hz / −3.4 dB at session 19), whose balance shifts with level because
+> one of its two paths is the nonlinear one. **Exclude 254 Hz from level-axis aggregates as 320 Hz
+> already is — explicitly, with the evidence recorded, never silently.**
+> **(4) ⭐ WITH IT REMOVED THE ITEM IS AT THE NOISE FLOOR.** Like-for-like on the SAME bands:
+> **CONTROL min+9:30 101–202 Hz = 0.29 dB; TARGET 2:30+max 101–202 Hz = 0.44 dB** ⇒ margin
+> **0.15 dB, AT the 0.144 dB take-to-take capture floor.** ⚠ The whole-band `ctrl` (0.47) was never
+> the right comparator: restricted to 101–254 the control is **0.72**, LARGER than the ex-254 target
+> it was supposed to bound. **Compare against a BAND-MATCHED control, not a whole-band one.**
+> **(5) THE 5×5 GRID CONFIRMS IT EMPIRICALLY.** satScale × kInputRefScale ∈ {0.70…1.30}²: the best
+> `mf_ex254` (**0.27 at 0.70/0.70**) sits at a **GRID CORNER, not an interior minimum**, and its
+> matched control falls in lockstep **0.29 → 0.14** so the target/control ratio gets **WORSE
+> (1.52 → 1.93)**. Margin across the whole grid **0.08–0.56 dB** (shipped 0.15); the smallest margins
+> get there by RAISING the control to meet the target. The metric is demonstrably sensitive
+> (`mf_ex254` spans 0.27–0.95) — it simply has no optimum, because there is no defect to find.
+> ⇒ **DO NOT ship a `clipSat`/`kInputRef` change for this item; do not re-open it on `mf_hot`.**
+> **(6) TWO SIDE FINDINGS, BOTH BELONGING TO A5.** **(a)** **Rails OFF** (`railNeg/railPos=1000` —
+> RailClamp is dead-linear to the knee, so this needs no rebuild) improves **`all` 1.00/2.14 →
+> 0.61/1.16 and the null band 12/15 → 13/15** while barely moving the target (0.44 → 0.42) ⇒ the model
+> rails somewhere that costs it on the level axis, **the same class as A5 but in the OD path.**
+> **(b)** ⚠ **My own rail hypothesis for the CONTROL was REFUTED by that A/B** — rails-off makes
+> `ctrl_ex` **worse** (0.29 → 0.33). What moves the control is the anti-diagonal (satSc = krSc), which
+> holds the clipper's operating point fixed while reducing **JFET** drive — consistent with DRIVE
+> sitting downstream of the J201. `kInputRef ×0.70 alone` improves the control (0.29 → 0.22) but
+> wrecks the target (0.44 → 0.73): not a free win.
+> **(7) ✅ THE CROSSOVER SUB-GATE IS NOW A COMMITTED TOOL AND REPRODUCES SESSION 38 EXACTLY.**
+> `grunt_span_probe.py` gained `peak()` (parabolic vertex in log2 f, the `mid_shape_verify` pattern)
+> + `crossover_gate()`, scoped to the drive-min triple on `sweep_clean`: **pedal flat 177.8 Hz/+6.27,
+> boost 144.0/+11.23; model 95.7/+10.27, 69.4/+16.39; deltas −0.89 oct/+4.00 dB and −1.05/+5.16** —
+> every figure matching session 38's ad-hoc record to the last decimal, so the locator is validated,
+> not merely plausible. Self-checks the PEDAL row against `GATE_TARGETS`; refuses `sweep_drv_-6`.
+> ⛔ Judge on PEAK LOCATION only — never this probe's aggregate span-err RMS.
+> **⭐ THE METHOD LESSON: `defective-rows-must-not-vote`, one level down — not rows of a matrix this
+> time but BANDS inside a single aggregate.** Sessions 34 and 37 both sized this item from `mf_hot`
+> without splitting it. The number was real, the aggregate was real, the attribution was wrong.
+> **Split an objective by its members and confirm each member is reachable by the knob you intend to
+> turn, BEFORE fitting** — it cost one decomposition and it stopped a 25-candidate fit from shipping
+> a compensating error.
+> **▶ NEXT: (a)** the mid-band clipper item is CLOSED — do not re-open without evidence that is not
+> `mf_hot`. **(b)** confirm the 254 Hz notch-skirt hypothesis (3) against GAP #2's TrebleAttack notch
+> (it also predicts the 320 Hz sign anomaly) so the exclusion rests on a mechanism, not a symptom.
+> **(c)** A5's rail-headroom item now has a second independent motivation from (6a) — and A5's own
+> queued step (localise which stage rails; EqPreGain first suspect) is still not started.
+> **(d)** the **crossover sub-gate is now A3's largest measured unexplained error** (~1 octave,
+> ~4–5 dB) and is the natural next A3 target, with (7) as its acceptance tool. Then A4 re-grade +
+> GATE-9, the queued `gain-n12` HF collapse, B (perf/HQ), C (carry-forwards), D (release).
+> ⚠ **NOTHING IS COMMITTED.** Working tree carries sessions 39 + 40.
+> ── prior session ──
+> **CURRENT (session 39, 2026-07-27): ▶ PHASE 9 — NEW CONFIRMED GAP, queued as A5: the CLEAN
+> (DIST-off) path distorts hard at moderate-to-hot input levels the real pedal doesn't. User-reported
+> impression, VERIFIED by direct measurement — analysis only, NOTHING in `src/` changed, ctest
+> untouched. New tool `analysis/clean_thd_check.py`. Positioned **before B (perf/HQ)** per user
+> request; full detail `docs/phase9-validation.md` §4 "A5", §0 backlog.**
+> **(1) THE TEST.** Every capture embeds discrete tones at −14 dBFS (82–8000 Hz) plus a 1 kHz
+> "compression knee" level ladder −36…−3 dBFS (`gen_test_signal.py::LEVEL_STEPS_DB`, segments
+> `lvl_-36`…`lvl_-3`) — built for the OD path, present unconditionally in every clean capture too.
+> Rendered `ref-clean.wav`'s exact settings through `OfflineRender` at shipped defaults and compared
+> per-harmonic level (H2..H6, Nyquist-guarded) against the pedal's own `ref-clean.wav` capture.
+> **(2) SPLIT RESULT.** The −14 dBFS discrete tones show NOTHING (both pedal and plugin at their
+> measurement floor, ≤0.001% THD) — that part of the impression doesn't hold at that level. But the
+> `lvl_` ladder: pedal stays at its floor (0.0000% THD) at EVERY step; **the plugin is bit-clean
+> only through −12 dBFS, then breaks — `lvl_-9` 0.97%, `lvl_-6` 12.9%, `lvl_-3` 22.9%** — on
+> `ref-clean.wav` at FLAT EQ. Confirmed on 5 more captures (the hottest EQ-boost `_1700_gain-n12`
+> extremes + two milder ones): identical onset between −12 and −9 dBFS, 11–23% THD by −3 dBFS.
+> −3 dBFS is an ordinary hot playing peak, not an edge case.
+> **(3) ROOT CAUSE LOCALISED AND A/B-CONFIRMED: the session-21 RailClamp.** `--fit railEnabled=0`
+> on the identical render drops every case straight back to the pedal's own floor. With DIST off the
+> audible chain is `IC1_A buffer → LevelBlend (distEngage=false returns cleanIn LITERALLY
+> unmodified, verified in LevelBlend.h::process) → C21 HP → EqPreGain (buffer + FIXED −2.2×, always
+> active regardless of EQ position — confirmed by the FLAT-EQ `ref-clean` render already showing it)
+> → Baxandall → LO-MID → HI-MID → MasterOut` — the ONLY nonlinearity on this whole path is
+> RailClamp. Arithmetic is consistent with EqPreGain railing first: at −3 dBFS, `kInputRef`
+> (3.377 V/FS, session 17) puts ≈2.39 V peak at IC1_A's output; ×2.2 ≈ 5.3 V peak around VD=4.5V —
+> spanning ≈[−0.8, +9.8] V against the shipped rail window ≈[1.6, 7.2] V, clipping hard well before
+> Baxandall/MasterOut see the signal (consistent with `master-1700` — MAXIMUM master, LEAST
+> available downstream attenuation — showing the SAME onset as everything else, not a worse one).
+> **Not yet pinned to the single worst-offending stage** — natural next step, not attempted.
+> **(4) WHY NO GATE CAUGHT IT.** Every A2/A2c/A2d clean-set grade reads `sweep_clean`, which tops
+> out at **−30 dBFS** (`CLEAN_FR_LEVELS_DB`) — well under the −12 dBFS onset. Same blind-spot class
+> as A3-adjacent (session 30): a level-dependent defect invisible to fixed-level grading.
+> **(5) VERIFIED NOT an OS/aliasing issue** (orthogonal to the §5 OS-sweep work, not related to it):
+> `ref-clean.wav`'s `lvl_-3` render is **bit-identical at OS 1×/2×/4×/8×** (THD 22.8546%, H2/H3 to
+> 4 decimal places) — this lives entirely in the base-rate EQ block (only the OD region is
+> oversampled). A headroom/gain-staging bug, not an aliasing one.
+> **(6) SECOND REQUEST ACTIONED: the performance-pass plan (`docs/phase9-validation.md` §5, backlog
+> B1b) now explicitly requires a no-OS (1×) and low-OS (2×) sweep with a WRITTEN compensation
+> decision** — not just the existing 4×-vs-8× fidelity comparison — covering the plain linear-stage
+> top-octave droop (`dsp.md` "Top-octave accuracy" / "Low-OS top-octave restore") that a low-CPU/
+> low-latency user running at 1×/2× would actually hit. That option was written up in dsp.md but
+> never actually run or decided on; GATE 9 now needs an explicit implement-or-reject call, not just
+> the option left on record.
+> **▶ NEXT (before B/perf, backlog A5): localise which stage(s) actually rail** (EqPreGain first
+> suspect) and either re-derive rail headroom for that stage specifically, or revisit whether
+> `kInputRef`/`EqPreGain`'s fixed gain still make sense together post-session-17 (the same
+> "degenerate pair" caution already logged for `kInputRef`/clip-ceiling) — do NOT raise the rail
+> voltages blind, they're physically derived (session 21), not fitted.
+> ── prior session ──
 > **CURRENT (session 38, 2026-07-27): ▶ PHASE 9 — ⭐ GAP #3b IS DISSOLVED, NOT SOLVED: its premise had
 > EXPIRED, and the GRUNT span turns out to be an A3 *instrument* rather than a gap of its own. Sessions
 > 34–37 also COMMITTED (`bc2b1fd`, 17 files, ctest verified 17/17 first). Analysis only — NOTHING in

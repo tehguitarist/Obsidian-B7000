@@ -214,8 +214,28 @@ struct FitParams
     double driveTaperExp = 1.98;  // VR3 100k C-taper, in (1-x) — 0 ohm at full CW. session-17
                                   // measured (bleed-free taper, drive_taper_curve.log; was 1.5/2.5)
     double levelTaperExp = 2.25;  // VR2 100k A-taper — session-8 measured (36 estimates; was 1.43)
-    double masterTaperExp = 2.25; // VR8 100k A-taper [ENG] — session-17; same pot as LEVEL, so
-                                  // shares its 2.25 (master captures bracket it: 2.06/2.37; was 1.43)
+    // VR8 100k A-taper [ENG]. ** SESSION-41: 2.25 -> 1.998. ** Session 17 set 2.25 by borrowing
+    // LEVEL's exponent, on the grounds that the master captures "bracket it: 2.06/2.37". They no
+    // longer do — `master-1700_gain-n12_base-clean.wav` was found to be a BAD TAKE and re-recorded
+    // in session 24 (its sweep_clean RMS moved -16.62 -> -18.20 dBFS), and it is the DENOMINATOR of
+    // both bracket estimates, which now read 1.93 (m=0.25) and 1.73 (m=0.75). Nothing re-ran the
+    // calibration afterwards, so a stale reference capture stayed baked into two shipped constants.
+    // ⚠ A THIRD interior knob point was also missing: `ref-clean.wav` IS master=0.50 of this same
+    // series (_REF_OD with base=clean is every pot at noon), it just carries no `master-` filename
+    // token, so the fit never saw the middle of the knob's travel — the exact place the shipped
+    // value was worst (2.5 dB). With it, the per-point exponents are 1.929 / 2.322 / 1.734 at
+    // m = 0.25 / 0.50 / 0.75 — NON-MONOTONE, so no power law of any exponent fits all three. Same
+    // finding as the DRIVE C-taper (session 16): a real pot taper is not a power law, and a
+    // one-parameter family fitted to ONE point looks exact and is wrong everywhere else.
+    // 1.998 is the LEAST-SQUARES value over all three, chosen on WHOLE-TRAVEL error:
+    //   worst |err| vs the captures — 2.25 (shipped) 3.87 dB | 1.734 (m=0.75) 3.54 |
+    //   2.322 (m=0.50) 4.73 | 1.929 (m=0.25) 2.37 | **1.998 (LS) 1.95**
+    // That is master_taper_makeup.py's own untargeted consistency check, which session 17 recorded
+    // as FAILING at 3.71 dB and shipped anyway. analysis/fit_logs/step7_master_taper_makeup.log.
+    // The residual 1.95 dB sits at m=0.50 and is the power law's own limit, not a fit error; it is
+    // also within reach of knob-pointer error on a ±28 dB control (A2c). Fixing it properly means
+    // replacing the power law with a real taper curve, as session 16 concluded for DRIVE.
+    double masterTaperExp = 1.998;
 
     // ---- C21 (100n) inter-stage coupling into the tone stack ----------------
     // The 100n cap is schematic-verified; the resistance it works against is the

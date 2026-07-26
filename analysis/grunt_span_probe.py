@@ -56,6 +56,7 @@ Usage:
     python3.11 analysis/grunt_span_probe.py BASE.json CAND1.json CAND2.json ...
 """
 import json
+import math
 import sys
 
 # (label, drive, cut-capture, flat-capture, boost-capture)
@@ -101,6 +102,84 @@ def spans(caps, cut_f, pos_f, sweep):
 
 def rms(v):
     return (sum(x * x for x in v) / len(v)) ** 0.5
+
+
+# ---------------------------------------------------------------- crossover gate
+#
+# Session 38's A3 sub-gate, made runnable. A3's other gates read null DEPTH
+# (a3_lead_fit), the DRIVE axis (a3_drive_axis G1/G2) and the LEVEL axis
+# (a3_level_axis). NONE of them reads the CROSSOVER FREQUENCY -- where |OD|
+# overtakes the bleed -- and that is exactly what this span's bump peak locates,
+# amplified by sitting on the cancellation. A candidate that improves null depth
+# while leaving the crossover an octave low has not fixed A3.
+#
+# Measured on the pedal at drive-min (session 38). These are the pedal's own
+# numbers, so they are a capture, not a target to be re-derived.
+GATE_TARGETS = {"flat": (178.0, 6.27), "boost": (144.0, 11.23)}
+GATE_TOL_OCT = 1.0 / 6.0
+
+
+def peak(bands, curve, lo, hi):
+    """(peak Hz, peak dB) of the span bump, refined by a parabola in log2(f).
+
+    ⚠ The refinement is not cosmetic. On a 1/3-octave grid a raw argmax locates a
+    peak only to +-1/6 octave, which IS the whole tolerance of this gate -- so the
+    raw grid cannot judge it at all. Same lesson as mid_shape_verify.py, and the
+    reason session 26's mid-peak claims had to be redone after being read off the
+    band grid ("three of six positions looked EXACT" and every one was 9-20 % low).
+    """
+    idx = [i for i, b in enumerate(bands) if lo <= b <= hi]
+    if not idx:
+        return float("nan"), float("nan")
+    i = max(idx, key=lambda k: curve[k])
+    fpk, ypk = bands[i], curve[i]
+    if idx[0] < i < idx[-1]:
+        y0, y1, y2 = curve[i - 1], curve[i], curve[i + 1]
+        den = y0 - 2 * y1 + y2
+        if abs(den) > 1e-9:
+            d = 0.5 * (y0 - y2) / den                      # vertex, in band steps
+            if abs(d) <= 1.0:
+                step = math.log2(bands[i + 1] / bands[i])
+                fpk = 2 ** (math.log2(bands[i]) + d * step)
+                ypk = y1 - (y2 - y0) ** 2 / (8.0 * den)
+    return fpk, ypk
+
+
+def crossover_gate(bands, caps, sweep, label=""):
+    """Session 38's crossover sub-gate: WHERE the drive-min GRUNT span peaks.
+
+    Reported for pedal and plugin side by side. The pedal row is a capture and
+    must reproduce GATE_TARGETS -- if it does not, this locator disagrees with
+    the ad-hoc measurement session 38 recorded, and THAT is the thing to fix
+    before reading the plugin row.
+    """
+    tlabel, _d, cut_f, flat_f, boost_f = TRIPLES[0]          # drive-min triple
+    print(f"\n### CROSSOVER SUB-GATE (session 38) — {tlabel}   [sweep {sweep}] {label}")
+    print(f"    {'pos':<6} {'pedal Hz':>9} {'dB':>7} | {'model Hz':>9} {'dB':>7}"
+          f" | {'d(oct)':>7} {'d(dB)':>7} | verdict")
+    out = {}
+    for pos, pos_f in (("flat", flat_f), ("boost", boost_f)):
+        s = spans(caps, cut_f, pos_f, sweep)
+        if s is None:
+            continue
+        pl, pd = s
+        fp, yp = peak(bands, pd, SPAN_LO, SPAN_HI)
+        fm, ym = peak(bands, pl, SPAN_LO, SPAN_HI)
+        doct = math.log2(fm / fp) if (fp > 0 and fm > 0) else float("nan")
+        ok = abs(doct) <= GATE_TOL_OCT
+        # cross-check the pedal row against session 38's recorded measurement
+        tf, ty = GATE_TARGETS[pos]
+        drift = abs(math.log2(fp / tf))
+        note = "" if drift <= 0.02 else f"   <-- pedal row differs from s38 ({tf:.0f} Hz)"
+        print(f"    {pos:<6} {fp:9.1f} {yp:+7.2f} | {fm:9.1f} {ym:+7.2f}"
+              f" | {doct:+7.2f} {ym - yp:+7.2f} |"
+              f" {'PASS' if ok else 'FAIL'} (tol +-{GATE_TOL_OCT:.3f} oct){note}")
+        out[pos] = dict(pedal_hz=fp, pedal_db=yp, model_hz=fm, model_db=ym,
+                        d_oct=doct, d_db=ym - yp, passed=ok)
+    print("    ⛔ judge on the PEAK LOCATION only. This probe's aggregate span-err"
+          " RMS must NOT\n       select a shared OD-path element (see the module"
+          " docstring).")
+    return out
 
 
 def report(path, label, sweep, verbose):
@@ -155,6 +234,14 @@ def main():
     for sweep in sweeps:
         for p in paths:
             summary.setdefault(sweep, []).append((p, report(p, p, sweep, verbose)))
+            # The sub-gate is DEFINED at drive-min on sweep_clean -- that is the
+            # condition session 38 measured GATE_TARGETS at, and this locator
+            # reproduces its pedal AND model rows exactly there. Running it on a
+            # hotter sweep answers a different question (the pedal's own span peak
+            # moves to ~106/89 Hz at -6 dBFS), so don't invite that comparison.
+            if sweep == "sweep_clean":
+                bands, caps = load(p)
+                crossover_gate(bands, caps, sweep, label=p.split("/")[-1])
     print("\n### summary — mean span-err RMS (lower = the switch's RANGE matches the pedal)")
     print(f"{'report':<52}" + "".join(f"{s:>16}" for s in sweeps))
     for i, p in enumerate(paths):

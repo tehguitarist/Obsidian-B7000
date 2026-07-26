@@ -74,11 +74,16 @@ int main(int argc, char** argv)
     const double dbfs   = (argc > 3) ? std::atof(argv[3]) : -36.0;
 
     const double fs = 48000.0;
-    const double amp = GainStaging::kInputRefNominal * std::pow(10.0, dbfs / 20.0);
+    double inputRef = GainStaging::kInputRefNominal;
 
     // Trailing key=value pairs override FitParams, so a candidate element can be
     // swept across the whole DRIVE axis without a rebuild (session 34, A3 step 3a:
     // the gate is a drive SWEEP, so every candidate needs all five CSVs).
+    // kInputRef is GainStaging-domain, not a FitParams member (see FitParams.h
+    // "Scope boundary"), so it is special-cased here rather than added to
+    // kFitKeys — session 39: the -12/-6 dBFS clipper item needs kInputRef swept
+    // JOINTLY with clipSatLo/Hi (its session-16/17 degenerate partner), and
+    // until now this tool had no way to move it off the shipped default at all.
     FitParams fp {};
     const struct { const char* name; double FitParams::* member; } kFitKeys[] = {
         {"trebleC7", &FitParams::trebleC7},
@@ -108,10 +113,12 @@ int main(int argc, char** argv)
         if (eq == std::string::npos) { std::fprintf(stderr, "expected key=value, got '%s'\n", argv[i]); return 1; }
         const std::string k = a.substr(0, eq);
         bool hit = false;
+        if (k == "kInputRef") { inputRef = std::atof(a.c_str() + eq + 1); hit = true; }
         for (const auto& fk : kFitKeys)
             if (k == fk.name) { fp.*(fk.member) = std::atof(a.c_str() + eq + 1); hit = true; }
         if (! hit) { std::fprintf(stderr, "unknown fit key '%s'\n", k.c_str()); return 1; }
     }
+    const double amp = inputRef * std::pow(10.0, dbfs / 20.0);
 
     PedalChain ch;
     ch.prepare(fs, fs);   // 1x: no OS latency, clean tap already aligned

@@ -42,6 +42,12 @@ LOG = "analysis/fit_logs/step7_master_taper_makeup.log"
 MASTERS = [
     (0.00, "master-0700_base-clean.wav"),
     (0.25, "master-0930_base-clean.wav"),
+    # ⚠ ADDED session 41. `ref-clean.wav` IS the master=0.50 member of this very series (_REF_OD
+    # with base=clean is every pot at noon, master included) — it was simply never listed here
+    # because it doesn't carry a `master-` filename token. It is the best-conditioned interior
+    # point on the knob and the ONE the shipped taper is worst at, so leaving it out let a
+    # 2.5 dB error sit in the middle of MASTER's travel while the fit reported itself consistent.
+    (0.50, "ref-clean.wav"),
     (0.75, "master-1430_gain-n12_base-clean.wav"),
     (1.00, "master-1700_gain-n12_base-clean.wav"),
 ]
@@ -65,9 +71,21 @@ def cap_level(name):
 
 
 def render_clean_level(master, taper_p, makeup):
-    """Render the CLEAN chain at a master setting; return sweep_clean RMS. dist-engage forced off."""
+    """Render the CLEAN chain at a master setting; return sweep_clean RMS. dist-engage forced off.
+
+    ⚠ FIXED 2026-07-27 (session 41): the render must sit in the SAME level frame as `cap_level`,
+    which multiplies the capture UP by gain_correction_linear() into the gainSessionDb=0 frame.
+    Session 21 taught `render_args()` to emit `--input-trim` for a capture's gain session — a
+    correct fix for the matrix, but it silently broke THIS script, which had been written when
+    render_args ignored gainSessionDb: the capture was being corrected UP by +12.071 dB while the
+    render was being trimmed DOWN by the same amount, a 12 dB double-count landing entirely in
+    kOutputMakeup. Clearing the tag on the render template puts both sides at full level again.
+    (Cross-checked: the corrected makeup reproduces a direct capture-vs-render level comparison
+    on the lvl_ ladder to 0.02 dB.)
+    """
     parsed = parse_capture("master-1700_gain-n12_base-clean.wav")  # base-clean knob template
     parsed["master"] = master
+    parsed["gainSessionDb"] = 0
     extra = ["--fit", f"masterTaperExp={taper_p:.6g}", "--fit", f"driveTaperExp={DRIVE_TAPER:.6g}"]
     out = f"/tmp/mtm_{int(master*100):03d}.wav"
     subprocess.run([RENDER_BIN, ORIG, out, "--os", "4", "--output-makeup", f"{makeup:.9g}"]
@@ -113,18 +131,41 @@ def main():
     emit("(1) masterTaperExp p   [ divRatio(m) = m^p ;  p = ln(R(m)/R(1.0)) / ln(m) ]")
     emit("-" * 90)
     ps = []
-    for m in (0.25, 0.75):
+    for m in (0.25, 0.50, 0.75):
         ratio = lv[m] / lv[1.0]
         p = math.log(ratio) / math.log(m)
         ps.append(p)
         clean = "  (both gain-n12 -> correction CANCELS, cleanest)" if m == 0.75 else ""
         emit(f"  m={m:.2f}: R(m)/R(1.0) = {ratio:.4f} = {20*math.log10(ratio):+.2f} dB  ->  p = {p:.3f}{clean}")
-    p_fit = ps[1]          # prefer the 0.75/1.0 estimate (gain-corr cancels); 0.25 corroborates
     p_mean = float(np.mean(ps))
-    emit(f"  => two estimates {ps[0]:.3f} / {ps[1]:.3f}; PREFER the gain-n12-cancelling 0.75/1.0: "
-         f"p = {p_fit:.3f}  (mean {p_mean:.3f})")
-    emit(f"  shipped interim was 1.43; A-taper pots typically p ~ 2-3. A pin-free interior value that")
-    emit(f"  both knobs agree on is the accept condition.")
+    emit(f"  => single-point estimates " + " / ".join(f"{p:.3f}" for p in ps) + f" (mean {p_mean:.3f})")
+
+    # ⚠ Session 41: the two points DISAGREE (1.93 vs 1.73), so a single power law cannot satisfy
+    # both — the same finding as the DRIVE C-taper (session 16): a real pot taper is not a power
+    # law, and a one-parameter family fitted to ONE point looks exact and is wrong elsewhere.
+    # Report the least-squares p over both points and the residual EACH candidate leaves, so the
+    # choice is made on the whole knob travel rather than on whichever point was fitted.
+    # (m=0.00 is a divider null, 0^p = 0 at every p, and carries no information about p.)
+    logs = [(m, 20 * math.log10(lv[m] / lv[1.0])) for m in (0.25, 0.50, 0.75)]
+    num = sum((-20 * math.log10(m)) * (-d) for m, d in logs)
+    den = sum((20 * math.log10(m)) ** 2 for m, _ in logs)
+    p_ls = num / den
+    emit(f"  => LEAST-SQUARES over all interior points: p = {p_ls:.3f}")
+    emit("")
+    emit(f"  {'candidate p':>28} " + " ".join(f"{'err @' + format(m, '.2f'):>10}" for m, _ in logs)
+         + f" {'worst':>8}")
+    cands = [(p, f"m={m:.2f} point fit") for p, (m, _) in zip(ps, logs)]
+    cands += [(p_ls, "least squares (all)"), (2.25, "SHIPPED (= levelTaperExp)")]
+    best = None
+    for p, label in cands:
+        errs = [20 * p * math.log10(m) - d for m, d in logs]
+        worst = max(abs(e) for e in errs)
+        emit(f"  {label:>28} " + " ".join(f"{e:>+10.2f}" for e in errs) + f" {worst:>8.2f}")
+        if best is None or worst < best[0]:
+            best = (worst, p, label)
+    emit(f"  => on whole-travel error the best of these is {best[2]} (p = {best[1]:.3f}, "
+         f"worst {best[0]:.2f} dB)")
+    p_fit = p_ls
     emit("")
 
     # ---- (2) output makeup ------------------------------------------------------------
@@ -146,7 +187,7 @@ def main():
     emit("-" * 90)
     emit(f"  {'master':>7} | {'capture':>9} {'model':>9} {'err dB':>7}")
     worst = 0.0
-    for m in (0.25, 0.75, 1.0):
+    for m in (0.25, 0.50, 0.75, 1.0):
         r_mdl = render_clean_level(m, p_fit, makeup)
         e = 20 * math.log10((r_mdl + 1e-12) / (lv[m] + 1e-12))
         worst = max(worst, abs(e))

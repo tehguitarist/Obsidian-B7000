@@ -11,6 +11,14 @@
 > "CURRENT (session 17)" — clipA0 26.14 / clipSat 2.007+2.932 / clipK 2.846 / clipC11 5.72 nF /
 > jfetGm 0.10 (HELD) / jfetSat 0.2007,3.177 / jfetCeil 2.343,0.2741 / jfetExpandBeta 2.135 /
 > driveTaperExp 1.98 / levelTaperExp 2.25 / masterTaperExp 2.25 / kInputRef 3.377 / makeup 3.684.
+> ⚠ **TWO OF THOSE ARE SUPERSEDED (session 41, 2026-07-27): `masterTaperExp` 2.25 → 1.998 and
+> `makeup` 3.684 → 2.599 — the plugin was 3 dB too loud.** This step's own consistency check printed
+> `worst |err| = 3.71 dB (CHECK — taper/makeup mismatch)` and was shipped anyway; the causes were a
+> reference capture later found to be a bad take (session 24), four clean-path fixes shipped since,
+> a 12 dB frame double-count `master_taper_makeup.py` inherited from session 21's `--input-trim`
+> harness fix, and a missing master=0.50 knob point. ⚠ **`kInputRef = 3.377` is also now DISPUTED
+> on independent physical grounds** — the DIST-off clean path needs 5.26 V at IC5_B where the 9 V
+> supply allows ±4.325 V. See `docs/phase9-validation.md` §4 "A5 step 1".
 > **⭐ ROOT-CAUSE BUG (the reason none of this was ever shipping): `PluginProcessor::prepareToPlay`
 > never called `setFitParams`, and `PedalChain()` is `=default`, so the plugin ran stage `constexpr`
 > nominals and ignored FitParams entirely — only OfflineRender/tests applied fits. `prepareToPlay`
