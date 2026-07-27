@@ -460,7 +460,12 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   minimum-phase at all; and `clipA0` has **~1/45th** of the needed phase authority. ⭐ **Every mechanism
   tested produces a phase change that GROWS with frequency while the requirement is FLAT** ⇒ the flat
   −38° may be an instrument artefact, and **Set A of the session-53 captures is the critical path**
-  (`docs/session53-capture-request.md`). §4 "A3 step 9".
+  (`docs/session53-capture-request.md`). **✅ CAPTURES ARE NOW COMPLETE (31 files, verified clean, no
+  clipping, no truncation — see §4 item 6's completion check) but DELIBERATELY NOT YET ANALYSED**
+  (user request, 2026-07-28: document and stop, analysis is next session). **Next session starts
+  with: (1) check the Set B control (`drive-1700_blend-0700_base-od`) against `blend-0700_base-od`
+  BEFORE reading anything else out of Sets B/C/D; (2) write `read_a3_tones.py` for Set A — the real
+  priority.** §4 "A3 step 9".
 
 - [~] **A3 step 8 (session 52) — ⛔⛔ THE POST-CLIPPER LINEAR CORRECTION NETWORK IS REFUTED, from the
   MEASURED phase, for the whole CLASS rather than for particular elements; and the blend axis is
@@ -4750,7 +4755,7 @@ escape (b) only **sized** the harmonic-power bias indirectly (reconciling needs 
 unbiased measurement is now a **capture request, not an analysis**: see `docs/session53-capture-request.md`
 and §6 below.
 
-#### 6. Captures requested (user capturing, 2026-07-28) — 27 files, two stimuli
+#### 6. Captures requested and now COMPLETE (requested + captured 2026-07-28) — 27 files, two stimuli
 
 New standalone stimulus `analysis/a3_tones_48k.wav` (`gen_a3_tones.py`): 10 s `sweep_clean`
 alignment anchor + 20 bands 20 Hz–1613 Hz × {−18, −30} dBFS as 2.0 s tones, 103.3 s total. Same
@@ -4782,3 +4787,31 @@ if the control disagrees the shared normalisation is invalid and nothing downstr
 were asked for to avoid per-take timing drift, then withdrawn — the blend axis recovers θ
 algebraically from magnitudes (`a3_blend_axis.unpack`) and never reads waveform phase, so it is
 **alignment-immune** and ordinary one-file-per-setting takes are correct.
+
+**✅ CAPTURE COMPLETION CHECK (2026-07-28, same session).** 31 files landed in `analysis/captures/`
+(gitignored — back them up) before this session closed. Verified, not merely counted:
+
+- **22/22 Set B+C+D matrix files present**, re-checked against `captures.py::parse_capture`/
+  `render_args` a second time now that they exist on disk (same result as the pre-recording check:
+  correct knob values and switch indices; matrix still resolves to exactly 63 with these excluded).
+- **9 `a3tones_*.wav` files present** — Set A's required 5, plus the optional Set E's 4
+  (`a3tones_drive-1700_blend-*`) that the request flagged as "nice to have, only if still set up."
+- **No clipping.** Screened every new file for CONSECUTIVE flat-topping (the real clipping
+  signature — a squared-off waveform — not merely a hot peak, which a periodic tone produces
+  naturally near its own crest). `attack-cut_blend-1430_base-od.wav` peaks at **0.9885**, matching
+  the session-24 bad-take pinned-peak VALUE exactly, but on a **single sample** (max consecutive run
+  = 1), not the many-sample flat top that signature actually requires — a genuine hot transient, not
+  a re-run of that defect. Every other new file's peak is well clear of clipping. Zero files need
+  re-capturing.
+- **No truncation.** Every matrix file is 83.70 s, every `a3tones_*` file is 103.30 s — uniform
+  across all 31, consistent with `gen_a3_tones.segment_times()`'s expected total and with the
+  existing matrix's own segment layout. A short file's missing segments would read as zeros and
+  produce confident nonsense (the standing capture-protocol warning); this rules that out.
+
+⚠ **One item from this list is deliberately NOT done: the Set B control has NOT been checked against
+`blend-0700_base-od.wav`.** Its file is present and clean, but the actual comparison — the thing
+that validates every Set B/C number downstream — is analysis, not a capture-quality check, and per
+the user's request this session stopped at "captures are ready" rather than starting the next
+session's work. **This is the first thing the next session must do, before reading anything else out
+of Sets B/C/D** (§4 item 6's own warning: if the control disagrees, the shared B=0 normalisation is
+invalid).

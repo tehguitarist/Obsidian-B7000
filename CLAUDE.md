@@ -188,39 +188,43 @@ high, execute routine work cheap) is what should persist.
 > ARTEFACT of the instrument** — session 52 escape (b) only SIZED the harmonic-power bias indirectly
 > (needed H/P 0.6–265, impossible at 8 of 15 bands) on a biased instrument. **The unbiased measurement
 > is now a capture request, not an analysis.**
-> **(6) ▶ CAPTURES REQUESTED AND IN PROGRESS (user capturing, 2026-07-28) — `docs/session53-capture-request.md`.**
-> **27 files, two stimuli.** New standalone stimulus `analysis/a3_tones_48k.wav` (`gen_a3_tones.py`;
-> 10 s `sweep_clean` anchor + 20 bands 20 Hz–1613 Hz × −18/−30 dBFS, 2 s tones; same posture as
-> `gen_jfet_ladder.py`, does NOT touch the frozen main signal). **Set A (5 files, tones at the reference
-> condition)** = the unbiased re-measurement of session 52's target: with one tone per band there is no
-> harmonic power in the measurement, so `r` stops being an UPPER BOUND and `θ` stops being biased toward
-> 90°. **Set B (7, BLEND × drive-min/max)** tests drive-dependence on the good axis. **Set C (12, BLEND ×
-> GRUNT/ATTACK)** uses the pedal's own switches as a pre-vs-post localiser. **Set D (3, LEVEL at
-> drive-min)** pins `b0` from the pot law (β/α = 1−L exactly) instead of inheriting it from the model.
-> ✅ **Filenames pre-verified**: all 22 matrix names parse to the correct knob values/switch indices via
-> `captures.py`, the 5 `a3tones_*` names are correctly REJECTED so they skip like `jfet_ladder_*`, and
-> the matrix still resolves to exactly 63. ⚠ **Set B includes a CONTROL, `drive-1700_blend-0700_base-od`**
-> — at BLEND 0 the wiper is on the clean pin so the capture must be identical to the existing
-> `blend-0700_base-od` whatever DRIVE does; every sweep reuses that one file as its B=0 normaliser, so
-> if the control disagrees the shared normalisation is invalid. ⚠ **I asked for continuous single-take
-> sweeps and then RETRACTED it**: the blend axis recovers θ algebraically from magnitudes
-> (`a3_blend_axis.unpack`) and never reads waveform phase, so it is alignment-immune.
-> **▶ NEXT, IN ORDER: (a)** ⭐ **Set A first — it is the critical path, not a refinement.** Every
-> physical mechanism for a flat 38° is now excluded ((5)), so the live question is whether the target is
-> real. Write `analysis/read_a3_tones.py`: align on `sweep_clean`, fixed-offset segment reads per
+> **(6) ✅ CAPTURES COMPLETE (2026-07-28) — `docs/session53-capture-request.md`. 31 files on disk in
+> `analysis/captures/` (all gitignored; back them up), VERIFIED clean before this session closed:**
+> **22/22** Set B (7) + Set C (12) + Set D (3) matrix files present, filenames re-checked against
+> `captures.py::parse_capture`/`render_args` (correct knob values/switch indices, matrix still
+> resolves to exactly 63 with these skipped). **9** `a3tones_*.wav` files present — Set A's 5 (BLEND
+> sweep at the reference condition) **plus the optional Set E's 4** (BLEND sweep at DRIVE max) that
+> weren't required but got captured anyway — nice to have, matches §4's "Optional Set E" exactly.
+> ✅ **No clipping**: every new file screened for consecutive flat-topping (the real signature, not
+> just a hot peak) — `attack-cut_blend-1430_base-od.wav` peaks at 0.9885 but on a SINGLE sample (not
+> pinned), so it is a genuine hot transient, not the session-24 clipping defect. Zero files show a
+> run >1 sample near their peak. **Durations consistent**: every matrix file 83.70 s, every a3tones
+> file 103.30 s — no truncation, no dropped segments (checked against `gen_a3_tones.segment_times()`
+> expectations, not merely file size). ⚠ **Set B's control, `drive-1700_blend-0700_base-od`, is
+> ON DISK and STILL NEEDS TO BE CHECKED** against the existing `blend-0700_base-od.wav` before
+> trusting any Set B/C number — every sweep reuses that file as its B=0 normaliser (§4 item 6), and
+> that check has NOT been run yet, only the file's presence/cleanliness has.
+> **▶ NEXT SESSION, IN ORDER (deliberately not started this session — user asked to defer the
+> analysis): (a)** ⭐ **Set A first — it is the critical path, not a refinement.** Every physical
+> mechanism for a flat 38° is now excluded (§5), so the live question is whether the target is real.
+> Write `analysis/read_a3_tones.py`: align on `sweep_clean`, fixed-offset segment reads per
 > `gen_a3_tones.segment_times()`, extract the FUNDAMENTAL narrowband over the middle 1.5 s, feed
 > `a3_blend_axis`'s own `quad_fit`/`unpack` with `r = |fundamental|`; needs a `--selftest` recovering a
 > synthesised (r, θ), and must report −18 vs −30 dBFS as a level CONTROL rather than averaging them.
-> **(b)** parameterise `a3_blend_axis.py` over conditions for Sets B/C (it hardcodes `BLENDS`), checking
-> the B=0 control FIRST. **(c)** if Set A confirms the target, the remaining region is **inside the
-> clipper's feedback loop** — a memoryless nonlinearity in RC feedback is not LTI, so neither Bode nor
-> the all-pass monotonicity argument binds it; note `Clipper.h:309` gives `a0` **no frequency dependence
+> **(b)** parameterise `a3_blend_axis.py` over conditions for Sets B/C (it hardcodes `BLENDS`),
+> checking the B=0 control FIRST (see the ⚠ above — do this before reading anything else out of Sets
+> B/C/D). **(c)** if Set A confirms the target, the remaining region is **inside the clipper's
+> feedback loop** — a memoryless nonlinearity in RC feedback is not LTI, so neither Bode nor the
+> all-pass monotonicity argument binds it; note `Clipper.h:309` gives `a0` **no frequency dependence
 > and the inverter no output impedance**, both derivable from the DAFx-2020 two-MOSFET model that gave
 > the 5.636 V rail. **(d)** re-derive C1/C2/C3 against whatever Set A says before any more carrier
 > hunting. **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12`
 > re-captures, A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
-> ⚠ **UNCOMMITTED at session close:** nothing — sessions 51 + 52 + 53 were committed together this
-> session. **Nothing in `src/` or `tests/` has been touched since session 44.**
+> ⚠ **UNCOMMITTED at session close:** nothing in `src/`/`tests/`/`analysis/` — sessions 51+52+53 were
+> committed as `f715bfb`. This session (53b) only updated this file (capture-completion note) and
+> is committed separately below. **Nothing in `src/` or `tests/` has been touched since session 44.**
+> **Captures themselves are gitignored and exist only on this machine — back them up before starting
+> the next session's analysis.**
 > ── prior session ──
 > **CURRENT (session 52, 2026-07-28): ▶ PHASE 9 / A3 STEP 8 — ⛔⛔ SESSION 51's OWN PLAN ITEM 3 IS
 > REFUTED: A POST-CLIPPER LINEAR CORRECTION NETWORK CANNOT CLOSE A3, AND NOT FOR ANY PARTICULAR
