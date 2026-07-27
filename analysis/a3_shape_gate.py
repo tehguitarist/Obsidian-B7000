@@ -68,6 +68,39 @@ DBFS = -18.0
 CORE = [20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254, 403, 508]
 INFO = [320, 640, 806]
 
+# ⭐ SIDE-EFFECT MONITORS (session 49). These are NOT part of the score and their
+# identifiability has deliberately not been argued -- they exist so that a
+# candidate which fixes 250-640 Hz by lifting the OD path EVERYWHERE cannot pass
+# unseen. Session 47 preferred `btC17=10n + btC16=1.496n` on a CORE score of 3.52
+# (vs the shipped 5.81); the full matrix then refused it, because that form adds
+# +3.7 dB of OD lift at 3-5 kHz and +1.6 dB at 6.5-13 kHz -- every one of those
+# bands sat outside the tool's band list, so the score was blind to the cost by
+# construction.  `SIDE_BUDGET_DB` is the flag threshold, not a pass/fail gate:
+# the matrix remains the arbiter (session 47 item 8), this only makes the
+# side effect VISIBLE next to the score instead of invisible.
+#
+# ⚠ Do NOT promote these into CORE by weighting them down instead. That is
+# exactly session 47 item 3's error (`CORE_HI`/`WEAK_W` de-weighted every band
+# above 254 Hz by a frequency cutoff, precisely where the defect was largest).
+# Weight by MEASURED identifiability or not at all.
+SIDE = [1016, 1613, 2560, 4064, 6451, 10240]
+SIDE_BUDGET_DB = 1.5
+
+# ⚠ The flag is on the CHANGE from shipped, not on |20log10 s| itself. The shipped
+# model ALREADY reads +11.3/+10.6/+11.1 dB at 1016/2560/10240 Hz, so an
+# absolute-magnitude threshold fires on the baseline and discriminates nothing.
+# (Those bands are also poorly conditioned -- mu is small behind the two
+# Sallen-Key LPFs, the two-phasor fit's rms reaches 5.5 dB at 6451, and 4064 /
+# 10240 are not identified at all. So a SIDE delta is an INDICATOR that a
+# candidate reaches above 1 kHz, never a measurement of by how much; the
+# 63-capture matrix remains the arbiter.)
+SIDE_BASELINE_DB = {1016: 11.31, 1613: 4.89, 2560: 10.60,
+                    4064: -1.94, 6451: 8.15, 10240: 11.11}
+
+# The bands beta is fitted over = the band set as it stood before session 49.
+# Frozen so the SCORE stays comparable to every recorded number; see fit_beta.
+BETA_BANDS = CORE + INFO
+
 # The shipped baseline this tool must reproduce with no overrides (--selfcheck).
 # 20 log10 s, dB, at the CORE bands, on df14ff3 + the session-45/46 working tree.
 BASELINE_DB = {20: 10.39, 25: 6.82, 32: 4.30, 40: 3.15, 50: 2.67, 64: 2.74,
@@ -102,11 +135,22 @@ def s_interval(mu, t, beta_db, slack_db=0.25):
 
 
 def fit_beta(pedal, model, lo=-20.0, hi=-14.0, step=0.1):
+    """Fit the pedal's bleed level beta over BETA_BANDS -- the ORIGINAL 17 bands only.
+
+    ⚠ Deliberately NOT ps.PROBE_BANDS. beta is fitted by summing each band's
+    residual, so letting the session-49 SIDE monitors into this sum would move
+    beta, and beta moves every band's s -- i.e. adding an OBSERVER would silently
+    redefine the SCORE and make it incomparable to every number on record
+    (BASELINE_SCORE, and session 47's 5.81 -> 3.52 locus). The monitors must
+    observe, not participate. Independently: mu is tiny above 1 kHz (two Sallen-Key
+    LPFs at 10.7k/3.3k sit in the OD path), so those bands carry almost no
+    information about a resistive, frequency-flat bleed anyway.
+    """
     best = None
     k = lo
     while k <= hi + 1e-9:
         tot = 0.0
-        for b in ps.PROBE_BANDS:
+        for b in BETA_BANDS:
             mu = [model[d][b][0] for d, _ in ps.DRIVES]
             (_, j, _), _ = ps.fit_band(pedal[b], mu, k, n_theta=181, n_s=601)
             tot += j
@@ -140,13 +184,32 @@ def report(tag, beta, rows, score):
           f"{'theta':>7} {'rms':>6}  ident")
     for b in ps.PROBE_BANDS:
         r = rows[b]
-        mark = "" if b in CORE else "   (INFO, not scored)"
+        mark = ("" if b in CORE else
+                "   (SIDE-EFFECT monitor, not scored)" if b in SIDE else
+                "   (INFO, not scored)")
         print(f"{b:6d} {r['s']:7.3f} {r['s_db']:+10.2f}   [{r['lo']:6.3f},{r['hi']:7.3f}]   "
               f"{r['theta']:7.1f} {r['rms']:6.3f}   {'Y' if r['identified'] else 'n'}{mark}")
     print(f"\nSCORE (RMS of 20log10 s over the {len(CORE)} CORE bands) = {score:.3f} dB"
           f"   [shipped baseline {BASELINE_SCORE:.3f}]")
     worst = max(CORE, key=lambda b: abs(rows[b]["s_db"]))
     print(f"worst CORE band {worst} Hz at {rows[worst]['s_db']:+.2f} dB")
+
+    # The side-effect read. A candidate that improves CORE by lifting the OD path
+    # broadband shows up here and nowhere else in this tool -- see the SIDE comment.
+    have = [b for b in SIDE if b in rows]
+    if have:
+        dev = {b: rows[b]["s_db"] - SIDE_BASELINE_DB[b] for b in have}
+        worst_s = max(have, key=lambda b: abs(dev[b]))
+        span = max(abs(dev[b]) for b in have)
+        print(f"SIDE-EFFECT bands 1-10 kHz: worst CHANGE vs shipped = {dev[worst_s]:+.2f} dB "
+              f"at {worst_s} Hz   [flag above {SIDE_BUDGET_DB:.1f}]")
+        print("  " + "  ".join(f"{b}:{dev[b]:+.2f}" for b in have)
+              + "   (CHANGE from shipped, not |s|; see SIDE_BASELINE_DB)")
+        if span > SIDE_BUDGET_DB:
+            print(f"  ⚠ FLAG: this candidate moves the OD path by >{SIDE_BUDGET_DB:.1f} dB above "
+                  "1 kHz.\n    That is a matrix question, not a shape-gate one -- grade the full "
+                  "63-capture\n    matrix before reading the CORE score as an improvement "
+                  "(session 47/49).")
 
 
 def main():

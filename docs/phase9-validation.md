@@ -134,13 +134,19 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   just decorrelation. Only shows up at the reduced (`gainSessionDb=-12`) stimulus level; `ref-od` at
   full level doesn't have it, which rules out a static filter/EQ explanation (those aren't
   level-dependent) and points at gain-staging or a nonlinear-stage operating-point difference instead.
-  ~~**Investigate AFTER A3 ships**~~ ⛔ **PRIORITY RAISED (session 47): this is now ON A3's CRITICAL
-  PATH, not behind it.** The A3 low-mid candidate `btC17` improves **every** matrix row group
-  monotonically — non-`gain-n12` OD 3.372 → 3.206, GRUNT cut 2.526 → 2.372, GRUNT flat/boost 4.990 →
-  4.671 — while **these 16 rows degrade monotonically 4.641 → 6.347 and alone turn the ALL-OD
-  aggregate around**, which is what blocked the fix from shipping. The "investigate it after A3" order
-  no longer works: A3 cannot be graded on the matrix until this group stops voting. §4 "A3 step 4"
-  item (8); original evidence in §4 "A3 chart-review corroboration".
+  ~~**Investigate AFTER A3 ships**~~ ~~⛔ **PRIORITY RAISED (session 47): ON A3's CRITICAL PATH.**~~
+  ⛔⛔ **PRIORITY LOWERED AGAIN (session 49) — this group is NOT blocking A3, and session 47's reason
+  for raising it did not survive measurement.** Session 47's claim was that `btC17` improves every
+  other row group monotonically (non-`gain-n12` OD 3.372 → 3.206) while these 16 rows alone turn the
+  aggregate around. Re-measured on `matrix_grade`'s own group split (session 47's figures came from an
+  ad-hoc split and are not comparable), **non-`gain-n12` OD does NOT improve: 2.909 → 2.932 at the
+  f0-pair and 3.190 at 10n alone**, and underneath that flat number is a 76-vs-16-row GRUNT trade, not
+  a uniform gain. `btC17` is now **refuted on reachability** — at fixed notch f0 the bridged-T cannot
+  lift 250–640 Hz by ≥4 dB for less than 3.66 dB at 1–13 kHz (1469-setting Pareto scan) — so no A3
+  decision waits on these rows. Session 48 already localised them as a **capture defect** (their THD
+  turnover, which no gain can move, differs from their twins' by up to 15.6 dB), so the fix is a
+  re-capture of 4 files, not analysis. §4 "A3 step 5" items (1)/(2)/(5); original evidence in §4 "A3
+  chart-review corroboration".
 - [x] **A3-next (0). `render_args()` now emits `--input-trim`** for `gainSessionDb`; baseline
   regenerated (session 21). Send-vs-record-gain settled three ways. §3.
 - [x] **A3-next (i). IC2_B recovery network — CLOSED, not a gap** (session 21). Topology re-verified
@@ -3835,13 +3841,161 @@ element that ATTENUATES the OD path and is explicitly disqualified from selectin
 further A3 element work. They are the only group voting against a change that improves every other
 group monotonically, and their defect (session 30, level-dependent HF collapse) has been parked since
 it was found. Localise it; then re-run this locus.
-**(b)** Keep `btC17 ≈ 10 nF` (in the f0-preserving form of (9)) as the located A3 low-mid candidate —
-do NOT re-derive it, and do NOT ship it on the subset argument in (8).
+**(b)** ~~Keep `btC17 ≈ 10 nF` (in the f0-preserving form of (9)) as the located A3 low-mid
+candidate~~ ⛔ **SUPERSEDED — `btC17` is REFUTED, see "A3 step 5" (session 49).** The f0-preserving
+form was graded on the full matrix and does NOT improve the non-`gain-n12` OD rows (2.909 → 2.932),
+and a Pareto scan over all four bt elements shows the required low-mid lift is unreachable at fixed f0
+without ≥3.66 dB of side effect at 1–13 kHz. ⚠ Item (9)'s "prefer this form" recommendation is
+**VOID**: it was scored over bands ≤806 Hz and could not see that the form adds +3.7 dB at 3–5 kHz.
 **(c)** A3's LF half — the +10.4 dB at 20 Hz / +6.8 at 25 / +4.3 at 32, ≈9.5 dB/oct and steeper than
 any first-order high-pass — is untouched by all of the above and is what remains of the classic
 sessions-29-38 A3. The shape gate now measures it on the same axis as everything else.
 **(d)** `trebleLadderDampR` stays at 30k until (a)/(b) land, then re-fit it — (6) shows the trade does
 dissolve, so this ordering is confirmed, not just assumed.
+**(e)** Then A4 re-grade + GATE-9, the `OSValidationTest` decision (session 45 item 7b), then B / C / D.
+
+### A3 step 5 — `btC17` REFUTED ON REACHABILITY (session 49)
+
+⛔⛔ **The session-47 candidate is CLOSED, and not on the subset argument it was parked under.** The
+bridged-T cannot supply A3's low-mid lift without a broadband HF side effect the matrix refuses, and
+that is a property of the NETWORK, not of one value. Analysis + tooling only; **nothing in `src/`
+changed**, ctest unchanged at 16/17 (the pre-existing session-44 `OSValidationTest` failure).
+
+**(1) THE VERIFICATION RENDER COMPLETED AND THE SPLIT DOES NOT SHOW THE PREDICTED SIGNATURE.** Session
+48's background render (`analysis/reports/s48_btC17_10n_f0.json`, `btC17=10.0e-9` + `btC16=1.496e-9`,
+63/63 captures) graded against the shipped baseline on `matrix_grade`'s group split:
+
+| subset | rows | shipped | btC17 f0-pair | 10n alone |
+|---|---|---|---|---|
+| OD | 120 | 3.186 | 3.495 | 3.534 |
+| CLEAN | 120 | 0.427 | 0.427 (bit-identical) | 0.427 |
+| **OD ex `gain-n12`** | 104 | **2.909** | **2.932** | **3.190** |
+| OD `gain-n12` [bad] | 16 | 4.991 | 7.154 | 5.765 |
+
+The resume gate was *"if `OD ex gain-n12` improves monotonically while only the known-bad group
+regresses, btC17 has a real case"*. **It does not improve** — it is flat (+0.023 dB, inside the
+0.144 dB take-to-take floor) — so the decision never depended on the `gain-n12` exclusion at all.
+
+⚠ **DO NOT compare these to session 47's `3.372 → 3.206`.** Those came from an ad-hoc split predating
+`matrix_grade`'s group feature (session 47 also quotes "ALL OD 3.567" beside "OD 3.186" — two
+different metrics in one entry). Measured on ONE tool, neither form improves the good rows.
+
+**(2) ⭐ UNDERNEATH THE FLAT AGGREGATE IS A 76-vs-16 ROW TRADE.** Non-`gain-n12` OD, by GRUNT:
+
+| GRUNT | rows | shipped | f0-pair | Δ | tilt shipped → f0-pair |
+|---|---|---|---|---|---|
+| cut | 76 | 2.373 | 2.639 | **+0.266** | +0.73 → −1.49 |
+| flat | 12 | 3.724 | 3.551 | −0.173 | +1.24 → −1.62 |
+| boost | 16 | 4.840 | 3.856 | **−0.985** | +7.02 → +3.71 |
+
+So it is the **mirror image of `clipC15` in session 37**: there, the candidate helped GRUNT cut and
+regressed the 28 flat/boost rows carrying GAP #3b; here it helps flat/boost and regresses the 76-row
+cut baseline. The aggregate is flat only because cut outnumbers boost 76:16. Every group's tilt drops
+~2.2 dB — on boost (+7.02 too bass-heavy) that is a large win; on cut (+0.73, already near zero) it
+**overshoots to −1.49 bass-light**. That is the mechanism of the trade.
+
+**(3) THE CUT REGRESSION IS LOCALISED, NOT BROADBAND** (76 GRUNT-cut rows, band-restricted band-RMS):
+
+| | shipped | f0-pair | Δ |
+|---|---|---|---|
+| full graded band | 2.373 | 2.639 | +0.266 |
+| **excluding 3225/4064/5120 Hz** | 2.278 | **2.164** | **−0.114** |
+| those 3 bands only | 2.204 | 4.040 | **+1.836** |
+
+Over all 104 good rows: full 2.909 → 2.932, **ex 3–5.5 kHz 2.859 → 2.564 (−0.295)**. ⇒ **the low/mid
+half of the change is real and good**; a localised +1.5 dB HF regression cancels it in the aggregate.
+
+**(4) ⚠⚠ AND MY FIRST EXPLANATION OF THAT WAS WRONG — corner arithmetic said "the upper shoulder moved
+into the band" (R23·C16 7.09 → 3.22 kHz). The ORACLE says otherwise.** `bridged_t_tf` on the report's
+own 1/3-oct grid, change vs shipped (positive = less attenuation = OD lift), mean over each region:
+
+| form | 250–640 Hz | 403–2032 | 3.2–5.2 kHz | 6.5–12.9 kHz | notch f0 |
+|---|---|---|---|---|---|
+| `btC17` 10n alone | **+8.35** | +3.95 | −0.51 | −0.18 | 717 → **1063 Hz** |
+| + `btC16` 1.496n (f0 held) | +7.70 | **+8.16** | **+3.69** | **+1.57** | 717 Hz |
+| + `btR22` 220k (f0 held) | **+1.46** | +1.78 | −0.17 | −0.11 | 717 Hz |
+| + `btR23` 72.6k (f0 held) | +6.57 | +6.75 | +3.91 | +1.65 | 717 Hz |
+
+It is not a shoulder shift: scaling `btC16` makes the scoop **shallower everywhere above the notch**,
+i.e. it converts a targeted low-mid lift into a broadband upper-band lift. And `btR22` — which holds
+f0 *and* both shoulders exactly — buys only +1.46 dB, i.e. it holds f0 by nearly cancelling the whole
+change. **10n alone is the only targeted form, and it pays f0: 320 Hz–2.5 kHz worsens by +0.4…+1.6 dB**
+(per-band, 104 rows), which is why it grades worst of the three. **Holding f0 is REQUIRED, not
+optional** — worth −0.03…−0.81 dB over 403 Hz–2 kHz.
+
+**(5) ⭐⭐ THE REFUTATION, MADE GENERAL — a Pareto scan, not four hand-picked forms.** All four bt
+elements over ±1 decade (13-point log grid, 20 736 combinations), keeping the 1469 that hold the
+schematic notch f0 = 716.3 Hz within 5 %; score = mean lift over 250–640 Hz vs max |change| over
+1016–12902 Hz:
+
+| 1–13 kHz budget | max achievable 250–640 Hz lift |
+|---|---|
+| ≤0.5 dB | +0.60 |
+| ≤1.0 dB | +1.41 |
+| ≤2.0 dB | +2.50 |
+| ≤3.0 dB | +3.88 |
+| unbounded | +18.89 |
+
+**Of the 631 settings reaching >+4 dB of lift, the MINIMUM HF change is 3.66 dB.** The shape gate puts
+the need at 250–640 Hz at **+4.68…+9.04 dB** (`s` at 254/403/508), and the matrix already refuses the
+pair's +3.69 dB of HF lift. ⇒ **at fixed f0 the bridged-T cannot deliver the required low-mid lift for
+less than ~3.7 dB at 1–13 kHz. The two are structurally coupled; no value of any bt element separates
+them.** Same form of result as session 38 item 4 (the GRUNT-cap locus off the curve in both
+coordinates) and session 45 item 4 (the required slope). **A3's low-mid carrier must be an element
+whose effect is confined to ≲1 kHz — the bridged-T is not it.**
+
+**(6) ⭐⭐ ROOT CAUSE OF THE WRONG PREFERENCE: EVERY A3 INSTRUMENT STOPPED AT 806 Hz.** The band list in
+`a3_blend_decompose.cpp`, `a3_phase_solve.PROBE_BANDS`, and `a3_shape_gate.CORE` all ended at 806 Hz,
+so a candidate's side effects above 1 kHz were **unmeasurable by construction**. Session 47 chose the
+f0-pair on a CORE score of 3.520 vs the shipped 5.808 while it was adding +3.7/+1.6 dB at 3–13 kHz,
+every one of those bands outside the tool's domain. ⭐ **THE LESSON, one range up from session 33's own
+extension to 806 Hz and session 32's tail finding: a gate whose DOMAIN is narrower than its
+candidate's REACH cannot discriminate — widen the domain, don't trust the score.** This is "measure
+the curve, not the feature" applied to the curve's *extent* rather than its shape.
+
+**(7) ✅ THE BLIND SPOT IS FIXED, AND THE FIX IS VERIFIED BOTH WAYS.** Band lists extended to
+**1016 / 1613 / 2560 / 4064 / 6451 / 10240 Hz** (2/3-oct spaced — these catch a broadband multi-dB
+side effect, which is what this family produces; ⚠ do NOT read a narrow feature off that grid, the
+session-46 error). `a3_shape_gate` gained a `SIDE` group, printed beside the score and **never
+scored**. Three deliberate design decisions:
+  - **β is now pinned to `BETA_BANDS` (= the original 17).** `fit_beta` sums each band's residual over
+    the band list, so letting the monitors in would move β — and β moves every band's `s`, so adding
+    an OBSERVER would have silently redefined the SCORE and broken comparability with every recorded
+    number. **An observer must not participate.**
+  - **The flag is on the CHANGE from shipped, not on |20log10 s|.** The shipped model already reads
+    +11.31/+10.60/+11.11 dB at 1016/2560/10240, so an absolute threshold fires on the baseline and
+    discriminates nothing (first draft did exactly that). `SIDE_BASELINE_DB` records the shipped row.
+  - **NOT folded into CORE with a low weight** — that is session 47 item 3's error (`CORE_HI`/`WEAK_W`
+    de-weighted by a frequency cutoff precisely where the defect was largest). Weight by measured
+    identifiability or not at all. These bands are poorly conditioned (fit rms reaches 5.5 dB at
+    6451; 4064 and 10240 are not identified), so a SIDE delta is an **indicator that a candidate
+    reaches above 1 kHz, never a measurement of how much**. The matrix stays the arbiter.
+
+  **Verification:** the 17 pre-existing bands are **bit-identical** across all five drive CSVs after
+  the extension; `--selfcheck` still reproduces the baseline (worst deviation **0.027 dB**, score
+  5.808 vs 5.800, **PASS**) with all SIDE deltas at +0.00; and on the rejected candidate the CORE
+  score reproduces session 47's **3.520 exactly** while the flag now fires at **−8.44 dB at 1016 Hz**.
+  ⭐ **Independent corroboration:** that −8.44 dB (the model needing *less* OD boost, i.e. the
+  candidate *added* OD level) matches the bridged-T oracle's predicted **+8.45 dB** at the same band
+  to 0.01 dB — two unrelated derivations of the same mechanism.
+
+**(8) WHAT THIS DOES AND DOES NOT SETTLE.** Settled: `btC17`/the bridged-T is not A3's low-mid carrier
+(5); the f0-pair does not ship; the shape gate's domain (6)/(7). **NOT settled:** the low-mid defect
+itself is still real and still unlocalised — GAP #2's sub-gate (OD within a few dB of the bleed over
+250–640 Hz) is unmet, and (3) shows a genuine −0.295 dB is available there to whatever element can
+supply it *without* reaching above 1 kHz. The 4 `gain-n12` re-captures are still owed but are **no
+longer blocking any A3 decision**.
+
+**▶ NEXT, IN ORDER.**
+**(a)** Find the A3 low-mid carrier under the (5) constraint: **it must lift 250–640 Hz by ~+5 dB with
+≤~1 dB change above 1 kHz.** Run every candidate through `a3_shape_gate` and read the **SIDE row as
+well as the score** — a candidate that flags is a matrix question before it is an improvement.
+**(b)** A3's LF half (+10.40 dB at 20 Hz, ≈9.5 dB/oct) is untouched by all of this and remains the
+classic sessions-29–38 A3.
+**(c)** `trebleLadderDampR` stays at 30k — session 47 item 6 still says the trade dissolves once A3's
+low-mids are supplied, and (5) means that supply is not coming from the bridged-T. Measure, don't assume.
+**(d)** Re-capture `ref-od_gain-n12.wav` + `level-0930/1430/1700_gain-n12_base-od.wav` (4 files;
+`level-0700_gain-n12` is the LEVEL=0 null) when convenient — no longer on the critical path.
 **(e)** Then A4 re-grade + GATE-9, the `OSValidationTest` decision (session 45 item 7b), then B / C / D.
 
 ## 5. Performance / HQ pass (not started)

@@ -72,8 +72,13 @@ DRIVES = [
 CLEAN_REF = "blend-0700_base-od.wav"          # BLEND fully counter-clockwise = full clean
 
 # The decompose probe's bands; matched to the report's 1/3-oct centres by nearest.
+# Extended past 806 Hz in session 49 so a candidate's side effects above 1 kHz are
+# measurable at all -- see the band-list comment in a3_blend_decompose.cpp for why
+# (session 47 shipped-nothing decision was made on a score that could not see them).
+# The 1-10 kHz entries are 2/3-oct spaced side-effect monitors, not full resolution.
 PROBE_BANDS = [20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254,
-               320, 403, 508, 640, 806]
+               320, 403, 508, 640, 806,
+               1016, 1613, 2560, 4064, 6451, 10240]
 
 
 def load_model(drive_vals, prefix="build/a3_dec_drv"):

@@ -104,6 +104,81 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 49, 2026-07-27): ▶ PHASE 9 / A3 STEP 5 — ⛔⛔ THE SESSION-47 `btC17` CANDIDATE IS
+> REFUTED AND CLOSED, on REACHABILITY rather than on the subset argument it was parked under; and the
+> reason it was ever preferred is a BLIND SPOT IN EVERY A3 INSTRUMENT, which is now FIXED AND VERIFIED.
+> Analysis + tooling only — NOTHING in `src/` changed; ctest unchanged at 16/17 (the pre-existing
+> session-44 `OSValidationTest` failure). Full detail `docs/phase9-validation.md` §4 "A3 step 5".**
+> **(1) SESSION 48's BACKGROUND RENDER HAD COMPLETED** (`analysis/reports/s48_btC17_10n_f0.json`,
+> 63/63, `fit_overrides = [btC17=10.0e-9, btC16=1.496e-9]`). ⚠ Note session 48's launcher pattern
+> (`nohup … &` inside a backgrounded tool call) makes the harness report "exit 0" for the LAUNCHER, not
+> the render — **check the artefact, never the exit code** (a sibling of session 44's `pgrep` trap).
+> **(2) ⭐ THE RESUME GATE IS NOT MET.** `matrix_grade`'s split, **OD ex `gain-n12` (104 rows): shipped
+> 2.909 → f0-pair 2.932 → 10n alone 3.190.** The gate was *"improves monotonically while only the
+> known-bad group regresses"*; it does **not** improve (+0.023 dB = inside the 0.144 dB take-to-take
+> floor). ⇒ **the decision never depended on the `gain-n12` exclusion at all.** ⚠ **DO NOT compare to
+> session 47's 3.372 → 3.206** — that was an ad-hoc split predating `matrix_grade`'s group feature
+> (session 47 quotes "ALL OD 3.567" beside "OD 3.186": two metrics in one entry). CLEAN bit-identical.
+> **(3) ⭐ UNDER THE FLAT AGGREGATE IS A 76-vs-16 ROW TRADE, the MIRROR of `clipC15` in session 37.**
+> Non-`gain-n12` OD by GRUNT: **cut (76) 2.373 → 2.639 (+0.266 WORSE) | flat (12) 3.724 → 3.551 |
+> boost (16) 4.840 → 3.856 (−0.985 BETTER)**. Session 37's candidate helped cut and hurt the 28
+> flat/boost rows carrying GAP #3b; this one does the reverse. Every group's tilt drops ~2.2 dB — on
+> boost (+7.02 too bass-heavy) a big win, on cut (+0.73, already ~0) an **overshoot to −1.49**.
+> **(4) ⭐ THE CUT REGRESSION IS LOCALISED TO 3–5.5 kHz, and the low/mid half of the change is REAL.**
+> 76 cut rows: full band 2.373 → 2.639; **excluding 3225/4064/5120 Hz → 2.278 → 2.164 (−0.114)**; those
+> 3 bands alone 2.204 → 4.040 (**+1.836**). Over all 104: ex-3–5.5 kHz **2.859 → 2.564 (−0.295)**.
+> **(5) ⚠⚠ MY FIRST EXPLANATION WAS WRONG AND THE ORACLE CORRECTED IT.** Corner arithmetic said "the
+> upper shoulder moved into the band" (R23·C16 7.09 → 3.22 kHz). `bridged_t_tf` says the real effect is
+> that scaling `btC16` makes the scoop **shallower everywhere above the notch**: mean OD lift vs
+> shipped = **10n alone +8.35 dB @250–640 / −0.51 @3–5 k; f0-pair +7.70 / +3.69 @3–5 k / +1.57
+> @6.5–13 k; `btR22`=220k (holds f0 AND both shoulders) only +1.46 @250–640** — it holds f0 by nearly
+> cancelling the change. **Holding f0 is REQUIRED, not optional** (10n alone worsens 320 Hz–2.5 kHz by
+> +0.4…+1.6 dB, which is why it grades worst).
+> **(6) ⭐⭐ THE REFUTATION, MADE GENERAL — a PARETO SCAN, not four hand-picked forms.** All four bt
+> elements, ±1 decade, 13-pt log grid; the **1469** settings holding f0 = 716.3 Hz within 5 %. Max
+> achievable 250–640 Hz lift for a given 1–13 kHz budget: **≤1 dB → +1.41 | ≤2 dB → +2.50 | ≤3 dB →
+> +3.88**; and of the **631** settings reaching >+4 dB, the **MINIMUM HF change is 3.66 dB**. The shape
+> gate puts the need at **+4.68…+9.04 dB** and the matrix already refuses +3.69. ⇒ **at fixed f0 the
+> bridged-T CANNOT separate the low-mid lift from a ≥3.7 dB side effect at 1–13 kHz. A3's carrier must
+> be an element confined to ≲1 kHz.** Same form as session 38 item 4 and session 45 item 4.
+> **(7) ⭐⭐ ROOT CAUSE OF THE WRONG PREFERENCE: EVERY A3 INSTRUMENT STOPPED AT 806 Hz** —
+> `a3_blend_decompose.cpp`'s band list, `a3_phase_solve.PROBE_BANDS`, `a3_shape_gate.CORE`. So a
+> candidate's side effects above 1 kHz were **unmeasurable by construction**: session 47 chose the
+> f0-pair on a CORE score of 3.520 vs 5.808 while it was adding +3.7/+1.6 dB at 3–13 kHz. ⭐ **THE
+> LESSON, one range up from session 33's own extension to 806 Hz: a gate whose DOMAIN is narrower than
+> its candidate's REACH cannot discriminate — widen the domain, don't trust the score.**
+> **(8) ✅ FIXED AND VERIFIED BOTH WAYS.** Bands extended to **1016/1613/2560/4064/6451/10240** (2/3-oct
+> — side-effect monitors, ⚠ never read a NARROW feature off that grid). `a3_shape_gate` gained a `SIDE`
+> group, printed beside the score and **never scored**. Three deliberate calls: **β pinned to
+> `BETA_BANDS` (the original 17)** — `fit_beta` sums over the band list, so letting an OBSERVER in
+> would move β, and β moves every `s`, silently redefining the SCORE; **the flag is on the CHANGE from
+> shipped** (`SIDE_BASELINE_DB`), because shipped already reads +11.31/+10.60/+11.11 dB there so an
+> absolute threshold fires on the baseline and discriminates nothing (my first draft did exactly that);
+> and **NOT folded into CORE at a low weight** — that is session 47 item 3's `CORE_HI`/`WEAK_W` error.
+> **Verification: the 17 pre-existing bands are BIT-IDENTICAL across all five drive CSVs; `--selfcheck`
+> still reproduces the baseline (worst dev 0.027 dB, score 5.808 vs 5.800, PASS) with SIDE all +0.00;
+> and on the rejected candidate CORE reproduces session 47's 3.520 EXACTLY while the flag fires at
+> −8.44 dB @1016 Hz.** ⭐ That −8.44 (model needing *less* OD boost ⇒ candidate *added* OD) matches the
+> oracle's predicted **+8.45 dB** at the same band **to 0.01 dB** — two unrelated derivations agreeing.
+> **(9) WHAT IS AND IS NOT SETTLED.** Settled: the bridged-T is not A3's low-mid carrier; the f0-pair
+> does not ship; the gate's domain. **NOT settled:** the low-mid defect is still real and unlocalised —
+> GAP #2's sub-gate is unmet and (4) shows **−0.295 dB is available** to whatever element supplies it
+> without reaching above 1 kHz. The 4 `gain-n12` re-captures are still owed but **no longer block any
+> A3 decision** (backlog priority lowered accordingly).
+> **▶ NEXT, IN ORDER: (a)** find the A3 low-mid carrier under (6)'s constraint — **lift 250–640 Hz by
+> ~+5 dB with ≤~1 dB change above 1 kHz** — and read `a3_shape_gate`'s **SIDE row as well as the
+> score** (a flagged candidate is a matrix question before it is an improvement). **(b)** A3's LF half
+> (+10.40 dB @20 Hz, ≈9.5 dB/oct) is untouched and is what remains of the classic sessions-29–38 A3.
+> **(c)** `trebleLadderDampR` stays at 30k; session 47 item 6 says the trade dissolves once A3's
+> low-mids are supplied, and (6) means that supply is not coming from the bridged-T — measure, don't
+> assume. **(d)** re-capture the 4 `gain-n12` OD files when convenient. **(e)** then A4 re-grade +
+> GATE-9, the `OSValidationTest` decision (session 45 item 7b), then B / C / D.
+> ⚠ **UNCOMMITTED at session close:** `CLAUDE.md`, `docs/phase9-validation.md`,
+> `analysis/a3_blend_decompose.cpp` (band list), `analysis/a3_phase_solve.py` (`PROBE_BANDS`),
+> `analysis/a3_shape_gate.py` (`SIDE`/`BETA_BANDS`/delta flag). Also regenerated but gitignored:
+> `build/a3_dec_drv*.csv` (now 23 bands — do NOT discard, the committed-tree state has them at 17) and
+> new `analysis/reports/s49_btC17_10n_alone.json`. Session 48 IS committed (`aac6aec`).
+> ── prior session ──
 > **CURRENT (session 48, 2026-07-27, INTERRUPTED MID-SESSION — user ran low on usage, this is a
 > HANDOVER not a closed session): ▶ PHASE 9 / gain-n12 LOCALISED — the 16 rows blocking session 47's
 > btC17 candidate are a CAPTURE DEFECT, not a model defect. NOTHING in `src/` changed this session.

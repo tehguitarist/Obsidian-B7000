@@ -165,8 +165,24 @@ int main(int argc, char** argv)
     // whether that is minimum-phase-realisable is decided by what |G| does ABOVE
     // the band. Session 32's lesson was that an unmeasured tail decides the
     // answer at the band edge — so measure this one instead of declaring it.
+    //
+    // ⭐ EXTENDED AGAIN TO 10 kHz (session 49) — same argument, one range up, and
+    // this time it had already cost a wrong decision. Every A3 instrument stopped
+    // at 806 Hz, so a candidate's SIDE EFFECTS above 1 kHz were unmeasurable by
+    // construction: session 47 preferred `btC17=10n + btC16=1.496n` (the
+    // f0-preserving pair) on a score computed over bands <=806 Hz, and the full
+    // 63-capture matrix then rejected it because that form adds +3.7 dB of OD lift
+    // at 3-5 kHz and +1.6 dB at 6.5-13 kHz -- entirely outside what the gate could
+    // see. A gate whose domain is narrower than its candidate's reach cannot
+    // discriminate; widen the domain rather than trusting the candidate.
+    //
+    // ⚠ The 1-10 kHz bands are spaced 2/3 octave, NOT the report's full 1/3-oct
+    // grid: they exist to catch a BROADBAND multi-dB side effect, which is what
+    // the bridged-T family produces. Do NOT read a NARROW feature (a notch depth
+    // or centre) off this grid -- that is the standing session-46 / A2c-2 error.
     const double freqs[] = {20, 25, 32, 40, 50, 64, 80, 101, 127, 160, 202, 254,
-                            320, 403, 508, 640, 806};
+                            320, 403, 508, 640, 806,
+                            1016, 1613, 2560, 4064, 6451, 10240};
 
     const char* gname = gruntArg == 0 ? "BOOST" : gruntArg == 1 ? "CUT" : "FLAT";
     std::printf("# a3_blend_decompose grunt=%s drive=%.3f dBFS=%.1f amp=%.6f V fs=%.0f\n",
