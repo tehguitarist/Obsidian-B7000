@@ -104,6 +104,65 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 48, 2026-07-27, INTERRUPTED MID-SESSION — user ran low on usage, this is a
+> HANDOVER not a closed session): ▶ PHASE 9 / gain-n12 LOCALISED — the 16 rows blocking session 47's
+> btC17 candidate are a CAPTURE DEFECT, not a model defect. NOTHING in `src/` changed this session.
+> A verification render of the btC17 candidate across the full 63-capture matrix was LAUNCHED IN
+> THE BACKGROUND and its completion was NOT observed before the session ended — check
+> `analysis/reports/s48_btC17_10n_f0.json` first (see "▶ RESUME" below) before re-running anything.**
+> **(1) ⭐⭐ THE 16 `gain-n12` OD ROWS ARE NOT −12 dB RE-TAKES OF THEIR TWINS.** New tool
+> `analysis/gain_n12_localise.py`, three tests:
+>   **(a) Matched absolute level.** `<cap>_gain-n12 @ sweep_drv_-6` and `<cap> @ sweep_drv_-18` sit
+>   at the SAME operating point to 0.071 dB (12.071 dB send correction vs a 12 dB rung step). The
+>   **model** reproduces the pair to **0.03 dB** (so `--input-trim`, session 21, is applied
+>   correctly and the render is level-consistent) but the **pedal** disagrees by **5.44 dB** — 38×
+>   the 0.144 dB take-to-take floor. The disagreement is on the capture side, not the model side.
+>   **(b) THD-turnover invariance (the decisive test, zero free parameters).** THD is a ratio: a
+>   RECORD gain cannot move it at all, and a SEND pad can only slide the curve sideways — so the
+>   VALUE at the curve's interior turning point is invariant to either, together or separately, and
+>   its POSITION carries exactly the pad. Measured per LEVEL setting (0.25/0.50/0.75/1.00): the
+>   implied pad is **+9/+9/+6/+3 dB**, never the harness's 12.07, and the turnover VALUE itself
+>   differs from the twin by **+13.6/+15.6/+2.9/+1.0 dB** — a quantity no gain of any kind can move.
+>   Decisive on `ref-od_gain-n12` and `level-0930_gain-n12` (+15.6/+13.6 dB); small on `level-1430`/
+>   `level-1700` (+2.9/+1.0) — **state it as two captures badly wrong and two mildly wrong, not a
+>   uniform group failure.**
+>   **(c) LEVEL ordering — corroboration only, NOT proof; the first draft over-claimed this.** VR2
+>   LEVEL is a passive divider so it's tempting to say band levels must order with the knob; they
+>   need not, because the stimulus is a swept sine through a distorting device and harmonics from
+>   low sweep frequencies land in high 1/3-oct bands — the NORMAL-gain group breaks this ordering
+>   too (11/22 bands at its hottest rung). Read only the CONTRAST: gain-n12 breaks it far more
+>   (16–20/22 bands) and worse at its QUIET rung than normal breaks at its HOT one.
+>   **⭐ DISCREP falls as LEVEL rises**, consistent with (not proof of) clean-bleed dilution — more
+>   OD against a fixed bleed means less dilution of the measured harmonics. Points at BLEND as the
+>   likely wrong setting; the exclusion does not rest on this guess.
+> **(2) CONSEQUENCE FOR SESSION 47's btC17 CANDIDATE.** Session 47 found the matrix "refuses" btC17
+> because the 16 gain-n12 rows degrade monotonically while everything else improves — this is now
+> explained: those 16 rows are not measuring the model at all. **`matrix_grade.py` now ALWAYS
+> breaks the OD aggregate into `OD ex gain-n12` / `OD gain-n12 [bad]`** (never silently — the
+> session-40 rule: "exclude explicitly, with the evidence recorded, never silently") so any future
+> aggregate shows both numbers side by side rather than one contaminated mean.
+> **(3) ▶ RESUME, IN ORDER: (a)** check whether the background render
+> `analysis/reports/s48_btC17_10n_f0.json` (btC17=10n + btC16=1.496n, the f0-preserving form from
+> session 47 item 9) completed — if the PID (`ps aux | grep comprehensive_report`) is gone and the
+> file exists, run `python3.11 analysis/matrix_grade.py analysis/reports/comprehensive_data.json
+> analysis/reports/s48_btC17_10n_f0.json --label-a shipped --label-b btC17`; if neither, re-launch it
+> (`python3.11 analysis/comprehensive_report.py --jobs 8 --fit btC17=10.0e-9 --fit btC16=1.496e-9
+> --out analysis/reports/s48_btC17_10n_f0.json`, ~10 min). **Read the NEW split row** —
+> `OD ex gain-n12` is the number that matters now; if it improves monotonically while only the
+> (now-known-bad) `gain-n12` row regresses, btC17 has a real case to ship, GATED ON A RE-CAPTURE OF
+> THE 5 GAIN-N12 OD FILES, not on excluding them forever. **(b)** Re-capture
+> `ref-od_gain-n12.wav`, `level-0930/1430/1700_gain-n12_base-od.wav` (4 files; `level-0700_gain-n12`
+> is the silent LEVEL=0 null, no need) — same protocol as session 24's bad-take re-records. Until
+> then, do not ship btC17 on the `ex gain-n12` number alone; it is evidence, not sign-off, because
+> the excluded group is 16 of 120 OD rows and could still hide something real underneath the capture
+> defect. **(c)** Once re-captured (or once (a)'s split is read and judged sufficient), decide
+> whether to ship btC17 in its f0-preserving form. **(d)** Then A5-era backlog resumes: the
+> `trebleLadderDampR` question (session 47 item 6 confirms the Rd=0 trade dissolves once A3 supplies
+> the low-mids — measure NOW, don't assume), A4 re-grade + GATE-9, OSValidationTest decision.
+> ⚠ **UNCOMMITTED at session close:** `analysis/gain_n12_localise.py` (new),
+> `analysis/matrix_grade.py` (group-split aggregate). Nothing else changed. Sessions 45-47 were
+> committed this session as `622ac55` before this work started.
+> ── prior session ──
 > **CURRENT (session 47, 2026-07-27): ▶ PHASE 9 / A3 STEP 4 — ⭐⭐ A3'S SHAPE IS MEASURED WHOLE-BAND
 > FOR THE FIRST TIME AND IT IS **NOT AN LF GAP**: the model's OD path is too weak vs the clean bleed
 > at EVERY band. The carrier for the mid/HF half is LOCATED (`btC17`, the bridged-T shunt cap) and

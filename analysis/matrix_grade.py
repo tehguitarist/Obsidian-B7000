@@ -70,14 +70,28 @@ def aggregate(rows, label):
     od = [v for v in rows.values() if v[2]]
     cl = [v for v in rows.values() if not v[2]]
     al = list(rows.values())
+    # The 16 gain-n12 OD rows are a CAPTURE defect, localised session 48 by
+    # analysis/gain_n12_localise.py: their THD turnover -- which no input or
+    # output gain can move -- differs from their own normal-gain twins' by up to
+    # 15.6 dB, and the input pad their turnover POSITION implies is 3-9 dB, not
+    # the 12.07 the harness renders them at.  So they are not -12 dB re-takes of
+    # the same measurement and `--input-trim` cannot repair them.
+    #
+    # They are broken out, NOT dropped.  An exclusion that is not printed is the
+    # session-40 trap ("exclude explicitly, with the evidence recorded, never
+    # silently"), and the honest form is to show the headline aggregate AND the
+    # clean read side by side so a reader can see how much rests on the split.
+    n12 = [v for k, v in rows.items() if v[2] and "gain-n12" in k[0]]
+    od_ok = [v for k, v in rows.items() if v[2] and "gain-n12" not in k[0]]
 
     def m(v, i):
         return sum(x[i] for x in v) / len(v) if v else float("nan")
 
     print(f"\n### {label}")
-    print(f"{'subset':<10}{'rows':>6}{'band-RMS dB':>13}{'tilt dB':>10}")
-    for name, v in (("OD", od), ("CLEAN", cl), ("ALL", al)):
-        print(f"{name:<10}{len(v):6d}{m(v, 0):13.3f}{m(v, 1):10.2f}")
+    print(f"{'subset':<22}{'rows':>6}{'band-RMS dB':>13}{'tilt dB':>10}")
+    for name, v in (("OD", od), ("CLEAN", cl), ("ALL", al),
+                    ("  OD ex gain-n12", od_ok), ("  OD gain-n12 [bad]", n12)):
+        print(f"{name:<22}{len(v):6d}{m(v, 0):13.3f}{m(v, 1):10.2f}")
     return {"OD": m(od, 0), "CLEAN": m(cl, 0), "ALL": m(al, 0), "tilt_od": m(od, 1)}
 
 
