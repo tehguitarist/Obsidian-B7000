@@ -97,7 +97,14 @@ def main():
         plg_raw = A.load(out_path)
         plg, _ = A.align(plg_raw, orig)
 
-        segs_to_check = [(f0, f"tone_{f0:g}") for f0 in TONES] + [(1000.0, "lvl_-3")]
+        # ** SESSION 44: the WHOLE onset region, not just the top rung. ** Session 39 located A5's
+        # onset BETWEEN -12 and -9 dBFS (pedal 0.0000 % at every rung; plugin bit-clean through
+        # -12, then 0.97 % / 12.9 % / 22.9 % at -9 / -6 / -3). Checking only `lvl_-3` reports that
+        # the defect exists but cannot show WHERE it starts or that it has actually gone — a fix
+        # that merely moved the onset up one rung would read as a pass. Carrying -12 as well gives
+        # a known-clean control rung inside the same capture, so "all four flat" is a real result.
+        segs_to_check = ([(f0, f"tone_{f0:g}") for f0 in TONES]
+                         + [(1000.0, f"lvl_{r}") for r in ("-12", "-9", "-6", "-3")])
         for f0, segname in segs_to_check:
             ped_seg = A.seg_of(ped, segname)
             plg_seg = A.seg_of(plg, segname)

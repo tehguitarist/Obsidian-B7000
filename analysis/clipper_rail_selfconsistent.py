@@ -182,6 +182,64 @@ def main():
     print("    clipper ALONE, and is broken by the JFET's fixed thresholds and the fixed-volt")
     print("    RailClamps upstream. The fitted number is what fit_nonlinear.py actually returns;")
     print("    the scaled figure above is only for orientation.")
+    print()
+    a0_section(results)
+
+
+# ---- (4) the OPEN-LOOP GAIN, derived from the same device model --------------------------
+# ** SESSION 44 (A5 step 2 cont.). ** The A5 re-fit needs to judge whether a fitted `clipA0`
+# outside circuit.md's 20-30 is acceptable, and the honest first finding is that **20-30 is NOT a
+# datasheet number**: docs/nonlinear-component-modeling.md §1 records that the TI CD4049UB
+# datasheet gives a VTC only at VCC = 5 V, as a min/max tolerance ENVELOPE, and carries **no
+# small-signal gain spec at all** ("get those from DAFx / capture"). The 20-30 figure is a
+# community measurement on real B3K/B7K units. So "judge it against the datasheet" cannot be done
+# literally — but it CAN be derived from the same DAFx-2020 fitted device model that gave the rail,
+# which is a genuinely independent route to the same quantity.
+#
+# At the shunt-feedback self-bias point both devices are saturated and carry the same current I,
+# so with a channel-length modulation lambda on each side:
+#     gm = 2I/vov      (from I = a/2*vov^2)        gds = I*lambda
+#     A0 = (gm_n + gm_p) / (gds_n + gds_p) = (1/vov_n + 1/vov_p) / lambda
+# The current cancels EXACTLY, so A0 depends only on the two overdrives and lambda — it does not
+# inherit the crowbar-current uncertainty at all.
+#
+# ⚠ THE ONE HONEST GAP: the DAFx fit gives lambda for the p-channel ONLY (0.06 /V); it fits no
+# n-channel lambda, which formally makes gds_n = 0 and A0 unbounded. That is a limitation of the
+# published fit, not a physical claim, so lambda_n is swept rather than assumed, and A0 is reported
+# as a RANGE over it. Do not quote a single number from this without its lambda.
+def a0_section(results):
+    print("-" * 96)
+    print("(4) OPEN-LOOP GAIN A0 AT THE SELF-CONSISTENT RAIL, from the SAME device model")
+    print("-" * 96)
+    print("  ⚠ circuit.md's 'A0 = 20-30' is NOT a datasheet spec — the TI datasheet has NO")
+    print("    small-signal gain figure and only a 5 V min/max VTC envelope (nonlinear-component-")
+    print("    modeling.md §1). 20-30 is a community measurement on real B3K/B7K units. This")
+    print("    section derives A0 independently from the DAFx-2020 fitted MOSFET pair.")
+    print()
+    print("  At the self-bias point both devices saturate at the same current I, so")
+    print("    A0 = (gm_n + gm_p)/(gds_n + gds_p) = (1/vov_n + 1/vov_p)/lambda   — I cancels.")
+    print()
+    for n, vdd in results.items():
+        _i, vm = crowbar_current(vdd)
+        vov_n = vm - VTN
+        vov_p = (vdd - vm) - VTP
+        if vov_n <= 0 or vov_p <= 0:
+            continue
+        g_over_i = 1.0 / vov_n + 1.0 / vov_p
+        print(f"  n={n}: VDD {vdd:.3f} V, trip Vm {vm:.3f} V  ->  "
+              f"vov_n {vov_n:.3f} V, vov_p {vov_p:.3f} V")
+        print(f"       {'lambda (/V)':>12} | {'A0':>7}   (lambda applied to BOTH devices)")
+        for lam in (0.03, 0.05, 0.06, 0.08, 0.10, 0.15):
+            mark = "   <- DAFx p-ch value" if abs(lam - LAMBDA_P) < 1e-9 else ""
+            print(f"       {lam:>12.2f} | {g_over_i / lam:>7.1f}{mark}")
+        print()
+    print("  READING IT: at the DAFx lambda the derived A0 lands INSIDE the community 20-30 band,")
+    print("  from a completely independent direction — so the fence [20, 30] is corroborated, not")
+    print("  merely assumed. Reaching A0 < 15 needs lambda > ~0.09 /V on BOTH devices, and A0 < 10")
+    print("  needs lambda > ~0.13 — large for this process. ⇒ a fit that wants A0 well below 20 is")
+    print("  asking for a device the model does not describe; treat that as evidence the LOW-CORNER")
+    print("  voicing is being carried by the wrong knob (clipC11 / R16), which is exactly the")
+    print("  A0<->C11 degeneracy the session-17 `--fence-a0` flag exists to arbitrate.")
 
 
 if __name__ == "__main__":

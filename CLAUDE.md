@@ -104,82 +104,88 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
-> **CURRENT (session 43, 2026-07-27): ▶ PHASE 9 / A5 STEP 2 — ⭐⭐ THE A5 CONTRADICTION IS
-> DISSOLVED, AND IN THE OPPOSITE DIRECTION TO THE ONE PREDICTED. The clean path's supply bound does
-> NOT fight the OD harmonic targets: imposing it makes the fit 2.1× BETTER than the unfenced control
-> and 14× better than the shipped point, and turns an IMPOSSIBLE clipper into a physical one.
-> NOTHING in `src/` changed — no candidate shipped, deliberately (see (7)). ctest untouched (17/17
-> from session 41). Full detail `docs/phase9-validation.md` §4 "A5 step 2", §0 A5.**
-> **(5) ⭐⭐ THE UNFENCED HARMONIC OBJECTIVE DOES NOT IDENTIFY `kInputRef` AT ALL.** The CONTROL run
-> (session 17's protocol unchanged, on today's model) returns **`kInputRef` = 5.972 against a bound
-> of 6.0** and **`clipSatHi` = 3.9999 against a bound of 4.0** — *both resting on their bounds*,
-> which the tool itself labels "a property of the box, not the pedal". ⇒ **session 17's 3.377 was
-> never a measurement either**; it is where that run's box and starts happened to stop.
-> `GainStaging.h`'s "degenerate pair" note is too weak: **K is not weakly identified by the OD
-> harmonics, it is not identified at all**, so an external constraint is the ONLY thing that can pin
-> it — the clean path is not an inconvenience, it is the missing equation.
-> **(6) ⭐⭐ AND THE CONTROL'S ANSWER IS PHYSICALLY IMPOSSIBLE:** `clipSatLo+Hi` = **7.323 V = 130 %
-> of the derived 5.636 V rail**. A CMOS inverter cannot swing 130 % of its own supply. It passed in
-> session 17 only because the check compared against a round "~7 V rail" no calculation produced.
-> **THE NUMBERS, all on one scale** (`a5_fit_eval.py` re-scores the fitted vectors at 45.76/96.99,
-> reproducing the fits' own 45.8/97.0, so the comparison is honest):
-> | | SHIPPED (s17) | CONTROL | **KFENCED** |
-> |---|---|---|---|
-> | cost | 649.6 | 97.0 | **45.8** |
-> | ψ3 err | — | 29.4° | **0.8°** |
-> | kInputRef | 3.377 | **5.972 ON BOUND** | 1.435 |
-> | V pk @ −6 dBFS | 1.69 | **2.99 implausible** | **0.72 plausible** |
-> | clipSat sum | 4.94 V (88 %) | **7.32 V (130 %) IMPOSSIBLE** | 1.42 V (25 %, soft) |
-> | FAMILY | — | **NOT PHYSICAL** | **PHYSICAL** (soft flag) |
-> ⚠ **NOT a seeding artefact** — 2 of KFENCED's 3 starts had K clipped into the fence (2.4/3.4 →
-> 1.509), a fair objection, but **the winning start was start 3 (K = 0.87, already inside)** at 45.8,
-> with a clipped start second at 56.5.
-> **(7) ⛔ BUT IT IS NOT SHIPPABLE, AND THE CHECK THAT STOPS IT IS THE ONE THE OBJECTIVE CANNOT
-> SEE.** `2·a·jfetCeilNeg` = **4.095** vs the square-law identity ~1.0 — left deliberately
-> unconstrained precisely so it can corroborate, and the fenced point misses it 4× while the
-> (unphysical) control lands at **1.161**. Also **`clipA0` rests on its 20.0 floor** (the optimum
-> wants A0 *below* circuit.md's datasheet prior) and the `clipSat` sum at 25 % of the rail carries
-> the soft flag. **The constrained fit is the right DIRECTION, not the right POINT.** ⚠ gm-sensitivity
-> is flat for neither (KFENCED 45.8 → 66.8/109.2/326.6 at gm 0.09/0.12/0.15 mS; CONTROL 97 →
-> 156/190/489), so the session-4 `jfetGm` anchor is load-bearing in both.
-> **▶ NEXT: (a)** re-run KFENCED with **`clipA0` freed downward** (find where its optimum actually
-> is, then judge THAT against the datasheet rather than assuming the 20–30 prior) and **all three
-> starts seeded inside the fence** so every start is informative. Target: a point that keeps the
-> fenced K and cost while bringing `2·a·ceilNeg` back to ~1. **(b)** Ship only on FULL step-4
-> acceptance, then **re-baseline the 63-capture matrix** — K is upstream of every nonlinearity, so
-> every OD number moves. **(c)** Backlog behind this unchanged: A3's crossover sub-gate (~1 octave /
-> 4–5 dB, `grunt_span_probe.py::crossover_gate()`), the 254 Hz notch-skirt vs GAP #2, A4 re-grade +
-> GATE-9, then B (perf/HQ), C (carry-forwards incl. C1 VU idle gate vs 2.599), D (release).
-> **(1) ⚠⚠ SESSION 42's TWO BACKGROUND FITS DID NOT SURVIVE THE SESSION BOUNDARY — and its reading
-> of them was wrong on top of that.** Both logs held only the 2–4 header lines and no process
-> existed. **But "no output yet after ~10 min" was NOT evidence they were slow: Python BUFFERS
-> stdout when redirected to a file**, so the fence banners and target table were sitting in a buffer
-> the whole time — the only thing that had appeared was the `stderr` warnings. Relaunched with
-> **`python3.11 -u`**, at which point the full header appears within seconds. ⭐ **LESSON: a
-> long-running background job that "prints nothing" may simply be block-buffered — always launch
-> analysis runs unbuffered (`-u`) or you cannot distinguish progress from a hang.**
-> **(2) ✅ THE 5.64 V RAIL IS NOW TRIPLE-CHECKED — the backup schematic agrees, closing session 42's
-> one flagged gap.** Session 42 verified IC3's five spare sections are input-grounded on the PRIMARY
-> only and recorded the backup as unverified (honest, but load-bearing: if those inputs floated, all
-> six sections draw crowbar current, the self-consistent rail collapses **5.64 → 2.70 V**, and the
-> shipped `clipSat` sum of 4.94 V becomes **impossible at 183 % of available swing** rather than
-> merely tight). Checked at 600 DPI: the backup draws the spares as an explicit row across its
-> top-left (region A, cols 3–6) as **U3B–U3F**; **inputs pin 5/7/9/11/14 all drop onto ONE net with
-> junction dots, terminating at a GND symbol**, every spare output (4/6/10/12/15) left dangling —
-> node-for-node identical to primary p.4. ⇒ **n = 1 confirmed on both sources; the 2.70 V case is
-> ruled out.** Recorded in `circuit.md`'s R19 note.
-> **(3) ✅ THE ACCEPTANCE BOUND IS NOW THE DERIVED NUMBER, IN THE TOOL.** `fit_nonlinear.py`'s
-> family check read `3.0 <= satsum <= 8.0` against "the ~7 V R19-dropped rail" — the figure session
-> 42 showed **no calculation ever produced**. Replaced with the derived **5.636 V** ceiling as a
-> HARD fail (prints % of rail and "IMPOSSIBLE, not merely unlikely"), and the 3.0 V floor **demoted
-> to an explicitly-labelled SOFT flag** — the rail argument bounds `satsum` from ABOVE only; a sum
-> under the rail means the fitted VTC saturates before the device's output stage would, which needs
-> a mechanism but is not a supply violation. FAMILY verdict now distinguishes the two.
-> ⚠ **Do not reject the constrained candidate on the soft floor alone** — that is precisely the
-> half-of-a-degenerate-pair error session 16 caught.
-> **(4) SHIPPED-POINT STALENESS REPRODUCES: `a5_fit_eval.py` returns cost 649.59** for the
-> session-17 family on today's model (session 17 logged **22.5**), drive ramp off by **−14.4 dB at
-> noon / −9.6 at 2:30 / −9.1 at max**. The clipper family needs re-fitting regardless of A5.
+> **CURRENT (session 44, 2026-07-27): ▶ PHASE 9 / A5 STEP 2 — ✅✅ CONCLUDED AND SHIPPED. A5 IS
+> CLOSED. Both of session 43's blockers turned out to be artefacts of the SEARCH, not the physics.
+> `kInputRef` **3.377 → 1.2596** plus the entire clipper/JFET family re-fitted under the clean
+> path's supply bound: objective cost **649.6 → 34.1**, every step-4 acceptance check green, and
+> **NOTHING resting on a bound**. ctest 17/17; 63-capture matrix re-baselined. Full detail
+> `docs/phase9-validation.md` §4 "A5 step 2 CONCLUDED", §0 A5.**
+> **(1) ⭐⭐ A5's DEFINING SYMPTOM IS GONE — measured, not inferred.** The clean (DIST-off) 1 kHz
+> level ladder, pedal/plugin THD%: `lvl_-12` 0.000/0.000 → 0.000/**0.000**, `lvl_-9` 0.000/0.572 →
+> 0.000/**0.000**, `lvl_-6` 0.000/10.49 → 0.000/**0.000**, `lvl_-3` 0.000/20.30 → 0.000/**0.000**.
+> Across 9 clean captures × 4 rungs the FLAGGED list goes **14 entries (up to +137 dB hotter than
+> the pedal) → NONE** — every plugin harmonic now sits below the pedal's own noise floor.
+> `clean_thd_check.py` was extended to carry the WHOLE onset region (was `lvl_-3` only): checking
+> just the top rung cannot distinguish "fixed" from "moved up one rung", and `-12` is a known-clean
+> control rung inside the same capture.
+> **(2) ⭐ THE `clipA0` FLOOR-REST WAS THE FENCE SITTING ON THE OPTIMUM — and the prior is now
+> DERIVED.** Move the floor 20 → 8 and A0 does NOT run down; it settles INTERIOR at 21.44 / 21.19.
+> ⚠ **And "20–30" was never a datasheet number** — the TI CD4049UB datasheet has NO small-signal
+> gain spec at all (only a 5 V min/max VTC envelope); it is a community measurement. It IS derivable
+> from the same DAFx-2020 device model that gave the 5.636 V rail: at the self-bias point both
+> devices carry the same current, so `A0 = (1/vov_n + 1/vov_p)/λ` — **the current cancels exactly**,
+> so it inherits none of the crowbar uncertainty. At the DAFx λ = 0.06 → **A0 = 22.0**, inside the
+> community band from an independent direction. New section (4) of `clipper_rail_selfconsistent.py`.
+> ⚠ Honest gap: DAFx publishes λ for the p-channel only, so λ is swept and A0 is a RANGE — never
+> quote it without its λ (A0 < 15 needs λ > 0.09; A0 < 10 needs λ > 0.13).
+> **(3) ⭐⭐ THE SQUARE-LAW CORROBORATION IS FREE, AND IT IS GENUINELY CORROBORATED.** New
+> `fit_nonlinear.py --square-law` imposes `2·a·ceilNeg = 1` as a SUBSTITUTION (`cn := 1/(2a)`, not a
+> penalty) so the constrained point is scored on the IDENTICAL objective. Imposing it costs nothing
+> (43.6 vs 39.8 unconstrained) and beat session 43's unconstrained 45.8. ⚠ **But an imposed check
+> cannot corroborate** — so a separate run FREED it again from the constrained basin: it returns
+> **1.009**, with perturbed seeds far worse (cn 1.10 → 57.8, cn 0.40 → 73.4). **The data PREFERS the
+> identity; s43's 4.095 was an unvisited region, not an unreachable one.** ⭐ Sharper: s43's point is
+> **outside the identity's feasible region** — projecting it onto the manifold makes the shaper FOLD
+> BACK (min slope −9.4e−02), because the square law caps `|a|·s` at ~0.80–0.95 and it sits at 0.970.
+> **(4) ⚠⚠ THE OPTIMISER FINDS LOCAL MINIMA — DO NOT READ SUB-2× COST DIFFERENCES AS RANKINGS.**
+> Proof from this session's own runs: `BOTH`'s box **strictly contains** `SQLAW`'s and it scored
+> **79.9 against 43.6**. This is why the ship decision was NOT made on cost.
+> **(5) ⛔ EACH WIDENED BOX BUYS ~10 % OF COST BY PARKING A DIFFERENT PARAMETER ON A BOUND — that is
+> where to stop.** SQ2 34.1 (nothing on a bound) → FREECHK 30.8 (`clipA0` on its 30 ceiling) →
+> FREECHK2 27.5 (`clipA0` 34.8 outside the prior, `kInputRef` ON its 1.509 fence, identity drifted
+> to 0.813). That is the degeneracy sliding, the same "the objective does not identify this
+> direction" signature s43 found for K itself.
+> **(6) ⛔ THE REMAINING TENSION IS LOCATED EXACTLY: the `clipSat` SOFT floor, and nothing else.**
+> `SQ_PHYS` (square law + K bound + A0 prior + session-15's physical clipSat [1.5,4]/side, i.e. ALL
+> constraints at once) costs **34.1 → 201.8 (5.9×)** with ψ3 err 7.7° → 27.4° and **three params
+> pinned simultaneously** — the signature of a jointly infeasible region. So the shipped `clipSat`
+> sum of 1.036 V (**18 % of the 5.636 V rail**) is a real residual but a **SOFT** flag: the rail
+> bounds satsum from ABOVE only, and rejecting on the floor alone is the half-of-a-degenerate-pair
+> error session 16 caught. It is structural to the fenced K (clipper drive scales with K).
+> **(7) ✅ SHIPPED = SQ2** (`analysis/fit_logs/step7_a5_sq2.log`): `kInputRef` 3.377 → **1.2596**
+> (GainStaging.h), `clipA0` 26.142 → **24.871**, `clipSatLo` 2.0067 → **0.4377**, `clipSatHi`
+> 2.9321 → **0.59791**, `clipK` 2.8462 → **2.4653**, `clipC11` 5.7207 → **3.69 nF**, `jfetSatPos`
+> 0.20072 → **0.4559**, `jfetSatNeg` 3.1769 → **0.76054**, `jfetCeilPos` 2.3428 → **2.0111**,
+> `jfetCeilNeg` 0.27408 → **0.65743**, `jfetExpandBeta` 2.1354 → **0.46279**. `kOutputMakeup`
+> UNCHANGED at 2.599 (K cancels through the linear path, so clean LEVEL does not move). Chosen over
+> the two lower-cost points because it is the ONLY one with zero bound-rests, its `clipA0` sits
+> inside both the community prior and near the derived 22.0, and its identity value is independently
+> corroborated by the freed run. Drive ramp H3−H2 within **1.6 dB at every knob position** (the
+> shipped point was −14.4 dB off at noon).
+> **(8) ✅ MATRIX RE-BASELINED (mandatory — K is upstream of every nonlinearity): OD 3.357 → 3.186,
+> CLEAN 0.465 → 0.427, ALL 1.911 → 1.807; 40 rows better >0.5 dB vs 22 worse.** ⭐ The split is
+> coherent: **every improvement is a HOT row, every regression a QUIET one** — gains at
+> `treble-1700_gain-n12` drv−6 2.54 → 0.39, `ref-od_gain-n12` drv−18 6.90 → 4.92, drv−12 5.81 → 3.84
+> (exactly the level-dependent/`gain-n12` rows that were railing); regressions all `sweep_clean` /
+> `sweep_drv_-18` (worst `drive-1430_base-od` sweep_clean 2.94 → 4.34), because a 2.7× lower K puts
+> the quiet end further below clipper onset. ⚠ **OD tilt −0.11 → +0.77** — small, but it is the A3
+> metric, so do not carry −0.11 forward.
+> **⚠ STILL OPEN, carried forward honestly: (a)** the `clipSat` sum at 18 % of rail wants a
+> mechanism (not a supply violation; forcing it back is infeasible per (6)); **(b) gm-sensitivity is
+> still NOT flat** (34.1 → 68.1/86.6/237.9 at gm 0.09/0.12/0.15 mS) so the session-4 `jfetGm` anchor
+> remains load-bearing — no worse than any prior fit, but unresolved; **(c)** `clipC11` = 3.69 nF is
+> now BELOW the schematic 4.7 nF, having been above it since session 17.
+> **⚠ METHOD TRAP THIS SESSION: `pgrep -f <script>.py` MATCHES ITS OWN WAITER.** Two
+> `until ! pgrep -f comprehensive_report.py; do sleep 30; done` loops hung forever after the job had
+> actually finished, because the pattern appears in the waiter's own `zsh -c` command line. The job
+> was fine; the watcher was the bug. Match on something the waiter does not contain, or check the
+> output artefact instead.
+> **▶ NEXT: A5 is CLOSED — do not re-open it without evidence that is not the clean ladder.**
+> Backlog resumes at **A3's crossover sub-gate** (the largest measured unexplained OD error, ~1
+> octave / 4–5 dB; `grunt_span_probe.py::crossover_gate()` is the acceptance tool) — ⚠ re-read its
+> numbers against the NEW baseline first, since (8) moved every OD row and the tilt. Then the 254 Hz
+> notch-skirt vs GAP #2, A4 re-grade + GATE-9, then B (perf/HQ), C (carry-forwards incl. C1 VU idle
+> gate vs makeup 2.599), D (release).
 > ── prior session ──
 > **CURRENT (session 42, 2026-07-27, INTERRUPTED MID-SESSION — ✅ ITS "▶ RESUME" BLOCK WAS EXECUTED
 > AND IS NOW SPENT; session 43 above supersedes it. Kept for the reasoning, not as instructions):

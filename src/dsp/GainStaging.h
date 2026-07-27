@@ -53,7 +53,29 @@ namespace GainStaging
 // nonlinear operating point / OD-vs-clean blend balance; the clean/linear LEVEL is
 // unchanged because K cancels through the linear path (proven std=0.000) and the
 // makeup below is recalibrated in lockstep (net outputGain = makeup/K ~= 1.09).
-static constexpr double kInputRefNominal = 3.377;
+// ** SESSION-44 UPDATE — kInputRef 3.377 -> 1.2596 (A5, Phase 9 step 2). SUPERSEDES the above. **
+// The session-17 reasoning was sound in METHOD (judge the family, never half a degenerate pair)
+// but rested on two numbers that have since been shown false:
+//   (1) THE 3.377 WAS NEVER PHYSICAL. Session 41 measured IC5_B's fixed -2.2x, which is upstream
+//       of every EQ band and always in circuit: at 3.377 the -3 dBFS rung needs 5.260 V of swing
+//       where the 9 V supply (-> 8.65 V, VD 4.325) allows +/-4.325 V. The pedal reads 0.0000 % THD
+//       at that rung; the model breaks into 22.9 % at it. The bound is <= 1.509 V/FS
+//       (analysis/clean_headroom_bound.py) and it is arithmetic, not a preference.
+//   (2) THE "~7 V RAIL" IT WAS JUDGED AGAINST WAS NEVER COMPUTED. The R19-dropped CD4049 supply
+//       is a fixed point VDD = 8.65 - I_DD(VDD)*R19, and solving it (session 42,
+//       analysis/clipper_rail_selfconsistent.py) gives 5.636 V, not ~7.
+// AND THE OD CAPTURES NEVER OBJECTED. Session 43 re-ran session 17's own protocol on today's model
+// and K went to 5.972 against a bound of 6.0 — i.e. the harmonic objective does NOT identify K at
+// all; it runs to whatever ceiling the box provides, so 3.377 was only ever where that run's box
+// and starts happened to stop. The clean path is therefore not a competing constraint but the
+// MISSING EQUATION. Re-fitting the whole family with K fenced to the clean bound (session 44,
+// analysis/fit_logs/step7_a5_sq2.log) gives K = 1.2596 INTERIOR (0.63 V peak at the -6 dBFS rung,
+// a normal passive-bass level) at cost 34.1 vs the shipped family's 649.6 on the same objective,
+// with every step-4 acceptance check green and NO parameter resting on a bound.
+// ⚠ K IS UPSTREAM OF EVERY NONLINEARITY, so this invalidates any OD number measured before it —
+// the 63-capture matrix was re-baselined in the same session. The clean/linear LEVEL is unaffected
+// (K cancels through the linear path, proven std = 0.000), so kOutputMakeup below is unchanged.
+static constexpr double kInputRefNominal = 1.2596;
 
 // Output make-up applied after the chain, before the output trim.
 // ** SESSION-17 CALIBRATED — 0.9 -> 3.684 (+11.33 dB). ** Set by level-matching a

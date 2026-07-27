@@ -376,6 +376,41 @@ def min_slope(s, a, cp, cn, beta=0.0):
     return float(np.min(core_slope + bump_slope))
 
 
+# ---- Optional structural constraint: the JFET square-law identity ------------------
+# ** SESSION 44 (A5 step 2 cont.). ** `a` (jfetSatNeg) is the even-term strength = 1/Vov and `cn`
+# (jfetCeilNeg) is the cutoff ceiling = Vov/2, so a square-law device satisfies `2*a*cn = 1`
+# EXACTLY. That identity is deliberately NOT imposed in the normal fit — it is the step-4
+# corroboration the harmonic objective cannot see, and constraining it by default would destroy
+# its whole value as an independent check (BOUNDS' jfetCeilNeg comment says so explicitly).
+#
+# `--square-law` imposes it anyway, ON PURPOSE, as a SEPARATE experiment. It answers the one
+# question the unconstrained fits cannot: "what does the fit COST when the corroboration holds,
+# and where does Vov land?" Session 43's KFENCED point missed the identity by 4x (2*a*cn = 4.095)
+# and that alone does not say whether the identity is unreachable at the fenced K or merely
+# unvisited — nothing in the objective was pulling the fit toward it. Enforcing it and reading the
+# cost separates those two.
+#
+# Implemented as a SUBSTITUTION (cn := 1/(2a), clamped to cn's own bounds) rather than a penalty
+# term, so the constrained point is scored on EXACTLY the same objective as the unconstrained one
+# and the two costs are directly comparable on one scale. `cn`'s coordinate becomes a dead
+# dimension in the simplex (a small waste of moves, not an error); `best.x` is passed back through
+# this same function before any reporting so the printed vector is self-consistent and can be fed
+# straight to a5_fit_eval.py.
+SQUARE_LAW = False
+
+
+def apply_constraints(params):
+    """Return `params` with any active structural constraint substituted in."""
+    if not SQUARE_LAW:
+        return params
+    p = list(params)
+    i_a, i_cn = FIT_KEYS.index("jfetSatNeg"), FIT_KEYS.index("jfetCeilNeg")
+    lo, hi = BOUNDS[i_cn]
+    a = max(float(p[i_a]), 1.0e-6)
+    p[i_cn] = min(max(1.0 / (2.0 * a), lo), hi)
+    return p
+
+
 def monotonic(params):
     g = dict(zip(FIT_KEYS, params))
     # jfetExpandBeta is HELD during the pivot gate and only enters FIT_KEYS for the step-3
@@ -392,6 +427,10 @@ PHASE_TARGET = None
 
 
 def cost(params, targets, verbose=False):
+    # Any active structural constraint is applied HERE, before feasibility and before the render,
+    # so every downstream consumer (monotonic, _split_flags, the acceptance prints) sees the same
+    # vector the model was actually evaluated at. See apply_constraints().
+    params = apply_constraints(params)
     if not monotonic(params):
         # infeasible: non-monotone (fold-back) waveshaper. Keep the return SHAPE
         # consistent so a verbose call on an infeasible point can't TypeError.
@@ -496,9 +535,26 @@ def main():
         [0.30, 1.8, 1.4, 0.5, 1.6, 28, 3.5, 3.5, 1.3, 3.40, 12.0],
         [0.28, 2.5, 1.0, 0.45, 2.0, 22, 2.5, 3.0, 2.0, 0.87, 4.7],
     ]
+    # `--start=` is REPEATABLE (session 44): each occurrence APPENDS a seed, and giving any at all
+    # replaces the three defaults wholesale. Session 43's KFENCED run had two of its three default
+    # seeds silently clipped onto the kInputRef fence edge (2.4 and 3.4 -> 1.509), so its real start
+    # diversity was 2, not 3 — the winning start happened to be the un-clipped one, which is what
+    # kept that result standing. With a re-fenced box the seeds must be re-placed INSIDE it rather
+    # than left to clip, or the run cannot distinguish "this is the optimum" from "every seed
+    # entered the box at the same corner".
+    explicit_starts = []
     for arg in sys.argv[1:]:
         if arg.startswith("--start="):
-            starts = [[float(v) for v in arg.split("=", 1)[1].split(",")]]
+            explicit_starts.append([float(v) for v in arg.split("=", 1)[1].split(",")])
+        if arg == "--square-law":
+            global SQUARE_LAW
+            SQUARE_LAW = True
+            print("** SQUARE-LAW CONSTRAINT ACTIVE: jfetCeilNeg := 1/(2*jfetSatNeg), i.e. "
+                  "2*a*ceilNeg == 1 is IMPOSED, not checked. **")
+            print("   This is a deliberate experiment (what does the step-4 corroboration COST?), "
+                  "NOT the normal fit —")
+            print("   the identity is normally left free precisely so it can corroborate. Read the "
+                  "cost, not the check.")
         if arg.startswith("--fence-a0="):
             # Session-17 fenced refit: the GRUNT-corner measurement (grunt_corner_measure.py) proved
             # the cut corner is genuinely LOW — but a low corner is A0<->C11 degenerate, so the
@@ -529,6 +585,9 @@ def main():
             old = BOUNDS[FIT_KEYS.index(key)]
             BOUNDS[FIT_KEYS.index(key)] = (lo, hi)
             print(f"** {key} FENCED to [{lo:g}, {hi:g}]  (was [{old[0]:g}, {old[1]:g}]) **")
+    if explicit_starts:
+        starts = explicit_starts
+        print(f"** {len(starts)} EXPLICIT start(s) given — the three defaults are NOT used. **")
     # A start outside the (possibly re-fenced) box is silently clipped by Nelder-Mead, which
     # would quietly turn a deliberate CONTROL seed into a duplicate of the fence edge. Say so.
     for start in starts:
@@ -542,6 +601,12 @@ def main():
             best = res
         print(f"  start {[round(s,1) for s in start]} -> cost {res.fun:.1f}")
 
+    # Report the CONSTRAINED vector, not the raw simplex coordinate. Under --square-law the
+    # optimiser's own jfetCeilNeg coordinate is a dead dimension that cost() overwrote at every
+    # evaluation, so printing best.x untouched would report a value the model never ran at — and
+    # that value would then be pasted into a5_fit_eval.py and score differently. Substituting here
+    # keeps the printed vector, the evaluated vector and the acceptance checks all the same point.
+    best.x = np.asarray(apply_constraints(best.x), dtype=float)
     print(f"\nBest cost = {best.fun:.1f}  (nominal {c0:.1f})")
     print("Fitted params:")
     for k, v, nom in zip(FIT_KEYS, best.x, NOMINAL):

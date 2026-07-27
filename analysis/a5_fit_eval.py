@@ -37,7 +37,18 @@ import fit_nonlinear as F
 # ⚠ kInputRef comes from GainStaging.h::kInputRefNominal, NOT FitParams -- it is processor-domain
 #    (F.CLI_FLAG_KEYS routes it to --input-ref). Keeping the two sources straight matters: this is
 #    exactly the pair whose degeneracy A5 is trying to break.
+# ** SESSION 44: updated to the A5 re-fit that now ships (was the session-17 family). ** If this
+# dict ever drifts from FitParams.h/GainStaging.h again, every "cost of the shipped point" number
+# this tool prints is silently about a point the plugin does not run — re-read both files, do not
+# trust the comment.
 SHIPPED = {
+    "jfetSatPos": 0.4559, "jfetSatNeg": 0.76054, "jfetCeilPos": 2.0111,
+    "jfetCeilNeg": 0.65743, "jfetExpandBeta": 0.46279,
+    "clipA0": 24.871, "clipSatLo": 0.4377, "clipSatHi": 0.59791, "clipK": 2.4653,
+    "kInputRef": 1.2596, "clipC11": 3.69,
+}
+# The superseded session-17 family, kept so the staleness comparison stays reproducible.
+SHIPPED_S17 = {
     "jfetSatPos": 0.20072, "jfetSatNeg": 3.1769, "jfetCeilPos": 2.3428,
     "jfetCeilNeg": 0.27408, "jfetExpandBeta": 2.1354,
     "clipA0": 26.142, "clipSatLo": 2.0067, "clipSatHi": 2.9321, "clipK": 2.8462,
@@ -77,7 +88,8 @@ def main():
     print(f"  held: " + ", ".join(f"{k}={v:g}" for k, v in F.HELD.items()))
     print(f"  phase target: drive-min psi3 @ {F.PHASE_TONE:g} Hz = {F.PHASE_TARGET:+.1f} deg")
 
-    pts = [("SHIPPED (session-17 family)", vec(SHIPPED))]
+    pts = [("SHIPPED (session-44 A5 re-fit)", vec(SHIPPED)),
+           ("superseded session-17 family", vec(SHIPPED_S17))]
     for arg in sys.argv[1:]:
         if arg.startswith("--point="):
             pts.append(("--point", [float(v) for v in arg.split("=", 1)[1].split(",")]))

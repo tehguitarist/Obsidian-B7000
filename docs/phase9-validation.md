@@ -330,13 +330,20 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   `clipSatHi` on its bound, giving a `clipSat` sum of **7.32 V = 130 % of the derived 5.636 V
   CD4049 rail, i.e. physically impossible**. So session 17's 3.377 was a property of its box, not
   a measurement, and the clean path is simply the constraint that pins a genuinely unpinned
-  parameter. ⛔ **Still NOT shippable**: the fenced point fails the deliberately-unconstrained
-  square-law corroboration `2·a·ceilNeg` = **4.095** vs ~1.0 (the control gets 1.161) and rests
-  `clipA0` on its 20.0 floor. ▶ Re-run fenced with `clipA0` freed downward and all three starts
-  seeded inside the fence; ship only on full step-4 acceptance, then **re-baseline the 63-capture
-  matrix** (K is upstream of every nonlinearity). ✅ The 5.636 V rail is now **triple-checked** —
-  the backup schematic's U3B–U3F spare sections are input-grounded exactly as the primary's.
-  §4 "A5 step 2".
+  parameter. ✅ The 5.636 V rail is **triple-checked** — the backup schematic's U3B–U3F spare
+  sections are input-grounded exactly as the primary's.
+  **✅✅ CONCLUDED + SHIPPED (session 44).** Both session-43 blockers were artefacts of the search,
+  not the physics: with `clipA0`'s floor moved 20 → 8 it settles INTERIOR at 21.2–21.4 (and the
+  prior is now *derived* — the same DAFx device model gives **A0 = 22.0**; note the TI datasheet has
+  no gain spec at all, so "20–30" was always a community measurement), and the square-law identity
+  costs **nothing** (43.6 constrained vs 39.8 free) and is genuinely **corroborated** — freed again
+  from the constrained basin it returns **1.009**, with perturbed seeds scoring far worse. SHIPPED
+  `kInputRef` **3.377 → 1.2596** plus the whole clipper/JFET family: cost **649.6 → 34.1**, every
+  step-4 check green, **nothing resting on a bound**. ⭐ **A5's defining symptom is GONE** — the
+  clean-path ladder now reads 0.000 % at `lvl_-12/-9/-6/-3` on every capture (was 0.57/10.5/20.3 %),
+  14 flagged harmonics → 0. ctest 17/17, 63-capture matrix re-baselined. ⚠ One residual: `clipSat`
+  sum at 18 % of the rail (SOFT — the rail bounds from above only; forcing it back is jointly
+  infeasible at 5.9× cost). §4 "A5 step 2 CONCLUDED".
 - [x] **A5b. ⭐⭐ THE OUTPUT LEVEL CALIBRATION HAD GONE STALE — the plugin was 3 dB TOO LOUD.
   FIXED + shipped (session 41).** `kOutputMakeup` **3.684 → 2.599** (−3.03 dB) and
   `masterTaperExp` **2.25 → 1.998**. Invisible to every Phase-9 number by construction (§1: every
@@ -3229,15 +3236,142 @@ processes then died with the session and had to be relaunched from scratch. **La
 with `python3.11 -u`** — otherwise you cannot distinguish progress from a hang, and "no output" is
 not evidence of either.
 
-**▶ NEXT.** (a) The A5 contradiction is **answered**: the clean-path bound wins, and the OD
-harmonics never objected — they simply had no opinion about K. The remaining work is to find a
-point inside the fence that ALSO satisfies `2·a·ceilNeg ≈ 1` and does not park `clipA0` on its
-floor. Natural next moves: re-run KFENCED with `clipA0` fenced wider (its optimum is below 20 —
-find out how far, then judge that against the datasheet rather than assuming the prior), and seed
-from inside the fence so all three starts are informative. (b) Only once the family passes step-4
-acceptance in full should `kInputRef`/`clipSat` be shipped — and then the **63-capture matrix must
-be re-baselined**, because K is upstream of every nonlinearity. (c) Then A3's crossover sub-gate
-(~1 octave / 4–5 dB), the 254 Hz notch skirt, A4 re-grade + GATE-9.
+**▶ NEXT.** Superseded by session 44 below — the point was found and SHIPPED.
+
+### ✅✅ A5 step 2 CONCLUDED (session 44, 2026-07-27) — the family is re-fitted under the clean-path bound and **SHIPPED**. `kInputRef` 3.377 → **1.2596**, the whole clipper/JFET family with it. A5's defining symptom is GONE
+
+Session 43 left two named blockers on the constrained point: it failed the square-law corroboration
+(`2·a·ceilNeg` = 4.095 against ~1.0) and parked `clipA0` on its 20.0 floor. **Both were artefacts of
+the search, not of the physics.** Six fits (all `python3.11 -u`, all seeds placed INSIDE their
+fences — see the tooling note) resolved them and produced a point that clears every step-4 check
+with nothing resting on a bound.
+
+**(1) ⭐ THE `clipA0` FLOOR-REST WAS THE FENCE SITTING ON THE OPTIMUM, AND THE PRIOR IS NOW DERIVED
+RATHER THAN ASSUMED.** With the floor moved 20 → 8, A0 does **not** run down: it settles at
+**21.44** (A0FREE) and **21.19** (SQLAW), both interior. And the prior itself is no longer an
+assumption. ⚠ **First correction: circuit.md's "A0 = 20–30" is NOT a datasheet number** — the TI
+CD4049UB datasheet gives a VTC only at VCC = 5 V, as a min/max tolerance envelope, and carries **no
+small-signal gain spec at all** (`nonlinear-component-modeling.md` §1 says so explicitly: "get those
+from DAFx / capture"). 20–30 is a community measurement on real B3K/B7K units. It CAN, however, be
+derived from the same DAFx-2020 device model that gave the 5.636 V rail: at the shunt-feedback
+self-bias point both devices saturate at the same current, so
+`A0 = (gm_n + gm_p)/(gds_n + gds_p) = (1/vov_n + 1/vov_p)/λ` — **the current cancels exactly**, so
+this inherits none of the crowbar-current uncertainty. At the DAFx λ = 0.06 it gives **A0 = 22.0**,
+inside the community band from a completely independent direction. New section (4) of
+`clipper_rail_selfconsistent.py`. ⚠ Its one honest gap: the DAFx fit publishes λ for the p-channel
+only, so λ is swept rather than assumed and A0 is a range — do not quote a number without its λ.
+Reaching A0 < 15 needs λ > 0.09 on both devices, A0 < 10 needs λ > 0.13.
+
+**(2) ⭐⭐ THE SQUARE-LAW CORROBORATION IS FREE, AND IT IS GENUINELY CORROBORATED — NOT IMPOSED.**
+`a` (jfetSatNeg) = 1/Vov and `cn` (jfetCeilNeg) = Vov/2, so a square-law device satisfies
+`2·a·cn = 1` exactly. New `fit_nonlinear.py --square-law` imposes it as a SUBSTITUTION
+(`cn := 1/(2a)`, not a penalty) so the constrained point is scored on the identical objective and
+the costs compare on one scale. Imposing it costs **nothing**: 43.6 constrained vs 39.8
+unconstrained-at-fenced-K, and it **beat session 43's unconstrained 45.8**. ⚠ But an imposed check
+cannot corroborate — that is the whole point of leaving it free — so a separate run (`FREECHK`)
+**freed the identity again and started from the constrained basin**: it came back at
+**`2·a·ceilNeg` = 1.009**, and both perturbed seeds (cn 1.10 → cost 57.8, cn 0.40 → 73.4) scored far
+worse. **The data prefers the identity; session 43's 4.095 was an unvisited region, not an
+unreachable one.**
+⭐ Sharper than "it missed the identity": session 43's point is **outside the identity's feasible
+region entirely**. Projecting it onto the manifold makes the waveshaper **fold back** (min slope
+−9.4e−02), because the square law caps `|a|·s` at ~0.80–0.95 (β-dependent) while that point sits at
+0.970. It would need β ≈ 4 — its upper bound — to be feasible at all.
+
+**(3) ⛔ AND THE REMAINING TENSION IS LOCATED EXACTLY: it is the `clipSat` SOFT FLOOR, nothing else.**
+`SQ_PHYS` added session-15's physical `clipSat` fence ([1.5, 4]/side) on top of the square law, the
+K bound and the A0 prior — i.e. every constraint at once. Cost **34.1 → 201.8 (5.9×)**, ψ3 error
+7.7° → 27.4°, and **three parameters pinned simultaneously** (`clipA0` on 20, `clipSatLo` on 1.5,
+`kInputRef` on 1.509). Every constraint binding at once is the signature of a jointly infeasible
+region. So the shipped point's `clipSat` sum of 1.036 V (**18 % of the 5.636 V rail**) is a real,
+quantified residual — but it is a **SOFT** flag by construction: the rail bounds `satsum` from
+ABOVE only, and rejecting on the floor alone is the half-of-a-degenerate-pair error session 16
+caught. It is also **structural to the fenced K**: the clipper's drive scales with K, so a 2.7×
+lower K pulls the fitted ceiling down with it.
+
+**(4) ⚠⚠ THE OPTIMISER IS FINDING LOCAL MINIMA — DO NOT READ SUB-2× COST DIFFERENCES AS RANKINGS.**
+Proof from this session's own runs: `BOTH`'s box **strictly contains** `SQLAW`'s (`clipA0` ∈ [8,30]
+⊃ [20,30], same everything else) and yet it scored **79.9 against 43.6**. Every cost below is a
+local optimum. This is why the ship decision was NOT made on cost.
+
+**(5) ⛔ AND WHY THE SHIP STOPPED WHERE IT DID: each widened box buys ~10 % of cost by parking a
+DIFFERENT parameter on a bound.** `SQ2` 34.1 (nothing on a bound) → `FREECHK` 30.8 (`clipA0` on its
+30 ceiling) → `FREECHK2` 27.5 (`clipA0` 34.8, outside both the community prior and the derived 22;
+`kInputRef` **on** its 1.509 fence; the identity drifted to 0.813). That is the degeneracy sliding,
+not the fit improving — the same "the objective does not identify this direction" signature session
+43 found for K itself. **Stop at the point where nothing rests on a bound.**
+
+**THE RUNS, all on one objective and one model** (`analysis/fit_logs/step7_a5_*.log`):
+
+| run | cost | 2·a·ceilNeg | clipA0 | kInputRef | clipSat sum | ψ3 err | on a bound? |
+|---|---|---|---|---|---|---|---|
+| SHIPPED s17 | 649.6 | 1.741 | 26.1 | 3.377 | 4.94 V (88 %) | — | K physically impossible |
+| CONTROL s43 | 97.0 | 1.161 | 22.6 | **5.97** | **7.32 V (130 %)** | 29.4° | K + clipSatHi — NOT PHYSICAL |
+| KFENCED s43 | 45.8 | **4.095** | **20.0** | 1.435 | 1.42 V (25 %) | 0.8° | clipA0 floor |
+| A0FREE | 39.8 | **3.631** | 21.44 | 1.368 | 1.47 V (26 %) | 1.3° | none |
+| SQLAW | 43.6 | 1.000 (imposed) | 21.19 | 1.005 | 0.73 V (13 %) | 1.8° | clipSatLo floor |
+| BOTH | 79.9 | 1.000 (imposed) | **10.6** | 0.972 | 0.72 V | 9.7° | beta floor |
+| SQ_PHYS | **201.8** | 1.000 (imposed) | **20.0** | **1.509** | 3.24 V (57 %) | 27.4° | **three at once** |
+| **✅ SQ2 (SHIPPED)** | **34.1** | **1.000** | **24.87** | **1.2596** | 1.04 V (18 %, soft) | 7.7° | **NONE** |
+| FREECHK | 30.8 | **1.009 (FREE)** | **30.0** | 1.242 | 1.18 V (21 %) | 1.8° | clipA0 ceiling |
+| FREECHK2 | 27.5 | 0.813 | **34.8** | **1.509** | 1.61 V (29 %) | 2.7° | K ceiling |
+
+**(6) ✅✅ SHIPPED = SQ2** (`FitParams.h` + `GainStaging.h::kInputRefNominal`): `kInputRef`
+**3.377 → 1.2596**, `clipA0` 26.142 → **24.871**, `clipSatLo` 2.0067 → **0.4377**, `clipSatHi`
+2.9321 → **0.59791**, `clipK` 2.8462 → **2.4653**, `clipC11` 5.7207 → **3.69 nF**, `jfetSatPos`
+0.20072 → **0.4559**, `jfetSatNeg` 3.1769 → **0.76054**, `jfetCeilPos` 2.3428 → **2.0111**,
+`jfetCeilNeg` 0.27408 → **0.65743**, `jfetExpandBeta` 2.1354 → **0.46279**. `kOutputMakeup` is
+UNCHANGED at 2.599 — K cancels through the linear path, so the clean LEVEL does not move.
+Chosen over the two lower-cost points because it is the only one with **zero bound-rests**, its
+`clipA0` sits inside both the community prior and near the derived 22.0, and its identity value is
+independently corroborated by FREECHK (1.009, freed, from this same basin). **ctest 17/17.**
+
+**(7) ✅✅ AND A5's DEFINING SYMPTOM IS GONE — the acceptance test, not an inference.**
+`clean_thd_check.py` extended to carry the WHOLE onset region (`lvl_-12/-9/-6/-3`), not just the top
+rung — checking only `lvl_-3` reports that the defect exists but cannot show that it has actually
+gone rather than moved up one rung, and `-12` gives a known-clean control rung inside the same
+capture. 1 kHz THD %, pedal / plugin, on `ref-clean`:
+
+| rung | BEFORE (K = 3.377) | AFTER (K = 1.2596) |
+|---|---|---|
+| `lvl_-12` | 0.000 / 0.000 (control) | 0.000 / **0.000** |
+| `lvl_-9` | 0.000 / 0.572 | 0.000 / **0.000** |
+| `lvl_-6` | 0.000 / 10.49 | 0.000 / **0.000** |
+| `lvl_-3` | 0.000 / 20.30 | 0.000 / **0.000** |
+
+Across all 9 clean captures × 4 rungs the FLAGGED list goes from **14 entries (up to +137 dB hotter
+than the pedal)** to **none** — every plugin harmonic now sits BELOW the pedal's own noise floor.
+**A5 is closed.**
+
+**(8) ✅ THE 63-CAPTURE MATRIX, RE-BASELINED (mandatory — K is upstream of every nonlinearity).**
+**OD 3.357 → 3.186 (−0.17) | CLEAN 0.465 → 0.427 (−0.04) | ALL 1.911 → 1.807 (−0.10)**;
+**40 rows better by >0.5 dB vs 22 worse.** ⭐ **And the split is coherent, not a wash: every
+improvement is a HOT row and every regression is a QUIET one.** Top gains are
+`treble-1700_gain-n12` `sweep_drv_-6` **2.54 → 0.39**, `ref-od_gain-n12` `sweep_drv_-18`
+**6.90 → 4.92** and `-12` **5.81 → 3.84**, `drive-1700_grunt-boost` `-12` **5.34 → 3.39** — i.e.
+precisely the level-dependent rows where the model was railing and the `gain-n12` group session 30
+flagged. The regressions are all `sweep_clean` / `sweep_drv_-18` (worst `drive-1430_base-od`
+`sweep_clean` **2.94 → 4.34**): a 2.7× lower K moves the whole nonlinear operating point down, so
+the quiet end now sits further below clipper onset. ⚠ **OD tilt moved −0.11 → +0.77**, i.e. slightly
+bass-heavy again — small, but it is the A3 metric, so re-read it when A3's crossover sub-gate is
+next touched rather than treating −0.11 as still current.
+
+**⚙ TOOLING.** `fit_nonlinear.py`: `--start=` is now **repeatable** (session 43's KFENCED had two of
+its three seeds silently clipped onto the K fence edge, so its real start diversity was 2 — the
+winner happened to be the un-clipped one, which is what kept that result standing); `--square-law`
+as described in (2), applied inside `cost()` so every downstream consumer sees the evaluated vector,
+and written back into `best.x` before reporting so the printed point can be pasted straight into
+`a5_fit_eval.py`. `clipper_rail_selfconsistent.py` gained the A0 derivation (1).
+`clean_thd_check.py` gained the full ladder (7). `a5_fit_eval.py`'s `SHIPPED` dict updated to the
+new family, with the session-17 one kept as `SHIPPED_S17` so the staleness comparison stays
+reproducible.
+
+**⚠ STILL OPEN, carried forward honestly.** (a) The `clipSat` sum at 18 % of the rail wants a
+mechanism — it is not a supply violation and (3) shows forcing it back is infeasible, but it is the
+one physical prior this family does not satisfy. (b) **gm-sensitivity is still not flat**
+(34.1 → 68.1 / 86.6 / 237.9 at gm 0.09/0.12/0.15 mS), so the session-4 `jfetGm` anchor remains
+load-bearing — no worse than every prior fit, but unresolved. (c) `clipC11` = 3.69 nF is now BELOW
+the schematic 4.7 nF, having been above it (5.72) since session 17.
 
 ## 5. Performance / HQ pass (not started)
 

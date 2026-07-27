@@ -52,9 +52,27 @@ struct FitParams
     // R19-dropped effective rail (nominal ~7 V, below the 8.6 V op-amp rail) and
     // their DIFFERENCE is the even-harmonic asymmetry. Fit to the drive-sweep
     // Farina THD(f) + low-frequency-tone H2/H3 balance.
-    double clipA0 = 26.142;      // session-17 fenced fit (was nominal 25)
-    double clipSatLo = 2.0067;   // session-17 fenced fit (was nominal 3.15)
-    double clipSatHi = 2.9321;   // session-17 fenced fit (was nominal 3.85)
+    // ** SESSION 44 (Phase 9 / A5 step 2): RE-FITTED under the clean path's supply bound. **
+    // The session-17 family was fitted with kInputRef FROZEN at 3.377 — a value session 41 then
+    // proved IMPOSSIBLE (IC5_B's fixed -2.2x would need 5.26 V of swing on a +/-4.325 V supply).
+    // Session 43 showed the OD harmonic objective does not identify K AT ALL (unfenced it rests on
+    // whatever bound the box provides), so the clean path is not a competing constraint but the
+    // MISSING EQUATION. Re-fit with K fenced to <= 1.509 (analysis/clean_headroom_bound.py) and the
+    // clipper ceilings freed: cost 649.6 (shipped, on today's model) -> 34.1, ALL step-4 acceptance
+    // checks green and NO parameter resting on a bound. See analysis/fit_logs/step7_a5_sq2.log.
+    // clipA0 = 24.87 is INTERIOR in [20, 30] and independently corroborated: the same DAFx-2020
+    // device model that gives the 5.636 V rail also gives A0 = 22.0 at its own lambda
+    // (clipper_rail_selfconsistent.py section 4). Note circuit.md's "20-30" is a COMMUNITY
+    // measurement, not a datasheet spec — the TI datasheet carries no small-signal gain figure.
+    // ⚠ clipSatLo+Hi = 1.036 V is only 18 % of the 5.636 V rail — a SOFT flag, deliberately not a
+    // rejection: the rail bounds the sum from ABOVE only, and rejecting on the floor alone is the
+    // half-of-a-degenerate-pair error session 16 caught. It is structural to the fenced K (the
+    // clipper's drive scales with K, so a 2.7x lower K pulls the fitted ceiling down with it).
+    // A fit forcing satsum back into session-15's [1.5, 4]/side fence costs 34.1 -> 201.8 and pins
+    // THREE parameters at once (step7_a5_sqphys.log) — that region is jointly infeasible.
+    double clipA0 = 24.871;      // session-44 A5 re-fit (was 26.142, session-17)
+    double clipSatLo = 0.4377;   // session-44 A5 re-fit (was 2.0067, session-17)
+    double clipSatHi = 0.59791;  // session-44 A5 re-fit (was 2.9321, session-17)
     // clipK = the VTC knee HARDNESS (session-11 reshape 2026-07-23, Clipper.h
     // vtc()): the per-side sigmoid is u/(1+u^k)^(1/k). A single tanh could not
     // decouple knee hardness from the small-signal gain a0 — the step-3/4 fits
@@ -70,7 +88,7 @@ struct FitParams
     // does the antialiasing), so the closed-form antiderivative is never used.
     // The k != 2 forward path (Clipper.h vtc()/vtcDeriv()) is a plain pow(), exact
     // for any k; only the k==2 sqrt fast-path is skipped (a little more CPU/sample). **
-    double clipK = 2.8462;       // session-17 fenced fit (was anchor 2.0 — see closed-form note below)
+    double clipK = 2.4653;       // session-44 A5 re-fit (was 2.8462, session-17; anchor 2.0 — see closed-form note below)
     // clipC11 = the ALWAYS-PRESENT GRUNT coupling cap (schematic 4n7, Clipper.h
     // kC11). Made fittable in session 17 (user-authorised 2026-07-24: "ATTACK and
     // GRUNT are somewhat estimated; I trust the captures more than the schematics").
@@ -85,7 +103,7 @@ struct FitParams
     // shift). Fit it JOINTLY with the K/clipSat/clipA0 family; a pin at its bound is
     // diagnostic (the corner wants a value no 4n7-labelled cap explains -> look past
     // C11). Only the Cut position depends on it alone; Boost = C11||220n is ~immune.
-    double clipC11 = 5.7207e-9;  // session-17 fenced fit (schematic 4.7 nF; user-authorised to move)
+    double clipC11 = 3.69e-9;    // session-44 A5 re-fit (was 5.7207e-9; schematic 4.7 nF, user-authorised to move)
     // clipC12/clipC13 = the SWITCHED GRUNT caps (schematic 47 nF / 220 nF, added in
     // Flat / Boost respectively). Only Flat depends on C12, only Boost on C13; Cut is
     // C11 alone (unaffected). Made fittable in session 19 to chase the GRUNT sub-bass
@@ -152,8 +170,8 @@ struct FitParams
     // DIFFERENT function, not a revert of the 2026-07-22 bug fix. With a finite ceiling
     // NEITHER closed form is sufficient: the constraint couples s, a and jfetCeilNeg, so
     // a fitter must scan the slope NUMERICALLY (fit_nonlinear.py does). **
-    double jfetSatPos = 0.20072; // s: square-law knee (gate volts) — session-17 fit (was 0.3)
-    double jfetSatNeg = 3.1769;  // a: even strength (signed) — session-17 fit (was 1.0)
+    double jfetSatPos = 0.4559;  // s: square-law knee (gate volts) — session-44 A5 re-fit (was 0.20072)
+    double jfetSatNeg = 0.76054; // a: even strength (signed) — session-44 A5 re-fit (was 3.1769)
     // ---- Asymmetric drain-current CEILING (added 2026-07-22) ----------------
     // The step-2 re-fit REJECTED its own result and diagnosed why: the capture's
     // H2 grows +6 dB across the drive sweep and the unbounded model's grew
@@ -184,8 +202,8 @@ struct FitParams
     // The asymmetry between them is a SECOND source of even harmonics alongside
     // jfetSatNeg, and reinforces it in the same direction; expect the fit to trade
     // the two off. Passing >= 1e6 disables a side exactly (pre-ceiling model).
-    double jfetCeilPos = 2.3428;   // session-17 fit (was nominal 1.0)
-    double jfetCeilNeg = 0.27408;  // session-17 fit (was nominal 0.5)
+    double jfetCeilPos = 2.0111;   // session-44 A5 re-fit (was 2.3428, session-17)
+    double jfetCeilNeg = 0.65743;  // session-44 A5 re-fit (was 0.27408) — 2*a*ceilNeg = 1.000, the square-law identity
     // jfetExpandBeta = the EXPANSIVE cubic coefficient of the core shape (session-15
     // branch B, 2026-07-23, JfetStage.h coreLimit()). SUPERSEDES the session-13/14
     // `jfetCeilK` hardness knob, which was proven the wrong lever (its pivot gate
@@ -204,7 +222,7 @@ struct FitParams
     // JfetStage.h), which is the only regime this branch uses; still scanned
     // numerically in fit_nonlinear.py + JfetStageTest per the standing bound-verify
     // rule. Nominal 0.0 is a PLACEHOLDER — this is the session-15 primary fit target.
-    double jfetExpandBeta = 2.1354;  // session-17 fit — EXPANSIVE cubic (was placeholder 0.0)
+    double jfetExpandBeta = 0.46279; // session-44 A5 re-fit — EXPANSIVE cubic (was 2.1354, session-17)
 
     // ---- Pot taper shapes (power-law exponent p, R = Rmax * x^p) ------------
     // dsp.md §tapers: fit the SHAPE, don't assume convex, and constrain p with at
