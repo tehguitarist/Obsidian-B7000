@@ -443,6 +443,32 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   `crossover_gate()` (session 38's sub-gate, now runnable and reproducing its record exactly).
   §4 "A3 step 3d".
 
+- [~] **A3 step 6 (session 50) — the C2 carrier SEARCH SPACE is closed, and it is EMPTY; plus the
+  component budget A3 should have had since session 34.** Analysis + tooling only; nothing in `src/`
+  changed. New tools `analysis/a3_carrier_scan.py` (reachability over the whole OD path) and
+  `analysis/a3_component_budget.py` (the beta budget). **(a) The budget:** at the identified
+  beta = −16.75 dB (interval [−17.25, −16.50] at the 0.144 dB capture floor; model ships −16.93,
+  inside it) A3 splits into **C1 a flat +2.68 dB floor, C2 a +3.20 dB low-mid rise over 101–508, and
+  C3 a +7.86 dB LF rise at 20 Hz (9.18 dB/oct)**. **beta explains at most 0.26 dB of C1**, so C1 is a
+  real broadband OD deficit — corroborated independently by `a3_lead_fit`'s free-gain row wanting
+  **+4.03 dB**. Fixing any ONE component perfectly leaves 3.5–4.8 dB of the 5.82 score, so **A3 will
+  not close on one element.** **(b) ⭐⭐ Only a POST-clipper linear element can supply `s(f)`**: `s` is
+  one scale per band that must fit all five drives, and the delivered lift is drive-INDEPENDENT
+  (`drvspr` = 0.00) for every post-clipper element and **4–19 dB** for every pre-clipper one.
+  Confirmed quantitatively — the cheap screen predicts the real shape-gate score to 3 d.p. for
+  post-clipper candidates (4.68→4.676; `btC17=10n` 3.49→3.490) and is wrong by 2.7 dB for pre-clipper
+  ones (`clipC11=10n` screen 3.26, real **5.922 = WORSE**; `jfetGm=0.4e-3` 2.88, real 5.661). **(c) ⛔
+  Nothing reachable supplies C2** (+5.91 dB over 101–508 for ≤1 dB above 1 kHz): the post-clipper
+  region holds only `OdCoupling` (LF-only, ±3.45 dB), the bridged-T (refuted, session 49, reproduced
+  here) and two HF Sallen-Keys — ⇒ **C2's carrier is a MISSING element**, as `OdCoupling` itself was
+  until session 36. **(d) ⭐⭐ The shape gate is NOT valid for C3.** Reverting `clipC15` to the
+  schematic 2u2 improves the score 5.808 → 4.676 at **+0.00 dB** side effect and collapses the
+  free-k demand to +0.39 dB — but the null gate goes **4/5 → 1/5**, and `a3_lead_fit` then
+  re-discovers a 1st-order ~30 Hz highpass (**4/5, PASS**), i.e. it puts C15 straight back.
+  **`clipC15` stays at 5.2 nF; gate C3 on the NULL, never the shape curve.** **(e) Scope:** the scan
+  is GRUNT cut / −18 dBFS, so level-dependent levers read zero — `railPos/Neg` are exactly 0.00 there
+  and were liveness-checked live (8.95 dB at −6 dBFS/drive max). §4 "A3 step 6".
+
 **B. Performance / quality pass (Phase 9 part 2):**
 - [ ] **B1. PerfBenchmark / FeatureProfile / OSFidelity probes** → the `hq` toggle decision (omega4 vs AccurateOmega is usually the only real lever) + README perf table. See §5.
 - [ ] **B1b. NEW (2026-07-27, user request): explicit no-OS (1×) and low-OS (2×) sweeps with a
@@ -3997,6 +4023,137 @@ low-mids are supplied, and (5) means that supply is not coming from the bridged-
 **(d)** Re-capture `ref-od_gain-n12.wav` + `level-0930/1430/1700_gain-n12_base-od.wav` (4 files;
 `level-0700_gain-n12` is the LEVEL=0 null) when convenient — no longer on the critical path.
 **(e)** Then A4 re-grade + GATE-9, the `OSValidationTest` decision (session 45 item 7b), then B / C / D.
+
+### A3 step 6 — the carrier search space is CLOSED to the post-clipper region, and it is EMPTY (session 50)
+
+Executing the session-49 "▶ NEXT (a)" as a **reachability question asked of the whole OD path**, not a
+value hunt, plus the component budget that should have preceded every candidate since session 34.
+**Analysis + tooling only — nothing in `src/` changed**, ctest unchanged at 16/17 (the pre-existing
+session-44 `OSValidationTest` failure). New tools `analysis/a3_carrier_scan.py` and
+`analysis/a3_component_budget.py`. Baseline verified first: `a3_shape_gate --selfcheck` PASS at 5.808
+(worst deviation 0.027 dB) before any locus was read.
+
+**(1) THE COMPONENT BUDGET, AND beta's ROLE IN IT — SETTLED.** `a3_component_budget.py` sweeps the
+pedal's bleed level and reports both the resulting `s(f)` curve and the joint fit residual, so beta's
+identifiability is measured rather than assumed. Optimum **beta = −16.75 dB** (interior — the tool
+refuses to report an interval when the optimum lands on the sweep edge, which the first draft did);
+identified interval **[−17.25, −16.50]** at the pedal's own **0.144 dB take-to-take capture floor**.
+The model ships −16.93, *inside* it.
+
+| component | definition | value | span across beta's identified interval |
+|---|---|---|---|
+| **C1** broadband floor | mean of 50/64 Hz | **+2.68 dB** | 0.07 dB — rock solid |
+| **C2** low-mid rise | mean 101–508 Hz, over C1 | **+3.20 dB** | 0.68–1.10 dB — solid |
+| **C3** LF rise | 20 Hz, over C1 | **+7.86 dB** (9.18 dB/oct, 32→20) | 2.51 dB — the softest |
+
+⭐ **beta accounts for at most 0.26 dB of the floor**, so **C1 is a real broadband OD-level deficit
+that no bleed level explains.** Independently corroborated from the other direction: `a3_lead_fit`'s
+free-gain row wants **k = 1.591 (+4.03 dB)** of broadband OD gain at the shipped state.
+
+⚠ **And no single component is more than ~40 % of the score, so A3 will not close on one element.**
+Score if each were fixed perfectly: **C1 alone 3.52 | C2 alone 4.34 | C3 alone 4.77 | all three 0.26**
+(against 5.82 as it stands).
+
+**(2) ⭐⭐ THE STRUCTURAL RESULT: ONLY A POST-CLIPPER LINEAR ELEMENT CAN SUPPLY `s(f)` AT ALL.** `s` is
+ONE scale per band that must reproduce all five drive totals, and the shipped model already does that
+to 0.094 dB rms — so whatever is missing is, as measured, drive-INDEPENDENT. The scan reports
+`drvspr` (max-minus-min of the delivered lift across drive 0.0/0.5/1.0) and the split is total:
+
+| region | elements | drvspr |
+|---|---|---|
+| **post**-clipper | `clipC15`, `btR22`, `btR23`, `btC16`, `btC17` | **0.00 at every value** |
+| **pre**-clipper | `trebleC7`, `trebleLadderDampR`, `clipC11`, `jfetGm`, `clipSat*` | **4–19 dB** |
+
+A post-clipper linear element multiplies |OD| by the same factor at every drive; a pre-clipper one
+moves the clipper's operating point, so its delivered lift is a different number at every drive and
+cannot be represented as a single `s` no matter what its average is.
+
+**(3) ✅ AND THAT PREDICTION IS CONFIRMED QUANTITATIVELY — the cheap screen is EXACT for post-clipper
+candidates and useless for pre-clipper ones.** Screen (`resid`, no beta/theta re-fit) vs the real
+`a3_shape_gate` score:
+
+| candidate | loc | drvspr | screen | real SCORE | error |
+|---|---|---|---|---|---|
+| shipped | — | 0.00 | 5.81 | 5.808 | 0.00 |
+| `clipC15` inert | post | 0.00 | 4.68 | 4.676 | 0.00 |
+| `btC17=10n` | post | 0.00 | 3.49 | **3.490** (session 47's own figure) | 0.00 |
+| `clipC11=10n` | pre | 8.50 | 3.26 | **5.922 (WORSE)** | 2.66 |
+| `jfetGm=0.4e-3` | pre | 9.71 | 2.88 | **5.661 (nil)** | 2.78 |
+
+⚠ **Both pre-clipper candidates moved the fitted beta by 0.7 dB (−16.80 → −16.10) and TILTED the
+curve** rather than lifting it — `clipC11=10n` overshoots 50 Hz to **−3.94 dB** while making 508 Hz
+**worse** (+9.09 → +13.82). A screen that averages over the target span cannot see that. The metric
+was changed to a mean-removed one (beta absorbs any flat part, so only SHAPE can count) and it still
+does not rank pre-clipper candidates correctly — **the honest statement is that `LIFT`/`SIDE`/`drvspr`
+are the trustworthy columns and any pre-clipper row needs Tier 2 regardless.**
+
+**(4) ⛔ NO REACHABLE ELEMENT SUPPLIES C2.** The requirement is **+5.91 dB over 101–508 Hz for ≤1 dB
+above 1 kHz**. Nothing in the table meets it. The best rows, all failing on one axis or the other:
+
+| element | lift | side | verdict |
+|---|---|---|---|
+| `btC17=10n` | +5.90 | 1.83 | already refuted on the matrix (session 49); reproduced here |
+| `btR22=47k` | +5.79 | 3.96 | side |
+| `jfetGm=0.4e-3` | +4.68 | 2.26 | side, drvspr 9.71, and the gm anchor is load-bearing (session 44) |
+| `clipC11=10n` | +4.50 | 1.34 | drvspr 8.50; real score is WORSE |
+| `trebleC7=10n` | +2.00 | **0.06** | the only genuinely side-effect-free lever, and it delivers 34 % of the need — by adding **+13.84 dB at LF**, a 2.2× overshoot of C3 |
+| `clipC15=100n` | +0.14 | 0.00 | LF-only, ±3.45 dB of authority — a C3 lever, not a C2 one |
+
+⇒ **The post-clipper region is the only one that can supply C2, and it contains exactly three things:
+`OdCoupling` (LF-only), the bridged-T (refuted on reachability), and two Sallen-Key LPFs (HF-only, and
+not exposed as fit parameters at all). A3's C2 carrier is therefore a MISSING element** — the same
+finding as `PedalChain::OdCoupling` itself, which was absent from the model entirely until session 36.
+This is session 49's argument one level up: not "this element cannot", but "no element in the only
+region that could, can".
+
+**(5) ⭐⭐ THE SHAPE GATE IS NOT A VALID INSTRUMENT FOR C3 — and this nearly shipped a false positive
+in one session rather than three.** Reverting `clipC15` to its **schematic 2u2** looks like the best
+result of the session: shape score **5.808 → 4.676**, SIDE **+0.00 dB** (bit-clean above 1 kHz), C1
+floor **+2.65 → +1.29**, C3 **+10.40 → +5.22**, C2 untouched (254/508 move 0.06/0.01 dB), the fitted
+beta unmoved, and the free-k demand collapsing **1.591 (+4.03 dB) → 1.046 (+0.39 dB)** — i.e. it
+appears to dissolve C1 and half of C3 at once, at a **schematic** value, retiring session 36's 423×
+departure. **It does not survive the null gate:**
+
+| state | shape score | null bands | free-k |
+|---|---|---|---|
+| `clipC15 = 5.2 nF` (shipped) | 5.808 | **4/5** (7.3 dB depth err) | +4.03 dB |
+| `clipC15 = 2u2` (schematic) | **4.676** | **1/5** (10.4 dB) | +0.39 dB |
+| `clipC15 = 2u2` + a fitted 1st-order HP | — | **4/5, 1.1 dB, PASS** | — |
+
+⭐ **The third row is the resolution: with C15 inert, `a3_lead_fit` re-discovers a first-order ~30 Hz
+highpass and the null comes straight back.** The two states are the same model; the shape gate simply
+rewards the extra LF |OD| that deleting the highpass provides, while being **blind to the phase that
+places the null** (its own docstring says so: *"a level/shape gate, not a phase gate"*). ⇒ **`clipC15`
+stays at 5.2 nF**, and — the durable lesson — **C3 must be gated on the NULL (`a3_lead_fit`), never on
+the shape curve.** At LF the OD and bleed are near anti-phase, so the total is dominated by
+cancellation geometry, which is a phase property the shape gate does not score. The shape gate is the
+right instrument for **C1 and C2 only**.
+
+**(6) SCOPE LIMITS OF THE SCAN, RECORDED HONESTLY.** It runs at **GRUNT cut / −18 dBFS** (A3's own
+measurement condition), so any level-dependent lever reads zero: `railPos`/`railNeg` move **exactly
+0.00 dB** at every value including 1000 (rails off). ⚠ That is the operating point, **not** a dead
+flag — liveness-checked per L-009 at −6 dBFS / drive max, where `railPos` 2.7 → 1.0 moves the OD path
+**8.95 dB**. So the scan is a valid statement about A3 as measured, and NOT a general statement about
+the OD path. Similarly it says nothing about GRUNT flat/boost.
+
+**(7) A NOTE ON COMPARABILITY.** `a3_lead_fit`'s no-element rms reads **2.591 dB** here against session
+47's 2.377 at the same shipped state. Not a regression — session 49 extended the probe band list from
+17 to 23 bands, and this metric is an RMS over them ("22 bands × 5 drives"). Do not carry session 47's
+figure forward across that change.
+
+**▶ NEXT, IN ORDER.**
+**(a)** C2's carrier is a **missing post-clipper element**. Before hypothesising one, close the loop on
+the topology: the SK filters' values and the treble ladder (C5/C9/C6, R7/R8, R12/R14) are
+`static constexpr` and reachable from no A3 tool — the ladder is the largest *pre*-clipper roll-off
+across the target span (−7.33 dB, 127→400 Hz) and has never been swept. Expose them, re-run the scan,
+and only then argue for a new element. ⚠ Plumbing must be verified BOTH ways (default bit-identical,
+override provably differs) — `a3_carrier_scan --selfcheck` does exactly this.
+**(b)** C1 (+2.68 dB flat, corroborated at +4.03 dB by the free-k row) is a **broadband OD-level**
+question, not an EQ one; its levers are the clipper's closed-loop gain and the LevelBlend divider, and
+it should be settled before any frequency-shaping element is fitted, or that element will absorb it.
+**(c)** C3 stays on the null gate. Do not work it from the shape curve — see (5).
+**(d)** `trebleLadderDampR` stays at 30k. **(e)** The 4 `gain-n12` re-captures, then A4 re-grade +
+GATE-9, the `OSValidationTest` decision, then B / C / D.
 
 ## 5. Performance / HQ pass (not started)
 
