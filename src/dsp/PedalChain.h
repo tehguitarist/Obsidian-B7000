@@ -215,6 +215,7 @@ public:
         clipper.setC11(f.clipC11);   // fittable GRUNT=Cut coupling cap (session 17)
         clipper.setC12(f.clipC12);   // fittable GRUNT=Flat  add-cap (session 19)
         clipper.setC13(f.clipC13);   // fittable GRUNT=Boost add-cap (session 19)
+        clipper.setR16(f.clipR16);   // clipper input R; diagnostic, ships nominal (session 45)
         jfet.setNonlinear(f.jfetGm, f.jfetRo, f.jfetRq2, f.jfetSatPos, f.jfetSatNeg,
                           f.jfetCeilPos, f.jfetCeilNeg, f.jfetExpandBeta);
         // The J201 drain's output impedance is stamped into the treble net's nodal

@@ -6,7 +6,7 @@
 >
 > **Status (2026-07-25, session 25):** Phase 7 calibration shipped (session 17); Phase 8 UI done.
 > Phase 9 in progress. FIXED + committed: GAP #1 (low end), GAP #1b (bridged-T — investigated twice,
-> closed both times, non-issue), GAP #2 (treble notch), GAP #3a (rail clamp), GAP #4 (mid-band range),
+> closed both times, non-issue), GAP #3a (rail clamp), GAP #4 (mid-band range),
 > **A2c-1 (TREBLE range, session 25)**, plus the gain-n12 harness defect. GAP #3b is CLOSED as
 > mis-attributed (session 23): it is not a GRUNT-cap gap, and neither the ÷4 nor the `C13 = 22n`
 > candidate was shipped — see §4 "3b CLOSED".
@@ -16,6 +16,20 @@
 > the first fit (`trebleWiperR`, R36 3.3k → 4.7k). **Two voicing items remain open: A2c (clean
 > tightening — target ≤0.7 dB mean NOT yet met at 1.168, and the entire remaining residual is the
 > mid-band group) and A3 (the OD/clean BLEND balance below ~200 Hz, quantified — §4 "A3 handover").**
+>
+> ⛔ **UPDATE (session 46, 2026-07-27): GAP #2 is REOPENED and is an A3 symptom.** The pedal's
+> ~320 Hz cancellation notch (7–24 dB at full resolution) is entirely absent from the model, and the
+> reason is A3: the model's OD path sits 11–14 dB under the clean bleed through 250–640 Hz, burying a
+> notch it genuinely has. **A3's scope is therefore wider than "below ~200 Hz"** — the same OD/bleed
+> imbalance is measurable up to at least 640 Hz. New A3 sub-gate + numbers in §4 "GAP #2 REOPENED".
+>
+> ⭐⭐ **UPDATE (session 47, 2026-07-27): A3 IS NOT AN LF GAP AT ALL.** Measured whole-band for the
+> first time (`analysis/a3_shape_gate.py`), the model's OD path is too weak relative to the clean
+> bleed at **every** band — a bathtub from **+10.4 dB at 20 Hz** through a minimum of **+2.6 dB at
+> 50 Hz** to **+9.0 dB at 508 Hz**, score 5.808 dB. It is at least three components (a broadband
+> floor, a mid/HF rise, and a steep sub-40 Hz rise) and no single first-order corner produces it.
+> The mid/HF half is entirely accounted for by the IC2_B bridged-T shunt cap, but the fix is blocked
+> from shipping by the 16 `gain-n12` rows. §4 "A3 step 4".
 > Current grade (240 rows, re-baselined session 25): **OD 5.965 / CLEAN 1.152 / ALL 3.558 dB**
 > band-RMS.
 >
@@ -49,7 +63,19 @@ detail section below. Check off + move to the Gap log (§4) as they land.
 **A. Close the remaining voicing gaps (Phase 9 core — highest impact on the sound):**
 - [x] **A0. Regenerate the full 63-cap baseline report at the shipped c21R=100k** (session 19). Confirmed GAP #1 holds (clean low end ~0 dB). Cache seeded.
 - [x] **A1. Bridged-T ~717 Hz notch** — INVESTIGATED, **CLOSED, non-issue** (session 19, re-opened and re-closed session 20/21). Tested like-for-like in the OUTPUT: plugin's mid dip matches the pedal's to ~0.5 dB over 116 OD rows (median −2.45 vs −3.02 dB). Topology re-verified pixel-zoom on both schematics, identical. Do NOT reshape `bt*`, no `schematic-checker` pass needed. See §4 GAP #1b.
-- [x] **A1b/c/d. TREBLE ~322 Hz notch too deep — the real root gap. FIXED + shipped** (session 19, GAP #2 below). Found while chasing A1: the OD low-mids (100–500 Hz) are scooped by the treble-ladder two-path cancellation notch (~28 dB model vs −3.4 dB capture). New `trebleLadderDampR=30k` shallows it. This is the root of the "backwards GRUNT" + the 254 Hz BLEND null.
+- [~] **A1b/c/d. TREBLE ~322 Hz notch. Shipped session 19 as `trebleLadderDampR=30k` — ⛔ REOPENED
+  session 46 (user-reported): the fix moved AWAY from the feature it is named after, and the feature
+  is an A3 symptom.** Session 19's premise was the ISOLATED stage transfer (~37 dB deep vs "−3.4 dB
+  capture") — but the *assembled* notch was already ≤2.6 dB (session 14) and ~1.6 dB at the OUTPUT,
+  so damping took it to ~0.4 dB against a pedal that has **7–24 dB at full resolution** (the −3.4 dB
+  figure is a 1/3-oct read of a notch centred 316–334 Hz, understating it by up to 20 dB). The
+  320 Hz band is now **the largest single-band mid error in the matrix (+4.09 dB at `ref-od`
+  drv_-12)**. ⭐ Root cause is NOT notch depth: at the schematic Rd=0 the model's OD path *does*
+  carry a 31 dB notch, but the clean bleed sits 11–31 dB above the OD path through 250–640 Hz and
+  buries it. **⛔ DO NOT move `trebleLadderDampR`** — the full matrix refutes Rd=0 (OD 3.186 → 3.412,
+  24 rows worse / 1 better); it is one knob trading the notch against the broad low-mid level, i.e. a
+  compensating error for A3. **Fix A3 first, then re-fit it.** New A3 sub-gate + full numbers in §4
+  "GAP #2 REOPENED".
 - [~] **A3 STARTED (session 20) — DECOMPOSED into two independent gaps, see §4 GAP #3.** The
   residual is NOT one thing: **3a** is a DRIVE-DEPENDENT bass tilt (the DRIVE op-amp's rail clamp
   has never been enabled) and **3b** is a STATIC ~19-23 dB bass tilt that only GRUNT flat/boost
@@ -108,9 +134,13 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   just decorrelation. Only shows up at the reduced (`gainSessionDb=-12`) stimulus level; `ref-od` at
   full level doesn't have it, which rules out a static filter/EQ explanation (those aren't
   level-dependent) and points at gain-staging or a nonlinear-stage operating-point difference instead.
-  **Investigate AFTER A3 ships** — A3's fix changes the gain-staging feeding this same BLEND region and
-  will likely reshape or clarify this before it's worth chasing directly. §4 "A3 chart-review
-  corroboration".
+  ~~**Investigate AFTER A3 ships**~~ ⛔ **PRIORITY RAISED (session 47): this is now ON A3's CRITICAL
+  PATH, not behind it.** The A3 low-mid candidate `btC17` improves **every** matrix row group
+  monotonically — non-`gain-n12` OD 3.372 → 3.206, GRUNT cut 2.526 → 2.372, GRUNT flat/boost 4.990 →
+  4.671 — while **these 16 rows degrade monotonically 4.641 → 6.347 and alone turn the ALL-OD
+  aggregate around**, which is what blocked the fix from shipping. The "investigate it after A3" order
+  no longer works: A3 cannot be graded on the matrix until this group stops voting. §4 "A3 step 4"
+  item (8); original evidence in §4 "A3 chart-review corroboration".
 - [x] **A3-next (0). `render_args()` now emits `--input-trim`** for `gainSessionDb`; baseline
   regenerated (session 21). Send-vs-record-gain settled three ways. §3.
 - [x] **A3-next (i). IC2_B recovery network — CLOSED, not a gap** (session 21). Topology re-verified
@@ -284,6 +314,44 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   GRUNT-side fix; see the A3-next (iii) entry above and §4 "GAP #3b DISSOLVED". (i) is now the joint
   `clipSat`/`kInputRef` re-fit** (never a one-parameter scan), carrying the new GRUNT-derived crossover
   sub-gate. §4 "A3 step 3c".
+- [~] **A3 crossover sub-gate — RE-MEASURED at the session-44 baseline and the GRUNT side is now
+  EXHAUSTED (session 45, 2026-07-27).** Analysis only; **no shipped constant moved.** The gate
+  survives the new `kInputRef`: **flat −0.78 oct / +4.33 dB, boost −0.97 / +4.61** (was −0.89/+4.00
+  and −1.05/+5.16), i.e. session 44 bought ~0.1 oct and evened the heights, and the pedal row still
+  reproduces `GATE_TARGETS` exactly so the locator needs no repair. Flat and boost still agree to
+  0.19 oct ⇒ ONE coherent error.
+  **(a) The mechanism is now explicit:** in GRUNT **cut** the OD never reaches the bleed (≤ −11.2 dB),
+  so the span's denominator IS the bleed and **the gate's peak tracks where |OD|/|bleed| is MAXIMAL**.
+  Requirement: move that maximum **+0.79 oct / −4.36 dB (flat), +1.00 oct / −4.72 dB (boost)** =
+  a trade rate near **−5 dB/oct**.
+  **(b) ⛔ All four GRUNT-side elements refuted, with a mechanism.** `clipC12`/`clipC13` move the right
+  way but trade **1.8–3.9× too steeply** and run out of travel (C12's asymptote is 160.3 Hz at +0.33 dB
+  — even deleting the cap never reaches 178 Hz). `clipC11`/`clipR16` have the **wrong sign** (+4…+5
+  dB/oct). ⚠ R16 refuted an analytic prediction of +0.62 oct: **68× buys 0.10 oct**, because lowering
+  it raises the closed-loop gain `−R18/R16` and lifts `OD(cut)` into the denominator.
+  **(c) Reachability probe only:** `clipC15` trades at −3.2…−6.5 dB/oct (straddling the requirement)
+  and at 0.6 nF the flat row would PASS — **but it is a SHARED element, the boost row does not follow
+  (2.04 dB short), and the null gate disagrees.** Not a proposal. New tool
+  `analysis/crossover_locus.py` (~20 s/point vs ~6 min, self-check validated to 0.01 oct); `clipR16`
+  plumbed as a diagnostic FitParam, default = schematic 6k8, bit-identical.
+  §4 "A3 crossover sub-gate RE-MEASURED".
+- [ ] **⚠ A3-stale-1. `build/a3_dec_drv*.csv` were rendered at the OLD `kInputRef`** (header
+  `amp=0.425139` = 3.377) and every A3 tool reads them silently. **Regenerated at the shipped state
+  (session 45)** — but the general defect stands: session 44 re-baselined the matrix and not its
+  siblings. **Before trusting any A3 number, check the CSV header's `amp` against the shipped
+  `kInputRef`.** §4 item (7a).
+- [ ] **⚠ A3-open-1. The null gate still wants +3.84 dB of broadband OD gain** (`k = 1.555`), worth
+  2.377 → 0.958 dB. It has shrunk from the pre-session-44 family's k = 1.804 but not gone, and it
+  **does not reconcile with session 37's recorded k = 0.995** at the same C15 — open discrepancy,
+  check before quoting either. §4 item (6).
+- [ ] **⛔ B2b (NEW, blocking a green suite). `OSValidationTest` FAILS on `df14ff3` — ctest is 16/17,
+  not 17/17.** Verified by stashing session 45's changes: identical failure at the committed tree, so
+  it is session-44 fallout. At the fixed probe amp 0.35 the alias floors are **2× −25.6 / 4× −32.1 /
+  8× −23.6 dB**. Session 17's trap in reverse — it moved that amp 0.2 → 0.35 *because* `kInputRef`
+  3.377 raised clipper onset, and session 44's 2.7× K drop moved the operating point back into the
+  anomaly zone. **⛔ Do not just re-tune the amp to green**: establish first whether 8× genuinely is
+  worse than 2× there (a real high-drive quality finding, backlog B2) — a gate with a hardcoded
+  operating point is not level-invariant. §4 item (7b).
 - [ ] **A4. Write final GATE-9 numbers into §4.** GATE-9 should wait for A3, which is the last
   documented gap materially moving these numbers.
 - [~] **A2c. Clean-baseline accuracy pass — STARTED (session 24, 2026-07-25), user-initiated.**
@@ -593,7 +661,14 @@ No unmatched notch: across all OD-path captures, bands 508/640/806/1016 Hz sit f
 left at their schematic values. (The isolated model notch is filled by the clean bleed in the full
 output, so it never surfaced as a capture gap.)
 
-### ✅ GAP #2 — Treble ~322 Hz notch too deep → OD low-mids scooped. FIXED (session 19).
+### ⛔ GAP #2 — Treble ~322 Hz notch. Shipped session 19; **REOPENED session 46** — see "GAP #2 REOPENED" at the end of §4 before acting on anything below.
+
+> ⚠ **The record below is kept for its reasoning, not as a current verdict.** Its "~37 dB deep in the
+> assembled model" is an ISOLATED-stage number (the assembled notch was ≤2.6 dB — session 14), and its
+> "−3.4 dB in the capture" is a 1/3-oct read of a notch that is 7–24 dB deep at full resolution. The
+> shipped `trebleLadderDampR = 30k` therefore damped a quantity that was already ~4× too shallow at the
+> output. **Do not move the constant on this basis either** — the full matrix refutes Rd=0; it is a
+> compensating error for A3's OD-vs-bleed balance and must be re-fitted only after A3.
 
 **Symptom.** The OD path's low-mids (100–500 Hz) are scooped: the plugin's OD peaks ~50–60 Hz and
 falls off a cliff above, while the pedal has a low-mid bump at ~180 Hz. This made GRUNT look
@@ -3372,6 +3447,402 @@ one physical prior this family does not satisfy. (b) **gm-sensitivity is still n
 (34.1 → 68.1 / 86.6 / 237.9 at gm 0.09/0.12/0.15 mS), so the session-4 `jfetGm` anchor remains
 load-bearing — no worse than every prior fit, but unresolved. (c) `clipC11` = 3.69 nF is now BELOW
 the schematic 4.7 nF, having been above it (5.72) since session 17.
+
+### ⭐ A3 crossover sub-gate RE-MEASURED at the session-44 baseline (session 45, 2026-07-27) — it survives the new `kInputRef`, every GRUNT-side element is now refuted with a MECHANISM, and two stale-baseline defects surfaced
+
+Analysis + one diagnostic plumbing change. **No shipped constant moved** (`clipR16`'s default IS the
+schematic 6k8, verified bit-identical). New tool `analysis/crossover_locus.py`.
+
+**(1) THE GATE WAS RE-MEASURED BEFORE ANYTHING WAS DESIGNED, and the pedal row proves the locator is
+sound.** The baseline was checked first (`matrix_grade` reproduces session 44's OD 3.186 / CLEAN
+0.427 / ALL 1.807 exactly), then `grunt_span_probe.py::crossover_gate()` re-run on it:
+
+| position | pedal (capture) | model, s38/s40 | model, NOW | error then | error NOW |
+|---|---|---|---|---|---|
+| flat  | **177.8 Hz / +6.27 dB** | 95.7 / +10.27 | **103.5 / +10.60** | −0.89 oct, +4.00 dB | **−0.78 oct, +4.33 dB** |
+| boost | **144.0 Hz / +11.23 dB** | 69.4 / +16.39 | **73.4 / +15.85** | −1.05 oct, +5.16 dB | **−0.97 oct, +4.61 dB** |
+
+The pedal row reproduces `GATE_TARGETS` with no drift note, so **only the model row moved** — the
+tool needs no repair. Session 44's `kInputRef` 3.377 → 1.2596 bought **≈0.1 octave** on both rows and
+evened the two height errors (5.16/4.00 → 4.61/4.33). Flat and boost still agree to 0.19 oct /
+0.28 dB, so session 38's "ONE coherent error, not two" holds at the new baseline. **Still FAIL, and
+still the largest measured unexplained OD error.**
+
+**(2) NEW TOOL — `analysis/crossover_locus.py`, the gate's fast inner loop, VALIDATED before use.**
+`crossover_gate()` reads a 63-capture report (~6 min/point), which cannot trace a locus. But the
+sub-gate is DEFINED at drive-min on `sweep_clean` (−30 dBFS) where the OD path is essentially linear,
+so the exact BLEND decomposition (`a3_blend_decompose`) yields the same three transfers in ~20 s per
+position. `--selfcheck` is mandatory and is the whole point: probe vs report is **−0.01 oct / +0.03 dB
+(flat), −0.03 / +0.10 (boost)** ⇒ the locus is readable. It carries session 38's scope rule in its
+docstring (GRUNT-side elements only).
+
+**(3) ⭐ THE MECHANISM IS SIMPLER THAN "CROSSOVER", AND THAT MAKES THE REQUIREMENT A SINGLE NUMBER
+PAIR.** `|OD| − |bleed|` per band at drive-min:
+
+| pos | 40 | 80 | 101 | 127 | 160 | 254 | 403 | crossing |
+|---|---|---|---|---|---|---|---|---|
+| cut   | −21.5 | −13.0 | −11.7 | **−11.2** | −11.5 | −14.1 | −15.9 | **never** |
+| flat  | +1.0 | +8.7 | **+9.5** | +9.2 | +8.0 | +2.9 | −1.9 | 37.9 Hz |
+| boost | +10.6 | **+14.5** | +14.0 | +12.7 | +10.6 | +4.4 | −1.1 | 21.9 Hz |
+
+In CUT the OD **never reaches the bleed** (≤ −11.2 dB at its own best band), so the span's denominator
+is the bleed at every band and `span(pos) ≈ 20log10|1 + OD(pos)/bleed|`. ⇒ **the gate's peak tracks
+where |OD(pos)|/|bleed| is MAXIMAL, not where it crosses unity.** So the requirement reads directly:
+move that maximum **+0.79 oct and −4.36 dB (flat) / +1.00 oct and −4.72 dB (boost)**.
+
+**(4) ⛔⛔ ALL FOUR GRUNT-SIDE ELEMENTS SCANNED AT THE NEW STATE AND ALL FOUR REFUTED — and the reason
+is a SLOPE, which is sharper and more portable than session 38's "off in both coordinates".** Express
+the requirement as a trade rate in (peak frequency, peak height): the pedal's point lies at
+**−5.5 dB/oct (flat) / −4.7 dB/oct (boost)** from the model's. Each element's locus has its own rate:
+
+| element | trade rate | vs required | verdict |
+|---|---|---|---|
+| `clipC12` (flat)  | −14.8 → −18.1 dB/oct | **2.7–3.4× too steep**, steepening | asymptote **160.3 Hz at +0.33 dB** — even C12 → 0 never reaches 178 Hz |
+| `clipC13` (boost) | −8.4 → −18.5 dB/oct | **1.8–3.9× too steep**, steepening | reaches 146.6 Hz but only at +2.52 dB, **8.7 dB short** |
+| `clipC11`         | **+3.9 dB/oct** | **WRONG SIGN** | +0.13 oct over a 2.5× change |
+| `clipR16` (new)   | **+4.3 … +5.3 dB/oct** | **WRONG SIGN** | **68× (6800 → 100 Ω) buys 0.10 octave** |
+
+So the family splits: C12/C13 move the right way on both coordinates but pay ~3× too much height per
+octave and run out of travel; C11/R16 move height and frequency **together**, so no setting of either
+approaches the target. ⚠ **R16's result refuted my own analytic prediction and that is why it was
+measured.** Corners scale as `1/(R16 + R18/(1+A0))`, so R16 → 0 should buy 0.62 oct at constant shelf
+height (the cap RATIOS are untouched). It buys 0.10, because lowering R16 also raises the closed-loop
+gain `−R18/R16`, which lifts `OD(cut)` off the floor and into the denominator, cancelling most of the
+move. **R16 is not a frequency knob with a gain side-effect; the two effects are the same size.**
+⇒ **the sub-gate cannot be closed from the GRUNT side.** Session 38's verdict stands at the new
+baseline, now with a mechanism rather than an observation.
+
+**(5) REACHABILITY ONLY, NOT A SELECTION — the required rate is BRACKETED by two shared OD-path
+corners, and neither is the answer.** Both scanned purely to ask "does any first-order LF corner in
+the OD path trade at ≈−5 dB/oct":
+
+| | 5.2n / 680p | 3.0n / 400p | 1.8n / 240p | 1.0n / 140p | 0.6n / 80p |
+|---|---|---|---|---|---|
+| `clipC15` flat | 103.0 / +10.63 | 109.8 / +10.34 | 122.0 / +9.61 | 141.1 / +8.25 | **164.1 / +6.55** |
+| `clipC15` boost | 71.8 / +15.95 | 80.4 / +15.23 | 91.5 / +13.86 | 108.9 / +11.63 | 126.3 / +9.19 |
+| `trebleC7` flat | 103.0 / +10.63 | 119.7 / +8.32 | 134.5 / +6.12 | 146.1 / +4.08 | 156.1 / +2.54 |
+
+`clipC15` trades at **−3.2 … −6.5 dB/oct** (straddling the required −5.5) and `trebleC7` at
+**−10.5 … −13.1** (too steep). At 0.6 nF, C15 puts the flat row **0.12 oct / 0.28 dB from the pedal —
+it would PASS the flat gate.**
+⛔ **This is NOT a proposal to move `clipC15`, for three independent reasons.** (a) It is a SHARED
+OD-path element, so this metric is disqualified from selecting it — and 0.6 nF is a more extreme
+version of the 1.5 nF that this same metric already preferred over the β-free 5.2 nF (session 38 item
+5, session 37 item (c)). (b) **The boost row does not follow**: at 0.6 nF boost is 126.3 / +9.19, still
+0.19 oct low and **2.04 dB short**, while flat is at 0.12 / 0.28. One C15 value cannot close both —
+and flat-and-boost agreeing is exactly what makes this one error rather than two. (c) The null gate
+disagrees (item 6). **What the pair of loci DOES establish is a shape requirement: the fix needs a
+trade rate near −5 dB/oct on BOTH rows simultaneously, and no single first-order LF corner in the OD
+path delivers that.**
+
+**(6) ⭐ SAME-SESSION A/B: SESSION 44 IMPROVED THE A3 NULL GATE ON EVERY ROW — including the ORACLE
+floor, which is the bound the DATA sets.** `a3_lead_fit.py` re-run against the pre-session-44
+parameter family (old `kInputRef` 3.377 + the whole session-17 clipper/JFET set, passed as `--fit`
+overrides so the binary, captures and tool are identical on both sides):
+
+| a3_lead_fit row | pre-session-44 family | **shipped (session 44)** |
+|---|---|---|
+| none (H = 1, k pinned) | 3.854 dB, β −15.07 | **2.377 dB**, β −16.20 |
+| broadband OD gain only | 2.354, k = 1.804 | **0.958**, k = 1.555 |
+| best causal element | 1.673 (3z/3p) | **0.468** (3z/3p) |
+| **ORACLE (floor set by the data)** | **1.280** | **0.220** |
+
+The oracle dropping **5.8×** is the load-bearing number: session 44 did not merely reshape the A3
+residual, it made the problem genuinely smaller. ⚠ **The one row that is still asking for something
+is the level**: the fit wants **k = 1.555 (+3.84 dB) of broadband OD gain**, and freeing it is worth
+2.377 → 0.958 dB. It has shrunk (the old family wanted k = 1.804, +5.13 dB) but has not gone away.
+⚠⚠ **And this does NOT reconcile with session 37's recorded figure** for the same tool at 5.2 nF —
+"0.904 dB with **k = 0.995** (wants NO level correction), β −17.38". The rms and β match today's
+free-k row well (0.958, β −17.29); **`k` does not** (0.995 vs 1.555). Recorded as an open
+discrepancy, not explained away — check whether s37's row was a different family or whether the tool
+has changed under it before quoting either number.
+
+**(7) ⚠⚠ TWO STALE-BASELINE DEFECTS, BOTH PRE-EXISTING, BOTH CARRIED FORWARD AS GREEN.**
+**(a) `build/a3_dec_drv*.csv` were rendered at the OLD `kInputRef`.** Dated 06:18 against the
+session-44 commit's 12:56, and their header `amp=0.425139` is exactly `10^(−18/20) × 3.377` — the old
+K, confirmed by re-rendering the old family and getting the identical amp (the shipped state gives
+0.158574). Session 44 re-baselined `comprehensive_data.json` and the 63-capture matrix but not these,
+and **every A3 tool reads them** (`a3_lead_fit`, `a3_phase_solve`, `a3_lead_design`), silently. Item
+(6) would have been measured against pre-session-44 data. Regenerated at the shipped state.
+⭐ **The lesson: a re-baseline that names one artefact leaves its siblings stale.** Sibling to session
+35's "`build/a3_dec_drv*.csv` — the default baseline every phase tool reads — was bit-identical to a
+fresh NOMINAL render", which is the same file, the same trap, ten sessions apart.
+**(b) ctest is 16/17, NOT 17/17 — `OSValidationTest` fails on the committed tree.** Verified by
+stashing this session's changes and re-running at `df14ff3`: **identical numbers**, so it is session-44
+fallout, not this session's. At the gate's fixed probe amp 0.35 the alias floors are
+**2× −25.6 / 4× −32.1 / 8× −23.6 dB**, so 8× is worse than 2× and the "oversampling works" assertion
+fires. Mechanism = **session 17's trap running in reverse**: that session moved the probe amp 0.2 →
+0.35 *because* `kInputRef` 3.377 had raised clipper onset; session 44's 2.7× K drop moved the
+operating point back down into the documented anomaly zone. ⭐ **A gate with a hardcoded operating
+point is not level-invariant — any gain-staging change re-scopes it.** ⛔ **Do not just re-tune the
+probe amp to green.** Decide first whether 8× really is worse than 2× at this operating point, which
+would be a genuine quality finding for high-drive users and belongs to backlog B2, not to a threshold
+edit.
+
+**▶ WHAT THIS HANDS TO A3.** The crossover sub-gate is confirmed live, coherent across flat and boost,
+and **unreachable from the GRUNT side** — it is an A3 instrument exactly as session 38 concluded. The
+requirement is now stated in a form a candidate can be tested against directly: **move the maximum of
+|OD|/|bleed| up 0.79 oct (flat) / 1.00 oct (boost) while dropping it 4.4 / 4.7 dB, i.e. a trade rate
+near −5 dB/oct on BOTH rows at once.** `crossover_locus.py --selfcheck --scan KEY=...` is the ~20 s
+inner loop for testing that; the acceptance check remains `crossover_gate()` on a full report, and any
+value must additionally clear `a3_lead_fit`'s null gate (item 6) before shipping.
+
+### ⛔ GAP #2 REOPENED (session 46, 2026-07-27) — the ~320 Hz notch is the largest single-band mid error, session 19's fix moved AWAY from it, and it is an A3 symptom, not a treble-network one
+
+**User-reported from an FR chart** (`ref-od`, `sweep_drv_-12`): the pedal has a large dip just above
+300 Hz before rising to a peak past 400 Hz, and *"our plugin doesn't show this against any capture at
+all."* Correct on both counts. Analysis only — **NOTHING in `src/` changed, no constant moved.**
+
+**(1) IT IS THE 320 Hz BAND, AND IT IS THE BIGGEST MID ERROR IN THE MATRIX.** `ref-od`, plugin −
+pedal, 1/3-oct: at `sweep_drv_-12` the 320 Hz band is **+4.09 dB** against ≤1.7 dB at every other band
+from 100 Hz to 1.3 kHz. It is present at every stimulus level and grows as level falls:
+**clean +7.06 / drv_-18 +5.64 / drv_-12 +4.09 / drv_-6 +2.03 dB.**
+
+**(2) ⭐ MEASURED AT FULL RESOLUTION IT IS FAR BIGGER THAN THE BAND GRID SHOWS — up to −24 dB.**
+`A.transfer` (nperseg 8192 → 5.9 Hz bins) over 200–520 Hz, notch centre and depth vs its left/right
+shoulders. **⚠ Session 19's "−3.4 dB in the capture" is a 1/3-oct read and understates it by up to
+20 dB** — 320.0 Hz is not the notch centre, so the band-grid point sample lands on the skirt. Same
+class as the A2c-2 lesson (never read a peak's frequency, or a notch's depth, off the 1/3-oct grid).
+
+| capture | sweep_clean | drv_-18 | drv_-12 | drv_-6 |
+|---|---|---|---|---|
+| `ref-od` | 334 Hz, **−8.96** | 316, −8.42 | 316, **−7.19** | 316, −4.30 |
+| `attack-boost` | 334, **−17.41** | 334, −12.96 | 334, −7.95 | 316, −4.68 |
+| `attack-cut` | 316, −7.24 | 316, −7.20 | 316, −6.56 | 299, −3.78 |
+| `grunt-boost` | 322, **−24.24** | 322, −13.80 | 316, −8.24 | 299, −4.33 |
+| `blend-1430` | 334, −3.63 | 316, −3.44 | 316, −2.85 | 299, −1.58 |
+| `ref-clean` | **none** | none | none | none |
+
+Four properties, all consistent with a genuine two-path cancellation in the OD path: **absent from the
+clean (DIST-off) path entirely**; **monotone in BLEND** (pedal depth vs local neighbours across the
+blend sweep at drv_-18: `blend-0700` −0.02 → `0930` −0.26 → `1200` −0.86 → `1430` −2.02 → BLEND max
+**−5.58 dB**); **ATTACK sets its depth** (boost −17.4 / flat −9.0 / cut −7.2 at sweep_clean — ~10 dB of
+authority); and it **migrates 334 → 299 Hz as level rises**, which no purely linear network can do.
+
+**(3) ⭐⭐ THE MODEL DOES HAVE THE NOTCH — IT IS BURIED UNDER THE CLEAN BLEED. THIS IS NOT A
+NOTCH-DEPTH PROBLEM.** `a3_blend_decompose` at the chart's exact operating point (GRUNT cut, drive
+noon, −12 dBFS), OD path vs bleed at the BLEND node, dB:
+
+| | 254 Hz | 320 Hz | 403 Hz | 508 | 640 |
+|---|---|---|---|---|---|
+| **Rd = 0** (schematic) OD | −43.2 | **−63.6** | −45.6 | −46.4 | −51.0 |
+| bleed | −32.3 | −32.3 | −32.3 | −32.3 | −32.3 |
+| **OD − bleed** | −10.9 | **−31.3** | −13.3 | −14.1 | −18.7 |
+| total | −30.98 | −32.56 | −31.80 | −31.04 | −31.48 |
+| **Rd = 30k** (shipped) OD | −38.0 | **−39.9** | −42.5 | −46.3 | −51.0 |
+| total | −28.69 | −29.30 | −29.98 | −30.75 | −31.35 |
+
+At the schematic value the model's OD path carries a **31 dB** notch at 320 Hz — but the bleed sits
+**31 dB above it**, so the total dips only 1.2 dB. ⇒ **the model's OD path is 11–14 dB too weak
+relative to the clean bleed through 250–640 Hz, and that is what hides the notch. This is A3, in the
+low-mids instead of at LF.** Session 20 inferred exactly this from the band data (*"a bleed-sensitive
+sign that the plugin's OD is too weak vs the clean bleed in the mids"*); the decomposition now
+measures it directly, at this band, for the first time.
+
+**(4) ⚠⚠ AND SESSION 19'S FIX MOVES AWAY FROM IT. `trebleLadderDampR = 30k` DESTROYS THE NOTCH IN THE
+OD PATH** — at 30k the OD path is monotone through 254→640 Hz (−38.0/−39.9/−42.5/−46.3), so the
+feature is **unreachable at any bleed level**, even after A3 lands. The premise was a measurement of
+the **isolated stage** (37 dB deep) — but session 14's `notch_scope.py` had already found the
+*assembled* notch to be ≤2.6 dB, and at the OUTPUT it was never more than ~1.6 dB, i.e. **already ~4×
+too shallow before the fix, which then took it to ~0.4 dB.** Sibling of GAP #1b: a stage-transfer
+number judged against an output-shaped requirement.
+
+**(5) ⛔ BUT DO NOT MOVE THE CONSTANT — THE FULL MATRIX REFUTES IT, AND MY OWN SINGLE-CAPTURE READ WAS
+WRONG.** On `ref-od` alone, Rd = 0 looked like a clean win (127–640 RMS 2.063 → 1.477, full-band
+2.569 → 2.461, 320 Hz error 4.71 → 1.67 dB, monotone toward 0). **It does not generalise.** Full
+63-capture matrix at `--fit trebleLadderDampR=0` vs the shipped baseline:
+
+| | shipped Rd=30k | Rd=0 |
+|---|---|---|
+| OD band-RMS | **3.186** | 3.412 |
+| CLEAN | 0.427 | 0.427 (bit-identical) |
+| ALL | **1.807** | 1.919 |
+| OD tilt | **0.77** | 2.04 |
+| rows better >0.5 dB / worse | — | **1 / 24** |
+
+⭐ **Split it and the trade is explicit** (104 non-`gain-n12` OD rows): mean |err| at 320 Hz
+**3.64 → 1.84 dB** (2× better) while the surrounding **200–520 Hz band-RMS 2.61 → 3.08** (worse).
+⇒ **`trebleLadderDampR` is ONE knob doing TWO jobs** — it trades the notch against the broad low-mid
+level, and neither end is right. That two-jobs-one-knob signature is the tell that **30k is a
+compensating error propping up the OD low-mids broadband**, exactly the defect (3) measures. Same
+pattern as `clipC15` at 1.5 nF (session 37): a constant fitted over rows carrying an unfixed defect
+lands on the value that compensates for it. ⚠ Note Rd = 0 is **not** the usual "delete the element"
+degeneracy — 0 IS the schematic ideal (no unmodelled damping), the physically privileged endpoint —
+which is precisely why the single-capture scan looked so convincing. **The matrix is the arbiter.**
+
+**(6) EVEN AT Rd = 0 THE MODEL DOES NOT REPRODUCE IT.** Band-metric depth (320 vs the mean of its
+254/403 neighbours) at `ref-od` drv_-12: **pedal −4.17 dB | Rd = 0 −1.15 | Rd = 30k +0.03.** So Rd = 0
+only stops making it worse; it is still 3.6× too shallow. **The fix is A3, not this constant.**
+
+**▶ WHAT THIS HANDS TO A3 — A NEW ACCEPTANCE CHECK, AND IT MEASURES SOMETHING NO EXISTING A3 GATE
+DOES.** `a3_lead_fit` reads null DEPTH at LF, G1/G2 read the DRIVE axis, `a3_level_axis` reads the
+LEVEL axis, and `crossover_gate` reads the LF crossover FREQUENCY. **None reads the OD/bleed ratio in
+the LOW-MIDS**, and (3) shows it is 11–14 dB off there. **NEW A3 SUB-GATE: at GRUNT cut / drive noon /
+−12 dBFS the model's OD path must come within a few dB of the bleed over 250–640 Hz, such that its
+~320 Hz notch survives to the output at ≥4 dB (band metric) / ≥7 dB (full resolution).** The table in
+(2) is the target set — it is cheap, it is a *feature* rather than an aggregate, and its ATTACK and
+BLEND monotonicity give three independent rows to check a candidate against.
+**▶ ORDER OF WORK: (a)** leave `trebleLadderDampR` at 30k; **(b)** fix A3's OD/bleed balance;
+**(c)** THEN re-fit `trebleLadderDampR` — the trade in (5) should dissolve and it should be free to
+return toward the schematic 0, at which point the notch appears. **Re-fitting it before A3 will just
+re-find a compensating value.**
+
+### A3 step 4 (session 47, 2026-07-27) — A3's shape, measured WHOLE-BAND for the first time; the carrier is located and the notch mechanism is confirmed; NOTHING SHIPPED
+
+Executing step (b) above. **Analysis + tooling only — no `src/` file changed, no constant moved,
+ctest unchanged at 16/17** (the pre-existing session-44 `OSValidationTest` failure; verified
+identical). Baseline verified first: `a3_blend_decompose` rebuilt and all five
+`build/a3_dec_drv*.csv` reproduce bit-identically at the shipped defaults.
+
+**(1) ⭐⭐ THE INSTRUMENT THAT WAS MISSING: A3 AS A CURVE, NOT A FEATURE.** Every A3 gate reads ONE
+feature — `a3_lead_fit` the null DEPTH, G1/G2 the DRIVE axis, `a3_level_axis` the LEVEL axis,
+`crossover_gate` the LF crossover FREQUENCY, GAP #2's sub-gate the 250–640 Hz ratio. None states the
+OD/bleed ratio as a curve over the whole measured band, which is how *"A3 is below ~200 Hz"* survived
+to session 46 and how the 250–640 Hz half of it was found by a user reading an FR chart rather than
+by a gate. New tool **`analysis/a3_shape_gate.py`**: `a3_phase_solve` already solves, per band, the
+scale `s` the model's OD magnitude needs for the pedal's five measured drive totals to be reproduced,
+so **`s(f)` IS the A3 defect in dB** and the gate is `20log10 s(f) = 0` at every band. `--selfcheck`
+reproduces the shipped baseline to 0.027 dB and is mandatory before any locus is read.
+
+**(2) ⭐⭐ A3 IS NOT AN LF GAP. THE MODEL'S OD PATH IS TOO WEAK RELATIVE TO THE BLEED AT EVERY SINGLE
+BAND, AND THE SHAPE IS A BATHTUB.** `20log10 s`, GRUNT cut / BLEND max / −18 dBFS, over the five
+drive captures:
+
+| f Hz | 20 | 25 | 32 | 40 | 50 | 64 | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **20log10 s** | +10.40 | +6.81 | +4.31 | +3.15 | +2.64 | +2.72 | +3.57 | +4.43 | +5.05 | +5.34 | +5.20 | +4.68 | +7.60 | +9.04 |
+
+**SCORE (RMS over the 14 CORE bands) = 5.808 dB.** Minimum +2.64 dB at 50 Hz; it rises to +5.2 dB
+through 127–254 and +7.6/+9.0 at 403/508, and to +10.4 dB at 20 Hz. It decomposes into at least
+three components, and **no single first-order corner produces this**: a broadband ~+2.7 dB floor, a
+mid/HF rise of ~+6 dB from 64 → 508 Hz, and a steep LF rise below ~40 Hz (≈9.5 dB/oct from 32 to
+20 Hz, far steeper than any first-order high-pass).
+
+⚠ **READ THE INTERVAL, NOT THE POINT.** `s` is only as identified as the cancellation is deep. The
+joint (s, θ) region within +0.25 dB of the optimum **spans 1.0 at 640 and 806 Hz**, so those bands do
+not constrain `s` at all and are printed as INFO; 320 Hz is the TrebleAttack-notch band and is
+excluded as everywhere else in A3. **The CORE set is fixed ONCE from the shipped baseline and is
+never re-derived per candidate** — a score whose own band set moves with the candidate lets the worst
+candidate win by shrinking its scoring set (the session-33 self-selecting-score trap). At 403 and 508
+the intervals are [1.82, 2.86] and [1.81, 3.53], i.e. **s ≥ 1.8 robustly** — those bands are real
+evidence, not tail noise.
+
+**(3) ⚠⚠ AND THE TOOL THAT FITS THE A3 ELEMENT DE-WEIGHTS EXACTLY WHERE THE DEFECT IS LARGEST.**
+`a3_lead_fit.py` sets `CORE_HI = 254` and `WEAK_W = 0.15`, so every band above 254 Hz enters its
+objective at 15 % weight. Its stated reason — *"above 254 Hz mu < 1 so the total is bleed-dominated
+and the band constrains the tail, not the fit"* — **is the GAP #2 category error**: the total being
+bleed-dominated *is the defect*, not a reason to ignore the band. It is not wholly wrong (640/806
+genuinely carry no information, per (2)), but 403 and 508 do, and they are the two largest errors in
+the whole curve. **Weight a band by its measured identifiability, not by a fixed frequency cutoff.**
+
+**(4) LOCALISED PER STAGE — the bridged-T is the single largest roller-off across exactly the span
+where the deficit lives.** `od_phase_probe` table C (cumulative |tap/clean|, drive-min, GRUNT cut),
+per-stage increment from 127 Hz → 400 Hz: **jfet +4.37 | treble −7.33 | drive 0.00 | clipper +9.55 |
+recovery (bridged-T) −11.28 | SK ×2 0.00**, netting −4.71 dB where the pedal's own ratio is flat. The
+IC2_B bridged-T reaches **−18.2 dB by 403 Hz** on its way to its −28 dB / 717 Hz notch.
+
+**(5) ⭐ `btC17` IS THE CARRIER, AT A VERIFIED INTERIOR MINIMUM.** `FitParams` already declares all
+four bridged-T values as FIT parameters (*"risk register #1 … the depth is highly tolerance-sensitive
+… to be reshaped to whatever the capture actually shows, including much shallower than ideal"*); they
+were simply never reachable from `a3_blend_decompose`, which now has them (plumbing verified BOTH
+ways — default bit-identical to the prior baseline AND to an explicit-nominal render, and an override
+provably differs). Shape score vs `btC17`:
+
+| btC17 | 22n (schematic) | 15n | 12n | 11n | **10n** | 9n | 8n | 4n7 |
+|---|---|---|---|---|---|---|---|---|
+| score dB | 5.808 | 4.092 | 3.605 | 3.520 | **3.490** | 3.521 | 3.621 | 4.438 |
+
+Worse on **both** sides — not the "delete the element" degeneracy. At 10 nF the whole 64–508 Hz span
+collapses from +2.72…+9.04 dB to **+0.79 / +1.00 / +1.11 / +0.96 / +0.52 / −0.34 / −1.53 / −0.30 /
+−0.34 dB**, i.e. the mid/HF component of (2) is *entirely* accounted for. The LF component is
+untouched (20 Hz +10.40 → +10.13), exactly as it must be — the bridged-T is flat below its 72 Hz
+corner. **The other three bt values are refuted:** `btC16` is worse at 1.5n (6.241) and reshapes
+badly at 3.3n; `btR23` improves only monotonically toward 10k (5.808 → 5.152) without moving 64–254 at
+all, which is the degeneracy signature; `btR22` deepens the scoop.
+
+**(6) ⭐⭐ GAP #2's SUB-GATE IS MET, AND SESSION 46's PREDICTION IS CONFIRMED.** At the sub-gate's own
+operating point (GRUNT cut / drive noon / −12 dBFS), OD − bleed in dB:
+
+| | 254 | 320 | 403 | 508 | 640 | band-metric notch depth |
+|---|---|---|---|---|---|---|
+| shipped | −5.62 | −7.62 | −10.19 | −13.96 | −18.72 | **+0.03** |
+| `btC17=10n` | **+0.59** | −0.67 | −2.29 | −4.57 | −7.43 | +0.07 |
+| `btC17=10n` + `Rd=0` | −4.64 | **−24.35** | −5.41 | −4.68 | −7.41 | **−2.82** |
+| *pedal* | — | — | — | — | — | *−4.17* |
+
+The requirement *"the OD path must come within a few dB of the bleed over 250–640 Hz"* is **met**. And
+with `trebleLadderDampR` back at the schematic 0 the ~320 Hz notch finally survives to the output:
+band-metric depth **+0.03 (shipped) → −1.15 (Rd = 0 alone, session 46) → −2.82 (both)** against the
+pedal's −4.17 — from 0.7 % to 68 % of the pedal's depth. **Session 46 item (5)'s prediction that the
+`trebleLadderDampR` trade would dissolve once A3's low-mids were supplied properly is confirmed.**
+
+**(7) ✅ INDEPENDENT CORROBORATION FROM THE NULL GATE — the unexplained broadband-gain demand halves.**
+`a3_lead_fit` at `btC17=10n` vs shipped: the **no-element baseline rms 2.377 → 1.741 dB** (the model
+explains the raw captures better with nothing added), and **the broadband OD gain the fit asks for
+collapses from k = 1.555 (+3.84 dB) to k = 1.203 (+1.61 dB)**. That k was recorded in session 45 as an
+open discrepancy against session 37's k = 0.995; over half of it turns out to be *not* a level error
+at all but the mid/HF scoop. ⚠ Against that: the null-FREQUENCY match of the no-element row degrades
+4/5 → 2/5 (the deepest band moves to 64 Hz at the two lowest drives), and best-causal / oracle are
+unchanged (0.468 → 0.500 / 0.220 → 0.262). btC17 does not touch A3's LF half, and slightly moves
+where the LF null lands.
+
+**(8) ⛔⛔ AND THE FULL 63-CAPTURE MATRIX DOES NOT SUPPORT SHIPPING IT. NOTHING WAS SHIPPED.**
+Four full runs. Headline (matrix_grade): shipped **OD 3.186 / CLEAN 0.427 / ALL 1.807, tilt 0.77** →
+`18n` **3.187 / 0.427 / 1.807, tilt 0.42** (1 row better, 0 worse) → `15n` **3.241 / 1.834, tilt 0.07**
+(3 better, 8 worse) → `10n` **3.534 / 1.980** (6 better, **35 worse**) → `10n + Rd=0` **3.365 / 1.896**
+(5 better, 26 worse). CLEAN is bit-identical throughout — the bridged-T is OD-path, so the change is
+surgical by construction.
+
+**⭐ BUT SPLIT BY ROW GROUP AND THE AGGREGATE IS CONTROLLED BY ONE DEFECTIVE GROUP** (band-RMS over
+`matrix_grade.rows_of`):
+
+| group | 22n (ship) | 18n | 15n | 10n | 10n+Rd0 |
+|---|---|---|---|---|---|
+| ALL OD (120) | 3.567 | **3.551** | 3.584 | 3.779 | 3.674 |
+| non-`gain-n12` (104) | 3.372 | 3.288 | 3.245 | **3.206** | 3.422 |
+| ..GRUNT cut (80) | 2.526 | 2.421 | **2.372** | 2.455 | 2.299 |
+| ..GRUNT flat/boost (24) | 4.990 | 4.925 | 4.881 | **4.671** | 5.398 |
+| `gain-n12` (16) | **4.641** | 4.925 | 5.280 | 6.347 | 5.012 |
+
+**Every group except `gain-n12` improves as C17 falls; `gain-n12` degrades monotonically and by more
+than everything else gains, and it alone turns the ALL-OD aggregate around.** Those 16 rows carry a
+separately-documented, still-unlocalised, level-dependent defect (session 30's HF collapse in
+`ref-od_gain-n12`, parked in §0 as "A3-adjacent"). This is the same signature session 36 recorded for
+`clipC15` — *"a large win everywhere the model is otherwise sound, the regression confined to the 16
+`gain-n12` rows"* — which session 37 then vindicated when those rows improved by 0.99 dB once C15 was
+corrected. **It is still not sufficient grounds to ship**: the aggregate is the arbiter (session 46
+item 5), a subset argument is exactly what this project has been burned by, and the shape gate's own
+optimum (10n) is where the matrix is clearly worst. Recorded as a located, unshipped candidate.
+
+**(9) THE NOTCH-FREQUENCY COST IS AVOIDABLE.** `btC17` alone moves the notch 717 → 1063 Hz
+(f0 ∝ 1/√(C16·C17)), and `FitParams` warns that the notch FREQUENCY is far more trustworthy than its
+depth. Scaling the pair the other way holds f0 fixed while lowering the zero's Q
+(Qz = √(C17·R22·R23/C16)/(R22+R23)): **`btC17=10n` + `btC16=1.496n` scores 3.520 against 3.490, i.e.
+the same, with the notch left at 717 Hz.** Prefer this form for any future candidate. ⭐ Note that at
+that point `s` at 508 and 806 Hz reads 1.063 and 1.019 with intervals that now *include* 1.0 — once
+the shape is corrected those bands stop identifying a defect at all.
+
+**(10) ⚠ SCOPE NOTE — the crossover sub-gate is NOT an argument here, in either direction.**
+`crossover_locus.py` (self-check PASS: −0.01 oct/+0.03 dB flat, −0.03/+0.10 boost) puts the drive-min
+GRUNT-span peak at **103.0 Hz/+10.63 (flat)** and **71.8/+15.95 (boost)** at 22n, moving to
+**107.7/+13.38** and **79.9/+18.69** at 10n — the right way in frequency (+0.06/+0.15 oct) and the
+wrong way in height (+2.75/+2.74 dB against a −4.36/−4.72 requirement). **But that metric rewards any
+element that ATTENUATES the OD path and is explicitly disqualified from selecting a SHARED element**
+(session 38 item 5, its own docstring), and `btC17` is shared. Reported as information only.
+
+**▶ NEXT, IN ORDER.**
+**(a) The 16 `gain-n12` rows are now ON A3's CRITICAL PATH and should be the next item**, ahead of
+further A3 element work. They are the only group voting against a change that improves every other
+group monotonically, and their defect (session 30, level-dependent HF collapse) has been parked since
+it was found. Localise it; then re-run this locus.
+**(b)** Keep `btC17 ≈ 10 nF` (in the f0-preserving form of (9)) as the located A3 low-mid candidate —
+do NOT re-derive it, and do NOT ship it on the subset argument in (8).
+**(c)** A3's LF half — the +10.4 dB at 20 Hz / +6.8 at 25 / +4.3 at 32, ≈9.5 dB/oct and steeper than
+any first-order high-pass — is untouched by all of the above and is what remains of the classic
+sessions-29-38 A3. The shape gate now measures it on the same axis as everything else.
+**(d)** `trebleLadderDampR` stays at 30k until (a)/(b) land, then re-fit it — (6) shows the trade does
+dissolve, so this ordering is confirmed, not just assumed.
+**(e)** Then A4 re-grade + GATE-9, the `OSValidationTest` decision (session 45 item 7b), then B / C / D.
 
 ## 5. Performance / HQ pass (not started)
 

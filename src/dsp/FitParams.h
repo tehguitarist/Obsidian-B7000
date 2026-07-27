@@ -132,6 +132,15 @@ struct FitParams
     // (the OD/clean LF balance) closed first, or it is just re-fitting this degeneracy.
     double clipC12 = 47.0e-9;    // GRUNT Flat  add-cap (schematic 47 nF — do NOT fit, see above)
     double clipC13 = 220.0e-9;   // GRUNT Boost add-cap (schematic 220 nF — do NOT fit, see above)
+    // clipR16 = the clipper INPUT resistor. Schematic 6k8, pixel-zoom verified and
+    // BOM-reconciled; settable only so the A3 crossover sub-gate can scan it
+    // (session 45). It is the one GRUNT-branch element that moves all three corners
+    // TOGETHER — 1/(2*pi*Cg*(R16 + R18/(1+A0))) — leaving the cap ratios, and hence
+    // the span shelf's height, alone; C11/C12/C13 each move height and frequency at
+    // once. ⚠ But it is NOT a free frequency knob: it also sets the closed-loop gain
+    // -R18/R16, so lowering it to raise the corners raises the OD level with them.
+    // Measured session 45 — see the note at the top of §4 "A3 crossover sub-gate".
+    double clipR16 = 6.8e3;      // ohms; schematic 6k8 — DIAGNOSTIC, ships at nominal
 
     // ---- J201 JFET stage (JfetStage.h) --------------------------------------
     // The ~5:1 J201 part spread means nominal SPICE cannot match a specific unit;

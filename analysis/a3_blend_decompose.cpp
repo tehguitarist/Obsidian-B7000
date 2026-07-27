@@ -94,6 +94,18 @@ int main(int argc, char** argv)
         // at the shipped state. Session 23's "no interior minimum" scan predates
         // trebleC7/clipC15, so it had to be re-run rather than carried forward.
         {"clipC12", &FitParams::clipC12}, {"clipC13", &FitParams::clipC13},
+        {"clipR16", &FitParams::clipR16},
+        // The IC2_B bridged-T (risk register #1). FitParams already declares all four
+        // as FIT parameters ("to be reshaped to whatever the capture actually shows,
+        // including much shallower than ideal"); they were never reachable from this
+        // probe. Added session 47 because the whole-band s(f) solve puts the model's
+        // OD path 4-9 dB too weak from 127 Hz up, and this stage is the single
+        // largest roller-off across exactly that span (-11.3 dB from 127 to 400 Hz).
+        // ⚠ GAP #1b closed this stage TWICE on OUTPUT dips — a band where the OD sits
+        // 6-19 dB under the bleed, so the output is bleed-dominated and cannot see the
+        // OD path's own shape. That is the GAP #2 category error, one gap over.
+        {"btR22", &FitParams::btR22}, {"btR23", &FitParams::btR23},
+        {"btC16", &FitParams::btC16}, {"btC17", &FitParams::btC17},
         {"railNeg", &FitParams::railNeg}, {"railPos", &FitParams::railPos},
         {"jfetGm", &FitParams::jfetGm},
         // The clipper VTC + JFET shaper, added session 37 so the LEVEL axis can be

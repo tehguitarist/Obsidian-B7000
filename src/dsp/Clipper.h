@@ -216,6 +216,22 @@ public:
         setGruntCap(gruntCapNow(grunt));
     }
 
+    // Set the clipper input resistor (FitParams::clipR16). DIAGNOSTIC lever, added
+    // session 45 for the A3 crossover sub-gate; the default IS the schematic 6k8, so
+    // not calling this is bit-identical to the pre-session-45 build.
+    //
+    // ⚠ R16 is NOT a pure GRUNT-side element even though it sits in the GRUNT branch.
+    // It does two things at once: (a) it scales ALL THREE GRUNT corners together via
+    // 1/(2*pi*Cg*(R16 + R18/(1+A0))), leaving the cap RATIOS — and hence the span
+    // shelf's height — untouched, which is the one thing C11/C12/C13 cannot do; and
+    // (b) it sets the clipper's closed-loop gain -R18/R16, so it moves the OD level
+    // too. Read any R16 result as that pair, never as a frequency translation alone.
+    void setR16(double v) noexcept
+    {
+        r16 = v;
+        setGruntCap(gruntCapNow(grunt));
+    }
+
     void setGrunt(Grunt g) noexcept
     {
         grunt = g;
@@ -227,8 +243,8 @@ public:
     void setGruntCap(double cg) noexcept
     {
         gcG = cg * 2.0 * fs;          // grunt cap companion conductance
-        dNode = gcG + 1.0 / kR16;     // intermediate-node conductance sum
-        gIn = gcG / (kR16 * dNode);   // Norton conductance of the (Cg,R16) branch
+        dNode = gcG + 1.0 / r16;      // intermediate-node conductance sum
+        gIn = gcG / (r16 * dNode);    // Norton conductance of the (Cg,R16) branch
     }
 
     // Process one sample (real volts in/out; input VD-ref, output trip-point-ref
@@ -236,7 +252,7 @@ public:
     inline double process(double x) noexcept
     {
         // Per-sample constant part of the input-branch current source.
-        const double ic = ieqG / (kR16 * dNode);
+        const double ic = ieqG / (r16 * dNode);
 
         // ---- Newton solve for node W ----------------------------------------
         double w = wPrev; // warm start
@@ -261,7 +277,7 @@ public:
 
         // ---- Update companion cap states ------------------------------------
         // Intermediate node m between Cg and R16 (eliminated in the solve).
-        const double m = (gcG * x - ieqG + w / kR16) / dNode;
+        const double m = (gcG * x - ieqG + w / r16) / dNode;
         ieqG = 2.0 * gcG * (x - m) - ieqG;
         ieq14 = 2.0 * gc14 * (y - w) - ieq14;
 
@@ -338,6 +354,7 @@ private:
     double c11 = kC11;   // fittable always-present GRUNT cap (FitParams::clipC11); schematic 4n7
     double c12 = kC12;   // fittable GRUNT Flat  add-cap (FitParams::clipC12); schematic 47n
     double c13 = kC13;   // fittable GRUNT Boost add-cap (FitParams::clipC13); schematic 220n
+    double r16 = kR16;   // fittable clipper input R (FitParams::clipR16); schematic 6k8
     double gcG = 0.0, dNode = 0.0, gIn = 0.0, ieqG = 0.0;
     // Newton warm-start.
     double wPrev = 0.0;
