@@ -1,0 +1,126 @@
+beta = -17.70 dB (fitted)   sweep = sweep_drv_-18
+
+=== 1. IDENTIFIABILITY AND CONDITIONING ===
+mu_spr = max-min of the MODEL's mu_d across the 5 drives (dB) = how much drive-axis
+information the band carries at all. width = the +0.5 dB theta interval.
+
+     f   theta     [lo     hi]   width  rms_dB       s  mu_spr  note
+    20   151.1   128.4   180.0    51.6    0.49    1.67   25.42  
+    25   146.0   136.1   180.0    43.9    0.56    1.78   25.42  
+    32   163.0   152.5   180.0    27.5    0.72    1.63   25.41  
+    40   168.7   165.0   174.2     9.2    0.78    1.47   25.39  
+    50   144.2   132.8   154.4    21.6    0.56    1.35   25.30  
+    64   121.1   107.3   131.8    24.5    0.34    1.40   24.41  
+    80   101.8    84.6   114.1    29.5    0.21    1.58   22.64  
+   101    84.3    55.8   101.5    45.8    0.24    1.76   20.56  
+   127    63.5     0.0    88.1    88.1    0.20    1.90   18.74  theta unidentified
+   160    27.5     0.0    74.2    74.2    0.22    1.95   17.37  theta unidentified
+   202     0.0     0.0    66.5    66.5    0.44    2.16   16.50  RAILED theta unidentified
+   254     0.0     0.0    68.4    68.4    0.43    2.06   15.86  RAILED theta unidentified
+   320   180.0     0.0   180.0   180.0    0.39    0.01   14.58  RAILED theta unidentified
+   403    67.2     0.0    96.9    96.9    0.17    2.28   12.07  theta unidentified
+   508    54.5     0.0    94.8    94.8    0.07    2.53    9.02  theta unidentified
+   640    18.2     0.0   110.1   110.1    0.40    2.09    6.18  theta unidentified
+   806    87.8     0.0   118.2   118.2    0.07    3.38    4.07  theta unidentified
+  1016   108.9     0.0   144.2   144.2    0.15    3.83    2.48  theta unidentified
+  1613     0.0     0.0   113.1   113.1    1.25    2.10    3.97  RAILED theta unidentified
+
+residual RMS over the 40-1700 Hz fit band (16 bands): 0.471 dB
+  ... restricted to theta-INTERIOR bands (12): 0.348 dB
+  ... bands whose theta interval is NARROWER than 60 deg: [40, 50, 64, 80, 101]
+
+⚠ Session 50 item 2 quotes 0.094 dB rms for this quantity. I cannot reproduce that
+  figure from any code in the tree; recomputed at the shipped state it is 0.471 dB
+  (5.0x larger) and already 3.3x the 0.144 dB capture floor.
+
+
+=== 2. POWER TEST — can this axis DETECT drive-dependence? ===
+Inject a mean-zero drive-dependent ramp of the given peak-to-peak span into synthetic
+totals built from the model, then refit a drive-INDEPENDENT (s, theta). 'thr' = the
+smallest span whose residual clears the 0.144 dB capture floor.
+
+     f   thr_dB  residual vs span (dB):    0.0    0.5    1.0    2.0    3.0    4.0    6.0    8.0   12.0   16.0   20.0
+    20    12.03                           0.00   0.01   0.01   0.02   0.03   0.04   0.07   0.10   0.14   0.22   0.34
+    25     5.08                           0.00   0.01   0.03   0.05   0.08   0.11   0.17   0.25   0.47   0.80   1.29
+    32     1.96                           0.00   0.03   0.07   0.15   0.23   0.32   0.54   0.81   1.48   2.25   2.99
+    40     0.97                           0.00   0.07   0.15   0.31   0.48   0.66   1.04   1.43   2.13   2.65   2.97
+    50     1.04                           0.00   0.07   0.14   0.28   0.41   0.54   0.80   1.04   1.49   1.92   2.36
+    64     1.54                           0.00   0.05   0.09   0.19   0.29   0.39   0.59   0.81   1.28   1.79   2.33
+    80     1.91                           0.00   0.04   0.07   0.15   0.23   0.32   0.52   0.73   1.20   1.73   2.30
+   101     2.11                           0.00   0.03   0.06   0.14   0.21   0.30   0.48   0.68   1.15   1.68   2.27
+   127     2.25                           0.00   0.03   0.06   0.13   0.20   0.27   0.44   0.63   1.08   1.59   2.17
+   160     2.45                           0.00   0.03   0.06   0.12   0.18   0.25   0.40   0.56   0.96   1.43   1.97
+   202     2.45                           0.00   0.03   0.06   0.12   0.18   0.25   0.39   0.56   0.95   1.41   1.93
+   254     2.61                           0.00   0.03   0.05   0.11   0.17   0.23   0.37   0.52   0.88   1.30   1.79
+   320     none                           0.00   0.00   0.00   0.00   0.00   0.00   0.01   0.01   0.02   0.03   0.04
+   403     2.18                           0.00   0.03   0.06   0.13   0.20   0.28   0.45   0.64   1.07   1.55   2.08
+   508     2.18                           0.00   0.03   0.06   0.13   0.20   0.28   0.44   0.63   1.04   1.50   2.02
+   640     1.95                           0.00   0.04   0.07   0.15   0.22   0.30   0.46   0.63   0.99   1.38   1.81
+   806     2.02                           0.00   0.03   0.07   0.14   0.22   0.31   0.49   0.69   1.16   1.69   2.28
+  1016     0.90                           0.00   0.08   0.16   0.33   0.50   0.68   1.06   1.47   2.38   3.29   4.19
+  1613     0.67                           0.00   0.11   0.22   0.43   0.65   0.86   1.30   1.73   2.59   3.45   4.30
+
+
+=== 3. DOES THE AXIS HAVE POWER? ===
+Over the 40-1700 Hz fit band (16 bands), vs the
+4-19 dB drvspr that pre-clipper elements actually deliver:
+
+  would have DETECTED a pre-clipper carrier (thr < 4 dB): 15 bands [40, 50, 64, 80, 101, 127, 160, 202, 254, 403, 508, 640, 806, 1016, 1613]
+  would NOT have detected it (thr >= 4 dB):            0 bands []
+  BLIND at every span tested (no threshold at all):           1 bands [320]
+
+=> the drive axis HAS the power to detect a pre-clipper carrier.
+   ⚠ Wide theta intervals do NOT imply no power: the residual test constrains the
+   MAGNITUDE ladder's shape, and mu_spr spans 4-25 dB, so a drive-dependent ramp
+   cannot be absorbed even where theta is free. My going-in hypothesis was wrong.
+
+
+=== 4. SO WHAT DOES IT ACTUALLY SAY ABOUT THE SHIPPED MODEL? ===
+Having established the axis CAN see drive-dependence, invert each band's power curve
+to ask: how much drive-dependence would produce the residual we ACTUALLY observe?
+
+⚠ This attributes the WHOLE residual to drive-dependence, so it is an UPPER BOUND on
+  the drive-dependent part (capture noise, band leakage and errors in mu_d's own shape
+  all land here too). It cannot prove the carrier is pre-clipper. What it CAN do is
+  test the claim that the residual is small enough to call the defect drive-INDEPENDENT.
+
+     f   rms_dB  equiv_span_dB  verdict
+    40     0.78            4.6  INSIDE the pre-clipper range
+    50     0.56            4.1  INSIDE the pre-clipper range
+    64     0.34            3.5  below the pre-clipper range
+    80     0.21            2.7  below the pre-clipper range
+   101     0.24            3.3  below the pre-clipper range
+   127     0.20            3.0  below the pre-clipper range
+   160     0.22            3.6  below the pre-clipper range
+   202     0.44            6.6  INSIDE the pre-clipper range
+   254     0.43            6.9  INSIDE the pre-clipper range
+   320     0.39            >20  off the span grid (>20 dB)
+   403     0.17            2.5  below the pre-clipper range
+   508     0.07            1.1  below the pre-clipper range
+   640     0.40            5.3  INSIDE the pre-clipper range
+   806     0.07            1.1  below the pre-clipper range
+  1016     0.15            0.9  below the pre-clipper range
+  1613     1.25            5.8  INSIDE the pre-clipper range
+
+median equivalent drive-dependence over the fit band: 3.5 dB
+bands whose residual alone implies >= 4 dB of drive-dependence: 6 of 16 [40, 50, 202, 254, 640, 1613]
+
+
+=== 5. VERDICT ===
+Session 50 item 2 is INVERTED, not merely unsupported:
+  * the axis genuinely CAN see drive-dependence (thresholds 0.7-12.0 dB), so its verdict is meaningful;
+  * but the shipped model's residual is 0.471 dB RMS, NOT the 0.094 dB the
+    argument was built on — 5x larger and 3.3x the capture floor;
+  * translated through the power curves that residual is equivalent to a MEDIAN
+    3.5 dB of unmodelled drive-dependence, with 6 band(s) already inside
+    the 4-19 dB range that pre-clipper elements deliver.
+
+=> The drive axis does NOT say the missing element is drive-independent. Read
+   correctly it says the opposite: there is several dB of drive-dependent residual
+   the drive-independent model cannot absorb. The post-clipper restriction that has
+   scoped A3 since session 50 rests on a residual figure I cannot reproduce, and at
+   the reproducible figure the same argument points PRE-clipper.
+   ⚠ This does not prove the carrier IS pre-clipper (see the upper-bound caveat in
+   section 4) — it removes the reason for excluding it. Combined with session 52's
+   proof that no causal linear POST-clipper element can supply the target, the
+   pre-clipper region is now the only one not ruled out.

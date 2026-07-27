@@ -104,6 +104,328 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 53, 2026-07-28): ▶ PHASE 9 / A3 STEP 9 — ⭐⭐ TWO LOAD-BEARING PREMISES EXPIRED
+> IN THE SAME SESSION. (a) SESSION 50's "ONLY A POST-CLIPPER ELEMENT CAN SUPPLY `s(f)`" IS **INVERTED**
+> — its residual figure is unreproducible and at the real figure the same argument points PRE-clipper.
+> (b) SESSION 31's "THE OD PHASE IS DRIVE-INDEPENDENT, SO A3'S PHASE GAP IS A **LINEAR** PROBLEM" IS
+> **FALSE AT THE CURRENT STATE** (spread up to 53.4°), WHICH CRACKS THE LTI FRAMEWORK SESSION 52's
+> IMPOSSIBILITY PROOF WAS BUILT IN. Analysis + tooling only — NOTHING in `src/` or `tests/` changed, so
+> ctest is unchanged at the pre-existing session-44 16/17 (`OSValidationTest`). New tools
+> `analysis/a3_drive_indep_audit.py`, `analysis/a3_treble_lag_probe.py`, `analysis/gen_a3_tones.py`.
+> Full detail `docs/phase9-validation.md` §4 "A3 step 9".**
+> **(1) ⭐⭐ SESSION 50 ITEM 2 IS INVERTED, NOT MERELY UNSUPPORTED — and the instrument had to be
+> POWER-TESTED before it could be read.** That item narrowed the entire A3 search to the post-clipper
+> region on the argument *"`s` is ONE scale per band that must reproduce all five drive totals, and the
+> shipped model already does, to **0.094 dB rms** — so whatever is missing is drive-INDEPENDENT."* That
+> is an **affirmation of the consequent**: "a drive-independent model fits, therefore the truth is
+> drive-independent" is valid ONLY if a drive-DEPENDENT alternative would fit detectably worse.
+> ⚠ **My going-in hypothesis — that the wide θ intervals meant no power — WAS WRONG, and measuring it
+> is what made the rest usable.** `a3_drive_indep_audit.py` injects a mean-zero drive-dependent ramp of
+> known span into synthetic totals built from the model, refits a drive-INDEPENDENT (s, θ), and reports
+> the smallest span clearing the 0.144 dB capture floor: **0.67–2.6 dB at 15 of 16 bands**, far below
+> the **4–19 dB** `drvspr` pre-clipper elements actually deliver (only 320 Hz is blind, where s = 0.01).
+> ⇒ **the axis genuinely CAN see drive-dependence**, because the residual constrains the MAGNITUDE
+> ladder and `mu_spr` spans 4–25 dB, even where θ is free. Mean-zero matters: a constant offset is
+> absorbed by `s` exactly, so only the variation is the signal.
+> ⭐ **BUT THEN ITS VERDICT RUNS THE OTHER WAY.** I **cannot reproduce 0.094 dB from any code in the
+> tree**; recomputed at the shipped state the residual is **0.471 dB RMS over the 40–1700 Hz fit band**
+> — 5× larger, **3.3× the capture floor**, and not the RMS/mean/median/min of that quantity under any
+> aggregation (closest single band 0.07 at 508/806 Hz). Inverting each band's own power curve, 0.471 dB
+> is equivalent to a **median 3.5 dB of unmodelled drive-dependence**, with **6 of 16 bands (40, 50,
+> 202, 254, 640, 1613 Hz) already INSIDE the 4–19 dB pre-clipper range**. ⇒ **the drive axis does not
+> say the missing element is drive-independent; read correctly it says the opposite.** ⚠ Be fair: the
+> equivalent-span figure attributes the WHOLE residual to drive-dependence (capture noise, band leakage
+> and errors in `mu_d`'s own shape all land there), so it is an **UPPER BOUND** and does **not** prove
+> the carrier is pre-clipper — **it removes the reason for excluding it.** Combined with session 52's
+> proof about added post-clipper elements, **pre-clipper is now the only region not ruled out.**
+> **(2) ⛔ THE "MODEL IS CARRYING ALL-PASS LAG" ESCAPE IS REFUTED — STRUCTURALLY, and it was a real gap
+> in session 52.** Session 52 proved the target needs ~38° more lead than the min-phase realisation of
+> its own magnitude, testing only what could be **ADDED** (min-phase is maximum-lead; any other causal
+> realisation is min-phase × all-pass, and an all-pass only adds LAG). It never asked the mirror
+> question: **is the MODEL's own OD path already contributing all-pass lag the pedal does not have?**
+> Removing existing lag equals adding lead and is not Bode-bound. Only a genuine TWO-PATH network can
+> do it (a cascade of min-phase stages is min-phase), and the OD path has exactly one pre-clipper: the
+> treble ladder. `a3_treble_lag_probe.py` solves it **SYMBOLICALLY** for exact zeros, so there is **no
+> Hilbert reconstruction and no tail assumption — session 32's trap cannot recur** (self-check
+> reproduces `eq_reference.treble_attack_tf` to **0.000000 dB / 0.000000°**; |A(jω)|−1 = 0.00e0).
+> ⭐ **New measured fact worth keeping: `trebleLadderDampR` controls whether the OD path is
+> minimum-phase at all.** The SHIPPED network has **0 RHP zeros** (zeros at 0, 110.45 Hz, and a damped
+> complex pair at 315.64 Hz, ζ = 0.48 = GAP #2's notch), but **92 of 1215 plausible ladder settings DO
+> have RHP zeros — and every one needs `RdampC5 ≤ 1k`**, i.e. near the schematic **0** that session 19
+> moved away from at 30k. ⛔ **It still cannot supply A3's shortfall: best available lead is 18.9° MEAN
+> with a 255° SPREAD**, ramping **1.4° at 40 Hz → 172° at 1281 Hz → −83° at 1613**. **An all-pass
+> factor's phase is monotone in frequency by construction, so it cannot produce a FLAT offset across
+> 40×** — the identical structural reason session 52 excluded a delay mismatch. ⇒ **do NOT plumb the
+> ladder on phase grounds.** ⚠ The ladder may still matter for A3's **MAGNITUDE** (C1/C2) — untested,
+> live, and still `static constexpr`/unreachable from every A3 tool (session 50 next-step (a) stands).
+> **(3) ⭐⭐ AND THE BIGGEST ONE: SESSION 31 ITEM 1 HAS EXPIRED.** It recorded *"the OD phase is
+> DRIVE-INDEPENDENT (<0.1° across the whole DRIVE knob, every band) — so A3's phase gap is a LINEAR
+> problem"*, and that premise has scoped **every** phase argument since, including session 52's use of
+> causal-LINEAR filter theory. Re-measured from the five shipped decompose CSVs at A3's own condition
+> (GRUNT cut, −18 dBFS), the OD-vs-clean phase spread across the DRIVE knob is **40 Hz 0.11° | 101 Hz
+> 10.3 | 202 Hz 29.7 | 403 Hz 42.6 | 640 Hz 53.4 | 1016 Hz 37.2** — **≥17° at every band from 127 Hz
+> up.** Liveness-checked (|OD| at 101 Hz moves −11.7 → +8.9 dB across the knob, so this is not an inert
+> probe). Cause: `trebleC7` (s34) and `kInputRef` 3.377 → 1.2596 (s44) both moved the clipper's
+> operating point after session 31 measured it. ⭐⭐ **CONSEQUENCE FOR SESSION 52: at A3's operating
+> point the OD path is NOT an LTI transfer, so `H_req = G_ped/G_mdl` is a ratio of DESCRIBING functions,
+> not of transfer functions — and a describing function has no obligation to satisfy Bode's
+> magnitude-phase relation.** The impossibility result is therefore **not a paradox**: it is the
+> expected signature of a NONLINEARITY difference, exactly session 52 item 4's own hypothesis, now with
+> direct evidence instead of speculation. **Do not quote session 52's proof as "no fix exists" — quote
+> it as "no LINEAR fix exists", which is what it shows.**
+> **(4) ⛔ BUT `clipA0` IS NOT THE LEVER, so Option 1(c) as framed does NOT proceed.** `clipA0` is the
+> DC value of the same open-loop gain a pole would roll off, i.e. the closest available proxy, swept at
+> FIXED drive noon via `a3_blend_decompose clipA0=`: **24.871 → 50.0 moves the OD phase +0.84° MEAN;
+> → 12.0 moves it −2.32°** — roughly **1/45th** of the needed 38° — and the shape is a **bump peaking at
+> 403 Hz**, not flat. An open-loop POLE acts only above its corner, so it would be HF-weighted = a ramp
+> = the same shape failure. ⇒ the phase authority in the clipper loop is the **OPERATING POINT** (53°
+> per (3)), not `A0`.
+> **(5) ⭐ THE PATTERN ACROSS THE WHOLE SEARCH, worth reading before proposing anything: EVERY
+> mechanism tested produces a phase change that GROWS WITH FREQUENCY, and the measured requirement is
+> FLAT across 40×.** Delay (s52a, linear in f), the ladder's all-pass ((2), monotone), in-loop `A0`
+> ((4), a 403 Hz bump), the drive axis itself ((3), 0.11° → 53°). Nothing physical tested so far has a
+> flat-in-frequency phase signature. ⚠ **That sharply raises the prior that the flat −38° is an
+> ARTEFACT of the instrument** — session 52 escape (b) only SIZED the harmonic-power bias indirectly
+> (needed H/P 0.6–265, impossible at 8 of 15 bands) on a biased instrument. **The unbiased measurement
+> is now a capture request, not an analysis.**
+> **(6) ▶ CAPTURES REQUESTED AND IN PROGRESS (user capturing, 2026-07-28) — `docs/session53-capture-request.md`.**
+> **27 files, two stimuli.** New standalone stimulus `analysis/a3_tones_48k.wav` (`gen_a3_tones.py`;
+> 10 s `sweep_clean` anchor + 20 bands 20 Hz–1613 Hz × −18/−30 dBFS, 2 s tones; same posture as
+> `gen_jfet_ladder.py`, does NOT touch the frozen main signal). **Set A (5 files, tones at the reference
+> condition)** = the unbiased re-measurement of session 52's target: with one tone per band there is no
+> harmonic power in the measurement, so `r` stops being an UPPER BOUND and `θ` stops being biased toward
+> 90°. **Set B (7, BLEND × drive-min/max)** tests drive-dependence on the good axis. **Set C (12, BLEND ×
+> GRUNT/ATTACK)** uses the pedal's own switches as a pre-vs-post localiser. **Set D (3, LEVEL at
+> drive-min)** pins `b0` from the pot law (β/α = 1−L exactly) instead of inheriting it from the model.
+> ✅ **Filenames pre-verified**: all 22 matrix names parse to the correct knob values/switch indices via
+> `captures.py`, the 5 `a3tones_*` names are correctly REJECTED so they skip like `jfet_ladder_*`, and
+> the matrix still resolves to exactly 63. ⚠ **Set B includes a CONTROL, `drive-1700_blend-0700_base-od`**
+> — at BLEND 0 the wiper is on the clean pin so the capture must be identical to the existing
+> `blend-0700_base-od` whatever DRIVE does; every sweep reuses that one file as its B=0 normaliser, so
+> if the control disagrees the shared normalisation is invalid. ⚠ **I asked for continuous single-take
+> sweeps and then RETRACTED it**: the blend axis recovers θ algebraically from magnitudes
+> (`a3_blend_axis.unpack`) and never reads waveform phase, so it is alignment-immune.
+> **▶ NEXT, IN ORDER: (a)** ⭐ **Set A first — it is the critical path, not a refinement.** Every
+> physical mechanism for a flat 38° is now excluded ((5)), so the live question is whether the target is
+> real. Write `analysis/read_a3_tones.py`: align on `sweep_clean`, fixed-offset segment reads per
+> `gen_a3_tones.segment_times()`, extract the FUNDAMENTAL narrowband over the middle 1.5 s, feed
+> `a3_blend_axis`'s own `quad_fit`/`unpack` with `r = |fundamental|`; needs a `--selftest` recovering a
+> synthesised (r, θ), and must report −18 vs −30 dBFS as a level CONTROL rather than averaging them.
+> **(b)** parameterise `a3_blend_axis.py` over conditions for Sets B/C (it hardcodes `BLENDS`), checking
+> the B=0 control FIRST. **(c)** if Set A confirms the target, the remaining region is **inside the
+> clipper's feedback loop** — a memoryless nonlinearity in RC feedback is not LTI, so neither Bode nor
+> the all-pass monotonicity argument binds it; note `Clipper.h:309` gives `a0` **no frequency dependence
+> and the inverter no output impedance**, both derivable from the DAFx-2020 two-MOSFET model that gave
+> the 5.636 V rail. **(d)** re-derive C1/C2/C3 against whatever Set A says before any more carrier
+> hunting. **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12`
+> re-captures, A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+> ⚠ **UNCOMMITTED at session close:** nothing — sessions 51 + 52 + 53 were committed together this
+> session. **Nothing in `src/` or `tests/` has been touched since session 44.**
+> ── prior session ──
+> **CURRENT (session 52, 2026-07-28): ▶ PHASE 9 / A3 STEP 8 — ⛔⛔ SESSION 51's OWN PLAN ITEM 3 IS
+> REFUTED: A POST-CLIPPER LINEAR CORRECTION NETWORK CANNOT CLOSE A3, AND NOT FOR ANY PARTICULAR
+> ELEMENT — FOR THE WHOLE CLASS, PROVEN FROM THE MEASURED PHASE. Also ⚠⚠ the blend axis is UNRELIABLE
+> below 40 Hz, which is exactly where C3's size was quoted. Analysis + tooling only — NOTHING in
+> `src/` or `tests/` changed (`git status` clean apart from two new scripts), so ctest is unchanged at
+> the pre-existing session-44 16/17 (`OSValidationTest`). Baseline verified FIRST (`a3_shape_gate
+> --selfcheck` PASS 5.808, worst dev 0.027 dB). New tool `analysis/a3_correction_fit.py`. Full detail
+> `docs/phase9-validation.md` §4 "A3 step 8".**
+> **(1) ⚠⚠ THE INSTRUMENT'S OWN VALIDATION, READ PER BAND INSTEAD OF AS ITS SUMMARY.**
+> `a3_blend_axis --validate` solves the MODEL's totals where the exact answer is known from the
+> superposition taps. Per band: **20 Hz +2.774 dB and θ 20.0° wrong | 25 Hz −0.157 dB / 16.5° |
+> 32 Hz −0.963 dB / 13.9° AND θ RAILED at 180.0 | 40 Hz–1613 Hz ≤0.324 dB and ≤2.7°.** ⭐ **The
+> recorded summary "mean 0.075 dB, worst 0.324 dB over 40–1700 Hz" STARTS AT 40 Hz, so it excluded the
+> tool's own three worst bands — and those three are exactly the bands carrying session 51 item 7's
+> "C3 is the DOMINANT A3 term" claim.** Same class as session 49 item 7, one level down: the
+> aggregate's RANGE was the problem, not its membership. ⇒ the fit band is **40 Hz–1.7 kHz**
+> (`--lo-hz`, default 40, justified in the flag's own help so the exclusion cannot read as
+> convenience). **C3's SIZE at 20–32 Hz is not measured to better than ~3 dB**; the qualitative claim
+> (the pedal's OD path rolls off far less at LF than the model's) rests on `r_ped` over 20–101 Hz plus
+> the four-level robustness check and survives, but the "+7.86 dB at 20 Hz / 9.18 dB/oct" budget
+> figure does not, and `r_mdl` at 20 Hz is −44.09 dB (exact tap), not the −41.31 the solve printed.
+> **(2) ⭐⭐ THE RESULT — THE MEASURED MAGNITUDE AND PHASE ARE MUTUALLY INCONSISTENT WITH CAUSALITY.**
+> Target `H_req = G_ped/G_mdl` (pedal from the blend axis, model from the EXACT taps: signed phase, no
+> solve). Magnitude alone is easy — a min-phase cascade fits it to **0.103 dB** (13 params), **0.232**
+> including unbounded tails, i.e. under the 0.144 dB capture floor. Jointly with phase, nothing fits,
+> and the honest form is the **PARETO FRONTIER** (session 49's move), not one weighted number:
+> **phase wt 0.00 → 0.232 dB / 40.3° | 0.05 → 0.882 / 15.9 | 0.10 → 1.126 / 12.9 | 0.30 → 2.202 / 7.0
+> | 1.00 → 4.799 / 3.3 | 3.00 → 5.657 / 2.6.** No point has both small, against a 0.144 dB floor and
+> 2.7° validated phase accuracy. ⭐ **WHY THAT IS AN IMPOSSIBILITY, NOT A FIT FAILURE: minimum phase
+> is the MAXIMUM-LEAD realisation of a given magnitude** (any other causal realisation is min-phase ×
+> an all-pass, and an all-pass only ADDS lag), and the measurement wants **more lead than the
+> min-phase realisation of its own magnitude — a near-constant ~−38° excess from 40 Hz to 1.6 kHz.**
+> ⇒ **no causal linear element of ANY order, anywhere post-clipper, can supply A3's measured target.**
+> One level stronger than session 50 (which ruled out the elements the model CONTAINS). Computed on
+> families that INCLUDE unbounded pure-zero tails, so it is not session 32's truncated-tail artefact —
+> that is why the tails are in the parameterisation. The `+` phase branch beats `−` by 2.6–4× at every
+> order, so the sign ambiguity is not doing this. ⭐ And the per-band sign fold was checked, not
+> assumed: it collapses to ONE global sign only while θ_ped avoids 0/180°, and **closest approach is
+> 37.5°** (at 50 Hz).
+> **(3) THREE ESCAPES, ALL TESTED, ALL CLOSED.** **(a)** A **delay-compensation mismatch** on the OD
+> path (dsp.md's own standing BLEND-node warning — the boring explanation): ⛔ EXCLUDED, because a
+> delay's phase error grows LINEARLY with f and over a 40× span the shortfall is FLAT — best-fit delay
+> −0.113 ms leaves **32.3°** rms vs **12.9°** for a flat −38.1° offset. **(b) ⭐ A NEWLY-DERIVED BIAS
+> IN THE AXIS ITSELF:** from the law's algebra `k1 = 2(Re g1 − c)` but `k2 = |g1|² + H − 2c·Re g1 + c²`
+> with `H` the band's HARMONIC power, so `unpack` returns `r = √(|g1|²+H)` = an **UPPER BOUND** on the
+> fundamental while `Q = Re g1` is exact ⇒ **`cos θ = Q/r` is biased TOWARDS 90°**. Correcting it moves
+> θ AWAY from 90°, which REDUCES the required lead over 127–640 Hz — i.e. it pushes the helpful way, so
+> it was sized rather than waved off: reconciling needs H/P of **0.6, 1.0, 1.1, 2.1, 5.0, 8.3, 36.1,
+> 265.1** and at **8 of the 15 bands NO inflation of any size works** (wrong direction, or the cosine
+> would have to change sign). ⛔ Cannot explain it. ⚠ Be fair: at 160/202/1613 Hz the needed H/P
+> (0.6–1.1) is large but not absurd for a hard-clipped path — the refutation rests on the 8 impossible
+> bands. ⚠ **This bias still QUALIFIES session 51's numbers:** `r_ped` is an upper bound and `θ_ped` is
+> biased toward 90°; `s_blend` (solved/solved) partly cancels it, a solved-vs-exact ratio does not.
+> **(c)** A wrong **bleed level `b0`** — the leading hypothesis, because `b0` enters `Q = k1/2 + (1−b0)`
+> identically at EVERY band, which is exactly what a flat ~−38° shortfall looks like, and because
+> requiring causality ACROSS bands should break the degeneracy the axis declares itself blind to.
+> ⛔ **REFUTED BY ITS OWN SCAN:** the cost falls monotonically toward low β and **SATURATES** (spread
+> 0.0047 over the three lowest points — as `b0 → 0`, `c → 1` and the target converges, so this is a
+> degeneracy with no interior optimum, the "make it see less" signature) and **still never reaches
+> realisability** (1.46 dB / 11.7° at β = −45 dB). Independently the helping direction is excluded from
+> OUTSIDE: **session 34 item 2 refutes β ≤ −18.5 dB from magnitudes alone.** Inside the admissible
+> window [−18.5, −16.5] the best is **1.418 dB / 17.4°**, still 6× the validated phase accuracy.
+> **(4) ▶ WHERE THIS POINTS — and it contradicts a session-50 conclusion, deliberately flagged rather
+> than reconciled.** The falsified premise is *"the pedal's OD path = the model's OD path × a linear
+> transfer function"*. Since the MAGNITUDE is comfortably realisable and only the PHASE is not, the
+> difference is not a missing linear element: it is upstream of, or inside, the nonlinearity, where no
+> Bode relation applies. ⚠ That sits against session 50 item 2's *"only a POST-clipper linear element
+> can supply `s(f)`"*, whose whole evidence was the drive-INDEPENDENCE of `s` — measured on the
+> drive-axis solve that session 51 item 6 then found **RAILED at 202/254/320/1613/4064 Hz.**
+> **Re-examine that argument before acting on either.** Hypothesis worth gating (NOT a finding): a
+> memoryless clipper inside an RC-coupled feedback loop has a drive-dependent effective FUNDAMENTAL
+> phase, so a clipper operating-point difference produces exactly this signature — a phase discrepancy
+> with no linear realisation. That is GAP #3a territory, **pre-clipper, not post.**
+> **(5) ⚠ A SELF-TEST THAT SYNTHESISES THE WRONG OBSERVATION STRUCTURE MEASURES ITS OWN MISTAKE.** The
+> tool's first `--selftest` folded the network's OWN phase instead of a pedal phase, making the target
+> non-representable; the resulting 12.7° miss was then narrated into the docstring as "the phase
+> degeneracy of magnitude-only fitting". Rebuilt with the real structure (known network on top of a
+> known model phasor, pedal phase folded as `acos` folds it) it recovers **0.00000 dB / 0.0000°** and
+> rejects the wrong branch by ~7e9×. Also fixed: the order-selection fallthrough printed **"CHOSEN"**
+> for a network 19.6 dB off at 1613 Hz with `k` and three Qs resting on their bounds — it now refuses
+> to name a candidate when no family reaches the floor.
+> **▶ NEXT, IN ORDER: (a)** settle the POST-vs-PRE question — re-run session 50's drive-independence
+> argument with the railed bands removed, since "post-clipper only" rests on it and one of its inputs
+> is now known to be uninformative. **(b)** ⚠ do NOT re-target `a3_shape_gate` at `r_ped(f)` as session
+> 51 item 10.1 proposed **without** carrying (3b)'s caveat — `r_ped` is an UPPER BOUND and is
+> unreliable below 40 Hz. Restricting CORE to bands where the drive solve is interior is unaffected and
+> still worth doing. **(c)** C1 is still a broadband OD-LEVEL question, still to be settled before any
+> frequency-shaping element. **(d)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4
+> `gain-n12` re-captures, A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+> ⚠ **UNCOMMITTED at session close:** `CLAUDE.md`, `docs/phase9-validation.md`, and the two new
+> scripts `analysis/a3_blend_axis.py` (session 51) + `analysis/a3_correction_fit.py` (this session).
+> **Nothing in `src/` or `tests/` has been touched since session 44.** Session 50 IS committed
+> (`b071565`); session 51 is NOT.
+> ── prior session ──
+> **CURRENT (session 51, 2026-07-27): ▶ PHASE 9 / A3 STEP 7 — ⭐⭐ A3 IS NOW MEASURED ON A SECOND,
+> INDEPENDENT AXIS AND THE CURVE IS MUTUALLY VALIDATED OVER 101 Hz–1 kHz — but the drive-axis target
+> every A3 decision has been ranked on since session 47 is SITTING ON ITS SEARCH BOUNDARY at 202, 254,
+> 320, 1613 and 4064 Hz, two of those inside C2's own span. Analysis + tooling only — NOTHING in `src/`
+> or `tests/` changed (`git status` clean apart from one new script), so ctest is unchanged at the
+> pre-existing session-44 16/17 (`OSValidationTest`). Baseline verified FIRST (`a3_shape_gate
+> --selfcheck` PASS 5.808, worst dev 0.027 dB). New tool `analysis/a3_blend_axis.py`. Full detail
+> `docs/phase9-validation.md` §4 "A3 step 7".**
+> **(1) ⭐⭐ THE NEW AXIS, AND WHY IT IS BETTER-CONDITIONED THAN ANYTHING A3 HAS HAD.** Every A3 number
+> since session 47 comes from ONE instrument — `a3_phase_solve`'s inversion along the DRIVE ladder,
+> which is bimodal in `s`, needs a 2-D grid, is only as identified as the cancellation is deep, and
+> **consumes the MODEL's own `mu_d` shape**. Session 50 closed the C2 search space and found it empty,
+> which leaves exactly two options: a missing element, or **a wrong target**. So the target needed an
+> independent check. **BLEND is that axis and had never been solved on:** it sits AFTER everything, so
+> the OD and clean phasors are literally constant across the five captures, and the mixing is LINEAR in
+> the knob. Normalising by `blend-0700` (which **is** the clean tap, so it is the reference, not an
+> unknown) gives `t(B) = |beta(B) + B.G|`, and squaring turns it into **a quadratic in B with unit
+> intercept** — two coefficients from four points by ordinary least squares, **closed form, no grid, no
+> branch to jump, and TWO SPARE EQUATIONS PER BAND that TEST the mixing law instead of assuming it**.
+> `a0`, `L` and the LEVEL taper never appear (`a0` folds into `G` and cancels pedal-over-model).
+> ⭐ **Harmonics do not break the law** — every OD harmonic carries the same `B` and the clean tap
+> contributes none, so band ENERGY keeps the form with `P` absorbing harmonic power. Verified, not
+> argued: the model control fits to **0.0000 dB** on a render whose OD path is clipping hard.
+> **(2) ⚠⚠ WHAT IT CANNOT DO: MEASURE β. Three unknowns `(c, P, Q)` map onto TWO coefficients ⇒
+> one-dimensionally DEGENERATE, every bleed level fits equally well.** Proven algebraically AND
+> demonstrated — freeing it on the MODEL's own render, true `b0 = 0.14239`, returns **`b0 = 0.886` at a
+> residual of 0.0002 dB**. So the tool takes `b0` from the model and **cannot be used to challenge β**;
+> β stays the drive axis's business (−16.75 dB, [−17.25, −16.50]). ⚠ My first draft instead fitted a
+> free level offset on `ref-od` and got a **level-independent −1.87 dB across three sweep levels
+> spanning 24 dB**, which reads exactly like a capture-level error on the most-used capture in the
+> project. It was this degeneracy. **Do not re-derive that "finding".**
+> **(3) ✅ `LevelBlend`'s MIXING LAW IS CORRECT — a live hypothesis, closed.** Parameter-free in `b0`,
+> worst per-band |Δt| over the 20 bands ≤1.7 kHz: **MODEL (control) 0.001 dB | PEDAL 0.083 dB**, i.e.
+> **below the 0.144 dB take-to-take floor at every band.** ⇒ the pedal obeys `Vout(B) = beta(B).Vc +
+> B.G` exactly as `LevelBlend.h` implements it. **The BLEND/LEVEL network is NOT A3's cause** — which
+> mattered, because it is the one place a small topology error produces precisely A3's signature (a
+> broadband, drive-independent, frequency-FLAT OD-vs-bleed level error = C1), and the captured unit is
+> an Ultra whose DIST footswitch must interrupt this very node.
+> **(4) ⭐ NEW MEASURED FACT: the pedal's BLEND taper is NOT linear** — effective B = **0.212 / 0.482 /
+> 0.739** at knob 0.25/0.50/0.75. ⚠ Run with the NOMINAL taper the pedal's law residual is 0.039 rms
+> and **infeasible (`r² < 0`) at 40/50 Hz**, which looks like a structural discovery. It is a pot.
+> **Nothing prior is invalidated:** sessions 8/29 used only the ENDPOINTS and both are taper-IMMUNE (at
+> B = 1 the wiper IS pin3 so `beta(1) = b0` whatever the taper does; B = 0 is the normaliser) — which
+> is also why the fit cannot absorb `b0` or any frequency-dependent defect. **But any future use of the
+> INTERIOR blend captures must carry the fitted taper.**
+> **(5) ⭐⭐ THE RESULT — A3's CURVE IS MUTUALLY VALIDATED, its first independent corroboration ever.**
+> `s_drive` vs `s_blend`, from instruments sharing no information (5 DRIVE captures + a nonlinear 2-D
+> grid vs 4 BLEND captures + closed-form linear LS): **101 Hz +4.50/+5.11 (θ 93.5/95.3) | 127
+> +5.12/+5.66 (75.2/75.0) | 160 +5.41/+6.52 | 403 +7.55/+6.78 (84.9/81.4) | 508 +8.93/+8.28
+> (78.8/74.2) | 640 +9.64/+11.20 | 806 +11.52/+11.53 (101.8/100.8)** — **magnitudes to ≤1.6 dB AND
+> PHASES to ≤5° across 101 Hz–1 kHz.** That range of the curve is real and can be fitted against.
+> Validation of the solver itself, both directions: `--selftest` recovers synthesised data to
+> **0.000000 dB / 0.00000°**; `--validate` reproduces `a3_blend_decompose`'s exact superposition taps to
+> **mean 0.075 dB / worst 0.324 dB over 40–1700 Hz**. ⚠ Above ~2.5 kHz it diverges (+11.8 dB at 4064)
+> because the swept-sine band average carries harmonic/aliasing power the single-tone tap does not —
+> the shared taper fit is therefore restricted to ≤1.7 kHz and **nothing above ~2 kHz should be read
+> off this tool.**
+> **(6) ⚠⚠ AND WHERE THE AXES DISAGREE, THE DRIVE SOLVE IS ON ITS PARAMETER BOUNDARY.** It searches
+> θ ∈ [0°, 180°] and sits ON that boundary at **202 (θ=0.0), 254 (0.0), 320 (180.0), 1613 (0.0), 4064
+> (0.0)**, within 4° at 2560; the blend axis returns interior 43.3/56.6/115.2/59.2/106.1° at law
+> residuals of 0.02–0.05 dB. Where the drive solve is interior the two agree to ≤1.6 dB; where it rails
+> they differ by **2.2 to 21.5 dB**. ⭐ **`a3_shape_gate`'s SCORE includes 202 and 254 Hz, both railed,
+> and both inside C2's own 101–508 Hz span** ⇒ part of the curve the entire C2 search has been aimed at
+> is set by a solve at its own boundary. That is a concrete, sufficient reason the search has not
+> converged. Same class as session 33's "6–7 of 12 bands pinned at 180°" — recorded then, never carried
+> into how the score is read. ⚠ Be fair: θ = 0 is representable and plausible (the model's own θ at
+> 202 Hz is 16°) and the sign is unobservable from magnitudes, so this proves the drive axis is
+> **uninformative** there, not that it is wrong.
+> **(7) ⭐ C3 IS MUCH BIGGER THAN THE SHAPE GATE SAYS — and it is NOT a floor.** The pedal's own OD
+> transfer `r = |G|` in dB, 20→101 Hz: **pedal −19.94/−19.91/−19.78/−19.41/−18.61/−17.35/−15.79/−14.31
+> vs model −41.31/−38.79/−34.26/−29.47/−25.73/−22.88/−20.78/−19.42.** The pedal's OD path is nearly
+> **FLAT (≈2.4 dB/oct) from 20 to 101 Hz where the model rolls off at ~9.5 dB/oct.** ⚠ A flat ≈−20 dB
+> is exactly what a measurement floor looks like, so it was TESTED: across −30/−18/−12/−6 dBFS it reads
+> **−20.53/−19.94/−19.31/−18.65 dB with θ stable at 117–120°** and law residual ≤0.05 dB — a fixed
+> noise floor would fall ~24 dB as a ratio; +1.9 dB is a real, mildly compressive transfer. Also robust
+> to the fixed `b0` (±1.5 dB moves `r_ped` <1 dB at 20 Hz, <0.25 dB at 101 Hz). ⇒ **C3 is the DOMINANT
+> A3 term, not a ~+8 dB tail.** ⚠ Quote **`r_ped`** as the measurement; `s_blend` at LF divides by a
+> model `r` of −41 dB and is only indicative there.
+> **(8) ⭐ THE MID SCOOP IS ~5 dB SHALLOWER AND CENTRED LOWER THAN THE MODEL'S, and GAP #2's notch is
+> visible in the OD path for the FIRST time.** Referenced to each side's own 2560 Hz value: **model =
+> ONE scoop, min at 640–806, 15.0 dB deep** (the bridged-T's 716 Hz notch, exactly where the schematic
+> puts it); **pedal = 9.6 dB deep at 640 PLUS a distinct local minimum at 320 Hz, 4–6 dB below its
+> 254/403 neighbours.** The 320 Hz feature is **GAP #2's TrebleAttack notch measured in the pedal's own
+> OD transfer** — session 46 predicted it was there and buried by the bleed, and the drive axis cannot
+> see it because that is precisely where its θ rails at 180°. ⚠ This does **NOT** revive session 47's
+> `btC17` candidate and does **NOT** contradict session 49: that Pareto scan proved the bridged-T
+> cannot lift 250–640 Hz **at fixed f0 = 716.3 Hz** — but f0 was held only because the model's own
+> schematic values put it there, never because anything measured it. ⚠ **And GAP #1b's closure is
+> weaker than recorded:** it compared OUTPUT dips (−2.45 vs −3.02 dB median over 116 OD rows) in a
+> region where the bleed sits 11–31 dB ABOVE the OD path, so it was insensitive to the OD path's shape
+> by construction — the session-49 item-7 class again.
+> **(9) ARTEFACT: `build/a3_blend_axis_<sweep>.csv`** — the pedal's measured OD-path transfer (r, θ per
+> band 20 Hz–16 kHz + an `identified` flag), i.e. **a MEASURED complex target for the OD path** rather
+> than an inverted one. Gitignored; regenerate with `python3.11 analysis/a3_blend_axis.py`.
+> **▶ NEXT, IN ORDER: (a)** ⭐ **stop ranking A3 candidates on a score containing railed bands** —
+> either restrict `a3_shape_gate`'s CORE to bands where the drive solve is interior, or better,
+> re-target it at `r_ped(f)`, which is interior everywhere below 1.7 kHz and agrees with the drive axis
+> wherever that axis is informative. **(b)** re-derive C1/C2/C3 against the corrected curve BEFORE any
+> more carrier hunting — session 50's budget was fitted to the drive-axis curve, (7) says C3 is far
+> larger and (6) says two of C2's five bands were railed. **(c)** the user has authorised breaking the
+> schematic (2026-07-27): with a measured complex target the move is no longer to hunt one component —
+> **fit a post-clipper linear correction network of whatever order the data demands**, as `OdCoupling`
+> was added in session 36, then gate it on the null (`a3_lead_fit`), the SIDE monitors, and the
+> 63-capture matrix. Session 50 already proved no single element can close A3. **(d)** unchanged behind
+> that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures, A4 re-grade + GATE-9, the
+> `OSValidationTest` decision, then B / C / D.
+> ⚠ **UNCOMMITTED at session close:** `CLAUDE.md`, `docs/phase9-validation.md`, and new
+> `analysis/a3_blend_axis.py`. **Nothing in `src/` or `tests/` was touched.** Session 50 IS committed
+> (`b071565`).
+> ── prior session ──
 > **CURRENT (session 50, 2026-07-27): ▶ PHASE 9 / A3 STEP 6 — ⭐⭐ THE C2 CARRIER SEARCH SPACE IS
 > CLOSED AND IT IS EMPTY, and A3 finally has a COMPONENT BUDGET. Analysis + tooling only — NOTHING in
 > `src/` changed; ctest unchanged at 16/17 (the pre-existing session-44 `OSValidationTest` failure).
