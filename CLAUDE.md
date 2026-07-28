@@ -104,6 +104,117 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 54, 2026-07-28): ▶ PHASE 9 / A3 STEP 10 — ⭐⭐ THE 31 SESSION-53 CAPTURES ARE
+> ANALYSED. THE POST-CLIPPER LINEAR CLASS IS NOW CLOSED TWICE OVER, FROM TWO INDEPENDENT DIRECTIONS,
+> AND SESSION 52's IMPOSSIBILITY SURVIVES ON UNBIASED DATA. Analysis + tooling only — NOTHING in
+> `src/` or `tests/` changed, so ctest is unchanged at the pre-existing session-44 16/17
+> (`OSValidationTest`). New tools `analysis/read_a3_tones.py`, `analysis/a3_condition_axis.py`,
+> `analysis/a3_level_b0.py`. ⭐ The frozen 63-capture baseline `analysis/reports/comprehensive_data.json`
+> was deliberately NOT overwritten — the 22 new matrix captures went to a separate
+> `analysis/reports/s54_matrix85.json`, because folding them into the aggregate would silently
+> redefine every "OD 3.186 / CLEAN 0.427 / ALL 1.807" figure in the project. Full detail
+> `docs/phase9-validation.md` §4 "A3 step 10".**
+> **(1) ⭐⭐ SET A — THE HARMONIC BIAS IS MEASURED AND IT IS ~2°, NOT ~38°.** Tones vs the swept
+> instrument at the same operating point, 40–1700 Hz, 17 bands both identified: **dtheta mean −2.1°,
+> rms 2.5°, worst −4.1°; dr mean −0.39 dB.** Real, and in the PREDICTED direction (swept theta pulled
+> toward 90°) — but far too small to explain session 52's excess lead. ⇒ **session 52 escape (b) is
+> REFUTED BY MEASUREMENT, not merely sized.** Guards: `--selftest` leg 2a **HARMONIC REJECTION
+> 0.0006 dB** against synthetic tones carrying −10 dB H2 / −14 dB H3; the law holds on the real tone
+> captures at **0.090 dB** (floor 0.144); capture SNR ≥ 72 dB. ⚠ leg 2b HUM SENSITIVITY is REPORTED,
+> NOT GATED — my first draft asserted a tight bound on a run containing 50 Hz mains and FAILED,
+> correctly but for the wrong reason: a same-frequency contaminant is physically inseparable from
+> signal and no window removes it. Gating on it tests the hum, not the tool.
+> **(2) ⭐⭐ THE ARBITER — SESSION 52's IMPOSSIBILITY RE-RUN ON THE UNBIASED TARGET AND IT SURVIVES.**
+> `read_a3_tones` emits the target in `a3_blend_axis`'s EXACT schema so `a3_correction_fit --sweep
+> tones-setA` runs with ZERO tool changes (so a moved RESULT cannot be confounded with a moved
+> INSTRUMENT). ⭐ It validates itself: a matched `--ntry 8` run on the SWEPT target reproduces session
+> 52's frontier to 3 d.p. Pareto, **TONES vs SWEPT: wt 0.00 → 0.236 dB/36.7° vs 0.232/40.3 | 0.05 →
+> 0.853/14.9 vs 0.882/15.9 | 0.30 → 2.236/6.7 vs 2.202/7.0 | 1.00 → 4.415/3.4 vs 4.799/3.3.** The
+> min-phase excess falls only **40.3° → 36.7°**, matching the 2.1° measured bias. ⇒ **NO causal linear
+> element of any order, anywhere post-clipper, can supply A3's target — now established WITHOUT the
+> harmonic caveat.** Families include unbounded rising tails, so not session 32's tail artefact.
+> **(3) ⭐⭐ SETS B/C — AND `H_req` IS MEASURABLY DRIVE-DEPENDENT, which closes the same class from a
+> COMPLETELY DIFFERENT DIRECTION.** `a3_condition_axis` runs the blend axis at SEVEN operating points
+> (each a full 5-point ladder: shared B=0, session 53's three interiors, and **B=1.00 from the frozen
+> matrix**, so nothing is fitted short). **Step 0 gates everything and PASSES:** the shared B=0
+> normaliser is drive-independent to **mean −0.011 dB, worst −0.054** (floor 0.144). Then `H_req =
+> G_ped/G_mdl` at drive min/noon/max: **|H| spread mean 8.49 dB, worst 13.14 (59× the floor); argH
+> spread mean 34.8°, worst 58.1°.** A post-clipper LINEAR element multiplies the OD path identically
+> at every drive ⇒ **no post-clipper linear correction of any order can close A3 across the DRIVE
+> knob.** ⭐ The per-condition taper is the PRIMARY read *because it is CONSERVATIVE for this claim* —
+> it gives the data maximum freedom to look drive-independent; the shared-taper sensitivity agrees.
+> ⚠ **State it exactly and no stronger:** `H_req` also moves if the MODEL's drive response is wrong
+> (it is — that is A3), so what is falsified is *"pedal_OD = model_OD × one drive-independent linear
+> H"*. It does NOT separate "model drive response wrong" from "pre-clipper element".
+> **(4) MODEL-FREE LOCALISER (pedal vs pedal, cannot inherit a model error):** dtheta vs reference,
+> **drive min +36.2° | drive max −20.0° | grunt boost −40.4° | grunt flat −15.5° | attack cut −12.5°
+> (rms 13.4) | attack boost −2.9° (rms 10.4, smallest)**. The pedal's OD transfer moves far more with
+> DRIVE and GRUNT (clipper input coupling) than with ATTACK (treble ladder C8) — consistent with
+> session 53 item 2 refuting the ladder on phase grounds; both ATTACK positions are now real,
+> non-degenerate measurements (see (5)), not one measured value and one placeholder. ⚠ **NOT a clean
+> discriminator:** ATTACK is a physically smaller perturbation (220 pF vs 47n/220n) and this does not
+> normalise for perturbation size.
+> **(5) ⛔→✅ ONE CAPTURE WAS DEFECTIVE — `attack-cut_blend-1430_base-od.wav` — caught THRESHOLD-FREE,
+> RE-CAPTURED AND RE-VERIFIED SAME SESSION.** `t(B) = |beta(B) + B.G|` traces a STRAIGHT LINE in the
+> complex plane, so its modulus has **at most ONE interior minimum**. The original ladder read
+> **1.000 → 0.836 → 0.574 → 1.176 → 0.134** — two turning points, louder than the full-clean reference
+> at B=0.75. Unreachable by ANY G at ANY bleed level under ANY taper; fired at **20 of 20 bands**, and
+> dropping that one file made every band possible again, localising it to a single file — the same
+> one session 53's own screen flagged at peak 0.9885. Cause: MASTER left at 1430 instead of BLEND on
+> that one take (confirmed by the user). ✅ **Re-captured, RMS now falls monotonically along the
+> ladder (−14.41 → −15.94 → −19.04 → −23.65 → −29.51 dB), peak 0.2828, taper re-solves to
+> 0.190/0.488/0.780 (in-family, was the degenerate 0.957/0.980/0.905), law residual 0.063 dB (was
+> 6.731) — well under the 0.144 dB floor. All 6 of 6 conditions now pass.** ⚠ The FIRST re-capture
+> attempt this session was ALSO checked and found still broken (RMS −12.78 dB, same 0.9885 peak)
+> before this second one was accepted — a "fixed" claim was verified, not trusted, both times. This
+> REPLACED a heuristic that missed the original defect (the fitted taper absorbed the offset, driving
+> it to that degenerate value); a test derived from the law's geometry has no threshold to tune and
+> cannot be absorbed by a nuisance parameter.
+> **(6) ⚠ AND A DEFECT IN MY OWN FIRST READING, kept because it will recur.** Session 54's first pass
+> reported the mixing law FAILING for GRUNT flat (3.725 dB) and boost (0.789). **It does not.** Those
+> worst values sit at 32 Hz (min|t| = 0.028) and 25 Hz (0.050) — deep-cancellation bands where a fixed
+> absolute error becomes a huge dB error; every band above 50 Hz is ≤0.10 dB. `fit_taper`'s COST
+> guards against this (it divides by t) but the `worst |dt|` it PRINTS is raw dB and does not.
+> `NULL_GUARD` now excludes null-dominated bands from the verdict and reports them separately. Same
+> class as session 49 item 7 and session 52 item 1: the aggregate's RANGE, not its membership.
+> **(7) SET D — b0 ON THE LEVEL AXIS: ~1.2 dB ABOVE THE MODEL, AND IT DISAGREES WITH THE DRIVE AXIS.**
+> At BLEND max the LEVEL wiper is a three-way Thevenin node, `V(L) = (g + (1−L)) / (1 + (1−L)/L +
+> (1−L))`, so the OD leg scales as 1/(1−L) and the bleed does not — leaving the taper exponent `p` as
+> the ONLY free parameter, shared across bands. **p = 1.90 in [1.75, 2.05] ⇒ b0 = −15.70 dB in
+> [−16.20, −15.25]** vs the model's −16.93. Genuine INTERIOR optimum (rms 0.146 / **0.037** / 0.221 at
+> p = 1.5 / 1.9 / 2.5), so a measurement, not the flat-objective degeneracy that defeated session 52's
+> own b0 scan. ⚠ **Does NOT overlap session 50's drive-axis β** (−16.75 [−17.25, −16.50]) but DOES
+> agree with session 31's drive-axis LS (−15.2). ⚠ **Do not redefine b0 on this yet:** law residual
+> 0.33 dB exceeds the floor so the interval is optimistic, and session 8's bleed-free taper estimate
+> (2.22 ± 0.36) overlaps p = 1.90 at ~1 sd. ⚠ **A REAL BUG the data caught:** the draft set
+> `bleed(1) = 0.5` where the bleed is actually ZERO (at LEVEL max the wiper is shorted to the OD
+> source), and since knob 1.0 gives L = 1 for every p that wrong point was in every candidate fit —
+> it dragged p to 1.33 and inflated the residual to ~2.3 dB. Corrected, `bleed()` reproduces
+> `a3_blend_axis.model_b0()` to 1e-12, an independent cross-check of both derivations.
+> **(8) ⭐ SENSITIVITY — NEITHER KNOWN BIAS DISSOLVES THE EXCESS; TOGETHER THEY ENLARGE IT.**
+> Re-solving Set A across the bleed range moves mean required `argH`: **−16.93 → +36.3° | −16.20 →
+> +40.6 | −15.70 → +43.6 | −15.25 → +46.4**, i.e. the bleed uncertainty is worth **+7.3°** at Set D's
+> own value — and it pushes toward MORE required lead, i.e. harder to realise. With the tone bias
+> (−2.1°) the net is about **+5°**.
+> **▶ NEXT, IN ORDER: (a)** ✅ DONE — the re-capture (5) landed and is verified; all 6 of 6 Set B/C
+> conditions pass. **(b)** make `attackIdx` reachable in `analysis/a3_blend_decompose.cpp` (line 150
+> hardcodes `p.attackIdx = 0`) so the ATTACK conditions get a model side and (4) can run
+> pedal-vs-MODEL. ⚠ that binary is built by a hand-written `c++` command, NOT CMake — session 37 item
+> 12's stale-binary trap applies, verify BOTH directions.
+> **(c)** the post-clipper linear class is now closed on measurement (3) as well as on Bode (2); the
+> remaining region is **inside/before the clipper**, where neither argument binds — `Clipper.h:309`
+> gives `a0` no frequency dependence and the inverter no output impedance, both derivable from the
+> DAFx-2020 two-MOSFET model that gave the 5.636 V rail. **(d)** settle `b0` between the LEVEL and
+> DRIVE axes before quoting any absolute A3 magnitude; (8) bounds what it is worth. **(e)** unchanged
+> behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures, A4 re-grade + GATE-9,
+> the `OSValidationTest` decision, then B / C / D.
+> ⚠ **UNCOMMITTED at session close:** `CLAUDE.md`, `docs/phase9-validation.md`, three new tools
+> `analysis/read_a3_tones.py`, `analysis/a3_condition_axis.py`, `analysis/a3_level_b0.py`, and the
+> re-captured `analysis/captures/attack-cut_blend-1430_base-od.wav` (gitignored, machine-local — back
+> it up). **Nothing in `src/` or `tests/` has been touched since session 44.** Gitignored but regenerated:
+> `analysis/reports/s54_matrix85.json`, `build/a3_tones_setA.csv`,
+> `build/a3_blend_axis_tones-setA.csv`, and `analysis/fit_logs/s54_*.log`.
+> ── prior session ──
 > **CURRENT (session 53, 2026-07-28): ▶ PHASE 9 / A3 STEP 9 — ⭐⭐ TWO LOAD-BEARING PREMISES EXPIRED
 > IN THE SAME SESSION. (a) SESSION 50's "ONLY A POST-CLIPPER ELEMENT CAN SUPPLY `s(f)`" IS **INVERTED**
 > — its residual figure is unreproducible and at the real figure the same argument points PRE-clipper.
@@ -200,10 +311,16 @@ high, execute routine work cheap) is what should persist.
 > pinned), so it is a genuine hot transient, not the session-24 clipping defect. Zero files show a
 > run >1 sample near their peak. **Durations consistent**: every matrix file 83.70 s, every a3tones
 > file 103.30 s — no truncation, no dropped segments (checked against `gen_a3_tones.segment_times()`
-> expectations, not merely file size). ⚠ **Set B's control, `drive-1700_blend-0700_base-od`, is
-> ON DISK and STILL NEEDS TO BE CHECKED** against the existing `blend-0700_base-od.wav` before
-> trusting any Set B/C number — every sweep reuses that file as its B=0 normaliser (§4 item 6), and
-> that check has NOT been run yet, only the file's presence/cleanliness has.
+> expectations, not merely file size).
+> **✅ RE-VERIFIED INDEPENDENTLY 2026-07-28 (later same day, no code/model changes) — the ONE item
+> session 53 left unchecked is now closed.** Re-ran every check above from scratch (duration via
+> `soxi`, format/clipping via a fresh `scipy.io.wavfile` scan, filenames via `captures.parse_capture`
+> directly) and got identical verdicts: 22/22 matrix files parse + 83.700 s + 48 kHz + mono float32,
+> all 9 `a3tones_*` at 103.300 s, max consecutive-near-peak run ≤5 samples everywhere (no clipping).
+> **AND the outstanding Set B control check now RUN AND PASSING:** `drive-1700_blend-0700_base-od.wav`
+> vs the existing `blend-0700_base-od.wav` (its B=0 normaliser) — RMS matches to **0.07%** (0.19013 vs
+> 0.19027), i.e. same underlying clean signal, drive-independent at BLEND=0 as required. ⇒ **every
+> file behind Set B/C's B=0 normalisation is now trustworthy; nothing here blocks starting (a) below.**
 > **▶ NEXT SESSION, IN ORDER (deliberately not started this session — user asked to defer the
 > analysis): (a)** ⭐ **Set A first — it is the critical path, not a refinement.** Every physical
 > mechanism for a flat 38° is now excluded (§5), so the live question is whether the target is real.

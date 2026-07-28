@@ -1,0 +1,126 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+find_captures: skipped 14 non-matrix .wav (not key-value filenames): a3tones_blend-0700.wav, a3tones_blend-0930.wav, a3tones_blend-1200.wav, a3tones_blend-1430.wav, a3tones_blend-1700.wav, a3tones_drive-1700_blend-0930.wav, a3tones_drive-1700_blend-1200.wav, a3tones_drive-1700_blend-1430.wav, a3tones_drive-1700_blend-1700.wav, jfet_ladder_drive-0930.wav, jfet_ladder_drive-1430.wav, jfet_ladder_drive-max.wav, jfet_ladder_drive-min.wav, jfet_ladder_drive-noon.wav
+Comprehensive report: 85 captures | OS=8x | 30 bands
+  THD coverage: 27/30 bands
+
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(1/85) [7/85] ? D0.50 BL0.50 ... done
+(2/85) [2/85] ? D0.50 BL0.25 ... done
+(3/85) [8/85] ? D0.50 BL0.75 ... done
+(4/85) [3/85] ? D0.50 BL0.50 ... done
+(5/85) [5/85] ? D0.50 BL1.00 ... done
+(6/85) [1/85] ? D0.50 BL1.00 ... done
+(7/85) [4/85] ? D0.50 BL0.75 ... done
+(8/85) [6/85] ? D0.50 BL0.25 ... done
+(9/85) [9/85] ? D0.50 BL1.00 ... done
+(10/85) [12/85] ? D0.50 BL1.00 ... done
+(11/85) [10/85] ? D0.50 BL1.00 ... done
+(12/85) [11/85] ? D0.50 BL1.00 ... done
+(13/85) [14/85] ? D0.50 BL0.25 ... done
+(14/85) [13/85] ? D0.50 BL0.00 ... done
+(15/85) [15/85] ? D0.50 BL0.50 ... done
+(16/85) [16/85] ? D0.50 BL0.75 ... done
+(17/85) [19/85] ? D0.00 BL1.00 ... done
+(18/85) [18/85] ? D0.00 BL1.00 ... done
+(19/85) [17/85] ? D0.00 ... done
+(20/85) [21/85] ? D0.00 BL0.25 ... done
+(21/85) [20/85] ? D0.00 BL1.00 ... done
+(22/85) [22/85] ? D0.00 BL0.50 ... done
+(23/85) [23/85] ? D0.00 BL0.75 ... done
+(24/85) [24/85] ? D0.00 BL1.00 ... done
+(25/85) [26/85] ? D0.00 BL1.00 ... done
+(26/85) [27/85] ? D0.00 BL1.00 ... done
+(27/85) [25/85] ? D0.00 BL1.00 ... done
+(28/85) [28/85] ? D0.00 BL1.00 ... done
+(29/85) [29/85] ? D0.25 BL1.00 ... done
+(30/85) [30/85] ? D0.25 BL1.00 ... done
+(31/85) [31/85] ? D0.25 BL1.00 ... done
+(32/85) [32/85] ? D0.25 BL1.00 ... done
+(33/85) [34/85] ? D0.75 BL1.00 ... done
+(34/85) [33/85] ? D0.25 BL1.00 ... done
+(35/85) [36/85] ? D1.00 BL1.00 ... done
+(36/85) [35/85] ? D1.00 BL1.00 ... done
+(37/85) [37/85] ? D1.00 BL0.00 ... done
+(38/85) [38/85] ? D1.00 BL0.25 ... done
+(39/85) [40/85] ? D1.00 BL0.75 ... done
+(40/85) [39/85] ? D1.00 BL0.50 ... done
+(41/85) [41/85] ? D1.00 BL1.00 ... done
+(42/85) [43/85] ? D0.50 BL0.25 ... done
+(43/85) [42/85] ? D0.50 BL1.00 ... done
+(44/85) [44/85] ? D0.50 BL0.50 ... done
+(45/85) [45/85] ? D0.50 BL0.75 ... done
+(46/85) [46/85] ? D0.50 BL1.00 ... done
+(47/85) [47/85] ? D0.50 BL0.25 ... done
+(48/85) [48/85] ? D0.50 BL0.50 ... done
+(49/85) [49/85] ? D0.50 BL0.75 ... done
+(50/85) [52/85] ? D0.50 BL1.00 ... done
+(51/85) [50/85] ? D0.50 BL1.00 ... done
+(52/85) [51/85] ? D0.50 BL1.00 ... done
+(53/85) [53/85] ? D0.50 BL1.00 ... done
+(54/85) [55/85] ? D0.50 BL1.00 ... done
+(55/85) [54/85] ? D0.50 BL1.00 ... done
+(56/85) [56/85] ? D0.50 BL1.00 ... done
+(57/85) [57/85] ? D0.50 BL1.00 ... done
+(58/85) [58/85] ? D0.50 BL1.00 ... done
+(59/85) [59/85] ? D0.50 BL1.00 ... done
+(60/85) [60/85] ? D0.50 BL1.00 ... done
+(61/85) [61/85] ? D0.50 BL1.00 ... done
+(62/85) [63/85] ? D0.50 BL1.00 ... done
+(63/85) [62/85] ? D0.50 BL1.00 ... done
+(64/85) [64/85] ? D0.50 BL1.00 ... done
+(65/85) [65/85] ? D0.50 BL1.00 ... done
+(66/85) [66/85] ? D0.50 BL1.00 ... done
+(67/85) [67/85] ? D0.50 BL1.00 ... done
+(68/85) [69/85] ? D0.50 BL1.00 ... done
+(69/85) [71/85] ? D0.50 BL1.00 ... done
+(70/85) [68/85] ? D0.50 BL1.00 ... done
+(71/85) [70/85] ? D0.50 BL1.00 ... done
+(72/85) [72/85] ? D0.50 BL1.00 ... done
+(73/85) [73/85] ? D0.50 BL1.00 ... done
+(74/85) [74/85] ? D0.50 BL1.00 ... done
+(75/85) [75/85] ? D0.50 BL1.00 ... done
+(76/85) [77/85] ? D0.50 BL1.00 ... done
+(77/85) [79/85] ? D0.50 BL1.00 ... done
+(78/85) [76/85] ? D0.50 BL1.00 ... done
+(79/85) [78/85] ? D0.50 BL1.00 ... done
+(80/85) [80/85] ? D0.50 BL1.00 ... done
+(81/85) [81/85] ? D0.50 BL1.00 ... done
+(82/85) [82/85] ? D0.50 BL1.00 ... done
+(83/85) [83/85] ? D0.50 BL1.00 ... done
+(84/85) [85/85] ? D0.50 BL1.00 ... done
+(85/85) [84/85] ? D0.50 BL1.00 ... done
+
+85/85 captures analysed (0 from cache).
+wrote analysis/reports/s54_matrix85.json  (1921861 bytes)

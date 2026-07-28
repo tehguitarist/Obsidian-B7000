@@ -1,0 +1,240 @@
+A3 correction network -- fitted to the MEASURED complex OD-path target.
+sweep=tones-setA   fitted bands: 15 (identified, 40-1700 Hz, 320 Hz excluded)
+⚠ EXCLUDED as UNRELIABLE, not as inconvenient: 20, 25, 32 Hz.
+  `a3_blend_axis --validate` solves the MODEL's own totals, where the exact
+  answer is known from the superposition taps. Read PER BAND instead of as
+  its 40-1700 Hz mean, it says: 20 Hz +2.77 dB / theta 20.0 deg wrong;
+  25 Hz -0.16 dB / 16.5 deg; 32 Hz -0.96 dB / 13.9 deg AND theta RAILED at
+  180.0; then <=0.32 dB and <=2.0 deg at every band from 40 Hz to 1.6 kHz.
+  ⚠ The published summary starts at 40 Hz, so it EXCLUDES the tool's own
+  three worst bands -- and those three are exactly the ones carrying
+  session 51's 'C3 is the dominant A3 term' claim. Re-run with --lo-hz 20
+  to see them fight the fit.
+
+=== 1. THE TARGET  H_req = G_ped / G_mdl ===
+  |H| is unambiguous. The phase has TWO branches because the blend-axis solve
+  returns |theta_ped| only (acos); theta_mdl is exact and signed.
+  ⚠ That fold is PER BAND, so strictly there are 2^15 sign patterns. Treating it
+  as ONE global sign is legitimate only while theta_ped stays clear of 0 and 180
+  deg (a continuous phase can only change sign through one of those).
+  CHECK: closest approach of theta_ped to either endpoint = 36.5 deg at 50 Hz
+  => OK, the global-sign treatment holds.
+     f  r_ped dB  r_mdl dB    |H| dB    th_mdl   +branch   -branch
+    40    -20.19    -29.15     +8.96     170.3     -31.3     +50.7
+    50    -19.32    -25.68     +6.35     146.1      -2.5     +70.4
+    64    -17.75    -22.65     +4.90     119.2     +13.4    +108.2
+    80    -16.07    -20.66     +4.59      95.3     +18.8    +150.5
+   101    -14.49    -19.35     +4.86      71.5     +21.7    -164.6
+   127    -13.37    -18.85     +5.48      49.7     +23.2    -122.7
+   160    -12.78    -19.15     +6.37      30.5     +23.4     -84.4
+   202    -12.75    -20.24     +7.49      15.9     +24.1     -55.9
+   254    -13.80    -21.80     +8.01       8.7     +45.1     -62.6
+   403    -17.55    -23.88     +6.33      10.2     +67.9     -88.3
+   508    -18.16    -25.92     +7.76       5.7     +64.4     -75.8
+   640    -19.63    -30.06    +10.44      12.3     +71.0     -95.5
+   806    -18.95    -29.78    +10.83      46.3     +51.5    -144.1
+  1016    -16.38    -24.96     +8.58      51.4     +42.8    -145.5
+  1613    -11.61    -18.36     +6.75      14.8     +42.3     -72.0
+
+=== 2a. WEAK INDICATOR -- magnitude-only fit, its own phase vs each branch ===
+  ⚠ RANKS the branches only: a magnitude-only fit over 15 discrete bands can be
+  phase-degenerate, so its absolute phase error is not a property of the target.
+family                          mag rms +branch rms -branch rms
+flat gain only (k)                1.873        41.4       105.8
+k + 1 real shelf                  1.475        35.3       110.3
+k + 2 real shelves                1.178        40.8       115.1
+k + 1 biquad                      1.066        44.7       117.6
+k + 1 shelf + 1 biquad            1.024        48.1       108.1
+k + 2 biquads                     0.507        41.9       113.5
+k + 1 shelf + 2 biquads           0.251        48.1       114.3
+k + 2 shelves + 2 biquads         0.109        58.4       118.1
++TAIL: k + 1 shelf + 1 zero       1.475        35.2       110.3
++TAIL: k + 1 biquad + 1 zero      1.066        44.7       117.6
++TAIL: k + 1 shelf + 1 bq + 1 zero    0.984        53.2       111.4
++TAIL: k + 1 shelf + 2 bq + 2 zero    0.236        36.7       123.1
+
+=== 2b. DECISIVE -- joint magnitude+phase fit on EACH branch ===
+  A min-phase cascade has no freedom left once both magnitude and phase are in
+  the cost. If one branch is fitted to the capture floor in magnitude AND to a
+  few degrees in phase while the other cannot be, the branch is SELECTED by the
+  data and the required correction IS approximately minimum-phase => realisable.
+family                          npar   +branch (mag/phase)      -branch (mag/phase)   
+flat gain only (k)                     1      1.873 dB /   41.4 deg      1.873 dB /  105.8 deg
+k + 1 real shelf                       3      2.205 dB /   21.9 deg      3.571 dB /   88.3 deg
+k + 2 real shelves                     5      2.018 dB /   21.9 deg      3.974 dB /   82.0 deg
+k + 1 biquad                           5      2.018 dB /   21.9 deg      2.843 dB /   85.9 deg
+k + 1 shelf + 1 biquad                 7      1.782 dB /   21.0 deg      4.727 dB /   71.2 deg
+k + 2 biquads                          9      1.740 dB /   19.6 deg      4.265 dB /   66.8 deg
+k + 1 shelf + 2 biquads               11      1.747 dB /   18.6 deg      4.281 dB /   64.9 deg
+k + 2 shelves + 2 biquads             13      1.512 dB /   16.4 deg      4.310 dB /   64.5 deg
++TAIL: k + 1 shelf + 1 zero            4      1.984 dB /   21.1 deg      3.572 dB /   88.3 deg
++TAIL: k + 1 biquad + 1 zero           6      1.404 dB /   16.6 deg      2.844 dB /   85.9 deg
++TAIL: k + 1 shelf + 1 bq + 1 zero     8      1.356 dB /   15.5 deg      5.011 dB /   70.2 deg
++TAIL: k + 1 shelf + 2 bq + 2 zero    13      1.079 dB /   13.0 deg      4.773 dB /   60.3 deg
+
+  best +branch: cost 1.196 (+TAIL: k + 1 shelf + 2 bq + 2 zero)   best -branch: cost 5.439 (+TAIL: k + 1 shelf + 2 bq + 2 zero)
+  => the data selects the + branch, by 4.5x in joint cost.
+  ⚠ NEITHER branch is fitted jointly (best 1.079 dB / 13.0 deg). Either the
+  phase measurement is untrustworthy at these bands, or the correction is
+  NON-minimum-phase (a two-path cancellation), which no cascade of ordinary
+  sections can supply. Do NOT ship a network from section 3 without
+  resolving this -- the magnitude alone would then be a coincidence.
+
+=== 2c. PARETO FRONTIER -- magnitude error vs phase error (selected branch) ===
+  Richest family (+TAIL: k + 1 shelf + 2 bq + 2 zero), which INCLUDES unbounded
+  rising tails, so a shortfall here cannot be blamed on a truncated tail.
+    phase wt    mag rms     ph rms
+        0.00      0.236       36.7
+        0.02      0.387       25.6
+        0.05      0.853       14.9
+        0.10      1.078       12.0
+        0.30      2.236        6.7
+        1.00      4.415        3.4
+        3.00      5.274        2.8
+  best magnitude anywhere on the frontier: 0.236 dB
+  best phase     anywhere on the frontier: 2.8 deg
+
+  ⭐ READ THIS AS THE RESULT. Minimum phase is the MAXIMUM-LEAD realisation of
+  a given magnitude (any other causal realisation is min-phase x an all-pass,
+  and an all-pass only ADDS lag). So if the measured phase cannot be reached by
+  a min-phase cascade that also matches the magnitude, NO causal linear element
+  of ANY order can supply this target -- which is a stronger statement than
+  session 50's reachability result (that ruled out the elements the model
+  contains; this rules out the whole CLASS).
+
+=== 2d. CAN THE PHASE MEASUREMENT'S KNOWN BIAS EXPLAIN THE SHORTFALL? ===
+  The blend-axis quadratic gives Q = Re(g1) EXACTLY but r = sqrt(|g1|^2 + H)
+  with H the band's harmonic power, so cos(theta) = Q/r is biased TOWARDS 90 deg
+  and r is an UPPER BOUND on the fundamental. Correcting it moves theta away
+  from 90 deg, which REDUCES the required lead over 127-640 Hz -- so it is a
+  live explanation. Sizing it as the implied harmonic-to-fundamental power:
+       f    th_ped th needed     d deg  implied H/P
+      40     139.0     111.8     -27.3   impossible
+      50     143.5      96.4     -47.2   impossible
+      64     132.6      82.6     -50.0    sign flip
+      80     114.1      73.1     -41.0    sign flip
+     101      93.2      63.7     -29.4    sign flip
+     127      72.9      52.3     -20.6          3.3
+     160      53.9      37.9     -16.0          0.8
+     202      40.0      23.0     -17.0          0.4
+     254      53.8      13.5     -40.3          1.7
+     403      78.1      23.4     -54.7         18.8
+     508      70.1      33.2     -36.9          5.0
+     640      83.3      38.0     -45.3         44.5
+     806      97.8      55.7     -42.1    sign flip
+    1016      94.2      58.5     -35.6    sign flip
+    1613      57.2      44.9     -12.3          0.7
+
+  'implied H/P' is the harmonic-to-fundamental POWER ratio the bias would need
+  in order to reconcile the measurement with the min-phase fit. H/P = 0.1 is
+  ~32%% THD; H/P = 1 is more harmonic power than fundamental. 'impossible' means
+  the bias would have to act in the WRONG DIRECTION (deflate r), which harmonic
+  power cannot do; 'sign flip' means no inflation of any size suffices.
+
+  DELAY CHECK: best-fit pure delay -0.101 ms leaves 29.7 deg rms; a FLAT offset
+  of -34.4 deg leaves 12.8 deg rms. Shortfall span -54.7 to -12.3 deg over a 40x
+  frequency range => FLAT, not proportional to f: a delay-compensation mismatch on the OD path is
+     EXCLUDED as the cause.
+  => the bias CANNOT explain the shortfall at the bands that carry it.
+
+=== 2e. FREE THE BLEED LEVEL -- does causality identify b0? ===
+  scan: one family (k + 1 shelf + 1 biquad, 7 par) at each trial beta.
+   beta dB       b0    mag rms     ph rms feasible
+     -45.0   0.0056      1.449       11.1        Y
+     -42.0   0.0079      1.442       11.2        Y
+     -39.0   0.0112      1.433       11.3        Y
+     -36.0   0.0158      1.422       11.4        Y
+     -33.0   0.0224      1.407       11.6        Y
+     -30.0   0.0316      1.397       12.0        Y
+     -27.0   0.0447      1.400       12.5        Y
+     -24.0   0.0631      1.430       13.2        Y
+     -21.0   0.0891      1.536       14.6        Y
+     -18.0   0.1259      1.352       16.4        Y
+     -15.0   0.1778      2.522       24.5        Y
+     -12.0   0.2512      3.613       36.3        Y
+     -18.5   0.1189      1.353       16.5        Y
+     -17.2   0.1372      1.666       20.5        Y
+     -16.8   0.1454      1.829       21.5        Y
+     -16.5   0.1496      1.898       22.3        Y
+
+  best joint cost at beta = -36.00 dB (mag 1.422 dB, phase 11.4 deg)
+  optimum is INTERIOR to the scan
+  cost spread over the three LOWEST beta points: 0.0035
+  => SATURATED. As b0 -> 0 the target converges (c -> 1), so this direction
+     is a DEGENERACY, not an identification: the fit improves toward a limit
+     and never reaches realisability.
+
+  WITHIN the independently ADMISSIBLE window beta in [-18.5, -16.5]
+  (session 34 item 2 refutes beta <= -18.5 from magnitudes alone; session
+  50 measures -16.75 [-17.25, -16.50]; LevelBlend's resistor arithmetic
+  gives -16.93): best is beta -18.00 dB at mag 1.352 dB / phase 16.4 deg.
+  ⇒ the bleed level CANNOT rescue realisability: inside the admissible
+  window the fit is still 16.4 deg out, and the direction that would help
+  is both degenerate AND excluded from outside.
+
+=== 3. JOINT COMPLEX FIT on the selected branch (phase weighted 0.10 dB/deg) ===
+family                              npar     cost   mag rms    ph rms      k dB  10kHz dB
+flat gain only (k)                     1    3.216     1.873      41.4     +7.18     +7.18
+k + 1 real shelf                       3    2.199     2.205      21.9    +26.02    +24.07
+k + 2 real shelves                     5    2.104     2.018      21.9    +26.02    +22.51
+k + 1 biquad                           5    2.104     2.018      21.9    +26.02    +22.51
+k + 1 shelf + 1 biquad                 7    1.948     1.782      21.0    +26.02    +22.77
+k + 2 biquads                          9    1.855     1.740      19.6    +26.02    +22.84
+k + 1 shelf + 2 biquads               11    1.804     1.747      18.6    +26.02    +22.32
+k + 2 shelves + 2 biquads             13    1.575     1.512      16.4    +26.02    +21.66
++TAIL: k + 1 shelf + 1 zero            4    2.048     1.984      21.1    +10.21    +24.64
++TAIL: k + 1 biquad + 1 zero           6    1.537     1.404      16.6    +26.02    +50.39
++TAIL: k + 1 shelf + 1 bq + 1 zero     8    1.456     1.356      15.5    +26.02    +50.36
++TAIL: k + 1 shelf + 2 bq + 2 zero    13    1.196     1.079      13.0    -13.92    +49.05
+
+  Order selection: take the SIMPLEST family whose magnitude residual is at
+  the capture floor (0.144 dB); extra sections beyond that are fitting noise.
+    flat gain only (k)             mag 1.873 dB 
+    k + 1 real shelf               mag 2.205 dB 
+    k + 2 real shelves             mag 2.018 dB 
+    k + 1 biquad                   mag 2.018 dB 
+    k + 1 shelf + 1 biquad         mag 1.782 dB 
+    k + 2 biquads                  mag 1.740 dB 
+    k + 1 shelf + 2 biquads        mag 1.747 dB 
+    k + 2 shelves + 2 biquads      mag 1.512 dB 
+    +TAIL: k + 1 shelf + 1 zero    mag 1.984 dB 
+    +TAIL: k + 1 biquad + 1 zero   mag 1.404 dB 
+    +TAIL: k + 1 shelf + 1 bq + 1 zero mag 1.356 dB 
+    +TAIL: k + 1 shelf + 2 bq + 2 zero mag 1.079 dB 
+
+  ⛔ NO FAMILY REACHES THE CAPTURE FLOOR IN MAGNITUDE while matching the
+  phase (best 1.079 dB at +TAIL: k + 1 shelf + 2 bq + 2 zero). The row below is the
+  lowest-JOINT-COST fit and is printed for diagnosis ONLY -- it is NOT a
+  candidate and must not be shipped. Read section 2c's frontier instead.
+    k=0.2013 (-13.92 dB)  |  shelf: z 677.7 Hz / p 145.7 Hz  |  biquad: z 34.6 Hz Q2.81 / p 1529.6 Hz Q0.55  |  biquad: z 1902.9 Hz Q12.00 / p 35.8 Hz Q12.00  |  TAIL zero: 100.0 Hz (rises 6 dB/oct above it, unbounded)  |  TAIL zero: 677.7 Hz (rises 6 dB/oct above it, unbounded)
+
+     f   |H| tgt   |H| fit      d dB    ph tgt    ph fit     d deg
+    40     +8.96     +8.42     -0.54     -31.3     -44.6     -13.3
+    50     +6.35     +4.17     -2.19      -2.5     -36.3     -33.8
+    64     +4.90     +3.03     -1.87     +13.4     -33.8     -47.2
+    80     +4.59     +2.40     -2.19     +18.8     -35.3     -54.1
+   101     +4.86     +1.73     -3.13     +21.7     -38.8     -60.5
+   127     +5.48     +0.94     -4.54     +23.2     -43.3     -66.5
+   160     +6.37     -0.04     -6.41     +23.4     -48.4     -71.7
+   202     +7.49     -1.23     -8.72     +24.1     -53.5     -77.7
+   254     +8.01     -2.56    -10.56     +45.1     -58.4    -103.5
+   403     +6.33     -5.62    -11.94     +67.9     -66.9    -134.8
+   508     +7.76     -7.30    -15.06     +64.4     -71.0    -135.3
+   640    +10.44     -9.12    -19.55     +71.0     -75.5    -146.5
+   806    +10.83    -11.23    -22.06     +51.5     -81.0    -132.5
+  1016     +8.58    -13.99    -22.57     +42.8     -87.7    -130.5
+  1613     +6.75    -25.87    -32.61     +42.3     -97.2    -139.6
+
+=== 4. REACH OUTSIDE THE FITTED BAND (the session-49 check) ===
+  Every section -> 1 at HF, so above the highest corner the network is exactly
+  the flat gain k. Predicted SIDE-monitor change and DC behaviour:
+    1016:-13.99  1613:-25.87  2560:-22.56  4064:-16.76  6451:-14.98  10240:-14.33  16000:-14.09
+    5:+2.61  10:+2.59  20:+2.62
+  ⚠ The LF numbers below 20 Hz are EXTRAPOLATION -- no capture measures them.
+  A section whose gain keeps climbing below the measurement floor is a
+  subsonic-headroom risk in the plugin even if it is invisible in the matrix.
+
+=== 5. IMPLEMENTATION (post-clipper, OS rate, after OdCoupling) ===
+  --fit odCorrEnabled=1 --fit odCorrK=0.201321 --fit odCorrShelfZ=677.653 --fit odCorrShelfP=145.667 --fit odCorrZ1f=34.5942 --fit odCorrZ1q=2.80828 --fit odCorrP1f=1529.6 --fit odCorrP1q=0.550336 --fit odCorrZ2f=1902.9 --fit odCorrZ2q=12 --fit odCorrP2f=35.8349 --fit odCorrP2q=12
+
+  wrote build/a3_correction_target_tones-setA.csv
