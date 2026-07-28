@@ -128,6 +128,7 @@ with redirect_stdout(io.StringIO()):
     import attack_multipole_screen as M                   # noqa: E402  (solver-free: record, db)
     import attack_tap_screen as T                         # noqa: E402  (the PROVEN tap solver)
     import attack_notch_probe as P                        # noqa: E402  (locate_notch = one oracle)
+    import attack_render_gate as RG                       # noqa: E402  (ONE render-condition source)
 
 POSITIONS = P.POSITIONS                                   # cut, boost, flat
 THROWS = ["boost", "cut"]
@@ -246,7 +247,11 @@ def gate_width():
 # GATE C -- the python->render calibration, tested OUT OF SAMPLE
 # =============================================================================================
 RENDER = "build/OfflineRender_artefacts/Release/OfflineRender"
-BASE_ARGS = ["--drive", "0.0", "--level", "1.0", "--blend", "1.0"]   # the record's own point
+# ⚠⚠ Taken from attack_render_gate, which DERIVES it from the capture filename rather than
+# hand-writing it (session 65). The hand-written version omitted `--grunt`, so every render this
+# tool made -- including GATE C's calibration anchor -- ran at GRUNT BOOST against captures taken
+# at GRUNT CUT, a ~36 Hz vs ~896 Hz first-order highpass. See attack_render_gate._base_args().
+BASE_ARGS = RG.BASE                                                 # the record's own point
 ATTACK_IDX = {"flat": "0", "boost": "1", "cut": "2"}
 
 
@@ -263,18 +268,30 @@ def render_cal():
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0:
             sys.exit("render failed:\n%s\n%s" % (" ".join(cmd), r.stderr))
+        RG.stamp(out, cmd)
     print("  ok.")
 
 
 def rendered(tag, pos):
     """Read a render. `dflt_*`/`prop_*` come from attack_render_gate.py (same operating point,
-    so nothing is re-rendered); `cal_*` is this tool's own calibration anchor."""
+    so nothing is re-rendered); `cal_*` is this tool's own calibration anchor.
+
+    ⚠ EVERY read is condition-checked against its own `.args.json` stamp. GATE C mixes renders
+    from two different producers, so a stale one on either side silently corrupts the calibration
+    -- which is exactly what happened in session 65 when the `dflt`/`prop` side was re-rendered at
+    the corrected GRUNT and this `cal_*` anchor was not (see `attack_render_gate.stamp`).
+    """
     dirn = CALDIR if tag == "cal" else RENDER_DIR
     path = os.path.join(dirn, "%s_%s.wav" % (tag, pos))
     if not os.path.exists(path):
         sys.exit("missing %s -- run: %s"
                  % (path, "python3.11 analysis/attack_shape_screen.py --render-cal"
                     if tag == "cal" else "python3.11 analysis/attack_render_gate.py --both"))
+    fits = CAL_FITS if tag == "cal" else (RG.PROPOSAL if tag == "prop" else [])
+    expect = list(BASE_ARGS) + ["--attack", ATTACK_IDX[pos]]
+    for f in fits:
+        expect += ["--fit", f]
+    RG.check_stamp(path, expect)
     orig = A.load(A.ORIG)
     x = A.load(path)
     x, _ = A.align(x, orig)
@@ -627,6 +644,39 @@ def show(tag, cost, x, parts, shared, fit_tap, tgt):
 
 
 # =============================================================================================
+def grunt_term(orig, curve):
+    """The GRUNT coupling's OWN contribution to the 200 -> 480 Hz drop, MEASURED.
+
+    Rendered twice at the drawn defaults, identical but for `--grunt`: CUT (the captures'
+    position, ~896 Hz first-order corner) minus BOOST (~36 Hz, i.e. essentially flat across this
+    window). The difference of the two drops IS the GRUNT term, with everything else in the chain
+    cancelling exactly. Cached -- it is one 18 s render and it never changes.
+    """
+    import subprocess
+    path = os.path.join(RENDER_DIR, "gruntctl_boost.wav")
+    if not os.path.exists(path):
+        os.makedirs(RENDER_DIR, exist_ok=True)
+        cmd = ([RENDER, A.ORIG, path]
+               + [("0" if a == "1" and BASE_ARGS[i - 1] == "--grunt" else a)
+                  for i, a in enumerate(BASE_ARGS)]
+               + ["--attack", ATTACK_IDX["flat"]])
+        print("  (rendering the GRUNT control %s ...)" % path)
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            sys.exit("GRUNT control render failed:\n%s\n%s" % (" ".join(cmd), r.stderr))
+        RG.stamp(path, cmd)
+
+    def drop(p):
+        x = A.load(p)
+        x, _ = A.align(x, orig)
+        f, m = curve(x, "sweep_clean_-36")
+        i = int(np.argmin(np.abs(f - 200.0)))
+        j = int(np.argmin(np.abs(f - 480.0)))
+        return float(m[j] - m[i])
+
+    return drop(os.path.join(RENDER_DIR, "dflt_flat.wav")) - drop(path)
+
+
 def tilt_probe():
     """⭐⭐ IS THE WIDTH RESIDUAL EVEN ATTACK'S? Measure the OD path's OWN absolute shape.
 
@@ -644,8 +694,27 @@ def tilt_probe():
     Then the mechanism test: remove ONLY the tilt DIFFERENCE (a first-order rotation about
     200 Hz, which cannot create or destroy a null) and re-measure the width with the same
     locator. ⚠ That test REFUTED the obvious hypothesis when it was run (session 64): the tilt
-    accounts for about a quarter of the width excess, not for it. Reported either way -- the
-    numeric coincidence that the tilt excess and the width excess are both ~2.1x is just that.
+    accounts for about a quarter of the width excess, not for it. Reported either way.
+
+    ⚠⚠ WHAT THIS PROBE FIRST REPORTED, AND WHY IT WAS WRONG -- session 65, kept because the
+    failure mode is general. On its first run (session 64) it read PEDAL -4.88 vs MODEL -11.05 dB
+    and concluded a 6.2 dB shape error attributable to the IC2_B bridged-T, i.e. GAP #1b reopened.
+    The renders it read were made by attack_render_gate.py, whose operating point was hand-written
+    as four flags -- and the flag it did NOT write, `--grunt`, fell back to OfflineRender's default
+    of 0 = BOOST while every capture here is GRUNT CUT. That is a first-order highpass at ~36 Hz
+    instead of ~896 Hz, worth ~6.7 dB of slope across exactly this window. The whole finding was
+    the missing flag. At the captures' own GRUNT the model drops -4.02 / -3.71 / -3.93 against the
+    pedal's -4.92 / -5.32 / -4.87, i.e. ~1 dB and in the OPPOSITE direction (the model's scoop is
+    slightly SHALLOWER), which is the same direction session 21 closed GAP #1b on.
+    ⭐ TWO GENERAL LESSONS, both already in this project's own rules and both re-learned here:
+      * the probe's two soundness gates -- present in all three throws, level-independent -- are
+        satisfied EXACTLY as well by a shared render-condition error as by a shared circuit error,
+        so neither gate could ever have caught this. What catches it is asserting that the render
+        condition IS the capture's condition (attack_render_gate GATE 0), which is now done by
+        deriving the flags from `captures.render_args` rather than typing them.
+      * this function's verdict paragraph was NARRATED, so it kept asserting "the bridged-T
+        accounts for it to 0.26 dB" above a table that no longer said that. Every number in the
+        verdict is now COMPUTED from the run (`computed-verdicts-not-narrated`, third occurrence).
     """
     print("\n" + "=" * 104)
     print("⭐⭐ IS THE WIDTH RESIDUAL EVEN ATTACK'S? -- the OD path's OWN shape, 200 -> 480 Hz")
@@ -666,7 +735,12 @@ def tilt_probe():
         return float(m[j] - m[i]), float(np.polyfit(np.log10(f[ex]), (m - m[i])[ex], 1)[0])
 
     def rendered_curve(tag, pos, seg):
-        x = A.load(os.path.join(RENDER_DIR, "%s_%s.wav" % (tag, pos)))
+        path = os.path.join(RENDER_DIR, "%s_%s.wav" % (tag, pos))
+        expect = list(BASE_ARGS) + ["--attack", ATTACK_IDX[pos]]
+        for f in (RG.PROPOSAL if tag == "prop" else []):
+            expect += ["--fit", f]
+        RG.check_stamp(path, expect)          # a render from another condition is not a datum
+        x = A.load(path)
         x, _ = A.align(x, orig)
         return curve(x, seg)
 
@@ -685,21 +759,39 @@ def tilt_probe():
             rows["%s %s" % (tag, pos)] = b
             print("  %-14s %+9.2f / %+9.2f  %+9.2f / %+9.2f" % (tag + " " + pos, *a, *b))
 
+    # ---- WHICH ELEMENT: a CLOSED accounting, not a single-element attribution ----------------
+    # ⚠ The GRUNT coupling is a first-order highpass at ~896 Hz in the CUT position, so it is
+    # worth several dB across this very window and must appear in the sum. Session 64's version
+    # omitted it -- and, because its renders were accidentally at GRUNT BOOST (~36 Hz, i.e. flat
+    # here), omitting it happened to close. It does not close at the captures' own GRUNT unless
+    # the term is there. It is MEASURED, not modelled: the same render at `--grunt 0`.
     bt = E.bridged_t_tf(np.array([200.0, 480.0]))
     btd = float(20.0 * np.log10(np.abs(bt[1]) / np.abs(bt[0])))
     sk = [E.sallen_key_lpf_tf(np.array([200.0, 480.0]), 10e3, 22e3, 1e-9, 1e-9),
           E.sallen_key_lpf_tf(np.array([200.0, 480.0]), 22e3, 47e3, 2.2e-9, 1e-9)]
     skd = sum(float(20.0 * np.log10(np.abs(s[1]) / np.abs(s[0]))) for s in sk)
-    print("\n  WHICH ELEMENT: over the same 200 -> 480 Hz the IC2_B bridged-T alone drops"
-          " %+.2f dB" % btd)
-    print("  and the two Sallen-Keys together %+.2f dB. The DRAWN model measures %+.2f dB, i.e."
-          % (skd, rows["dflt flat"][0]))
-    print("  the bridged-T accounts for it to %.2f dB and nothing else in the chain has authority"
-          % abs(btd - rows["dflt flat"][0]))
-    print("  here. The PEDAL drops only %+.2f dB ⇒ its scoop is ~%.1fx SHALLOWER through this"
-          % (rows["PEDAL flat"][0], rows["dflt flat"][0] / rows["PEDAL flat"][0]))
-    print("  window, which is circuit.md RISK #1 verbatim (\"reshape to whatever the capture")
-    print("  shows, including much shallower than ideal\").")
+    gd = grunt_term(orig, curve)
+    tot = rows["dflt flat"][0]
+    acct = btd + skd + gd
+    print("\n  WHICH ELEMENT -- every named contribution to the DRAWN model's own drop, summed:")
+    print("    IC2_B bridged-T (analytic)      %+7.2f dB" % btd)
+    print("    two Sallen-Keys (analytic)      %+7.2f dB" % skd)
+    print("    GRUNT cut coupling (measured)   %+7.2f dB   <- absent from session 64's accounting"
+          % gd)
+    print("    %-30s %+7.2f dB" % ("SUM", acct))
+    print("    %-30s %+7.2f dB   residual %.2f dB" % ("MODEL, measured", tot, abs(acct - tot)))
+    print("  ⇒ the bridged-T is still the only element with real authority here (%.1fx the SKs),"
+          % (abs(btd) / max(abs(skd), 1e-9)))
+    print("    but it is opposed by the GRUNT highpass, and the two nearly cancel.")
+    resid = rows["PEDAL flat"][0] - tot
+    print("\n  PEDAL %+.2f dB vs MODEL %+.2f ⇒ residual %+.2f dB (floor ~%.2f). %s"
+          % (rows["PEDAL flat"][0], tot, resid, 2.0 * P.DIFF_FLOOR,
+             "The model's scoop is SHALLOWER than the pedal's through this window."
+             if resid < 0 else "The model's scoop is DEEPER than the pedal's here."))
+    print("  ⚠ Session 64 read this as %+.1f dB with the model far DEEPER and reopened GAP #1b on"
+          % -6.2)
+    print("    it; that was the missing --grunt flag (see the docstring). The sign here agrees")
+    print("    with session 21's closure, which also found the plugin's dip ~0.5 dB SHALLOWER.")
 
     print("\n  MECHANISM TEST -- does the excess tilt EXPLAIN the ~2x width? Rotate each model")
     print("  curve about 200 Hz until its ex-null background slope equals the pedal's, then")
@@ -720,16 +812,21 @@ def tilt_probe():
                   % (tag + " " + pos, w0, w1, wp, w1 / wp))
             out["%s %s" % (tag, pos)] = dict(w=w0, w_detilted=w1, w_pedal=wp,
                                              ratio_before=w0 / wp, ratio_after=w1 / wp)
-    print("\n  ⇒ de-tilting moves the PROPOSAL's ratio 1.93/2.20/1.93 -> ~1.7, so the excess tilt")
-    print("    is worth about a QUARTER of the width excess and the rest is a genuine null-Q")
-    print("    difference. ⚠ The tempting reading -- that the tilt excess and the width excess are")
-    print("    both ~2.1x, so one causes the other -- is REFUTED by this test. Coincidence.")
-    print("  ⇒ But the TILT finding stands on its own and is LARGER: a %.1f dB shape error in the"
-          % (rows["dflt flat"][0] - rows["PEDAL flat"][0]))
-    print("    OD path over 200-480 Hz, in all three throws, level-independent, attributable to")
-    print("    the bridged-T. That is GAP #1b, reopened on an axis that can SEE it.")
+    pb = [out["prop %s" % p]["ratio_before"] for p in POSITIONS]
+    pa = [out["prop %s" % p]["ratio_after"] for p in POSITIONS]
+    print("\n  ⇒ de-tilting moves the PROPOSAL's ratio %s -> %s, so the excess tilt is worth"
+          % ("/".join("%.2f" % v for v in pb), "/".join("%.2f" % v for v in pa)))
+    print("    about %.0f %% of the width excess and the rest is a genuine null-Q difference."
+          % (100.0 * (1.0 - (np.mean(pa) - 1.0) / max(np.mean(pb) - 1.0, 1e-9))))
+    print("    ⚠ The tempting reading -- that the tilt excess and the width excess are the same")
+    print("    ~2x, so one causes the other -- is REFUTED by this test. Coincidence.")
+    print("  ⇒ AND THE TILT ITSELF IS NOW SMALL: %+.2f dB (flat throw), against session 64's"
+          % resid)
+    print("    -6.2 dB. GAP #1b stays CLOSED; what remains is the null-Q difference above,")
+    print("    which is ATTACK's network and not the bridged-T's.")
     return dict(drop_slope={k: list(v) for k, v in rows.items()},
-                bridged_t_drop=btd, sk_drop=skd, detilt=out)
+                bridged_t_drop=btd, sk_drop=skd, grunt_drop=gd, accounted=acct,
+                model_drop=tot, residual=resid, detilt=out)
 
 
 class TapCost:

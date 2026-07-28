@@ -104,6 +104,120 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 65, 2026-07-29): ▶ PHASE 9 / A3 STEP 22 — ⛔⛔ SESSION 64's HEADLINE DOES NOT
+> SURVIVE: THE "6.2 dB OD-PATH SHAPE ERROR ATTRIBUTED TO THE BRIDGED-T" WAS A **MISSING `--grunt`
+> FLAG**, AND GAP #1b IS RE-CLOSED. ⭐⭐ AND WITH IT FIXED THE TWO-POLE ATTACK PROPOSAL IS
+> MATERIALLY **BETTER** THAN SESSION 63 RECORDED — DEPTHS NOW MATCH THE PEDAL TO 0.2–0.6 dB (were
+> 3.6–4.3 dB DEEPER) AND BOOST'S BROADBAND SLOPE HAS THE **RIGHT SIGN** (was the wrong one).
+> Session 64's next-step (a), which turned out not to need doing. Tooling + analysis only;
+> **NOTHING in `src/` or `tests/` changed**; **ctest 16/17** (the pre-existing session-44
+> `OSValidationTest`, identical `amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`). Baseline verified
+> FIRST: `attack_shape_screen --tilt` reproduced every session-64 figure exactly before anything was
+> touched. Full detail `docs/phase9-validation.md` §4 "A3 step 22".**
+> **(1) ⛔⛔ THE DEFECT — THE RENDER CONDITION WAS HAND-WRITTEN AND THE OMITTED FLAGS TOOK THE
+> RENDERER'S DEFAULTS.** `attack_render_gate.py` (s63) set `BASE = ["--drive","0.0","--level","1.0",
+> "--blend","1.0"]` and `attack_shape_screen.py` (s64) copied it. `OfflineRender` defaults
+> **`--grunt 0` = BOOST**; every capture in that comparison is **GRUNT CUT**. GRUNT is the CLIPPER'S
+> INPUT COUPLING and circuit.md puts its corner at **~896 Hz (cut) vs ~36 Hz (boost)** — across
+> 200 → 480 Hz that is **+6.71 vs +0.11 dB of rise, i.e. a 6.60 dB slope difference in exactly the
+> window session 64 measured.** It reported 6.2 dB. (`--lo-mid-freq`/`--hi-mid-freq` were also
+> defaulted 2 vs the captures' 1 — inert at the flat knob, now asserted not assumed.)
+> **(2) ✅ GAP #1b IS RE-CLOSED, AND THE ACCOUNTING NOW CLOSES.** At the captures' own GRUNT the
+> 200 → 480 Hz drop is **PEDAL −4.92/−5.32/−4.87 vs MODEL −4.02/−3.71/−3.93** ⇒ residual
+> **−0.90/−1.61/−0.95 dB** (floor ~0.41) with the model's scoop **SHALLOWER**, not 2.3× deeper —
+> the same direction session 21 closed on (−2.45 vs −3.02 dB over 116 OD rows), so two independent
+> instruments now agree in sign and rough size. ⭐ The probe prints every named contribution and
+> sums them, with the GRUNT term **MEASURED** by re-rendering at `--grunt 0`: **bridged-T −10.79 +
+> Sallen-Keys −0.03 + GRUNT +7.13 = −3.69 vs measured −3.93 (residual 0.24 dB).** The bridged-T is
+> still the only element with authority here (390× the SKs) — s64 was right about that — **but it is
+> OPPOSED by the GRUNT highpass and the two nearly cancel**, which is why attributing the whole drop
+> to it gave the wrong answer. ⚠ s64's accounting omitted GRUNT and still closed to 0.26 dB
+> **because** its renders sat where that term is ~0. **A term missing from an accounting and ~zero
+> in the data is invisible; only changing the condition that zeroes it finds it.**
+> **(3) ⚠⚠ NEITHER OF THE PROBE'S OWN SOUNDNESS GATES COULD EVER HAVE CAUGHT IT.** It gated on
+> "present in ALL THREE throws ⇒ shared" and "level-independent ⇒ not an operating point". A shared
+> **render-condition** error satisfies both exactly as well as a shared **circuit** error, and GRUNT
+> is linear so it is level-independent too. ⭐ **GENERAL: gates that show a finding is SYSTEMATIC
+> cannot separate a systematic property of the DEVICE from one of the MEASUREMENT — the condition a
+> comparison is made under needs its own gate.** New `attack_render_gate.py` **GATE 0 CONDITION**
+> asserts flag-by-flag that the renderer's arguments equal
+> `captures.render_args(parse_capture(<capture>))` with `--attack` the only permitted difference,
+> and **exits** rather than printing numbers. ⭐ And the fix is structural: `_base_args()` DERIVES
+> the list from the parser and `attack_shape_screen` imports `RG.BASE` (one source — the session-62
+> anti-divergence rule). ⚠ **Blast radius is exactly those two tools:** `comprehensive_report.py`
+> has always called `C.render_args(parsed)`, so **NO MATRIX NUMBER MOVES** (incl. session 63's
+> `s63_twopole.json` verdict), and `a3_blend_decompose` writes `grunt=CUT` into its CSV header.
+> **(4) ⭐ THE CORRECTED RENDER GATE — FOUR RECORDED READINGS DIE, THREE OF THEM AGAINST THE
+> PROPOSAL** (`analysis/reports/s65_render_gate.json`; f0 is UNCHANGED to the bin at 316.4/328.1/
+> 334.0, as a smooth first-order HP must leave a null alone):
+> ⭐ **DEPTH NOW MATCHES: 14.42/33.26/15.79 vs the pedal's 14.93/32.70/16.01 (0.51/0.56/0.22 dB)**,
+> where s63 measured the model **3.6–4.3 dB DEEPER** and had to rest the claim on the ranking. The
+> allowance was never needed. ⭐ **BOOST'S SLOPE SIGN IS RIGHT: +0.56 dB/dec vs pedal +1.23**, where
+> s63 item 5(a)'s headline was **−1.39 = the WRONG SIGN**; resid rms **1.27 → 0.66**, median 7.43 →
+> **8.49** vs 8.63. ⛔ **s63 ITEM 4 IS REVERSED** — it recorded the model compressing HARDER (+6.31
+> vs the pedal's +4.43 across −18 → −36 dBFS) and filed ~1.9 dB to A3/A5 headroom; corrected it is
+> **+1.28, i.e. the model compresses LESS. Do not carry that headroom item forward.** ⚠ **s63 ITEM
+> 5(b)'s INFERENCE IS WEAKENED** — its "the width excess is a UNIFORM ~2.1×, and a per-throw element
+> cannot make a uniform error, therefore a SHARED ladder element" is what aimed session 64's entire
+> search; corrected the ratios are **1.51/1.72/1.90**, still all >1 but no longer uniform.
+> ⚠ **CUT IS NOT RESCUED**: slope −0.00 vs the pedal's −1.38, spread 5.14 vs 2.62 — so the cut-shape
+> disagreement (s60 item 11 / s61 item 5 / s63 item 5a) stands and is now the WHOLE of item 5(a).
+> **(5) ⚠ `h` IS NOT EXACTLY A RATIO — MEASURED, NOT ARGUED.** Every ATTACK instrument since s57
+> rests on "anything shared by all three throws cancels in `h`". GRUNT is shared, yet the broadband
+> median moved **DRAWN 0.14 (boost) / 0.06 (cut) dB** but **PROPOSAL 1.06 (boost) / 0.06 (cut)**.
+> The one large entry is the throw that pushes ~8.6 dB more into the J201 and clipper ⇒ **GRUNT sits
+> at the CLIPPER INPUT, so it moves the operating point, and a ratio through a nonlinearity does not
+> cancel.** Quote the ratio argument with that bound: ~0.1 dB for a shared LINEAR element, ~1 dB for
+> a shared element that changes the clipper's drive, on the hot throw.
+> **(6) ⭐ SESSION 64's OWN "LOAD-BEARING METHOD FINDING" LARGELY DISSOLVES.** Its item 2 said the
+> fast ladder solve is **~4 dB off on depth / up to 24 % on width** vs the render, with the mechanism
+> "`D(f)` falls 17.1 dB across 150–700 Hz = the bridged-T scoop". That fall was the GRUNT boost
+> coupling leaving the LF unattenuated. GATE C's in-sample constants go **depth −3.76/−4.00/−4.45 →
+> +0.32/−0.64/+0.06 dB** and **width ×0.805/0.878/1.007 → ×1.028/1.124/1.022**, and out-of-sample
+> **±1.7–6.9 Hz f0 / 0.18–2.57 dB depth / −1.6…+15.7 % width** against s64's ±5 Hz / ±3.3 dB /
+> ±10–27 %. ⚠ **But GATE C's VERDICT is unchanged and still CHECK** (±16 % of width is not something
+> to fit an absolute width on), so `attack_shape_screen` stays a **LEVER FINDER** and
+> `attack_render_gate` stays the arbiter. The conclusion survived even though its numbers did not.
+> **(6b) ⚠⚠ AND THOSE OUT-OF-SAMPLE NUMBERS WERE WRONG ONCE MORE, IN THIS SESSION, FOR A THIRD
+> REASON.** GATE C compares renders from TWO producers — `dflt_*`/`prop_*` from `attack_render_gate`
+> and its own `cal_*` anchor. Re-rendering only the first pair gave a fully plausible table reading
+> **+29…+49 % width**; re-rendering the anchor too moved it to −1.6…+15.7 %. That is
+> `rebaseline-all-derived-artefacts` (s45 item 7a, s35) a third time. ⭐ **FIX: the artefact now
+> carries its own condition** — every render writes a `<file>.args.json` stamp of its exact argv and
+> every read calls `check_stamp()`, which ABORTS on a mismatched or missing stamp. Both paths were
+> **MUTATION-TESTED** (flip `--grunt` in one stamp, delete another) rather than assumed to work.
+> **(7) ⚠ WHAT IS NOT RE-RUN, FLAGGED NOT SILENTLY CARRIED.** `--census` is ladder-solve-only and
+> takes no render, so **s64 item 4 (no shared ladder element is a width lever) STANDS**. But
+> `--fit`/`--best` (s64 items 5 and 7) score against the requirement transferred through GATE C's
+> calibration, and that calibration moved ⇒ **s64's "the nine numbers are reachable only at R7 ×572
+> / C6 ×62 / the tap on its bound" is UNVERIFIED at the corrected calibration.** Not asserted wrong
+> — asserted untested. ⚠ Also: the de-tilt mechanism test is now a STRONGER refutation of the joined
+> reading than s64's — ratios 1.51/1.72/1.90 → **1.73/1.71/1.83**, i.e. removing the background tilt
+> does not help on average AT ALL (s64 read it as "worth about a quarter").
+> **▶ NEXT, IN ORDER: (a)** ⭐ **re-run `attack_shape_screen --fit --best` at the corrected
+> calibration** and re-read item 7's verdict — the width residual is now 1.5–1.9× (not a uniform
+> 2.1×) and the SHARED-element premise behind that search is weaker, so ask the question again
+> rather than re-quoting the answer. **(b)** cut's broadband SHAPE is now the largest clearly-open
+> ATTACK item (slope −0.00 vs −1.38, spread 5.14 vs 2.62); the cheap test is still the optional pair
+> `level-1700_attack-{boost,cut}_base-od.wav` (drive **noon**, LEVEL max), which also settles
+> whether it and s60 item 11 / s61 item 5 are ONE item. **(c)** ⭐ `shape_gate`'s **63 % LOCAL**
+> finding still deserves its own pass (`--top N` + the LOCAL-curve plot) — unaffected by any of
+> this, and still the single largest unexplored lead in A3. **(d)** unchanged: `b0` between the
+> LEVEL and DRIVE axes before quoting any absolute A3 magnitude; then the 4 `gain-n12` re-captures,
+> A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D. **(e)** ⭐ still worth doing
+> once: fold `sweep_clean_-36` into the matrix properly (a deliberate re-baseline).
+> ⚠ **UNCOMMITTED at session close:** `CLAUDE.md`, `docs/phase9-validation.md`,
+> `analysis/attack_render_gate.py` (derived `BASE`, GATE 0, `stamp`/`check_stamp`),
+> `analysis/attack_shape_screen.py` (imports `RG.BASE`, new `grunt_term()`, computed tilt verdict,
+> stamp checks on every render read). **Nothing in `src/` or `tests/`.**
+> ⚠ Gitignored but regenerated: ALL of `build/attack_render_gate/*.wav` and
+> `build/attack_shape_screen/cal_*.wav` were **deleted and re-rendered at the correct GRUNT with
+> condition stamps** — the pre-session-65 ones are wrong and any left on another machine must be
+> deleted, not reused (the stamp check will refuse them). New
+> `build/attack_render_gate/gruntctl_boost.wav`, `analysis/reports/s65_render_gate.json`,
+> `analysis/reports/s65_tilt.json`. The session-60 captures are gitignored and exist only on this
+> machine — **back them up.**
+> ── prior session ──
 > **CURRENT (session 64, 2026-07-29): ▶ PHASE 9 / A3 STEP 21 — ⭐⭐ THE WIDTH RESIDUAL IS **NOT A VALUE
 > ERROR IN THE SHARED LADDER**, AND THE INSTRUMENT EVERY ATTACK SCREEN SINCE SESSION 61 HAS FITTED ON
 > IS **~4 dB / 24 % OFF THE SHIPPED CHAIN** ON EXACTLY THE QUANTITIES IT WAS FITTING. ⭐⭐ AND THE

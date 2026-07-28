@@ -72,6 +72,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analyze as A                                    # noqa: E402
+import captures as C                                   # noqa: E402  (the capture -> render-args map)
 with redirect_stdout(io.StringIO()):
     import attack_notch_probe as P                     # noqa: E402  (locator, windows, floors)
 
@@ -80,7 +81,36 @@ OUTDIR = "build/attack_render_gate"
 
 # The operating point the measurement was taken at: drive MIN (clipper idle), LEVEL MAX (the wiper
 # shorts to the OD source, so the clean bleed is EXACTLY zero -- session 59 item 6), BLEND MAX.
-BASE = ["--drive", "0.0", "--level", "1.0", "--blend", "1.0"]
+#
+# ⚠⚠ DERIVED FROM THE CAPTURE, NOT HAND-WRITTEN -- session 65. The first version of this list was
+# `["--drive","0.0","--level","1.0","--blend","1.0"]`, which is correct as far as it goes and
+# SILENTLY WRONG in what it omits: every flag left off falls back to OfflineRender's own default,
+# and those defaults are NOT the captures' settings. `gruntIdx` defaults to 0 = BOOST while these
+# captures are GRUNT CUT -- a first-order highpass at ~36 Hz instead of ~896 Hz, i.e. a 6.6 dB
+# difference in slope across 200 -> 480 Hz alone. That is the whole of session 64's "GAP #1b
+# reopened, the OD path is 6.2 dB too dark" finding (see §4 "A3 step 22"). `loMidFreq`/`hiMidFreq`
+# default to 2 where the captures use 1; harmless only because the mid stages are unity at the
+# flat knob, which is now asserted rather than assumed (GATE 0).
+#
+# ⭐ THE FIX IS STRUCTURAL, NOT A CORRECTED CONSTANT: build the argument list by asking
+# `captures.render_args` what THIS capture file's settings are, so the render condition cannot
+# drift from the measurement condition again. `--attack` is dropped because it is the variable.
+def _base_args():
+    """Every non-ATTACK flag of the FLAT reference capture, straight from the filename parser."""
+    args = C.render_args(C.parse_capture(P.FLAT))
+    out, skip = [], False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a == "--attack":
+            skip = True
+            continue
+        out.append(a)
+    return out
+
+
+BASE = _base_args()
 ATTACK_IDX = {"flat": "0", "boost": "1", "cut": "2"}
 
 # Session 62's proposed point. Realised as FitParams: trebleC5 is the base cap and the trims are
@@ -99,6 +129,35 @@ CURVE = (40.0, 2000.0)                                 # the whole compared curv
 # =============================================================================================
 # rendering
 # =============================================================================================
+def stamp(out, cmd):
+    """Write the exact argv that produced a render, beside it.
+
+    ⚠ WHY: session 65 fixed the GRUNT condition, re-rendered THIS tool's `dflt_*`/`prop_*`, and
+    then read attack_shape_screen's GATE C -- which silently mixed those fresh renders with its own
+    `cal_*` anchor, still on disk from the previous condition. The half-refreshed set produced a
+    plausible table (out-of-sample width error "+29..+49 %") that was pure artefact; re-rendering
+    the anchor moved it to -1.6..+15.7 %. That is `rebaseline-all-derived-artefacts` again, and the
+    reason a render must carry its own condition rather than depend on someone remembering which
+    files a change invalidated -- the same habit as `a3_blend_decompose` printing `grunt=CUT` into
+    its CSV header. `check_stamp` is what makes it a gate rather than a note.
+    """
+    with open(out + ".args.json", "w") as fh:
+        json.dump({"argv": cmd}, fh, indent=1)
+
+
+def check_stamp(path, expect):
+    """Refuse a render whose recorded argv is not `expect` (argv minus in/out paths)."""
+    side = path + ".args.json"
+    if not os.path.exists(side):
+        sys.exit("%s has no .args.json stamp -- it predates the condition gate and cannot be "
+                 "trusted. Delete it and re-render." % path)
+    got = json.load(open(side))["argv"][3:]
+    if got != expect:
+        sys.exit("%s was rendered at a DIFFERENT condition and would silently corrupt this run:\n"
+                 "   on disk: %s\n   wanted : %s\nDelete it and re-render."
+                 % (path, " ".join(got), " ".join(expect)))
+
+
 def render(tag, pos, fits, quiet=True):
     """Render one ATTACK position through the real chain; returns the aligned signal."""
     os.makedirs(OUTDIR, exist_ok=True)
@@ -109,6 +168,7 @@ def render(tag, pos, fits, quiet=True):
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit("render failed for %s/%s:\n%s\n%s" % (tag, pos, " ".join(cmd), r.stderr))
+    stamp(out, cmd)
     if not quiet:
         print("    " + r.stdout.strip().splitlines()[-1])
     return out
@@ -286,10 +346,29 @@ def main():
         tfm[tag] = model_curves(tag, fits, orig, levels)
     print("  ok.")
 
-    # ---- GATE 1 LIVENESS ---------------------------------------------------------------
+    # ---- GATE 0 CONDITION --------------------------------------------------------------
+    # ⚠⚠ THE GATE SESSION 64 DID NOT HAVE, AND IT IS WHY ITS HEADLINE DID NOT SURVIVE. Every
+    # comparison in this file assumes the render sits at the captures' own operating point. That
+    # was hand-written as four flags, and the flags NOT written silently took OfflineRender's
+    # defaults -- `--grunt 0` (Boost) against captures at `--grunt 1` (Cut). The check is now:
+    # the flags actually handed to the renderer must equal, term for term, what
+    # `captures.render_args` says this capture file is, with ATTACK the only difference.
     print("\n" + "=" * 104)
     print("GATES")
     print("=" * 104)
+    want = C.render_args(C.parse_capture(P.FLAT))
+    got = BASE + ["--attack", ATTACK_IDX["flat"]]
+    wd = dict(zip(want[0::2], want[1::2]))
+    gd = dict(zip(got[0::2], got[1::2]))
+    diff = sorted(k for k in set(wd) | set(gd) if wd.get(k) != gd.get(k))
+    print("  0 CONDITION  render flags vs %s: %d flag(s) differ   %s"
+          % (P.FLAT, len(diff), "OK" if not diff else "FAIL: " + ", ".join(diff)))
+    if diff:
+        for k in diff:
+            print("      %-16s capture=%s  render=%s" % (k, wd.get(k), gd.get(k)))
+        sys.exit("render condition does not match the capture -- every number below would be void")
+    print("      (%s)" % " ".join(BASE))
+
     live = None
     if len(variants) == 2:
         f, a = h_curve(tfm["dflt"], "boost", P.MAIN)

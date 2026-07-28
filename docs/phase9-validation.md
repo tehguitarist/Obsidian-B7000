@@ -65,22 +65,24 @@ detail section below. Check off + move to the Gap log (§4) as they land.
 - [~] **A1. Bridged-T ~717 Hz notch** — was CLOSED as a non-issue (session 19, re-opened and
   re-closed session 20/21) on OUTPUT dips over 116 OD rows (median −2.45 vs the pedal's −3.02 dB),
   topology pixel-zoom-verified identical on both schematics.
-  ⛔⛔ **REOPENED (session 64) — and the reason is that the closing measurement could not see the
-  thing it closed.** It compared **output** dips in a region where the clean bleed sits **11–31 dB
-  ABOVE** the OD path, so it was insensitive to the OD path's own shape *by construction* — session
-  51 item 8 already flagged that closure as "weaker than recorded". Measured **directly on the OD
-  path, bleed-free by topology** (LEVEL max / BLEND max, drive min), each curve referred to its own
-  200 Hz value, the drop over **200 → 480 Hz** is **pedal −4.88 dB vs the model −11.05** — a
-  **6.2 dB shape error**, present in **all three ATTACK throws** (so it is shared, not ATTACK's) and
-  **level-independent to 0.02–0.15 dB** across −36/−30 dBFS (so not an operating point).
-  ⭐⭐ **And the element is named arithmetically:** over the same span the **IC2_B bridged-T alone
-  drops −10.79 dB** and the two Sallen-Keys **−0.03 dB**, so the bridged-T accounts for the model's
-  −11.05 **to 0.26 dB** and nothing else in the chain has authority there. The pedal's scoop is
-  **~2.3× shallower** — circuit.md **risk #1** verbatim. ⚠ Note what is and is not claimed: the
-  bridged-T is the only element in the *model* with authority here; whether the *pedal's* scoop is
-  itself shallower or something else compensates is not settled by this. ▶ This is now the
-  best-localised open OD-path shape error. `analysis/attack_shape_screen.py --tilt` is the
-  instrument. See §4 "A3 step 21" item 6, and §4 GAP #1b for the superseded closure.
+  ⛔⛔ **REOPENED (session 64) on a 6.2 dB OD-path shape error over 200–480 Hz attributed to the
+  bridged-T — and ✅ RE-CLOSED (session 65): that measurement was a MISSING `--grunt` FLAG.**
+  `attack_render_gate.py` hand-wrote its operating point as four flags, so `--grunt` fell back to
+  `OfflineRender`'s default of **0 = BOOST** while every capture in that comparison is **GRUNT CUT**
+  — a first-order highpass at ~36 Hz instead of ~896 Hz, worth **6.60 dB of slope across exactly
+  that window**. Session 64 reported 6.2 dB. Re-measured at the captures' own GRUNT the drop is
+  **pedal −4.92/−5.32/−4.87 vs model −4.02/−3.71/−3.93**, i.e. a **~1 dB residual with the model's
+  scoop SHALLOWER** — the same direction session 21 closed on (−2.45 vs −3.02 dB over 116 OD rows).
+  ⭐ The element accounting now CLOSES with the GRUNT term in it (bridged-T −10.79, Sallen-Keys
+  −0.03, GRUNT cut coupling **+7.13 measured** ⇒ −3.69 against a measured −3.93). The bridged-T is
+  still the only element with authority here; it is **opposed by the GRUNT highpass and the two
+  nearly cancel**, which is why attributing the whole drop to it gave the wrong answer.
+  ⚠ Session 64's two soundness gates — present in all three throws, level-independent — are
+  satisfied just as well by a shared *render-condition* error as by a shared *circuit* error, so
+  neither could have caught this. The condition now has its own gate (`attack_render_gate.py`
+  **GATE 0**), and the flags are DERIVED from `captures.render_args` rather than typed. See §4
+  "A3 step 22". **⇒ GAP #1b is CLOSED; do not re-open it without an instrument that gates its own
+  operating point.**
 - [~] **A1b/c/d. TREBLE ~322 Hz notch. Shipped session 19 as `trebleLadderDampR=30k` — ⛔ REOPENED
   session 46 (user-reported): the fix moved AWAY from the feature it is named after, and the feature
   is an A3 symptom.** Session 19's premise was the ISOLATED stage transfer (~37 dB deep vs "−3.4 dB
@@ -7195,3 +7197,218 @@ difference with no identified carrier. Whether the pedal's shallower scoop is it
 shallower or something else compensating (the bridged-T is the only element in the *model* with
 authority here; that is not the same claim). And session 63 item 5(a)'s cut-shape disagreement, which
 is in the same region and may be one item with this.
+
+---
+
+### ⛔⛔ A3 step 22 — session 64's GAP #1b reopening does NOT survive: the "6.2 dB OD-path shape error" was a MISSING `--grunt` FLAG. And with it fixed, the two-pole proposal is materially BETTER than session 63 recorded (session 65)
+
+Session 64's next-step (a) was to re-open GAP #1b and re-run session 49's bridged-T Pareto scan
+against the newly-measured OD-path shape. **That work is not needed: the measurement it rests on
+is void.** What follows is the defect, its blast radius measured rather than argued, and what the
+corrected numbers say — which is a better result for the ATTACK proposal than the buggy ones were.
+
+Tooling + analysis only. **NOTHING in `src/` or `tests/` changed**, and ctest was RUN (not assumed)
+at the pre-existing session-44 **16/17** (`OSValidationTest`, identical
+`amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`). Baseline verified FIRST: `attack_shape_screen --tilt`
+reproduced every session-64 figure exactly (PEDAL −4.93/−5.36/−4.88, DRAWN −11.14/−10.74/−11.05,
+bridged-T −10.79, SKs −0.03) before anything was touched.
+
+#### 1. ⛔⛔ THE DEFECT — the render condition was HAND-WRITTEN, and the flags it omitted took the renderer's own defaults
+
+`attack_render_gate.py` (session 63) set its operating point as
+
+```
+BASE = ["--drive", "0.0", "--level", "1.0", "--blend", "1.0"]
+```
+
+and `attack_shape_screen.py` (session 64) copied it. Every flag **not** in that list falls back to
+`OfflineRender`'s default — and those defaults are not the captures' settings:
+
+| flag | OfflineRender default | the captures (`captures.render_args`) |
+|---|---|---|
+| `--grunt` | **0 = BOOST** | **1 = CUT** |
+| `--lo-mid-freq` | 2 (1 kHz) | 1 (500 Hz) |
+| `--hi-mid-freq` | 2 (3 kHz) | 1 (1.5 kHz) |
+
+The mid-freq indices are inert here (the mid stages are unity at the flat knob). **GRUNT is not.**
+It is the clipper's input coupling and its corner moves an order of magnitude between positions —
+circuit.md puts it at **~896 Hz at CUT and ~36 Hz at BOOST**. Across 200 → 480 Hz a first-order
+highpass at 896 Hz rises **+6.71 dB** and one at 36 Hz rises **+0.11 dB**, i.e. the mismatch is worth
+**6.60 dB of slope in exactly the window session 64 measured**. Its reported error was **6.2 dB**.
+
+#### 2. ⇒ GAP #1b IS NOT REOPENED. At the captures' own GRUNT the residual is ~1 dB and the OPPOSITE SIGN
+
+Drop over 200 → 480 Hz, each curve referred to its own 200 Hz value, `sweep_clean_-36`:
+
+| | cut | boost | flat |
+|---|---|---|---|
+| PEDAL | −4.92 | −5.32 | −4.87 |
+| MODEL, GRUNT **boost** (session 64, the bug) | −11.16 | −10.74 | −11.06 |
+| MODEL, GRUNT **cut** (correct) | **−4.02** | **−3.71** | **−3.93** |
+
+Residual **−0.90 / −1.61 / −0.95 dB** against a ~0.41 dB floor — small, real, and with the model's
+scoop **SHALLOWER** than the pedal's, not 2.3× deeper. ⭐ That is the same direction session 21
+closed GAP #1b on (the plugin's 640/806 Hz dip measured −2.45 dB median against the pedal's −3.02,
+i.e. ~0.5 dB shallower, over 116 OD rows). **Two independent instruments, seven years of sessions
+apart in this log, now agree on both the sign and the rough size. GAP #1b stays CLOSED.**
+
+⭐ **And the element accounting now CLOSES, which session 64's did not have to.** The probe prints
+every named contribution to the drawn model's own drop and sums them — the GRUNT term MEASURED, by
+re-rendering the identical chain at `--grunt 0` so everything else cancels:
+
+```
+IC2_B bridged-T (analytic)      −10.79 dB
+two Sallen-Keys (analytic)       −0.03 dB
+GRUNT cut coupling (measured)    +7.13 dB   <- absent from session 64's accounting
+SUM                              −3.69 dB
+MODEL, measured                  −3.93 dB   residual 0.24 dB
+```
+
+The bridged-T is still the only element with real authority here (390× the Sallen-Keys) — session
+64 was right about *that* — **but it is opposed by the GRUNT highpass and the two nearly cancel**,
+which is why attributing the whole drop to it gave the wrong answer. Session 64's version omitted
+the GRUNT term and still closed to 0.26 dB; it closed *because* its renders were accidentally at
+GRUNT boost, where that term is ~0. **A term that is missing from an accounting and ~zero in the
+data is invisible; it is only found by changing the condition that makes it zero.**
+
+#### 3. ⚠⚠ WHY NEITHER OF THE PROBE'S OWN SOUNDNESS GATES COULD EVER HAVE CAUGHT IT
+
+The probe gated the finding two ways, both defensible and both useless against this failure:
+
+* **"present in ALL THREE throws ⇒ shared, not ATTACK's"** — a shared *render-condition* error is
+  present in all three throws exactly as well as a shared *circuit* error is.
+* **"LEVEL-independent to 0.02–0.15 dB ⇒ not an operating point"** — GRUNT is a linear coupling
+  network, so its effect is level-independent too.
+
+Both gates test properties of the *finding*. Neither tests whether the *instrument* was pointed at
+the right thing. ⭐ **GENERAL: gates that establish a finding is systematic cannot distinguish a
+systematic property of the device from a systematic property of the measurement. The condition
+under which a comparison is made needs its own gate.** That gate now exists
+(`attack_render_gate.py` **GATE 0 CONDITION**) and it does not compare against a hand-written
+expectation either — it asserts, flag by flag, that the arguments handed to the renderer equal
+`captures.render_args(parse_capture(<the capture file>))`, with `--attack` the only permitted
+difference, and exits rather than printing numbers if they do not.
+
+⭐ **The structural fix is that the render condition is now DERIVED from the capture, not typed.**
+`attack_render_gate._base_args()` builds the list from the parser; `attack_shape_screen` imports
+`RG.BASE` rather than keeping a second copy (one source, the session-62 anti-divergence rule).
+⚠ Note which tools were exposed and which were not: `comprehensive_report.py` — and therefore the
+whole 63-capture matrix, including session 63's `s63_twopole.json` verdict — has always called
+`C.render_args(parsed)`, so **no matrix number is affected**; and `a3_blend_decompose` prints
+`grunt=CUT` in its CSV header, which is the session-55 habit of writing the condition into the
+artefact. The two tools that hand-wrote their condition are the two newest ones.
+
+#### 4. ⭐ THE CORRECTED RENDER GATE — the two-pole proposal is BETTER than session 63 recorded
+
+Re-run of `attack_render_gate.py --both`, everything else identical
+(`analysis/reports/s65_render_gate.json`):
+
+| quantity | s63/64 (GRUNT boost, the bug) | s65 (GRUNT cut) | PEDAL |
+|---|---|---|---|
+| PROP f0 cut/boost/flat, Hz | 316.4 / 328.1 / 334.0 | **316.4 / 328.1 / 334.0** | 316.4 / 328.1 / 334.0 |
+| DRAWN f0 | 398.4 ×3 | **398.4 ×3** | — |
+| PROP depth, dB | 18.51 / 36.62 / 20.31 | **14.42 / 33.26 / 15.79** | 14.93 / 32.70 / 16.01 |
+| DRAWN depth, dB | 9.02 / 8.38 / 8.95 | 3.26 / 3.08 / 3.21 | — |
+| PROP width (interp), Hz | 150.6 / 59.6 / 138.6 | **118.0 / 46.6 / 136.6** | 77.9 / 27.1 / 71.9 |
+| PROP boost median / slope | +7.43 / **−1.39** | **+8.49 / +0.56** | +8.63 / +1.23 |
+| PROP boost resid rms | 1.27 | **0.66** | floor 0.204 |
+| PROP cut median / slope | −2.24 / +0.10 | −2.30 / −0.00 | −2.38 / −1.38 |
+| PROP boost level trend −18 → −36 | +6.31 | **+1.28** | +4.43 |
+
+Four of session 63/64's recorded readings do not survive, and three of them were **against** the
+proposal:
+
+* ⭐ **DEPTH NOW MATCHES.** Session 63 measured the model 3.6–4.3 dB DEEPER than the pedal and
+  (correctly, since depth is a lower bound) allowed it, resting the claim on the ranking. At the
+  right GRUNT the depths agree to **0.51 / 0.56 / 0.22 dB**. The allowance was never needed.
+* ⭐ **THE BOOST SLOPE SIGN IS RIGHT.** Session 63 item 5(a)'s headline — "the broadband SLOPE has
+  the WRONG SIGN on both throws" — was **boost −1.39 dB/dec against the pedal's +1.23**. It is now
+  **+0.56**: the right sign, undershooting. Residual rms halves, 1.27 → 0.66 dB. ⚠ Cut is *not*
+  rescued: −0.00 against the pedal's −1.38, and cut's spread is still 5.14 dB against 2.62. So the
+  cut-shape disagreement (session 60 item 11 / 61 item 5 / 63 item 5a) stands, unchanged, and is
+  now the *whole* of item 5(a) rather than half of it.
+* ⛔ **SESSION 63 ITEM 4 IS REVERSED.** It recorded the model compressing HARDER than the pedal
+  (+6.31 dB of level trend against +4.43) and filed a ~1.9 dB excess to A3/A5 headroom. The model
+  compresses **LESS** (+1.28 vs +4.43). The recorded direction was the GRUNT boost coupling driving
+  the clipper far harder at LF. **Do not carry that headroom item forward.**
+* ⚠ **SESSION 63 ITEM 5(b)'s INFERENCE IS WEAKENED.** Its argument was that the width excess is a
+  *uniform* ~2.1× across all three throws, and a per-throw element cannot make a uniform error, so
+  the carrier must be a SHARED ladder element — which is what sent session 64's entire search at the
+  shared ladder. Corrected, the ratios are **1.51 / 1.72 / 1.90**: still all >1, no longer uniform.
+  The shared-element premise is now a weaker reading of the data, not a forced one.
+
+#### 5. ⚠ AND `h` IS NOT EXACTLY A RATIO — MEASURED, NOT ARGUED
+
+Every ATTACK instrument since session 57 rests on "`h` = throw − flat is a ratio, so anything shared
+by all three throws cancels by construction". GRUNT is shared, so `h` should have been immune. It
+almost is, and where it is not, the mechanism is the one already on record: **GRUNT sits at the
+CLIPPER INPUT, so it moves the operating point, and a ratio through a nonlinearity is not a
+cancellation.** Measured shift in broadband median between the two GRUNT positions:
+
+| | boost throw | cut throw |
+|---|---|---|
+| DRAWN | 0.14 dB | 0.06 dB |
+| PROPOSAL | **1.06 dB** | 0.06 dB |
+
+The one large entry is the proposal's BOOST throw — the throw that pushes ~8.6 dB more into the
+J201 and the clipper, which is session 61 item 3's mechanism arriving on a different axis. ⇒ **`h`
+is invariant to a shared LINEAR element to ~0.1 dB, and to a shared element that changes the
+clipper's drive only to ~1 dB on the hot throw.** Quote the ratio argument with that bound attached.
+
+#### 6. ⭐ SESSION 64's OWN "LOAD-BEARING METHOD FINDING" LARGELY DISSOLVES TOO
+
+Session 64 item 2 reported that the fast ladder solve is **~4 dB off on depth and up to 24 % off on
+width** against the real render, called it the reason session 62 had fitted on the wrong instrument,
+and gave the mechanism as "`D(f) = render − ladder` falls 17.1 dB across 150–700 Hz — the bridged-T
+scoop". That fall was the GRUNT boost coupling leaving the LF unattenuated. Re-measured, GATE C's
+in-sample calibration constants move from
+
+```
+s64  depth offset −3.76 / −4.00 / −4.45 dB     width scale 0.805 / 0.878 / 1.007
+s65  depth offset +0.32 / −0.64 / +0.06 dB     width scale 1.028 / 1.124 / 1.022
+```
+
+⇒ **the ladder solve and the shipped chain agree far better than session 64 concluded** (depth to
+0.06–0.64 dB, width to 2–12 %), and out-of-sample the transfer improves too: **±1.7–6.9 Hz of f0,
+0.18–2.57 dB of depth, −1.6…+15.7 % of width**, against session 64's ±5 Hz / ±3.3 dB / ±10–27 %.
+⚠ **But GATE C's VERDICT is unchanged and still CHECK** — ±16 % of width is still not something to
+fit an absolute width on. So `attack_shape_screen` remains a **LEVER FINDER** and
+`attack_render_gate` remains the arbiter: the tool's own conclusion survives even though the
+numbers behind it did not.
+
+⚠⚠ **AND THOSE OUT-OF-SAMPLE NUMBERS WERE WRONG ONCE BEFORE, IN THIS SESSION, FOR A THIRD REASON —
+recorded because it is the same lesson a third time.** GATE C compares renders from TWO producers:
+`dflt_*`/`prop_*` from `attack_render_gate` and its own `cal_*` anchor. Re-rendering only the first
+pair and re-running produced a fully plausible table reporting **+29…+49 % of width** — the stale
+anchor, read silently. Re-rendering the anchor moved it to −1.6…+15.7 %. That is
+`rebaseline-all-derived-artefacts` (session 45 item 7a, session 35) recurring, and the fix is the
+same habit `a3_blend_decompose` already had: **the artefact carries its own condition.** Every
+render now writes a `<file>.args.json` stamp of its exact argv, and every read calls
+`check_stamp()`, which refuses a render made at a different condition or with no stamp at all.
+⭐ Both paths were **mutation-tested**, not merely written: flipping `--grunt` inside one stamp and
+deleting another each abort the run with the offending file named.
+
+#### 7. WHAT IS AND IS NOT SETTLED
+
+**Settled.** The defect, its size, and its structural fix. GAP #1b is **closed**, on an axis that
+can see the OD path directly and now agrees with session 21 in sign and rough magnitude. The
+element accounting over 200–480 Hz closes to 0.24 dB with the GRUNT term in it. Session 63's items
+4 and 5(a)-for-boost are void; item 5(b)'s uniformity is void; the proposal's depth and boost slope
+meet the record. `h`'s ratio-invariance is bounded by measurement.
+
+**NOT settled, and unchanged by any of this.** (a) The null-Q difference: widths are still
+**1.51 / 1.72 / 1.90 ×** the pedal's, and the de-tilt mechanism test now attributes essentially
+**none** of it to the background tilt (ratios 1.51/1.72/1.90 → 1.73/1.71/1.83, i.e. de-tilting does
+not help on average at all — a *stronger* refutation of the joined reading than session 64's).
+(b) Cut's broadband SHAPE — slope −0.00 against −1.38, spread 5.14 against 2.62. (c) The
+63-capture matrix verdict on the two-pole topology (`OD ex gain-n12` 1.903 → 2.218) is **unaffected
+by this defect** and still says the topology costs more than it buys, with session 63 item 0's
+`shape_gate` decomposition localising that cost to LEVEL and CURVATURE.
+
+**NOT re-run, and flagged rather than silently carried.** `attack_shape_screen --census` is a
+ladder-solve-only sensitivity table and takes no render, so session 64 item 4 stands as measured.
+But `--fit` and `--best` (session 64 items 5 and 7) score candidates against the requirement
+*transferred through GATE C's calibration*, and that calibration has moved — so **session 64's
+"the nine numbers are reachable only at R7 ×572" conclusion is UNVERIFIED at the corrected
+calibration and must be re-run before it is quoted again.** It is not asserted to be wrong; it is
+asserted to be untested.
