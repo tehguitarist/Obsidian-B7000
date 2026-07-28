@@ -43,10 +43,10 @@ INHERITED CAVEATS -- read before quoting anything
   * ⚠ the swept read carries the harmonic-power bias (session 52 item 3b) -- `read_a3_tones.py`
     measures it at ~2 deg over 40-1700 Hz, so it is small here, but it is not zero and these are
     swept captures.
-  * ⚠ ATTACK is NOT reachable in `a3_blend_decompose.cpp` (`p.attackIdx = 0` is hardcoded at
-    line 150), so there is no MODEL side for the two ATTACK conditions. Their pedal-side comparison
-    is unaffected -- that is the model-free half above -- but no `H_req` is printed for them, and it
-    is reported as a gap rather than quietly omitted.
+  * ⭐ ATTACK is reachable since session 55 (`a3_blend_decompose ... attackIdx=1|2`), so ALL SEVEN
+    conditions now have a model side and step 4 runs the step-2 localiser pedal-vs-MODEL. ⚠ that
+    makes step 4 the STRICTER read but NOT the model-free one: step 2 stays as the fallback that
+    cannot inherit a model error, and both are printed.
 
 Run:
     python3.11 analysis/a3_condition_axis.py --selftest
@@ -73,6 +73,20 @@ B0_FILE = "blend-0700_base-od.wav"
 
 # condition -> (interior-B files, B=1.00 file, model decompose CSV or None)
 # The three interior files are session 53's captures; the B=1 file is the frozen matrix's own.
+#
+# ⭐ EVERY condition now has a model side (session 55). GRUNT was always reachable
+# (`a3_blend_decompose`'s argv[1]) and the CSVs simply had never been rendered; ATTACK was
+# genuinely unreachable until `attackIdx=` was added to that tool. Regenerate all seven with:
+#     ./build/a3_blend_decompose 1 0.0 -18                        > build/a3_dec_drv0.0.csv
+#     ./build/a3_blend_decompose 1 0.5 -18                        > build/a3_dec_drv0.5.csv
+#     ./build/a3_blend_decompose 1 1.0 -18                        > build/a3_dec_drv1.0.csv
+#     ./build/a3_blend_decompose 2 0.5 -18                        > build/a3_dec_grunt-flat.csv
+#     ./build/a3_blend_decompose 0 0.5 -18                        > build/a3_dec_grunt-boost.csv
+#     ./build/a3_blend_decompose 1 0.5 -18 attackIdx=1            > build/a3_dec_attack-boost.csv
+#     ./build/a3_blend_decompose 1 0.5 -18 attackIdx=2            > build/a3_dec_attack-cut.csv
+# ⚠ that binary is built by a hand-written `c++` command, NOT by CMake, so `cmake --build` will
+# NOT rebuild it when a header changes -- session 37 item 12's stale-binary trap. Each CSV states
+# its own grunt/attack/drive in its header line; check that before trusting one.
 CONDITIONS = {
     "ref (drive noon)": (["blend-0930_base-od.wav", "blend-1200_base-od.wav",
                           "blend-1430_base-od.wav"], "ref-od.wav", "build/a3_dec_drv0.5.csv"),
@@ -83,14 +97,18 @@ CONDITIONS = {
                           "drive-1700_blend-1430_base-od.wav"], "drive-1700_base-od.wav",
                          "build/a3_dec_drv1.0.csv"),
     "grunt flat":       (["grunt-flat_blend-0930_base-od.wav", "grunt-flat_blend-1200_base-od.wav",
-                          "grunt-flat_blend-1430_base-od.wav"], "grunt-flat_base-od.wav", None),
+                          "grunt-flat_blend-1430_base-od.wav"], "grunt-flat_base-od.wav",
+                         "build/a3_dec_grunt-flat.csv"),
     "grunt boost":      (["grunt-boost_blend-0930_base-od.wav", "grunt-boost_blend-1200_base-od.wav",
-                          "grunt-boost_blend-1430_base-od.wav"], "grunt-boost_base-od.wav", None),
+                          "grunt-boost_blend-1430_base-od.wav"], "grunt-boost_base-od.wav",
+                         "build/a3_dec_grunt-boost.csv"),
     "attack boost":     (["attack-boost_blend-0930_base-od.wav",
                           "attack-boost_blend-1200_base-od.wav",
-                          "attack-boost_blend-1430_base-od.wav"], "attack-boost_base-od.wav", None),
+                          "attack-boost_blend-1430_base-od.wav"], "attack-boost_base-od.wav",
+                         "build/a3_dec_attack-boost.csv"),
     "attack cut":       (["attack-cut_blend-0930_base-od.wav", "attack-cut_blend-1200_base-od.wav",
-                          "attack-cut_blend-1430_base-od.wav"], "attack-cut_base-od.wav", None),
+                          "attack-cut_blend-1430_base-od.wav"], "attack-cut_base-od.wav",
+                         "build/a3_dec_attack-cut.csv"),
 }
 
 
@@ -139,6 +157,30 @@ def load_model_csv(path):
         ref, od, cl = complex(v[1], v[2]), complex(v[5], v[6]), complex(v[7], v[8])
         out[v[0]] = (abs(od) / abs(ref), cmath.phase(od) - cmath.phase(cl))
     return out
+
+
+def hreq_of(solved_map, name, bands):
+    """{f: (|H_req| dB, argH_req deg)} for one condition, or {} if it has no model CSV.
+
+    `H_req = G_ped / G_mdl` -- what a correction element would have to supply, at THIS condition.
+    Factored out (session 55) because it is now computed four ways: two taper variants x two
+    axes (DRIVE in step 3, the SWITCHES in step 4), and four copies of a phase-fold is how a
+    sign convention drifts between two halves of the same verdict.
+    """
+    mdl = load_model_csv(CONDITIONS[name][2])
+    if mdl is None:
+        return {}
+    h = {}
+    for f in bands:
+        if not solved_map[name].get(f, (0, 0, 0, False))[3]:
+            continue
+        key = min(mdl, key=lambda x: abs(x - f))
+        if abs(key - f) > 0.06 * f:          # the model grid is the tool's own band list
+            continue
+        rm, thm = mdl[key]
+        h[f] = (20 * math.log10(solved_map[name][f][0] / rm),
+                ((AX.fold(solved_map[name][f][1]) - math.degrees(thm)) + 180) % 360 - 180)
+    return h
 
 
 # ⚠⚠ A dB residual at a band sitting in a deep cancellation null is NOT a law failure.
@@ -392,39 +434,10 @@ def main():
     print("  A post-clipper LINEAR element multiplies |OD| by the same H(f) at every drive. So if")
     print("  the missing element is post-clipper, H_req = G_ped/G_mdl must be IDENTICAL at drive")
     print("  min, noon and max. A drive-dependent H_req rules the whole post-clipper class out.")
-    hreq = {}
-    for name in ("drive min", "ref (drive noon)", "drive max"):
-        mdl = load_model_csv(CONDITIONS[name][2])
-        if mdl is None:
-            continue
-        h = {}
-        for f in bands:
-            if not solved[name].get(f, (0, 0, 0, False))[3]:
-                continue
-            key = min(mdl, key=lambda x: abs(x - f))
-            if abs(key - f) > 0.06 * f:
-                continue
-            rm, thm = mdl[key]
-            h[f] = (20 * math.log10(solved[name][f][0] / rm),
-                    ((AX.fold(solved[name][f][1]) - math.degrees(thm)) + 180) % 360 - 180)
-        hreq[name] = h
+    DRIVES = ("drive min", "ref (drive noon)", "drive max")
+    hreq = {n: h for n in DRIVES if (h := hreq_of(solved, n, bands))}
     # sensitivity: repeat H_req under the SHARED taper so the verdict cannot rest on the nuisance
-    hreq_sh = {}
-    for name in ("drive min", "ref (drive noon)", "drive max"):
-        mdl = load_model_csv(CONDITIONS[name][2])
-        if mdl is None:
-            continue
-        h = {}
-        for f in bands:
-            if not solved_shared[name].get(f, (0, 0, 0, False))[3]:
-                continue
-            key = min(mdl, key=lambda x: abs(x - f))
-            if abs(key - f) > 0.06 * f:
-                continue
-            rm, thm = mdl[key]
-            h[f] = (20 * math.log10(solved_shared[name][f][0] / rm),
-                    ((AX.fold(solved_shared[name][f][1]) - math.degrees(thm)) + 180) % 360 - 180)
-        hreq_sh[name] = h
+    hreq_sh = {n: h for n in DRIVES if (h := hreq_of(solved_shared, n, bands))}
 
     common = sorted(set.intersection(*[set(h) for h in hreq.values()])) if len(hreq) == 3 else []
     if common:
@@ -457,8 +470,80 @@ def main():
                   % ("HOLDS" if (max(sm2) > 3 * TAKE_FLOOR_DB) == (max(sm) > 3 * TAKE_FLOOR_DB)
                      else "⚠ CHANGES"))
 
-    print("\n⚠ ATTACK has no model side (a3_blend_decompose.cpp:150 hardcodes attackIdx = 0), so")
-    print("  the two ATTACK conditions appear in step 2 only. Making it reachable is a next step.")
+    # ---- step 4: step 2's localiser, run pedal-vs-MODEL (session 55) ----
+    print("\n=== 4. ⭐ THE LOCALISER, PEDAL-vs-MODEL -- does H_req move with the SWITCHES? ===")
+    print("  Step 2 asks whether the PEDAL's OD transfer moves with a switch. It always does, and")
+    print("  its own caveat is that it does not normalise for how big each perturbation is (ATTACK")
+    print("  moves 220 pF; GRUNT moves 47n/220n), so a small dtheta under ATTACK is ambiguous")
+    print("  between 'the ladder is not the carrier' and 'the ladder barely moved'.")
+    print("  Differencing H_req instead removes whatever the model ALREADY reproduces, so what is")
+    print("  left is only the part of each switch's effect the model gets WRONG -- which is the")
+    print("  quantity a carrier hypothesis is actually about.")
+    print("  A post-clipper linear element sits downstream of the treble ladder AND the clipper")
+    print("  input, so it multiplies the OD path identically in every position ⇒ H_req must be")
+    print("  SWITCH-INDEPENDENT, exactly as step 3 requires it to be drive-independent.")
+    href = hreq_of(solved, "ref (drive noon)", bands)
+    SWITCHES = [n for n in CONDITIONS if n != "ref (drive noon)" and n not in DRIVES]
+    hsw = {n: hreq_of(solved, n, bands) for n in SWITCHES}
+    mdl_ref = load_model_csv(CONDITIONS["ref (drive noon)"][2])
+
+    # ⚠⚠ ONE COMMON BAND SET, or the rows are not comparable. Per-condition band sets differ
+    # (grunt boost identifies 8 bands where the others identify 12, because its deeper LF
+    # cancellation costs it identifiability), and an rms over DIFFERENT members is not a ranking
+    # -- that is session 49 item 7 / session 52 item 1 / session 54 item 6, three times over. The
+    # per-condition counts are printed too, so the restriction cannot hide a condition that is
+    # mostly unidentified.
+    common4 = sorted(set(href) & set.intersection(*[set(h) for h in hsw.values()])) if hsw else []
+    if not common4:
+        print("  no band is identified in every condition -- step 4 cannot run")
+        return
+    print("\n  Decomposed on ONE common band set (%d bands, %.0f-%.0f Hz): what the PEDAL does"
+          % (len(common4), common4[0], common4[-1]))
+    print("  across the switch, what the MODEL does, and the residual (= the H_req move).")
+    print("\n  %-14s %-22s %-22s  bands" % ("condition", "d|G| dB  ped / mdl / RESID",
+                                            "dtheta deg ped / mdl / RESID"))
+    sw_rows = []
+    for name in SWITCHES:
+        h, mdl = hsw[name], load_model_csv(CONDITIONS[name][2])
+        dm = [h[f][0] - href[f][0] for f in common4]
+        dp = [((h[f][1] - href[f][1]) + 180) % 360 - 180 for f in common4]
+        # the model's OWN response to this switch, so "the perturbation is small" and "the model
+        # gets it wrong" are separated on the page instead of only in a caveat below.
+        mk = lambda m, f: m[min(m, key=lambda x: abs(x - f))]
+        dmm = [20 * math.log10(mk(mdl, f)[0] / mk(mdl_ref, f)[0]) for f in common4]
+        dpm = [((math.degrees(mk(mdl, f)[1] - mk(mdl_ref, f)[1])) + 180) % 360 - 180
+               for f in common4]
+        dpp = [x + y for x, y in zip(dp, dpm)]          # pedal side = resid + model side
+        dmp = [x + y for x, y in zip(dm, dmm)]
+        rms = lambda v: float(np.sqrt(np.mean(np.square(v))))
+        sw_rows.append((name, dm, dp, common4))
+        print("  %-14s %6.2f /%6.2f /%6.2f      %6.1f /%6.1f /%6.1f          %2d"
+              % (name, rms(dmp), rms(dmm), rms(dm), rms(dpp), rms(dpm), rms(dp), len(hsw[name])))
+    print("  (rms over the common bands; RESID = ped - mdl = the d(H_req) a correction must absorb)")
+    if sw_rows:
+        wm = max(max(abs(x) for x in dm) for _, dm, _, _ in sw_rows)
+        wp = max(max(abs(x) for x in dp) for _, _, dp, _ in sw_rows)
+        print("\n  worst across the four switch conditions: |H_req| %.2f dB (floor %.3f), "
+              "argH %.1f deg" % (wm, TAKE_FLOOR_DB, wp))
+        print("  VERDICT: H_req is %s"
+              % ("SWITCH-INDEPENDENT -- consistent with a post-clipper linear element"
+                 if wm <= 3 * TAKE_FLOOR_DB and wp <= 10 else
+                 "⛔ SWITCH-DEPENDENT -- no post-clipper linear element of any order reproduces "
+                 "this"))
+        # ⚠ STATE IT EXACTLY, and no stronger. H_req = G_ped/G_mdl moves if EITHER the pedal has an
+        # element the model lacks OR the model's own response to the switch is wrong -- and the
+        # model's ATTACK/GRUNT response has never been gated on its own. So what a switch-dependent
+        # H_req falsifies is "pedal_OD = model_OD x ONE switch-independent linear H", nothing more.
+        # It does NOT separate "the model's switch response is wrong" from "there is a pre-clipper
+        # element", and it does NOT identify which network carries it -- the SIZE of the row is not
+        # a ranking, because a bigger perturbation can still produce a bigger residual under a
+        # single shared cause. Same shape of caveat as step 3's, one axis over.
+        print("  ⚠ falsifies 'pedal_OD = model_OD x ONE switch-independent linear H' and no more:")
+        print("    H_req also moves if the MODEL's own ATTACK/GRUNT response is wrong (never gated")
+        print("    on its own), so this does not separate that from a pre-clipper element, and the")
+        print("    row sizes are NOT a ranking of which network carries it.")
+        print("  ⚠ step 2 (pedal-vs-pedal) remains the model-free fallback; where the two disagree,")
+        print("    step 2 is the one that cannot inherit a model error.")
 
 
 if __name__ == "__main__":

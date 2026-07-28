@@ -334,6 +334,97 @@ struct FitParams
                             // physical origin (why the ideal notch is far too deep; tolerance
                             // ruled out) is a schematic-checker follow-up, but dsp.md makes the
                             // capture authoritative on the notch depth (like c21R's 10x corner).
+                            // ⭐ UPDATE (session 62): this constant is what GAP #2 and ATTACK have
+                            // in common. 30k destroys the notch (session 46), and the ATTACK
+                            // proposal wants it to STOP being one constant and become the switched
+                            // pole B — 6.14k flat / 478 boost / 6.04k cut. It still sets ALL THREE
+                            // throws (setNotchDamp); attackDampBoost/attackDampCut override one.
+
+    // ---- The TWO-POLE ATTACK topology (TrebleAttack.h, Phase 9 / A3 step 19-20)
+    // ⚠ ATTACK is [ENG] — the 3-way switch is not on our schematic, so these
+    // PROPOSE a topology rather than correcting a drawn one. EVERY DEFAULT BELOW
+    // REPRODUCES THE DRAWN NETWORK EXACTLY, so leaving them alone is a true no-op:
+    // the tap collapses onto node P and the notch leg is position-independent.
+    //
+    // WHY (docs/phase9-validation.md §4 "A3 step 17/19"): measured bleed-free at
+    // LEVEL max / drive min, ATTACK does TWO things at once — a broadband gain of
+    // +8.65 / -2.39 dB (boost/cut re flat, flat to ~1 dB over 80 Hz-1.6 kHz) AND a
+    // cancellation null that moves 316.4 / 328.1 / 334.0 Hz with depth >= 14.9 /
+    // 32.7 / 16.0 dB. Session 61 refuted every family in which the switch changes
+    // one element VALUE on a SIGN (0 of 782 random draws reproduce the pattern; in
+    // that topology the cut throw can only move the null UPWARD), and session 62
+    // showed the two halves are carried by three provably NON-INTERACTING groups —
+    // the tap divider owns the gain (d f0 0.01-0.02 Hz), Rd owns the depth (d h
+    // 0.00 dB), the ladder RC owns the frequency (d h 0.00 dB). Hence two poles.
+    //
+    // Session 62's proposed point, for reference (NOT the defaults — the matrix is
+    // the arbiter, as it was for btC17 and clipC15):
+    //   attackTapRa/Rb/Rc/R11 = 470k / 506k / 78.5k / 212k
+    //   trebleC5 = 19.7n, attackC5TrimBoost = +1.1n, attackC5TrimCut = +2.7n
+    //   trebleLadderDampR = 6.14k (flat), attackDampBoost = 478, attackDampCut = 6.04k
+    //
+    // ⚠ ONLY RATIOS ARE IDENTIFIED. `h` is a ratio between switch positions, so any
+    // element common to all three throws cancels out of the measurement BY
+    // CONSTRUCTION — Ra duly parked on whichever bound it started nearest (100 ohm
+    // and 10 Mohm scored identically) until it was pinned to the drawn R8. The
+    // proposal also wants the tap-to-ground resistance to sum to ~797k against the
+    // drawn R11 = 470k; since the switch is [ENG] the surrounding rail is a proposal
+    // too, but state that rather than bury it.
+    double attackTapRa = 470.0e3;    // ohms; M -> T1 (boost tap). Default = the drawn R8.
+    double attackTapRb = 0.0;        // ohms; T1 -> T2 (flat tap).  Default 0 = taps collapsed.
+    double attackTapRc = 0.0;        // ohms; T2 -> T3 (cut tap).   Default 0 = taps collapsed.
+    double attackTapR11 = 470.0e3;   // ohms; T3 -> GND. Default = the drawn R11.
+
+    // Pole B, the notch leg. `trebleC5` is the base cap (all positions); the two
+    // trims are ADDITIVE, i.e. a small parallel cap selected by the same pole —
+    // which is how a +-7 % move should be realised, not as three graded caps.
+    double trebleC5 = 22.0e-9;       // farads; the drawn C5. 0 trims => all positions equal.
+    double attackC5TrimBoost = 0.0;  // farads added to trebleC5 in the BOOST throw
+    double attackC5TrimCut = 0.0;    // farads added to trebleC5 in the CUT throw
+
+    // Per-throw damping. NEGATIVE = "inherit trebleLadderDampR" (the sentinel keeps
+    // every existing `--fit trebleLadderDampR=` tool behaving exactly as before —
+    // it still sets all three throws). A negative resistance is physically
+    // meaningless, so the sentinel is unambiguous.
+    double attackDampBoost = -1.0;   // ohms, or < 0 to inherit trebleLadderDampR
+    double attackDampCut = -1.0;     // ohms, or < 0 to inherit trebleLadderDampR
+
+    // C8 — the 220 pF cap the DRAWN switch reroutes. Fittable ONLY so that the
+    // two-pole proposal, which does not use C8 at all, can actually be rendered:
+    // attack_tap_screen.py screened it at C8 = 0, so a render that leaves 220 pF in
+    // is NOT the thing that was screened. kC8 (220p) = the drawn stage.
+    double trebleC8 = 220.0e-12;     // farads; 0 removes it (the proposal's condition)
+
+    // ---- The SHARED treble ladder (TrebleAttack.h::setLadder) ----------------
+    // Session 50's next-step (a), open from session 50 to 63: R7 and the C9/C6 +
+    // R12/R14 ladder were `static constexpr` and reachable from NO analysis tool, so
+    // no A3 screen could render a candidate that moved them.
+    //
+    // WHY THEY ARE REACHABLE NOW (session 64). Session 63's two-pole ATTACK topology
+    // matches the null's (f0, depth) to the BIN at all three throws while every null
+    // is ~2x too BROAD — half-depth width 150.6 / 59.6 / 138.6 Hz against the pedal's
+    // 77.9 / 27.1 / 71.9 (cut/boost/flat). A ~2x error that is nearly UNIFORM across
+    // three throws cannot be per-throw (the throws differ only in pole B), so the
+    // width lever must be SHARED — and these five values are the shared set.
+    //
+    // ⚠ ALL FIVE ARE SCHEMATIC-VERIFIED (circuit.md; covered by the R1-R54 / C1-C39
+    // BOM reconciliation), so moving one is a capture-vs-document disagreement of the
+    // same class as trebleC7 (147x), c21R (10x) and trebleWiperR (1.4x) — not a bug
+    // fix. Defaults are the drawn values and a default render is BIT-IDENTICAL to the
+    // pre-session-64 stage (TrebleAttackTest Test 10).
+    //
+    // ⚠ AND THE SENSITIVITY CENSUS SAYS DO NOT EXPECT A FREE LUNCH (session 64,
+    // `analysis/attack_shape_screen.py --census`): every one of these moves the null's
+    // WIDTH and its FREQUENCY together, at ~0.5-1.5 Hz of width per Hz of f0, and f0
+    // currently matches to the bin. Only C7 is width-selective (11.4 Hz of width per
+    // Hz of f0) and its authority is small. The tap divider (attackTapRa/Rb/Rc/R11) is
+    // width-NEUTRAL to <=0.5 Hz, which extends session 62's pole-independence result
+    // to the width statistic.
+    double trebleR7 = 200.0e3;          // ohms; the drawn R7 (G -> M on the top rail)
+    double trebleLadderR12 = 6.8e3;     // ohms; the drawn R12 (L1 -> GND)
+    double trebleLadderR14 = 22.0e3;    // ohms; the drawn R14 (L2 -> GND)
+    double trebleC9 = 22.0e-9;          // farads; the drawn C9 (L1 -> L2)
+    double trebleC6 = 22.0e-9;          // farads; the drawn C6 (L2 -> M)
 
     // ---- C7, the coupling cap into IC2_A (TrebleAttack.h::setC7) ------------
     // Phase 9 / A3 step 3a (session 34, SHIPPED session 35). At the schematic 100n

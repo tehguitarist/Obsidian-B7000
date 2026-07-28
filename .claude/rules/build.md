@@ -62,6 +62,47 @@ remove/re-add the plugin.
 └── tests/                       # per-stage validation exes
 ```
 
+## Run tests in parallel — always, unless a specific test forbids it
+
+**Default to parallel execution for any test/analysis run, not just the big matrix renders.**
+Serial-by-default is the wrong instinct here — this project's own history shows the win is not
+marginal (session 28: `comprehensive_report.py`'s 63-capture A/B went **~30 min → 5m42s** at
+`--jobs 8`, no correctness change, verified bit-identical to serial). Apply this every time, not
+just when a run already feels slow:
+
+- **`ctest`**: run `ctest --output-on-failure -j $(sysctl -n hw.ncpu)` (or a fixed `-j 8`/`-j 4` if
+  you want to leave headroom for other work), never bare `ctest`. The per-stage test exes are
+  independent processes with no shared state — there's no correctness reason to serialise them.
+- **This applies to EVERY script under `analysis/`, not just `comprehensive_report.py`** — the whole
+  family of scan/fit/probe/gate tools (`a3_carrier_scan.py`, `a3_component_budget.py`,
+  `mid_perpos_fit.py`, `drive_taper_gate.py`, `clipper_onset_gate.py`, `grunt_span_probe.py`,
+  `a3_level_axis_scan.sh`, every `--selftest`/`--validate` sweep, etc.) whenever it renders/scores
+  more than a handful of independent items (candidate values, captures, bands, knob positions,
+  drive settings). Default assumption for a NEW analysis script: **it should be parallel from the
+  first draft**, not serial-until-slow.
+  - **`analysis/comprehensive_report.py`** and any other capture-matrix harness: pass `--jobs`/`-j`
+    (defaults to `min(8, cores−2)`) rather than accepting the default when running a **subset** via
+    `--only`, and never pass `--jobs 1` unless you're specifically debugging a cache/ordering issue.
+  - **New or existing throwaway scan/probe scripts** (candidate sweeps, per-band scans, per-position
+    fits, grid scans like `a3_carrier_scan`'s 249-file cache): if the work items are independent —
+    which they almost always are, since each is a fresh `OfflineRender` invocation or a fresh
+    capture-file read — write/rewrite them with a process pool / `multiprocessing.Pool` /
+    `concurrent.futures.ProcessPoolExecutor` rather than a serial `for` loop over candidates/bands/
+    captures. Don't wait until a run feels slow to add it — assume it's needed.
+  - **A serial-loop analysis script you're about to run or modify**: if it's about to iterate more
+    than ~4-5 independent items and will call `OfflineRender`/re-render per item, parallelise it
+    before running rather than after timing it once and complaining.
+  - Verify parallel output is bit-identical to a serial run once per script (as session 28 did for
+    `comprehensive_report.py`) before trusting it as the default — a shared mutable accumulator or
+    an un-guarded cache write is the usual way naive parallelisation of these scripts goes wrong.
+- **Only exception:** a test that is itself measuring timing/CPU-load (`PerfBenchmark`) or that
+  depends on shared mutable state (a single capture cache being written for the first time, a
+  background render another step is waiting on) — run those serially, and say so explicitly in the
+  command/comment so the exception doesn't get silently copied elsewhere as "tests are serial here."
+- Before trusting a "this got slower" read, remember `wallclock-is-not-runtime` (memory) — check
+  cache mtimes / `pmset -g log` before concluding a parallel run regressed; sleep/throttling can
+  masquerade as a parallelism problem.
+
 ## Testing pattern (validate every stage before moving on)
 
 - Linear stages: pure chowdsp_wdf console exes (no JUCE) — verify frequency response vs the

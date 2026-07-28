@@ -62,7 +62,25 @@ detail section below. Check off + move to the Gap log (§4) as they land.
 
 **A. Close the remaining voicing gaps (Phase 9 core — highest impact on the sound):**
 - [x] **A0. Regenerate the full 63-cap baseline report at the shipped c21R=100k** (session 19). Confirmed GAP #1 holds (clean low end ~0 dB). Cache seeded.
-- [x] **A1. Bridged-T ~717 Hz notch** — INVESTIGATED, **CLOSED, non-issue** (session 19, re-opened and re-closed session 20/21). Tested like-for-like in the OUTPUT: plugin's mid dip matches the pedal's to ~0.5 dB over 116 OD rows (median −2.45 vs −3.02 dB). Topology re-verified pixel-zoom on both schematics, identical. Do NOT reshape `bt*`, no `schematic-checker` pass needed. See §4 GAP #1b.
+- [~] **A1. Bridged-T ~717 Hz notch** — was CLOSED as a non-issue (session 19, re-opened and
+  re-closed session 20/21) on OUTPUT dips over 116 OD rows (median −2.45 vs the pedal's −3.02 dB),
+  topology pixel-zoom-verified identical on both schematics.
+  ⛔⛔ **REOPENED (session 64) — and the reason is that the closing measurement could not see the
+  thing it closed.** It compared **output** dips in a region where the clean bleed sits **11–31 dB
+  ABOVE** the OD path, so it was insensitive to the OD path's own shape *by construction* — session
+  51 item 8 already flagged that closure as "weaker than recorded". Measured **directly on the OD
+  path, bleed-free by topology** (LEVEL max / BLEND max, drive min), each curve referred to its own
+  200 Hz value, the drop over **200 → 480 Hz** is **pedal −4.88 dB vs the model −11.05** — a
+  **6.2 dB shape error**, present in **all three ATTACK throws** (so it is shared, not ATTACK's) and
+  **level-independent to 0.02–0.15 dB** across −36/−30 dBFS (so not an operating point).
+  ⭐⭐ **And the element is named arithmetically:** over the same span the **IC2_B bridged-T alone
+  drops −10.79 dB** and the two Sallen-Keys **−0.03 dB**, so the bridged-T accounts for the model's
+  −11.05 **to 0.26 dB** and nothing else in the chain has authority there. The pedal's scoop is
+  **~2.3× shallower** — circuit.md **risk #1** verbatim. ⚠ Note what is and is not claimed: the
+  bridged-T is the only element in the *model* with authority here; whether the *pedal's* scoop is
+  itself shallower or something else compensates is not settled by this. ▶ This is now the
+  best-localised open OD-path shape error. `analysis/attack_shape_screen.py --tilt` is the
+  instrument. See §4 "A3 step 21" item 6, and §4 GAP #1b for the superseded closure.
 - [~] **A1b/c/d. TREBLE ~322 Hz notch. Shipped session 19 as `trebleLadderDampR=30k` — ⛔ REOPENED
   session 46 (user-reported): the fix moved AWAY from the feature it is named after, and the feature
   is an A3 symptom.** Session 19's premise was the ISOLATED stage transfer (~37 dB deep vs "−3.4 dB
@@ -76,6 +94,11 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   24 rows worse / 1 better); it is one knob trading the notch against the broad low-mid level, i.e. a
   compensating error for A3. **Fix A3 first, then re-fit it.** New A3 sub-gate + full numbers in §4
   "GAP #2 REOPENED".
+  ⭐ **UPDATE (session 62): GAP #2 and ATTACK are answered by the SAME proposal** — see §4 "A3 step
+  19". `trebleLadderDampR` stops being one constant and becomes the ATTACK switch's notch-leg pole:
+  **6.14 kΩ (flat) / 478 Ω (boost) / 6.04 kΩ (cut)**, which reproduces the pedal's notch to 0.1 Hz
+  and 0.18 dB at all three throws. So "fix A3 first, then re-fit it" is now "build the two-pole
+  ATTACK topology, which re-fits it". Still **not shipped** — the 63-capture matrix is the arbiter.
 - [~] **A3 STARTED (session 20) — DECOMPOSED into two independent gaps, see §4 GAP #3.** The
   residual is NOT one thing: **3a** is a DRIVE-DEPENDENT bass tilt (the DRIVE op-amp's rail clamp
   has never been enabled) and **3b** is a STATIC ~19-23 dB bass tilt that only GRUNT flat/boost
@@ -443,7 +466,266 @@ detail section below. Check off + move to the Gap log (§4) as they land.
   `crossover_gate()` (session 38's sub-gate, now runnable and reproducing its record exactly).
   §4 "A3 step 3d".
 
-- [~] **▶ A3 step 9 (session 53) — ⭐⭐ TWO LOAD-BEARING PREMISES EXPIRED. READ THIS BEFORE step 8 or
+- [~] **▶ A3 step 14 (session 58) — the CLIPPER IS DE-CONVOLVED from the ATTACK measurement, so the
+  network's LINEAR transfer is pinned over 80–254 Hz for the first time; the required SHAPE is
+  specified; and 403–640 Hz is shown to be UNDECIDABLE on this axis.** Session 57's next-step (a),
+  answered in the two parts that must precede proposing a topology. Tooling + analysis only; nothing
+  in `src/` or `tests/` changed, ctest run and unchanged at 16/17 (`OSValidationTest`, identical
+  numbers). New `analysis/attack_tf_spec.py`, `analysis/attack_linear_extract.py`.
+  **(1) THE SPECIFICATION.** Minimum-phase families of rising order against the −30 dBFS ratio
+  (floor √2 × 0.144 = **0.204 dB**): ⭐ **CUT is a frequency-FLAT −3.2 dB across 80–1613 Hz** (order 0,
+  rms 0.566 — **no corners at all**); ⛔ **BOOST saturates at 0.31–0.35 dB**, orders 2 and 3 buying
+  0.30 and 0.01 dB respectively and only by parking corners **off-band** (21 Hz, 0.5 Hz) or landing a
+  zero **on a pole** (228/200 Hz). ⚠ A self-test gate had to be fixed first: at order 3 DE converged
+  to **0.360 dB on a target the family generated itself**, deterministically — 60 multi-start
+  `least_squares` restarts take every family to 0.00000 dB. Same lesson as step 13's discarded
+  random search.
+  **(2) ⭐⭐ THE DE-CONVOLUTION, WITH NO NEW CAPTURES.** Under a swept sine the clipper sees one tone
+  at a time, so `r_boost(f,L) = h · r_ref(f, L+h)` ⇒ `ratio_dB = h_dB + S_f(L+h) − S_f(L)`, with
+  `S_f` the pedal's OWN measured ref transfer vs level. `h` solved per band by bisection; the clipper's
+  shape, rails and drive dependence all cancel. ⭐ **And session 52 §3b's `r = √(|g1|²+H)` upper-bound
+  bias cancels EXACTLY** — boost@L and ref@(L+h) present the clipper with the identical waveform, so
+  this is the first ATTACK instrument not exposed to it. Gates: recovery of a known `h(f)` through a
+  known compressor to **1.8e-15 dB**, liveness to the same, and **no extrapolation** (cells needing
+  level data we do not have print `--`).
+  **(3) THE RESULT.** `h` boost **+7.03@80 / +7.83@101 / +8.24@127 / +8.38@160 / +8.44@202** (resid
+  0.29–1.33) and `h` cut **−3.15 / −2.92 / −2.91 / −3.00 / −3.09** (resid **0.111–0.426, within 2× the
+  floor**). ⭐ A genuine de-convolution at the mid bands: at 254 Hz the raw drive-noon ratio reads
+  **+3.65 dB** where `h` is **+7.77** — the clipper had eaten 4 dB. ⚠ The fixed level subset is chosen
+  by feasibility and is **identical at every band**; the first draft let each band pick its own and the
+  summary then claimed "3 levels each" over a table showing 2 and 3 — the session-49 item-7 trap in my
+  own gate.
+  **(4) ⛔ A FIT-FREE BOUND, AND ITS LIMIT.** `h` drops out of a level difference, so
+  `|ratio(L1)−ratio(L2)| ≤ 2·TV(S)`: BOOST exceeds it at **403 / 508 / 640 Hz by +3.03 / +4.03 /
+  +4.35 dB**. ⚠⚠ **Do NOT read that as a refutation** — those are exactly the three bands where the
+  OD fundamental is weakest (the bridged-T scoop, −17…−18.6 dB) while its octave-down neighbours are
+  4–6 dB hotter, i.e. where harmonic leakage into the band is worst and §2's cancellation argument
+  (which needs `h` flat) fails hardest. ⭐ Conditioning was checked as an alternative and does **not**
+  explain it: `min|t|` is flat at 0.152–0.251 and anti-correlates with the residual.
+  **(5) ▶ the same 6 drive-min captures, now sharper** — at drive min the compression budget goes to
+  ~0 at every band, so the ratio *is* `h(f)` directly and 403–640 becomes decidable.
+  `docs/session58-capture-request.md`; all six re-verified to parse AND to emit `--attack 1/2`
+  (checked, because a switch that parses but is not passed to the renderer is the session-20
+  `--input-trim` defect). §4 "A3 step 14".
+
+- [~] **▶ A3 step 15 (session 59) — the 15 new captures are IN and verified. Session 58's drive-min
+  premise EXPIRES on the INSTRUMENT, not the physics; the bonus drive-max ladders settle `h`'s
+  placement OUT-OF-SAMPLE; and the instrument that WILL decide 403–640 Hz is validated on a file
+  already on disk.** New `analysis/attack_drive_axis.py`; new report
+  `analysis/reports/s59_matrix100.json`, a proven **strict superset** of `s54_matrix85.json`
+  (20 400 values bit-identical) so no prior number moves.
+  **(1)** ⭐ the **B=0 ATTACK control PASSES** (boost worst −0.062 dB, cut +0.051, floor 0.144) —
+  the shared normaliser behind every ATTACK ladder since session 55 is now verified, not assumed.
+  **(2)** ⛔⛔ the **drive-min ladders cannot be read on the blend axis.** Drive min idles the clipper
+  but also drops the OD path to ~−15 dB under the clean bleed, so `t(B)=|β+B·G|` degenerates to
+  `β+B·Re(G)` and the taper absorbs the effect (session 47 item 11's small-µ degeneracy). **Proven
+  with a known feature**: the post-clipper bridged-T scoop, which cannot depend on the DRIVE knob, is
+  **absent (0.6/0.7 dB) vs 5.2/5.3 at noon and 10.9 at max**. ⇒ **403–640 Hz still undecided.**
+  ⚠ the drive-min budget is **not ~0 but 1.70–2.75 dB** — the **J201 sits upstream of DRIVE** and
+  never idles. ⭐ **The DRIVE axis trades compression against sensitivity in BOTH directions; drive
+  noon is the sweet spot.**
+  **(3)** ⭐⭐ **drive max settles the placement out-of-sample**: predicting its ratio from session
+  58's published `h` and drive max's own level transfer gives **pre-clipper rms 0.08 dB vs
+  post-clipper 7.50 dB** (~90×) on data never in that fit. ⚠ but it **corroborates rather than
+  re-measures** the VALUE (4 of 5 h-intervals contain s58's number; **202 Hz does not**).
+  **(4) ▶ 2 FILES — `docs/session59-capture-request.md`.** At **LEVEL max** the bleed is **exactly
+  zero** and LEVEL sits **after every nonlinearity**, so at BLEND max the output IS the OD path and
+  `h(f)` is a plain subtraction. Pre-flight on the existing `drive-0700_level-1700_base-od.wav`:
+  **bridged-T scoop back at 6.0–6.1 dB**, |G| up ~8 dB, −30/−18 dBFS agreeing to ~0.1 dB.
+  §4 "A3 step 15".
+
+- [~] **▶ A3 step 18 (session 61) — the drawn ATTACK topology is REFUTED on the SIGN of the notch
+  shift (0 of 782 random draws, not an optimiser result), and the specification splits into TWO jobs
+  that need TWO switch poles.** Session 60's next-step (a), first move — the cheap reachability screen
+  before any proposal. New `analysis/attack_notch_screen.py`. Nothing in `src/`/`tests/` changed.
+  **(1) ⭐ The scored statistic is a SIGN, not a distance:** relative to flat the pedal moves the null
+  **DOWN in BOTH throws** (−17.6 / −5.9 Hz) and makes **boost 2.04× deeper**. No component scaling
+  changes a sign.
+  **(2) ⛔⛔** At the schematic `RdampC5 = 0` the model's notch sits at **320.3 Hz in all three
+  positions (spread 0.0 Hz)**, and C8 swept over **four decades** never fixes the sign — cut always
+  moves **UP**, boost **DOWN**, because boost puts C8 in a **bridging** path and cut in a **shunt to
+  ground**.
+  **(3) ⭐⭐ A SIGN CENSUS removes the optimiser from the argument and localises the failure to ONE
+  requirement:** 6000 random draws over ±2 decades in all 12 elements, 782 of which move the null
+  measurably ⇒ **0 match the pedal.** Per sign: *boost down* 52.3 %, *boost deeper* 48.7 %, **"cut
+  moves DOWN" 0.0 %** — structural, not a co-occurrence problem.
+  **(4)** The free 12-element DE search agrees and **saturates** (cost 6.85/6.78/6.78 at ±1/±2/±3
+  decades — 0.08 across 2 orders of magnitude) and **switches the throws off** (both shifts → 0.00)
+  rather than trading. Gates first: liveness **0.000e+00**, search gate **0.002/0.065** = ~100×
+  separation. ⚠ That gate needed tightening — its first version accepted **railed** targets sitting on
+  the search-window edge and recovered them trivially.
+  **(5) ⭐ Clean decomposition:** the search reproduces the **flat** position essentially exactly
+  (333.9 vs 333.98 Hz, 16.04 vs 16.01 dB) ⇒ **the notch-forming network is fine; the switch's coupling
+  into it is what is wrong.**
+  **(6) ⭐⭐ What CAN make it:** `RdampC5` alone **nails the DEPTH triple to ±0.1 dB** (so a 2× depth
+  change is just a damping change) but puts every f0 at 319–320 Hz; `RdampC5`+`C5` switched together
+  hits all three (f0, depth) pairs with structured values (Rd 6117/437/6117 Ω, C5 22.6/20.4/19.3 nF)
+  — ⚠ 2 dof vs 2 targets, so that fit is not evidence. **The deciding test is the broadband gain of
+  the same setting: −0.14 dB where +8.64 is required.** ⛔ The notch leg supplies ~0 dB broadband.
+  **(7) ⇒ STOP LOOKING FOR ONE ELEMENT.** The notch triple is reachable *inside* the notch leg; the
+  broadband ±gain is not reachable there at all ⇒ the measurement points at a **3-way switch with more
+  than one POLE**. ⭐ Direct precedent: **A2c-3 resolved the mid-frequency selector exactly this way**
+  (2-pole, switching the across-lug cap with the series cap) after single-element fits could match
+  range *or* centre but never both. §4 "A3 step 18".
+
+- [~] **A3 step 17 (session 61) — session 60's item (8b) is now REPRODUCIBLE, and it reproduces
+  EXACTLY. The ATTACK notch spec is a committed measurement, plus three refinements item 8b did not
+  make.** Session 60's next-step (a0). New `analysis/attack_notch_probe.py` (gated, `--selftest`),
+  new `analysis/reports/s61_attack_notch.json`. Tooling + analysis only — **nothing in `src/`/`tests/`
+  changed**, ctest **RUN** at the pre-existing session-44 **16/17** (`OSValidationTest`, identical
+  `amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`).
+  **(1) ⭐ THE AD-HOC NUMBERS SURVIVE, to the bin and to 0.03 dB:** cut **316.4 Hz / 14.93 dB**,
+  boost **328.1 / 32.70**, flat **334.0 / 16.01** (s60 recorded 316.4/14.9, 328.1/32.7, 334.0/16.0).
+  So verdict (2) stands: a **17.6 Hz spread — 3.0× the 5.86 Hz bin — and boost at 2.04× flat's
+  depth**, which no pure broadband gain can produce. **ATTACK and GAP #2 remain ONE problem.**
+  **(2) ⚠ MY FIRST GATE WAS WRONG AND FAILED FOR THE RIGHT REASON.** It assumed a bin grid is
+  accurate on a BROAD notch and biased on a sharp one, and gated the broad case at ±1.5 dB. The broad
+  case is the **worst (−4.3 dB)**, because there are **two** bias mechanisms and only one is about
+  resolution: **(i) shoulder contamination** — a broad notch's own skirt reaches into the 200–270 Hz
+  reference window, so `shoulder − min` understates the depth *definitionally*; **(ii) bin smearing**
+  — a 5.9 Hz-bin CSD estimate cannot reach a sharp deep floor (a true 33 dB notch reads ~29). Both
+  **understate**, so the gate was rebuilt on what the verdict actually uses: depth **never
+  over-states** (worst +0.05 dB) and depth **RANKING** survives a doubling (true 16/33 → read
+  14.9/29.8). ⇒ **every depth here is a LOWER bound**, which cannot manufacture the boost/flat gap.
+  **(3) ⭐ REFINEMENT — item 8b's "identical to the bin at −36/−30/−18" is true of FREQUENCY ONLY.**
+  Boost's **depth moves 5.11 dB** across those same three levels (33.0 → 32.7 → 27.9) while its
+  frequency does not move at all; cut moves 0.07, flat 0.82. Mechanism is already known: boost pushes
+  ~8 dB more into the J201, which sits upstream of DRIVE and never idles (s59 item 3), so compression
+  reaches boost first. ⇒ **quote the quietest row; treat depth as a bound, frequency as a value.**
+  **(4) ⭐ REFINEMENT — the nominal 287–351 Hz exclusion window UNDER-COVERS.** Located by
+  measurement (contiguous region where `|h − median|` exceeds the 0.204 dB floor, then re-derived
+  against a median the window no longer pollutes), it is **269.5–369.1 Hz on boost** and
+  **269.5–521.5 Hz on cut**. The medians barely move (0.02 dB), so this is a refinement not a
+  reversal — but the read now excludes the measured window by name.
+  **(5) ⚠ REFINEMENT — "h is broadband flat" is much STRONGER for boost than for cut, and item 8b did
+  not say so.** Over 80 Hz–1.6 kHz ex-window: boost **+8.64 dB, spread 1.90 (22 % of its own size)**;
+  cut **−2.39 dB, spread 2.05 (86 %)**, needing a **252 Hz** exclusion window against boost's 100 Hz.
+  Same finding as the 421.9 Hz cancellation check: the shared peak **cancels on boost** (range
+  0.47 dB over 360–500 Hz) but **not on cut** (1.16 dB, 5.7× the floor) ⇒ **cut carries real
+  structure over ~350–520 Hz.** Note this is the same region and direction as step 16 item 11's
+  unexplained cut-shape disagreement with session 58 — the two may be one item.
+  **(6)** Confirmed in passing: `flat |H|` varies **4.44 dB across the 1/3-oct band at 403 Hz** (0.80
+  at 508, 1.11 at 640), so 8b(i)'s "403/508/640 are not sitting on sharp features" is too strong for
+  403. What defends the 1/3-oct read is not the absence of a feature but that the feature is
+  **shared and cancels** — which (5) shows holds on boost and only partly on cut. §4 "A3 step 17".
+
+- [~] **A3 step 16 (session 60) — `h(f)` is MEASURED whole-band by plain subtraction, 403–640 Hz
+  is DECIDED, and the throw is BROADBAND — so sessions 57/58's "+8 dB peaked at ~200 Hz" is a bleed
+  artefact and the topology requirement is far simpler than recorded.** The 2 requested captures
+  landed plus 2 bonus GRUNT files. Tooling + analysis only; nothing in `src/`/`tests/` changed, ctest
+  RUN at the pre-existing 16/17. New `analysis/attack_level_extract.py`, `analysis/extract_m36.py`;
+  new `analysis/reports/s60_matrix104.json`, proven a **strict superset** of s59 (24 000 values
+  bit-identical).
+  **(1)** The zero-bleed premise is **bounded by measurement, not trusted**: deepest |G| is −34.0 dB
+  ⇒ worst-case dilution ≤0.87 dB, and bleed can only shrink `h` ⇒ every value is a **lower bound**.
+  **(2) ⚠** The plain subtraction is **not** `h` — boost pushes ~8 dB more into the J201 (which never
+  idles), so its raw ratio moves **2.41 dB at 640 Hz** across level where cut moves 0.27. Session
+  59's pre-flight checked the **flat reference**, which could not have seen this.
+  **(3) ⭐⭐** The fix was a level the matrix has **never read**: `sweep_clean_-36` is in every
+  capture but `comprehensive_report.py` stops at −30. Extracted pedal-side into a **side file**
+  (not a change to the shared oracle). With it, boost's two quietest levels agree to **0.065 dB**
+  and `raw − solved` is **0.027 dB** ⇒ **converged; the de-convolution is confirmatory, not
+  load-bearing.**
+  **(4) ⭐⭐ RESULT — boost is a BROADBAND ~+8.6 dB, flat 80 Hz–1.6 kHz (±1 dB); cut ~−2…−3 dB, also
+  broadly flat.** Not a low-mid peak. The old LEVEL-**noon** pair (independent, different day)
+  reproduces session 57's +4.50 dB peak at 202 Hz, and predicting it from the bleed-free `h` plus the
+  known LEVEL/BLEND coefficients puts the peak at **202 Hz — the same band as the |OD| maximum**
+  ⇒ the "resonance" was the bleed diluting a flat gain where |OD| is weakest.
+  **(5) ⚠⚠** 320 Hz is **not a transfer value** (1/3-oct sample on the 316–334 Hz notch that
+  migrates with level); 254 and 403 bracket it. **(6) ⚠** The MODEL control genuinely **failed**
+  (solved `h` spread 5.3/12.7 dB) — recorded, not explained away: GRUNT's `h` is ~+20 dB so the only
+  computable bands are the scoop floor where harmonic leakage is worst. The headline does not rest on
+  it. **(7) ⚠** Disagrees with session 58 on **cut's shape** (a slope, not flat) and by +1.6 dB at
+  80 Hz on boost, common-mode at LF — unexplained. §4 "A3 step 16".
+
+- [~] **A3 step 13 (session 57) — the pedal's ATTACK shape is MEASURED bleed-free, the [ENG] ladder
+  topology is REFUTED on a second independent instrument, and step 11 §5's ambiguity is RESOLVED IN
+  DIRECTION toward reading (i).** Session 56's next-step (a), answered with captures already on disk.
+  Tooling + analysis only; nothing in `src/` or `tests/` changed, ctest run and unchanged at 16/17
+  (`OSValidationTest`). New `analysis/attack_topology_probe.py`.
+  ⚠ **Two corrections to step 12's handover:** there are **6** `attack-*_blend-*` captures, not 8,
+  and they are **not unused** (`a3_condition_axis.py:105-111` since session 54); and the ATTACK peak
+  is at **~101–127 Hz**, not ~202 — that came from the bleed-diluted OUTPUT span, and the dilution
+  moved it an octave. **(1)** The switch only reroutes C8's plate ⇒ `H(boost)/H(flat)` is a **purely
+  linear** ladder property, so the comparison needs no clipper, bleed or dilution model. Pedal
+  **+6.82@80 / +7.19@101 / +4.62@202 / −1.26@640** vs ladder **−0.02 / −0.02 / −0.02 / +0.43** — a
+  **falling low-mid peak against a rising HF shelf**, rms 4.31 (boost) / 3.14 (cut) dB.
+  **(2) ⭐⭐ THE LEVEL AXIS RESOLVES (i) vs (ii), AGAINST (ii):** a clipper mechanism must FADE toward
+  the linear regime; the effect **grows** monotonically as level drops (254 Hz: −0.36 → +0.06 →
+  +3.65 → **+8.71** from −6 to −30 dBFS), reaching **~9 dB over 80–640 Hz** where the ladder has
+  0.03. ⭐ **CUT is level-INVARIANT** (−3.0 dB at 80–202 across 18 dB) — boost-dependent/cut-invariant
+  is exactly a LINEAR level change ahead of a compressor, and explains step 12's unexplained
+  boost/cut asymmetry. The known upper-bound bias is worse at high level so it biases *against* the
+  trend; conditioning *improves* as level falls (0.043 vs 0.165 dB). ⚠ Direction only — the linear
+  limit's magnitude is not pinned. **(3)** Reachability, all 11 elements freed, both throws on one
+  parameter set: joint shape rms **3.028 dB at ±3, ±6 AND ±9 decades** (identical to 3 d.p. —
+  saturated, 21× floor), with the fit setting boost **identically to 0.00 dB** rather than trading.
+  ⚠ A random-search first attempt **failed its own gate** (0.727 dB on a reachable target) and was
+  discarded; DE passes at 0.0027 dB. ⚠ A **pathology guard** was required — the unguarded ±9-decade
+  run reported `D = +88 dB` by driving the FLAT denominator to −320 dB at a 44 dB shape error.
+  **(4) ▶ the one capture gap is exactly 6 files**: `drive-0700_attack-{boost,cut}_blend-{0930,1200,
+  1430}_base-od` — at drive min the OD path is near-linear, so the ATTACK ratio there must equal the
+  ladder's linear ratio exactly, with no describing-function caveat. §4 "A3 step 13".
+
+- [~] **A3 step 12 (session 56) — step 11's ATTACK finding SURVIVES an independent instrument, and
+  the modelled ATTACK network is REFUTED as its carrier.** Session 55's next-steps (b) then (a).
+  Tooling + analysis only; nothing in `src/` or `tests/` changed, ctest run and unchanged at 16/17
+  (`OSValidationTest`). New `analysis/attack_span_probe.py` (matched-pair output span from the
+  frozen matrix — no solve, no bleed estimate, no `b0`) and `analysis/attack_c8_screen.py`.
+  **(b) THE GATE PASSES.** Model ATTACK span over 80–640 Hz is **≤0.08 dB at every one of 4 drives ×
+  4 levels**, below the 0.204 dB span floor, vs the pedal's up to 5.61 dB. ⭐ The **GRUNT control**
+  is what makes it airtight: a schematic-verified linear cap bank on the same instrument gives
+  **11.63 dB (138× ATTACK)** and tracks the pedal at **71–157 %** where ATTACK tracks at **1–13 %**
+  ⇒ the model's null is inertness, not the output-span dilution caveat. ⚠ One refinement: the model
+  is **magnitude**-inert (d|OD| ≤ 0.132 dB ≤1700 Hz), NOT phasor-inert — d(arg) runs +1.5° → +21.2°,
+  and that part *is* diluted away (the decompose's own `full` column predicts the report's model
+  rows, an independent two-renderer cross-check). **(3) ⭐⭐ A DISCRIMINATION step 11 could not make:**
+  at the matrix's most linear corner the pedal's span **converges** to ~2.7 dB (2.92/2.68/2.16/1.14
+  at −30/−18/−12/−6 dBFS, 8 % between the two lowest) instead of vanishing, and the GRUNT control
+  has the identical shape ⇒ **a LINEAR pre-clipper low-mid difference exists** (step 11 §5 reading
+  (i)); the high-level collapse is a generic clipper+bleed property the model already reproduces.
+  **(a) THE LADDER IS REFUTED, WITHOUT A `src/` CHANGE** — the oracle already parameterises it, so
+  reachability was screened before writing the plumbing. **C8 alone SATURATES at 1.20 dB rms = 45 %
+  of the target** with a FLAT joint error across 22n–100n (the tool refuses to call that an interior
+  minimum). With R7/R8/RdampC5 free the *size* is reachable and 80–254 Hz tracks to 0.4–0.7 dB, but
+  best joint err is **0.76 dB = 3.7× the floor**, R7 rests on its bound, and it costs ×0.10/×3.16 on
+  two **schematic-verified** resistors. ⭐ And the residual is a **shape**: every setting plateaus
+  above 254 Hz while the pedal **peaks at +4.23 @202 and falls to +0.21 @320 / +1.35 @640**; adding
+  damping drives RdampC5 to the far edge, so it is NOT GAP #2's notch reappearing. ⇒ the live A3
+  question is the ATTACK **topology** ([ENG], not on our schematic), and it needs a measurement of
+  the pedal's ATTACK shape — the 8 unused `attack-*_blend-*` captures — not another fit. §4 "A3 step 12".
+
+- [~] **A3 step 11 (session 55) — ATTACK is reachable in the model at last, and the model's ATTACK
+  response is measurably NULL where the pedal's is ±3–7 dB across 80–640 Hz.** Session 54's
+  next-step (b). Tooling + analysis only; nothing in `src/` or `tests/` changed, ctest confirmed
+  unchanged at 16/17 (`OSValidationTest`). `a3_blend_decompose.cpp` gained `attackIdx=` (it
+  hardcoded `p.attackIdx = 0`, so the two ATTACK conditions had no model side at all), the CSV
+  header now states its own `attack=`, and the four missing condition CSVs were rendered — **all
+  seven conditions of `a3_condition_axis.py` now have a model side.** Verified BOTH directions plus
+  the two standing traps: default bit-identical to explicit `attackIdx=0`, `=1`/`=2` provably
+  differ, default bit-identical to the pre-existing `a3_dec_drv0.5.csv`, and `drv0.0`/`drv1.0`
+  re-rendered bit-identical (session 45 item 7a). Steps 2 and 3 reproduce session 54's figures
+  exactly. **New step 4 runs step 2's localiser pedal-vs-MODEL**, on ONE common band set (the
+  fourth occurrence of the differing-members trap) and **decomposed** into pedal / model / residual
+  so "the perturbation is small" and "the model gets it wrong" are separated on the page: **grunt
+  flat 6.06/7.98/2.00 dB and 16.2/57.5/42.7° | grunt boost 7.49/8.00/2.00 and 41.7/68.6/42.1 |
+  attack boost 4.99/0.05/5.01 and 11.3/8.4/15.7 | attack cut 3.24/0.07/3.18 and 10.7/7.1/6.6.**
+  `H_req` is **SWITCH-DEPENDENT** (worst 7.22 dB / 60.5°), the same closure step 3 gets on DRIVE now
+  on a second axis. ⭐ **The finding: the model's `d|G|` across ATTACK is ≤0.13 dB at EVERY band
+  20 Hz–1.6 kHz** (a 220 pF C8 can only act above ~2 kHz, and it does: −7.8/+10.4 dB at 2.5/4 kHz)
+  **while the pedal's is a smooth monotone +6.8→−1.3 dB (boost) / −3.3→−5.1 dB (cut) over
+  80–640 Hz** — exactly where C2 lives. ⭐ **That INVERTS session 54 item 4**: normalised for what
+  the model already reproduces, ATTACK has the LARGEST magnitude residual and GRUNT the largest
+  phase residual, where the un-normalised pedal-side read had ATTACK smallest. Session 53 item 2
+  refuted the ladder as a source of *flat phase lead* — untouched; the ladder as a **magnitude**
+  carrier has never been tested, and it is still `static constexpr`/unreachable (session 50's own
+  next-step (a)). ⚠ **States exactly one thing:** it falsifies "pedal_OD = model_OD × ONE
+  switch-independent linear H", and does NOT separate "the model's switch response is wrong" from
+  "there is a pre-clipper element" — both readings are pre-/in-clipper, which is where sessions
+  53/54 had already narrowed to, and ATTACK is **[ENG]** so there is no verified topology to defer
+  to. §4 "A3 step 11".
+
+- [~] **A3 step 9 (session 53) — ⭐⭐ TWO LOAD-BEARING PREMISES EXPIRED. READ THIS BEFORE step 8 or
   step 6, both of which it qualifies.** (a) **Session 50's post-clipper restriction is INVERTED**: its
   0.094 dB residual is **not reproducible** (recomputed 0.471 dB RMS = 5× larger, 3.3× the capture
   floor), the axis was **power-tested** and provably CAN detect drive-dependence (thresholds 0.67–2.6 dB
@@ -5034,3 +5316,1882 @@ qualified it since session 52 is now discharged by measurement rather than by ar
     §4 item 6 bounds what it is worth (~7° of argH, ~0.2 dB of |H|).
   * **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
     A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+
+---
+
+### A3 step 11 — ATTACK is reachable in the model at last, and the model's ATTACK response is measurably NULL where the pedal's is ±3–7 dB (session 55)
+
+Session 54's next-step (b). Tooling + analysis only — **nothing in `src/` or `tests/` changed**, so
+ctest is unchanged at the pre-existing session-44 **16/17** (`OSValidationTest`); confirmed by
+running it, not assumed.
+
+#### 1. THE CHANGE
+
+`analysis/a3_blend_decompose.cpp` hardcoded `p.attackIdx = 0` (line 150), so the two ATTACK
+conditions of session 54's condition axis had **no model side at all** and its localiser could only
+ever run pedal-vs-pedal. Added `attackIdx=0|1|2` as a trailing `key=value` override — special-cased
+next to `kInputRef` rather than added to `kFitKeys`, because it is a `PedalChain::Params` switch
+index, not a `double FitParams::*`. Out-of-range values are rejected with a message rather than
+silently clamped. The CSV **header line now states `attack=`** beside `grunt=`/`drive=`, so a file
+that is read by name from a dozen tools declares its own operating point (sessions 45/37).
+
+GRUNT was already reachable via `argv[1]`; those CSVs had simply never been rendered. So all four
+missing condition CSVs were generated and wired into `a3_condition_axis.py::CONDITIONS`
+(`build/a3_dec_{grunt-flat,grunt-boost,attack-boost,attack-cut}.csv`, superposition self-check
+≤ −273 dB on all four). **Every one of the seven conditions now has a model side.**
+
+#### 2. VERIFICATION — BOTH DIRECTIONS, plus the two traps this file keeps re-learning
+
+The binary is built by a hand-written `c++` command, not by CMake, so `cmake --build` would not
+rebuild it (session 37 item 12). Five checks, all run:
+
+  * default render **bit-identical** to an explicit `attackIdx=0` render ✅
+  * `attackIdx=1` and `=2` each **provably differ** from default, and from each other ✅
+    (the first test alone also passes when nothing was rebuilt — that is the trap)
+  * default render **bit-identical to the pre-existing `build/a3_dec_drv0.5.csv`** ✅ — the edit is
+    surgical, and this simultaneously proves that baseline was not stale
+  * `build/a3_dec_drv0.0.csv` and `drv1.0.csv` re-rendered and **bit-identical** ✅ (session 45 item
+    7a: a re-baseline that names one artefact leaves its siblings stale, and step 3's whole verdict
+    rests on these two)
+  * `attackIdx=3` **rejected**, exit 1 ✅
+
+Regression on the analysis side: `a3_condition_axis.py --selftest` PASS (1.8e-13 deg), and steps 2
+and 3 reproduce session 54's recorded figures **exactly** (drive min +36.2° / drive max −20.0° /
+grunt boost −40.4° / attack cut −12.5° / attack boost −2.9°; |H| spread mean 8.49 dB worst 13.14,
+argH mean 34.8° worst 58.1°). The `H_req` computation was factored into one `hreq_of()` used by all
+four call sites — it is now computed two taper variants × two axes, and four copies of a phase fold
+is how a sign convention drifts between two halves of one verdict.
+
+#### 3. NEW STEP 4 — THE LOCALISER RUN PEDAL-vs-MODEL
+
+Step 2 asks whether the PEDAL's OD transfer moves with a switch. Its own recorded caveat is that it
+does **not normalise for how big each perturbation is** (ATTACK moves 220 pF; GRUNT moves
+47n/220n), so a small ATTACK row is ambiguous between "the ladder is not the carrier" and "the
+ladder barely moved". Differencing `H_req` instead subtracts whatever the model **already
+reproduces**, leaving only the part of each switch's effect the model gets **wrong** — which is what
+a carrier hypothesis is actually about.
+
+⚠ **ONE COMMON BAND SET, or the rows are not a ranking.** Per-condition identifiability differs
+(grunt boost identifies 10 bands where the others identify 12–13), and an rms over different members
+is the session-49-item-7 / session-52-item-1 / session-54-item-6 trap for the fourth time. The table
+is restricted to the 8 bands identified in every condition (80–1016 Hz); each row still prints its
+own total count so the restriction cannot hide a mostly-unidentified condition.
+
+| condition | d\|G\| dB ped / mdl / **RESID** | dtheta deg ped / mdl / **RESID** | bands |
+|---|---|---|---|
+| grunt flat   | 6.06 / 7.98 / **2.00** | 16.2 / 57.5 / **42.7** | 13 |
+| grunt boost  | 7.49 / 8.00 / **2.00** | 41.7 / 68.6 / **42.1** | 10 |
+| attack boost | 4.99 / **0.05** / **5.01** | 11.3 / 8.4 / **15.7** | 12 |
+| attack cut   | 3.24 / **0.07** / **3.18** | 10.7 / 7.1 / **6.6** | 12 |
+
+(rms over the common bands; RESID = ped − mdl = the `d(H_req)` a correction would have to absorb.)
+
+Worst across the four: **|H_req| 7.22 dB** against the 0.144 dB floor, **argH 60.5°**.
+⇒ **`H_req` is SWITCH-DEPENDENT.** A post-clipper linear element sits downstream of both the treble
+ladder and the clipper input, so it multiplies the OD path identically in every switch position —
+the same argument step 3 runs on DRIVE, now on a second, independent axis.
+
+#### 4. ⭐⭐ THE FINDING: THE MODEL'S ATTACK IS INERT BELOW 1.6 kHz; THE PEDAL'S IS NOT
+
+The decomposition is what makes this visible, and it is not a marginal number. The **model's** own
+`d|G|` across ATTACK, per band, is **≤0.13 dB at every band from 20 Hz to 1613 Hz** (−0.01 at 20 Hz,
++0.10/−0.13 at 403) and only becomes large at 2.5 kHz and above (−7.8 / +10.4 / +11.2 dB at
+2560/4064/6451) — exactly what a 220 pF C8 must do. The **pedal's** is a broad, smooth, monotone
+low-mid shape, not one band:
+
+| f (Hz) | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 | 640 |
+|---|---|---|---|---|---|---|---|---|---|
+| attack **boost** | +6.82 | +7.19 | +6.87 | +5.95 | +4.62 | +3.65 | +2.01 | −0.39 | −1.26 |
+| attack **cut**   | −3.28 | −3.04 | −3.01 | −3.00 | −2.94 | −3.11 | −4.24 | −4.55 | −5.06 |
+
+So the pedal's ATTACK switch has **±3–7 dB of authority across 80–640 Hz that the model reproduces
+essentially not at all** — the residual is ~100 % of the move because the model's contribution is
+zero. That span is exactly where A3's C2 component lives (+3.20 dB over 101–508 Hz on the session-50
+budget; +4.4…+9.0 dB on session 47's bathtub).
+
+⭐ **This INVERTS session 54 item 4's tentative reading.** That item recorded ATTACK as producing the
+*smallest* pedal-side move (rms 10.4°/13.4° vs GRUNT's 15.9°/43.1°) and read it as "consistent with
+session 53 item 2 refuting the ladder", while flagging that it did not normalise for perturbation
+size. Normalised, the ordering flips in MAGNITUDE: **ATTACK has the LARGEST magnitude residual of
+the four (5.01 / 3.18 dB rms) and GRUNT the largest PHASE residual (42.7 / 42.1°).** Session 53 item
+2 refuted the treble ladder as a source of *flat phase lead*, which is untouched; nothing had ever
+tested the ladder as a **magnitude** carrier, and session 50's own next-step (a) already noted the
+ladder is `static constexpr` and unreachable from every A3 tool.
+
+#### 5. ⚠ WHAT THIS DOES AND DOES NOT ESTABLISH
+
+  * It falsifies **"pedal_OD = model_OD × ONE switch-independent linear H"** and no more. `H_req`
+    moves if the pedal has an element the model lacks **OR** if the model's own response to that
+    switch is wrong — and the model's ATTACK/GRUNT response has never been gated on its own. It does
+    **not** separate those, exactly as step 3's drive-axis version does not.
+  * The two candidate readings of §4 are both pre-clipper or in-clipper, which is the region
+    sessions 53/54 had already narrowed to: **(i)** the pedal's ATTACK network has far more
+    low-mid authority than a 220 pF C8 — note ATTACK is **[ENG]**, the 3-way switch does not exist
+    on our schematic at all, so there is no verified topology here to defer to; or **(ii)** the
+    pedal's clipper operating point is far more sensitive to the HF content ATTACK moves than the
+    model's is. Both are testable; neither is tested here.
+  * The pedal-side numbers are **describing-function** differences, not transfer functions (the
+    standing caveat on this whole axis) — a broadband move through a nonlinearity is expected even
+    from an HF-only network. That cuts both ways: it is also why the model showing ~0.00 dB is the
+    informative half.
+  * ⚠ **Do not read the 2.5–10 kHz model rows.** They are above `FIT_HI_HZ` = 1700 Hz, where the
+    blend axis is explicitly untrustworthy (session 51 item 5).
+  * Step 2 (pedal-vs-pedal) **remains the model-free fallback**; where the two disagree, step 2 is
+    the one that cannot inherit a model error. Both are printed, and neither replaces the other.
+
+#### 6. ▶ NEXT
+
+  * **(a)** ⭐ make the treble ladder reachable (`C5/C9/C6`, `R7/R8`, `R12/R14`, and `C8` itself are
+    `static constexpr` — session 50's next-step (a), still open) and re-run step 4: if a ladder
+    change closes the ATTACK magnitude residual it is a C1/C2 candidate on a second axis, and if it
+    cannot, that is a reachability refutation of the same shape as session 49's bridged-T Pareto.
+    ⚠ verify plumbing BOTH ways, as above.
+  * **(b)** gate the model's ATTACK response on its own before reading any more into `H_req` — that
+    is the ambiguity in §5's first bullet, and it is a cheap matched-pair measurement
+    (`attack-boost_base-od` vs `ref-od` vs `attack-cut_base-od` already exist in the frozen matrix).
+  * **(c)** unchanged from step 10: the post-clipper linear class is closed on measurement and on
+    Bode; the remaining region is inside/before the clipper (`Clipper.h:309` gives `a0` no frequency
+    dependence and the inverter no output impedance).
+  * **(d)** settle `b0` between the LEVEL and DRIVE axes before quoting any absolute A3 magnitude.
+  * **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
+    A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+
+---
+
+### A3 step 12 — the ATTACK finding survives an independent instrument, and the modelled ATTACK network is refuted as its carrier (session 56)
+
+Session 55's next-steps **(b)** then **(a)**, in that order. Tooling + analysis only — **nothing in
+`src/` or `tests/` changed**, so ctest is unchanged at the pre-existing session-44 **16/17**
+(`OSValidationTest`, same `amp 0.35 : 2x -25.6 / 4x -32.1 / 8x -23.6` failure); run, not assumed.
+New tools `analysis/attack_span_probe.py` and `analysis/attack_c8_screen.py`.
+
+#### 1. WHY (b) FIRST, AND WHY IT MATTERED
+
+Step 11's finding — the model's ATTACK is inert below 1.6 kHz where the pedal's has ±3–7 dB of
+authority — now carries the A3 search, and it was measured entirely through ONE instrument: the
+blend-axis solve, whose pedal side is a *solved* quantity with a documented upper-bound bias
+(session 52 item 3b). Step 11's own next-step (b) said to gate it independently before reading more
+into `H_req`. Doing (a) first would have meant plumbing eight `static constexpr` values through
+`FitParams`/`TrebleAttack`/`PedalChain`/two CLI maps against a premise that had never been
+cross-checked.
+
+`attack_span_probe.py` is that gate, on a completely different instrument: the frozen 63-capture
+matrix, differenced as a **matched pair** (the GAP #4 / `grunt_span_probe` method). No solve, no
+taper fit, no bleed estimate, no `b0`. Three ATTACK captures exist at each of four drive settings ×
+four stimulus levels, so this is far more than the "cheap matched pair" the next-step budgeted for.
+
+Self-test, all three run before any number is read: **(1)** a capture differenced against itself is
+identically zero (0.000e+00 dB); **(2)** the report's per-row gain match really is being removed —
+worst shift 1.222 dB, so the correction is load-bearing rather than a no-op it never exercises;
+**(3) LIVENESS (L-009)** — the model's ATTACK span above 2 kHz is 12.62 dB, because a 220 pF C8
+*must* act somewhere. Without (3) the LF null would be indistinguishable from a mis-wired probe.
+
+#### 2. ⭐ THE GATE PASSES, AND THE GRUNT CONTROL IS WHAT MAKES IT AIRTIGHT
+
+Span rms over 80–640 Hz, model vs pedal, across all drives and levels:
+
+| | model | pedal | model/pedal |
+|---|---|---|---|
+| **ATTACK** (worst over 4 drives × 4 levels) | **0.08 dB** | 5.61 dB | **1 %–13 %** |
+| **GRUNT** control, same instrument | **11.63 dB** | 11.94 dB | **71 %–157 %** |
+
+The model's ATTACK span is *below the 0.204 dB span floor* (√2 × the 0.144 dB take-to-take shape
+floor) at **every** drive and level. ⭐ **The control is the load-bearing half.** An output span does
+not cancel the OD/bleed balance (`grunt_span_probe`'s standing caveat), so "the model's span is ~0"
+invites the objection "a switch change just gets diluted at the output". GRUNT — a schematic- and
+BOM-verified **linear cap bank on the clipper's input**, i.e. exactly the class of element proposed
+for ATTACK — is 138× larger on the identical instrument, same captures, same bands. **So the model's
+ATTACK null is inertness, not burial**, and step 11's blend-axis reading is confirmed by an
+instrument that shares none of its machinery.
+
+⚠ **One refinement to step 11's framing.** The model's ATTACK is **magnitude**-inert, not
+phasor-inert. The exact superposition taps give `d|OD| ≤ 0.132 dB` at every band ≤1700 Hz, but
+`d(arg OD)` runs **+1.5° at 80 Hz monotonically to +21.2° at 1613 Hz** (mirrored negative for cut).
+That rotation *is* diluted away by the bleed — the decompose's own `full` (= od + bleed) column
+predicts a ≤0.12 dB output span over 80–640 Hz and reproduces the report's model rows, which is an
+independent cross-check between two renderers with no capture involved. Step 11's §4 quoted d|G|
+only; its dtheta column (8.4° / 7.1°) already carried this, but "the model's ATTACK is inert" should
+be stated as **magnitude**-inert or it is wrong.
+
+#### 3. ⭐⭐ AND A DISCRIMINATION STEP 11 EXPLICITLY COULD NOT MAKE
+
+Step 11 §5 left two readings open: **(i)** the pedal's ATTACK network has low-mid authority a 220 pF
+C8 lacks — a *linear* pre-clipper difference; **(ii)** the pedal's clipper operating point is far
+more sensitive to the HF that ATTACK moves — a *nonlinear* difference. The drive × level grid
+separates them, because a clipper-operating-point mechanism must **vanish** where the clipper is
+idle and a linear pre-clipper element must **not**.
+
+At DRIVE min — the most linear corner in the matrix — the pedal's ATTACK boost span vs stimulus
+level (−30 / −18 / −12 / −6 dBFS) is **2.92 / 2.68 / 2.16 / 1.14 dB rms**: it *converges* to ~2.7 dB
+as level falls (8 % between the two lowest levels), it does not vanish. The GRUNT control, a known
+linear element, has the identical shape (**8.88 / 7.28 / 5.26 / 2.92**) — so the collapse at high
+level is a generic clipper+bleed property the model already reproduces, not something peculiar to
+ATTACK, and it is not evidence either way. ⇒ **reading (i): a LINEAR, pre-clipper low-mid difference
+of ~2.7 dB rms exists in the ATTACK network.**
+
+⚠ Scoped exactly: this establishes a linear component exists. It does **not** show the whole ATTACK
+residual at drive-noon/−6 dBFS is linear; reading (ii) may still contribute there.
+
+⚠ **An unresolved discrepancy between the two instruments, recorded rather than explained.** The
+blend axis puts boost/cut at 5.01 / 3.18 dB (1.6× asymmetric); the output puts them at 3.51 / 1.03
+(3.4×). Dilution is common to both positions, so it does not obviously account for the difference.
+
+#### 4. THEN (a) — AND THE SCREEN RAN BEFORE THE PLUMBING, WHICH IS WHY NO `src/` CHANGE WAS WRITTEN
+
+Session 50's next-step (a) — make the treble ladder reachable — is a `src/` change with the standing
+stale-binary trap attached (session 37 item 12). But `eq_reference.treble_attack_tf` **already**
+parameterises every ladder element including C8, so reachability can be answered for free first.
+
+`attack_c8_screen.py` predicts the OUTPUT span for a candidate ladder without rendering anything. At
+the linear corner the OD path is a product, so a treble-network change enters the BLEND node as one
+factor `r(f) = H(boost)/H(flat)`, and `a3_blend_decompose`'s drive-min CSV supplies the model's own
+`od` and `cl` phasors by exact superposition — so `span = 20log10|od·r + cl| − 20log10|od + cl|`
+needs no bleed estimate and no solve. **The dilution that makes an output span unreadable as a stage
+transfer is here computed rather than worried about.**
+
+**Self-test with a known answer:** at the shipped C8 = 220 pF the prediction must reproduce the
+model's own *measured* span from the report. It does — boost 0.046 predicted vs 0.047 measured, cut
+0.028 vs 0.029, worst per-band difference **0.003 dB**. A wrong `Zs` boundary, position map or
+phasor convention fails here.
+
+#### 5. ⛔ C8 ALONE IS REFUTED ON REACHABILITY, NOT ON VALUE
+
+Target (pedal, drive-min, −18 dBFS, 80–640 Hz): **boost 2.68 / cut 0.40 dB rms**, strongly
+asymmetric. C8 swept 220 pF → 100 nF, **both positions scored on ONE value** (C8 is a single part
+and the switch only reroutes its bottom plate — a C8 that fixes boost while wrecking cut is not a
+candidate; the GAP #4 joint-mid-cap failure mode):
+
+| C8 | 220p | 2.2n | 6.8n | 22n | 47n | 100n |
+|---|---|---|---|---|---|---|
+| boost span rms | 0.05 | 0.44 | 0.89 | 1.11 | 1.17 | 1.20 |
+| joint err | 1.94 | 1.81 | 1.54 | 1.40 | **1.40** | 1.41 |
+
+**The boost span saturates at 1.20 dB rms = 45 % of the pedal's 2.68**, and the joint error is FLAT
+across 22n–100n (rises +0.00 / +0.01 dB either side of its numerical minimum). ⭐ The tool refuses to
+call that an optimum: an "interior minimum" test is not enough, because a saturating curve puts its
+argmin in the grid's interior while being flat there — the "objective does not identify this
+direction" signature (session 44 item 5), and calling it a minimum is how a degeneracy ships as a
+fit. It requires the curve to rise on both sides by more than the capture floor, and it does not.
+The mechanism is structural: in boost, C8 bridges R8, and as C8 → ∞ it fully shorts R8, so the lift
+is bounded by the R7/R8 divider whatever the value.
+
+#### 6. THE FRONTIER — THE NETWORK REACHES THE SIZE, AT A LARGE SCHEMATIC COST, AND NOT THE SHAPE
+
+Session 49's bridged-T Pareto argument, one stage over: not "this value cannot" but "nothing in the
+reachable space can". C8 × R7 × R8 (±1 decade on the resistors, 972 settings) — freeing R7/R8 makes
+the bound **stronger**, since they are schematic-verified:
+
+  * max BOOST span reachable **8.93 dB** (cut 1.30) — ⚠ on both resistor grid edges, so it bounds
+    what is reachable and identifies nothing;
+  * max BOOST with cut ≤ the pedal's **5.96 dB** (cut 0.61) ⇒ **the asymmetry is reachable too**,
+    and its mechanism is visible: boost bridges R8 while cut shunts node P against R11, so with
+    R8 ≫ R11 the same C8 acts an octave apart in the two throws.
+
+Then the joint fit over C8 × R7 × R8 × RdampC5 (6 damping values added because the pedal's boost
+span *collapses* at 320 Hz, GAP #2's notch band, which `trebleLadderDampR = 30k` is known to destroy
+— session 46). Scored **twice**, both printed: 320 Hz is a band `a3_shape_gate`'s CORE,
+`a3_phase_solve` and the level-axis aggregates all already exclude *by name*, so applying that
+exclusion is consistency — but never silently (the session-40 rule).
+
+| | best joint err | at | edges |
+|---|---|---|---|
+| all 10 bands | 1.06 dB | C8 6.8n / R7 20k / R8 1486k / Rd 100k | R7, RdampC5 |
+| **ex 320 Hz** | **0.76 dB** | C8 6.8n / R7 20k / R8 1486k / Rd 30k | R7 |
+| shipped | 1.94 dB | 220p / 200k / 470k / 30k | — |
+
+⛔ **Not a candidate, on three counts.** (a) 0.76 dB is **3.7× the 0.204 dB span floor**. (b) R7
+rests on its bound in both fits — not identified, the objective wants to keep going. (c) It costs
+**×0.10 on R7 and ×3.16 on R8, both schematic-verified** (pixel-zoom + the R1–R54 BOM census) — a far
+bigger claim than re-valuing the [ENG] C8.
+
+⭐ **And the residual is a SHAPE the network cannot make.** Per band (boost, drive-min, −18):
+
+| f (Hz) | 80 | 101 | 127 | 160 | 202 | 254 | 320 | 403 | 508 | 640 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pedal | −1.74 | +1.10 | +2.85 | +3.79 | **+4.23** | +4.04 | **+0.21** | +2.10 | +2.20 | +1.35 |
+| best fit | −2.18 | +0.44 | +2.17 | +3.16 | +3.56 | +3.55 | +3.43 | +3.45 | +3.34 | +2.66 |
+
+The fit tracks 80–254 Hz to ~0.4–0.7 dB and then **plateaus** while the pedal **peaks at 202 Hz and
+falls away**. Adding RdampC5 does not recover it — the fit drives damping to the far edge (*more*
+damping, further from the schematic 0), so the 320 Hz collapse is **not** GAP #2's notch reappearing.
+
+#### 7. ⇒ NO `src/` CHANGE WAS WRITTEN, AND THAT IS THE RESULT
+
+Next-step (a) asked for the ladder to be plumbed and step 4 re-run, and said that if it cannot close
+the residual "that is a reachability refutation of the same shape as session 49's bridged-T Pareto".
+It cannot, and the screen delivered that refutation without touching `src/` — which is the whole
+reason it was run first. The modelled ATTACK network is a **partial** carrier: the low-mid *size* is
+reachable but only by moving two verified resistors by 10× and 3×, the fit is unidentified, and the
+shape above 254 Hz is wrong at every setting.
+
+⚠ **Scope, twice.** The screen is the LINEAR corner only; at higher drive the ladder feeds a working
+clipper and could do more, and only a real render tests that. And **ATTACK is [ENG]** — the 3-way
+switch is not on our schematic at all — so the failure may be the assumed *topology* rather than any
+value in it, which is the one hypothesis this screen cannot test.
+
+#### 8. SIDE OBSERVATION, NOT CHASED
+
+The GRUNT control shows the model **over**-delivering at `sweep_clean`: GRUNT flat tracks the pedal
+at **137–157 %** at −30 dBFS while sitting at 96–124 % on the driven sweeps. That is the 28 GRUNT
+flat/boost rows (GAP #3b) seen on a new axis. Recorded; not this session's item.
+
+#### 9. ▶ NEXT
+
+  * **(a)** The live A3 question is now the ATTACK **topology**, not its values: the modelled
+    network can make a shelf, and the pedal makes a **peak at ~202 Hz that falls away above it**. A
+    peaking shape needs a resonant/two-path element the [ENG] 3-way switch as drawn does not have.
+    Since ATTACK is [ENG] there is no schematic to defer to — but equally, nothing corroborates a
+    new topology, so this needs a *measurement* of the pedal's ATTACK transfer shape, not another
+    fit. The 8 unused `attack-*_blend-*` captures are the obvious source.
+  * **(b)** Carry the §3 result into `H_req`: a linear pre-clipper component of the ATTACK residual
+    is now established, so step 11 §5's ambiguity is narrowed (not closed) toward reading (i).
+  * **(c)** unchanged: the post-clipper linear class is closed on measurement and on Bode; the
+    remaining region is inside/before the clipper (`Clipper.h:309`).
+  * **(d)** settle `b0` between the LEVEL and DRIVE axes before quoting any absolute A3 magnitude.
+  * **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
+    A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+
+### A3 step 13 — the pedal's ATTACK shape is MEASURED bleed-free, the [ENG] ladder topology is refuted on a second independent instrument, and step 11 §5's ambiguity is resolved toward reading (i) (session 57)
+
+Session 56's next-step (a) called for a **measurement** of the pedal's ATTACK transfer shape rather
+than another fit, and named the `attack-*_blend-*` captures as the source. That measurement is now
+done, on captures that were already on disk. Analysis + tooling only — **nothing in `src/` or
+`tests/` changed**, and ctest was RUN (not assumed) at the pre-existing session-44 **16/17**
+(`OSValidationTest`, identical `amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`). New tool
+`analysis/attack_topology_probe.py`.
+
+#### 0. TWO CORRECTIONS TO THE SESSION-56 HANDOVER, BOTH OF WHICH CHANGE WHAT TO DO
+
+Step 12 §9(a) described "the **8 unused** `attack-*_blend-*` captures". There are **6**
+(`attack-{boost,cut}_blend-{0930,1200,1430}_base-od`), and they are **not unused** —
+`a3_condition_axis.py:105-111` has read all six since session 54. So (a) was never a fresh data
+source waiting to be opened; it is a re-read of data already in the pipeline, which is why it could
+be answered the same session it was raised.
+
+Step 12 also placed the pedal's ATTACK peak at **~202 Hz**. That came from the OUTPUT span, which
+is diluted by the flat clean bleed by a frequency-dependent amount. Measured bleed-free the peak is
+at **~101–127 Hz** (§1). The dilution moved the apparent peak by about an octave. Quote the
+bleed-free number.
+
+#### 1. ⭐⭐ THE COMPARISON IS NOW CLIPPER-FREE AND BLEED-FREE ON BOTH SIDES
+
+The ATTACK switch only reroutes C8's bottom plate, so `H(boost)/H(flat)` is a **purely linear
+property of the ladder** — no drive, no clipper, no bleed, no dilution model. Session 56's screen
+had to *predict* an output span through a dilution calculation; this compares like with like.
+
+LIVENESS (L-009), run first: C8 = 0 makes both throws identical to flat at **0.000e+00 dB** (the
+switch really does only move that one plate), and the shipped 220 pF moves **2.36 dB** over the fit
+band, so the probe is not inert.
+
+| f Hz | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 | 640 | 1613 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pedal boost | +6.82 | **+7.19** | +6.87 | +5.95 | +4.62 | +3.65 | +2.01 | −0.39 | −1.26 | −0.41 |
+| ladder boost | −0.02 | −0.02 | −0.03 | −0.03 | −0.02 | +0.00 | +0.12 | +0.24 | +0.43 | +2.36 |
+| pedal cut | −3.28 | −3.04 | −3.01 | −3.00 | −2.94 | −3.11 | −4.24 | −4.55 | −5.06 | −1.16 |
+| ladder cut | −0.03 | −0.04 | −0.06 | −0.07 | −0.09 | −0.11 | −0.16 | −0.19 | −0.24 | −0.83 |
+
+**The modelled ladder is a rising HF shelf; the pedal is a falling low-mid peak.** They have
+opposite slopes across the whole identified band — rms error **4.31 dB (boost) / 3.14 dB (cut)**
+against the 0.144 dB floor. This is not a value error, and 320 Hz is blind on this axis in every
+condition (null-dominated), so the 254/403 pair brackets it rather than measuring it.
+
+#### 2. ⭐⭐ THE LEVEL AXIS RESOLVES STEP 11 §5 — AND IT RESOLVES **AGAINST** READING (ii)
+
+Reading (ii) — the pedal's clipper converting an HF-only network into a broadband low-mid move —
+requires the effect to **fade** toward the linear regime. Measured bleed-free at drive noon, the
+ATTACK **boost** ratio does the opposite, monotonically, at every band:
+
+| level | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 | 640 |
+|---|---|---|---|---|---|---|---|---|---|
+| −30 dBFS | +7.42 | +8.20 | +8.67 | **+8.98** | **+9.12** | +8.71 | +6.90 | +6.48 | +4.58 |
+| −18 | +6.82 | +7.19 | +6.87 | +5.95 | +4.62 | +3.65 | +2.01 | −0.39 | −1.26 |
+| −12 | +5.33 | +4.66 | +3.23 | +1.80 | +0.59 | +0.06 | −0.91 | −1.35 | −1.18 |
+| −6 | +2.48 | +1.33 | +0.37 | −0.16 | +0.13 | −0.36 | −0.72 | −0.35 | −0.04 |
+| linear ladder | −0.02 | −0.02 | −0.03 | −0.03 | −0.02 | +0.00 | +0.12 | +0.24 | +0.43 |
+
+At 254 Hz it runs −0.36 → +0.06 → +3.65 → **+8.71** as level drops 24 dB. In the most linear
+condition in the matrix the pedal's ATTACK network has **~9 dB of low-mid authority spanning
+80–640 Hz** where the modelled ladder has **0.03 dB**.
+
+⭐ **And the CUT throw is the clincher, because it is level-INVARIANT:**
+
+| level | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 | 640 |
+|---|---|---|---|---|---|---|---|---|---|
+| −30 dBFS | −3.03 | −2.91 | −2.95 | −3.01 | −3.00 | −3.00 | −3.97 | −4.23 | −4.39 |
+| −18 | −3.28 | −3.04 | −3.01 | −3.00 | −2.94 | −3.11 | −4.24 | −4.55 | −5.06 |
+| −12 | −3.67 | −3.21 | −3.00 | −2.83 | −2.75 | −3.63 | −4.80 | −5.58 | −6.40 |
+| −6 | −2.46 | −2.08 | −1.83 | −1.79 | −1.48 | −2.96 | −2.88 | −2.93 | −3.06 |
+
+−3.0 dB at 80–202 Hz across an 18 dB level range. **Boost is strongly level-dependent, cut is not**
+— which is exactly what a LINEAR level change ahead of a compressor does: a boost gets progressively
+compressed away as level rises, a cut does not. That is a mechanism for the boost/cut asymmetry
+session 56 §3 recorded as unexplained (blend axis 1.6× vs output 3.4×), and both halves point the
+same way.
+
+⭐ **Two things make this readable rather than suggestive.** (a) The known instrument bias cuts the
+right way: `r = √(|g1|²+H)` is an UPPER bound inflated by harmonic power (session 52 §3b), which is
+*worse* at high level — so it biases the ratio UP exactly where the effect measures smallest, and
+the true trend is steeper than the table. (b) Conditioning **improves** as level falls (law residual
+0.043 dB at −30 dBFS vs 0.165 at −6 dBFS, floor 0.144, 13 bands identified throughout), so the
+trend is not the low-level end going soft — the noisiest row is the −6 dBFS one where the effect
+reads ≈0.
+
+⇒ **Reading (i) — a LINEAR pre-clipper low-mid element the model lacks — is established in
+DIRECTION.** ⚠ State it exactly: the magnitude of the linear limit is **not** pinned, because the
+level trend has not plateaued at drive noon, and a residual clipper contribution at higher levels is
+not excluded. What is excluded is (ii) as the *primary* carrier.
+
+#### 3. ⭐ REACHABILITY — THE TOPOLOGY CANNOT MAKE THE SHAPE, AND THE SEARCH IS GATED
+
+Session 56 scored one value at a time against a predicted span. Here all **11** ladder elements are
+freed at once (freeing schematic-verified parts only makes a negative result stronger) and **both
+throws are scored with ONE parameter set** — they are the same network.
+
+⚠ **My first attempt FAILED its own gate and was discarded.** Random search returned "best joint
+3.04 dB, best D +0.77 dB", but recovered a *definitionally reachable* target to only **0.727 dB**,
+with the max-D point resting on **6 of 11 bounds**. A 4× separation between reachable and measured
+is not a refutation, it is a weak optimiser. Re-run with differential evolution the gate passes at
+**0.0027 dB** on structured targets (including 26 and 30 dB ones), so a failure is now readable.
+
+| box (decades) | best joint shape rms |
+|---|---|
+| ±1.5 | **3.029 dB** |
+| ±3.0 | **3.028 dB** |
+| ±6.0 | **3.028 dB** |
+| ±9.0 | **3.028 dB** |
+
+**It moves by 0.001 dB across 7.5 orders of magnitude of box widening in every element** —
+saturated, not fenced, at **21× the capture floor**. And the fit's boost row is **identically 0.00 dB at every
+band**, with cut a frequency-flat −3.12: the optimiser's best move is to switch the boost throw off
+entirely rather than trade. That is the "objective cannot reach this direction" signature.
+
+The shape statistic `D = ratio(101 Hz) − ratio(640 Hz)` (how far the effect FALLS across the
+low-mids; a capacitive bridge is a high-pass action, so it should be ≤ 0) saturates at **+1.15 dB**
+(0.984 / 1.145 / 1.150 / 1.151 at ±1.5 / ±3 / ±4.5 / ±6 decades) against the pedal's **+8.46**.
+
+⚠ **A PATHOLOGY GUARD had to be added, and it is now in the tool.** The unguarded ±9-decade run
+reported `D = +88 dB` — apparently reachable. It is not: `D` has the FLAT response in its
+denominator, and that point drives flat to **−320 dB** with 72 dB of ripple (C5 = 0.63 F, C9 = 18 F,
+R11 = 3.3e14 Ω, R7 = 2.5 mΩ), at a **shape rms of 44.4 dB**. A dead denominator inflates every ratio
+without the curve resembling anything. Points whose flat response is implausibly small or ripply are
+now rejected.
+
+#### 4. WHAT IS AND IS NOT SETTLED
+
+**Settled:** the pedal's ATTACK effect on the OD path is a low-mid peak centred ~101–127 Hz with
+~+9 dB (boost) / ~−3 dB (cut) of authority at the linear end; the drawn [ENG] ladder cannot produce
+that shape at any setting of any of its 11 elements; and the carrier is predominantly a **linear
+pre-clipper** element, not a clipper-operating-point difference.
+
+**Not settled:** ⚠ the pedal side is a **describing-function** ratio at drive noon — the LEVEL AXIS
+is what makes it readable, and no single condition separates (i) from (ii). ⚠ **ATTACK is [ENG]** —
+the 3-way switch is not on our schematic at all — so what is refuted is the *assumed* topology,
+which nothing corroborated in the first place; this is not a schematic disagreement. ⚠ The linear
+limit's magnitude is not pinned (§2).
+
+#### 5. ⭐ THE ONE CAPTURE GAP, NOW PRECISELY SCOPED
+
+Every ATTACK blend ladder is at **drive noon**. At **drive min** the OD path is near-linear, so the
+pedal's bleed-free ATTACK ratio there *must equal the ladder's linear ratio exactly* if the topology
+is right — an assumption-free test that needs no describing-function caveat at all. The drive-min
+flat ladder already exists (`drive-0700_blend-{0930,1200,1430}` + `drive-0700_base-od`), and both
+B=1 ATTACK anchors exist (`drive-0700_attack-{boost,cut}_base-od`). Missing is exactly **6 files**:
+
+    drive-0700_attack-{boost,cut}_blend-{0930,1200,1430}_base-od.wav
+
+All six verified to parse through `captures.parse_capture` (drive 0.0, blend 0.25/0.50/0.75) and
+confirmed new to the 51-entry matrix. Drive-min identifiability covers 101–1613 Hz (it loses 80 and
+806 relative to noon), so the peak region survives.
+
+Two lesser gaps, recorded not requested: **320 Hz is blind on this axis in every condition** (deep
+cancellation — an instrument property, no capture fixes it), and `drive-1700_attack-cut_base-od` is
+absent while `drive-1700_attack-boost_base-od` exists. There is also no ATTACK-position B=0 control;
+ATTACK should be exactly inert at B=0 on physical grounds, but that is the same assumption session
+53 spent a capture verifying for DRIVE.
+
+#### 6. ▶ NEXT
+
+  * **(a)** The ATTACK carrier is a linear pre-clipper low-mid network of ~+9/−3 dB authority that
+    the drawn ladder cannot be. Since ATTACK is [ENG], the question is what topology to *propose* —
+    and the 6 drive-min captures in §5 are what would test a proposal without the
+    describing-function caveat. Do not fit a new topology against the drive-noon target alone.
+  * **(b)** ✅ DONE — step 11 §5's ambiguity is resolved in direction toward reading (i) (§2).
+  * **(c)** unchanged: the post-clipper linear class is closed on measurement and on Bode; the
+    remaining region is inside/before the clipper (`Clipper.h:309`).
+  * **(d)** settle `b0` between the LEVEL and DRIVE axes before quoting any absolute A3 magnitude.
+  * **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
+    A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+
+---
+
+### A3 step 14 — the clipper is de-convolved and the ATTACK network's LINEAR transfer is pinned over 80–254 Hz; the required SHAPE is specified; and 403–640 Hz is shown to be undecidable on this axis (session 58)
+
+Session 57's next-step (a) was: the ATTACK carrier is a linear pre-clipper low-mid network the drawn
+ladder cannot be, ATTACK is `[ENG]` so the question is what topology to **propose** — and "do not fit
+a new topology against the drive-noon target alone". This session did not fit a topology. It did the
+two things that have to come first: turned the measurement into a **specification** (what order and
+what corner frequencies must a proposal realise?) and then **removed the describing-function caveat
+arithmetically**, which turned out to be possible from captures already on disk.
+
+Analysis + tooling only — **nothing in `src/` or `tests/` changed**, and ctest was RUN (not assumed)
+at the pre-existing session-44 **16/17** (`OSValidationTest`, identical `amp 0.35: 2x −25.6 /
+4x −32.1 / 8x −23.6`). New tools `analysis/attack_tf_spec.py`, `analysis/attack_linear_extract.py`.
+Baseline verified first: `attack_topology_probe.py --selftest` reproduces session 57's liveness
+(C8 = 0 → 0.000e+00 dB, shipped 220 pF → 2.36 dB) and its search gate (worst recovery 0.0024 dB).
+
+#### 1. THE SPECIFICATION — what order does the ATTACK ratio actually demand?
+
+`attack_tf_spec.py` fits minimum-phase rational families of rising order to the bleed-free ratio at
+the most linear condition in the matrix (`sweep_clean`, −30 dBFS), and reports where the residual
+reaches the floor. The floor for a ratio of two solved quantities from the same instrument is
+**√2 × 0.144 = 0.204 dB**, not 0.144 (the session-56 §2 convention).
+
+⚠ **A self-test gate had to be fixed before any of this could be read.** At order 3 differential
+evolution converged to a **0.360 dB local minimum on a target the family had generated itself**,
+deterministically, at both budgets — a family that cannot recover its own parameters makes a large
+residual on real data unreadable. Adding multi-start local refinement (60 random `least_squares`
+starts on top of DE) takes every family to **0.00000 dB** recovery. This is a correctness
+requirement, not a speed tweak, and it is the same lesson as session 57's discarded random search.
+
+| family | BOOST rms | CUT rms |
+|---|---|---|
+| order 0 — flat gain | 1.859 | **0.566** |
+| order 1 — shelf | 0.656 | 0.533 |
+| order 2 — two real shelves | 0.350 | 0.315 |
+| order 2 — resonant (biquad) | 0.322 | 0.114 |
+| order 3 | 0.313 | 0.090 |
+
+⭐ **CUT is, to 0.57 dB, a frequency-flat gain of −3.2 dB across the whole 80–1613 Hz band.** Order 0
+— no corners at all. Everything below that is a single feature near 600 Hz (see §4).
+
+⛔ **BOOST saturates at ~0.31–0.35 dB, 1.5–1.7× the floor, and never reaches it.** Order 2 buys
+0.30 dB over order 1 and order 3 buys a further 0.01 dB — and both higher orders get there only by
+parking a corner **off-band** (21 Hz, 0.5 Hz) or by landing a zero **on top of a pole** (228/200 Hz;
+597/612 Hz for cut). Those are the "this order adds nothing" signatures, reported explicitly by the
+tool rather than quoted as fitted values. **So the boost shape is not a low-order minimum-phase
+rational**, and the honest read of that is not "the pedal contains something exotic" — it is that
+~0.3 dB of the target is structure the fit cannot represent, which §3 then explains.
+
+#### 2. ⭐⭐ THE CLIPPER IS DE-CONVOLVED — AND IT NEEDS NO NEW CAPTURES
+
+Every ATTACK number since session 55 is a describing-function ratio, and session 57 had to state
+that "the linear limit's magnitude is NOT pinned". It can be pinned, from the existing captures,
+with one identity.
+
+Write the OD path as `linear A(f) → clipper → linear B(f)` and let ATTACK insert a linear factor
+`h(f)` ahead of the clipper. Under a **swept sine the clipper sees one tone at a time**, of
+amplitude `|A(f)|·L`, so its describing-function gain is a function of that single scalar:
+
+```
+    r_ref  (f, L) = |B·A| · n(|A|·L)
+    r_boost(f, L) = |B·A| · h · n(h·|A|·L) = h · r_ref(f, L + h)
+
+⇒   ratio_dB(f, L) = h_dB(f) + S_f(L + h_dB) − S_f(L)
+```
+
+where `S_f` is **the pedal's own ref transfer as a function of stimulus level** — measured, not
+modelled. The right-hand side is monotone in `h`, so `h` is solved per band per level by bisection.
+Nothing about the clipper is assumed but memorylessness: its shape, rails and drive dependence all
+cancel.
+
+⭐ **And session 52 §3b's upper-bound bias cancels exactly here.** `r = √(|g1|²+H)` is inflated by
+harmonic power, worse at high level — the standing caveat on every blend-axis number. In this
+identity, boost at level `L` and ref at level `L+h` present the clipper with the **identical input
+waveform**, so they carry identical harmonic power, and the identity equates two measurements rather
+than a measurement to a model. This is the first ATTACK instrument not exposed to that bias.
+
+Gates, all run first: self-test recovers a known `h(f)` through a known compressor to **1.8e-15 dB**
+over 28 cells; liveness (`h = 0` → `0`) to the same; and **no extrapolation** — `L + h` must land
+inside the captured level range or the cell prints `--`.
+
+**The enabling measurement, and it is new: the pedal's own OD transfer vs level, per band.** Its
+total variation is the **compression budget** — the most level dependence any pre-clipper linear
+element can borrow from the clipper at that band.
+
+| f Hz | 80 | 101 | 127 | 160 | 202 | 254 | 403 | 508 | 640 | 1016 | 1280 | 1613 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| budget dB | 0.31 | 0.77 | 1.68 | 2.71 | 4.18 | 4.34 | **0.93** | **1.42** | **0.75** | 5.58 | 9.40 | 12.23 |
+| min\|t\| | 0.152 | 0.196 | 0.234 | 0.251 | 0.241 | 0.169 | 0.159 | 0.163 | 0.154 | 0.152 | 0.166 | 0.187 |
+
+#### 3. THE RESULT — h(f) pinned over 80–254 Hz, and 403–640 Hz shown to be undecidable
+
+One `h` per band, fitted across a **fixed level subset chosen by feasibility and identical at every
+band** (a positive `h` pushes `L+h` past the hottest captured row, so BOOST can only use the two
+quiet rows; CUT drops −30 and keeps three). ⚠ The first draft let each band pick its own subset and
+the summary line then claimed a uniform "3 levels each" while the table showed 2 and 3 — the
+session-49 item-7 aggregate-over-different-members trap, in my own gate, caught and fixed.
+
+| f Hz | h BOOST dB | resid | h CUT dB | resid |
+|---|---|---|---|---|
+| 80 | **+7.03** | 0.289 | **−3.15** | 0.426 |
+| 101 | **+7.83** | 0.343 | **−2.92** | 0.340 |
+| 127 | **+8.24** | 0.511 | **−2.91** | 0.281 |
+| 160 | **+8.38** | 0.876 | **−3.00** | 0.177 |
+| 202 | **+8.44** | 1.325 | **−3.09** | 0.111 |
+| 254 | +7.77 | 1.631 | −4.01 | 0.754 |
+| 403 | +4.78 | 2.255 | −4.17 | 0.843 |
+| 508 | +3.55 | 3.278 | −4.45 | 1.432 |
+| 640 | +1.66 | 2.940 | −4.61 | 1.661 |
+
+**CUT: mean residual 0.267 dB / worst 0.426 over 80–202 Hz — within 2× the floor, and 0.111 at
+202 Hz is BELOW it.** So the cut throw is a **frequency-flat −3.0 dB linear attenuation ahead of the
+clipper**, and that is now a measured quantity rather than a description of a trend.
+
+**BOOST: +7.0 → +8.4 dB rising from 80 to 202 Hz**, residual 0.29–1.33 (1.4–6.5× floor). ⭐ Note
+this is a genuine de-convolution at the mid bands: at 254 Hz the raw drive-noon ratio reads **+3.65
+dB** and `h` is **+7.77** — the clipper had eaten 4 dB.
+
+#### 4. ⛔ AND A FIT-FREE BOUND SAYS 403–640 Hz CANNOT BE DECIDED ON THIS AXIS
+
+Because `ratio(L) = h + S(L+h) − S(L)`, subtracting two levels makes **`h` drop out entirely**:
+
+```
+    |ratio(L1) − ratio(L2)|  ≤  2 · TV(S)
+```
+
+so if the measured ratio swings by more than twice the band's compression budget, **no linear
+pre-clipper factor of any value can produce it**. Nothing is optimised, so this is the strongest
+form of the result. Using the budget over the full captured range makes it generous.
+
+| f Hz | 403 | 508 | 640 | (all others) |
+|---|---|---|---|---|
+| BOOST swing dB | 4.90 | 6.88 | 5.84 | within budget |
+| 2 × budget | 1.86 | 2.84 | 1.49 | — |
+| **excess** | **+3.03** | **+4.03** | **+4.35** | — |
+
+CUT exceeds only marginally and only at 80 Hz (+0.60), 403 Hz (+0.06) and 640 Hz (+1.85).
+
+⚠⚠ **DO NOT read this as "the boost throw is not a linear pre-clipper element."** The three
+offending bands are exactly the three where the pedal's OD **fundamental is weakest** (−17.0 / −17.1
+/ −18.6 dB — the bridged-T scoop) while its neighbours an octave down sit **4–6 dB hotter**. That is
+precisely where harmonics generated at `f/2`, `f/3` … leak most into the band, i.e. where the
+instrument's own `r = √(|g1|²+H)` upper bound is loosest. And the exact-cancellation argument in §2
+requires `h` to be flat with frequency to hold for the leaked harmonics too — over 403–640 Hz the
+fitted `h` falls 3 dB, so it is not. **The excess is real as measured; this axis cannot separate "the
+boost throw does something a pre-clipper linear factor cannot" from "harmonic leakage inflates the
+swing at the three scoop bands".** That is also the most likely source of §1's irreducible ~0.31 dB.
+
+⭐ **Conditioning was checked as an alternative and does NOT explain the pattern.** `min|t|` (the
+blend ladder's closest approach to a cancellation null) is flat across the band at 0.152–0.251 and
+does not track the residual at all — 80 Hz is among the worst-conditioned (0.152) and has the
+*smallest* boost residual, while 202 Hz is the best-conditioned (0.241) and has a residual 4.6× larger.
+So the degradation is a property of frequency, not of null-dominance.
+
+#### 5. WHAT IS AND IS NOT SETTLED
+
+**Settled.** The ATTACK network's linear transfer, clipper-de-convolved, over 80–254 Hz:
+**boost +7.0 → +8.4 dB rising to a maximum near 202 Hz; cut −3.0 dB, frequency-flat.** The cut throw
+is a plain flat attenuation to within 2× the capture floor over 80–202 Hz and needs **no corners at
+all** across the whole measured band. The two throws are therefore **strongly asymmetric in the
+linear domain** (+8 vs −3, peaked vs flat) — which matters for a topology proposal, because a single
+element rerouted between two positions would not naturally give one peaked throw and one flat one.
+
+**Not settled.** ⚠ 403–1613 Hz on the boost throw — §4. ⚠ The `[ENG]` status is unchanged: nothing
+corroborates any ATTACK topology, so `h(f)` above is a **specification a proposal must meet**, not a
+disagreement with a drawn circuit. ⚠ Magnitude only; this axis has no phase, so these are
+minimum-phase statements and a non-minimum-phase realisation is not excluded. ⚠ `h` is placed ahead
+of the clipper because sessions 55–57 established the carrier is pre-clipper; an element **inside**
+the clipper's feedback loop would not satisfy the §2 identity at all, and remains the natural reading
+of §4's excess if it survives the drive-min captures.
+
+#### 6. ▶ THE CAPTURE REQUEST IS NOW SHARPER, AND IT IS THE SAME SIX FILES
+
+Session 57 scoped six drive-min ATTACK blend files. §4 raises their value: **at drive min the
+compression budget goes to ~0 at every band**, so the measured ratio *is* `h(f)` directly — no
+de-convolution, no leak-vs-physics ambiguity, and 403–640 Hz becomes decidable. Written up as
+`docs/session58-capture-request.md`, with the settings, the two standing traps and the known gaps.
+All six re-verified this session: they parse through `captures.parse_capture`, they are absent from
+the matrix, and `render_args` genuinely emits `--attack 1` / `--attack 2` for them (checked, because
+a switch position that parses but is not passed to the renderer is exactly the session-20
+`--input-trim` defect — my first check of this was a flawed flat-membership diff that reported no
+difference; the real diff is clean).
+
+#### ▶ NEXT
+
+* **(a)** The 6 drive-min captures (`docs/session58-capture-request.md`) — they convert §3's
+  80–254 Hz result into a whole-band linear transfer and settle §4. Until then **do not propose a
+  topology against 403–640 Hz**, which is the region a proposal would most want to fit.
+* **(b)** With `h(f)` in hand, a proposal must produce **+8 dB peaked at ~200 Hz on one throw and a
+  flat −3 dB on the other, from one 3-position switch**. §1 says cut needs **no corners**, so the
+  cheapest structure consistent with both is a switch whose cut position is a plain attenuation and
+  whose boost position is not the same element rerouted.
+* **(c)** unchanged: the post-clipper linear class is closed on measurement and on Bode; the
+  remaining region is inside/before the clipper (`Clipper.h:309`).
+* **(d)** settle `b0` between the LEVEL and DRIVE axes before quoting any absolute A3 magnitude.
+* **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
+  A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+
+### A3 step 15 — the 15 new captures: the drive-min premise EXPIRES on the instrument rather than the physics, and the drive-max ladders settle the PRE-clipper placement out-of-sample (session 59)
+
+Tooling + analysis only — **nothing in `src/` or `tests/` changed**, and ctest was RUN (not assumed)
+at the pre-existing session-44 **16/17** (`OSValidationTest`, identical `amp 0.35: 2x −25.6 /
+4x −32.1 / 8x −23.6`). New `analysis/attack_drive_axis.py`. New report
+`analysis/reports/s59_matrix100.json` — a **strict superset** of `s54_matrix85.json`, proven, not
+assumed: all 85 prior captures present and **20 400 values bit-identical (worst |Δ| = 0.000e+00)**,
+so every session-54–58 number is unmoved.
+
+#### 0. The captures, verified first
+
+The user delivered **15 files**, not the 6 requested: the six drive-min ATTACK ladders, **both B=0
+controls** (§6's "worth one extra file", taken for both throws), the **entire drive-max ATTACK
+ladder** (6 files), and `drive-1700_attack-cut_base-od.wav` (the matrix asymmetry session 57 §6
+recorded). All 15 verified before any analysis: filenames parse through `captures.parse_capture`;
+`render_args` genuinely emits `--attack 1` / `--attack 2` while a non-ATTACK control emits
+`--attack 0`; 48 kHz, 83.700 s, no truncation; **no clipping** on the real signature (longest run of
+consecutive near-peak samples ≤ 8, and the one file with a run of 8 peaks at 0.159); and every BLEND
+ladder's RMS falls **monotonically** (the cheap form of session 54's geometric test that caught
+MASTER left at 1430).
+
+#### 1. ⭐ The B=0 ATTACK control PASSES — a standing assumption is now verified
+
+Every ATTACK ladder since session 55 divides by `blend-0700_base-od.wav`, on the argument that at
+BLEND = 0 the OD path is out of circuit so ATTACK cannot matter. Session 53 spent a capture verifying
+the equivalent for DRIVE; for ATTACK it had never been tested. Over 20 bands 20–1700 Hz: **boost mean
+−0.009 dB / worst −0.062; cut mean +0.036 / worst +0.051**, against the 0.144 dB floor. Valid.
+
+#### 2. ⛔⛔ THE DRIVE-MIN PREMISE IS HALF RIGHT, AND THE HALF THAT FAILS IS THE INSTRUMENT
+
+`docs/session58-capture-request.md` argued that at drive min the compression budget → 0, so the
+measured ratio simply **is** `h(f)`, with no de-convolution and 403–640 Hz decidable. **Drive min does
+idle the clipper. It also drops the pedal's OD path to ~−15 dB relative to the clean bleed** (vs
+−13 at noon, −4 at max), and the blend axis measures exactly that ratio. The ladder
+`t(B) = |β(B) + B·G|` then degenerates to `β(B) + B·Re(G)`: only the **projection** survives, `(r, θ)`
+collapse to a ridge, and the fitted BLEND taper absorbs the difference. That is **session 47 item 11's
+small-µ degeneracy at a new operating point**.
+
+⭐ **This is PROVEN with a known feature, not argued from conditioning.** The IC2_B bridged-T sits
+AFTER the clipper, is schematic-verified on both schematics and capture-confirmed (GAP #1b, 116 OD
+rows), and its broad 400–700 Hz scoop **cannot depend on the DRIVE knob**. Measured as |G| at 202 Hz
+minus the mean of 403/508/640 Hz:
+
+| condition | sweep_clean | sweep_drv_−18 |
+|---|---|---|
+| drive min | **0.6 dB** | **0.7 dB** ⛔ absent |
+| drive noon | 5.2 | 5.3 |
+| drive max | 10.9 | (640 Hz unidentified) |
+
+A solve that has lost a network physically obliged to be there is not measuring the OD path, whatever
+its law residual says. Corroborating statistics, both computed: the boost/flat ratio **moves 0.94–2.69 dB**
+under an equally defensible taper choice at drive min, versus **0.10–0.24 dB** at noon and **0.00–0.17 dB**
+at max; and noise propagation (`--selftest` gate 3, 200 trials at the pedal's own 0.144 dB
+take-to-take) gives at |G| = −15 dB only **84/200 solves, bias −1.53 dB, ratio error ±1.12 dB**,
+against −3 dB's **200/200, bias +0.03, ±0.38**.
+
+⇒ **The six drive-min captures are sound; the blend axis cannot read them. 403–640 Hz is STILL
+undecided.** ⭐ The general lesson, and it is the useful one: **the DRIVE axis trades compression
+against sensitivity in BOTH directions** — drive min removes the clipper but buries the signal, drive
+max exposes the signal but compresses the effect away. Drive noon is the sweet spot, not an
+unfortunate compromise.
+
+⚠ **And the budget at drive min is not ~0 either — it is 1.70–2.75 dB**, because the **J201 sits
+UPSTREAM of the DRIVE pot** (circuit.md), so it sees the same level at every drive setting and its own
+compression never goes away. Drive min idles the **clipper**, not the OD path. (Drive noon 0.31–4.34;
+drive max 14.03–22.68.)
+
+#### 3. ⭐⭐ THE DRIVE-MAX LADDERS SETTLE THE PLACEMENT — OUT-OF-SAMPLE
+
+The bonus drive-max ladders were **never part of session 58's fit**, so they are a test set rather
+than more fitting data. Session 58 published `h(f)` from drive-noon captures alone; predict the
+drive-max ratio from it and from drive max's **own** measured level transfer,
+`ratio = h + S_max(L+h) − S_max(L)`, with nothing fitted. Drive max compresses so hard (budget
+14–22 dB) that a **pre**-clipper `h` of +8 dB must be squashed to ~0, while a **post**-clipper element
+of the same size arrives undiminished. The two hypotheses predict ~+0.3 dB and ~+8 dB.
+
+| BOOST | 80 | 101 | 127 | 160 | 202 |
+|---|---|---|---|---|---|
+| s58 `h` (drive noon, published) | +7.03 | +7.83 | +8.24 | +8.38 | +8.44 |
+| PREDICTED, `h` pre-clipper | +1.09 | +0.48 | +0.28 | +0.28 | — |
+| PREDICTED, `h` post-clipper | +7.03 | +7.83 | +8.24 | +8.38 | +8.44 |
+| **MEASURED at drive max** | **+1.24** | **+0.45** | **+0.24** | **+0.28** | **+0.44** |
+
+**Pre-clipper rms residual 0.08 dB — below the 0.144 dB take-to-take floor — against 7.50 dB for
+post-clipper.** A ~90× separation, on data the fit never saw. CUT is the same direction but weaker:
+**0.84 dB vs 2.50 dB**, with a systematic residual (+1.14 → +0.45, monotone), which is about the size
+of the drive-max cut throw's own taper sensitivity — consistent within the instrument's demonstrated
+stability, not sharp.
+
+⇒ **Sessions 55–58 placed `h` ahead of the clipper because the earlier sessions had put the carrier
+there. It is now MEASURED, out-of-sample.**
+
+#### 4. ⚠ HOW STRONG THAT TEST IS ABOUT `h`'s VALUE — stated, not glossed
+
+Heavy compression is what makes §3 decisive about the **mechanism** and is the same thing that makes
+it weak about the **value**: once the clipper is squashing, a wide range of `h` predicts nearly the
+same output. Scanning `h` and keeping everything that predicts the measured ratio within the 0.204 dB
+ratio floor: **80 Hz [5.6, 8.8] | 101 [3.0, 12.0] | 127 [0.7, 12.0] | 160 [1.7, 12.0] | 202 [5.2, 6.0]**.
+
+**4 of 5 intervals contain session 58's published value; 202 Hz does NOT** ([5.2, 6.0] vs +8.44). That
+is a genuine disagreement between the two drives at that one band, recorded rather than rounded up —
+the tool computes the count and prints the warning itself rather than narrating a conclusion above a
+table that contradicts it. Either way the widths mean **drive max CORROBORATES `h`; it does not
+re-measure it. Session 58's drive-noon `h(f)` remains the estimate of the value.**
+
+#### 5. What is settled, and what is not
+
+* ✅ The shared B=0 normaliser is **verified** for the ATTACK conditions (§1).
+* ✅ `h` is **PRE-clipper**, measured out-of-sample at ~90× in rms residual (§3).
+* ✅ Session 58's de-convolution identity survives an independent condition it was not fitted on.
+* ⛔ **403–640 Hz is still undecided.** The drive-min route fails on the instrument (§2), not on the
+  captures.
+* ⚠ 202 Hz shows a real drive-max/drive-noon disagreement on `h`'s value (§4).
+* ⚠ Everything remains `[ENG]` and magnitude-only: `h(f)` is a **specification a topology proposal
+  must MEET**, not a disagreement with a drawn circuit, and minimum-phase statements only.
+
+#### ▶ NEXT
+
+* **(a)** ⭐⭐ **TWO FILES — `docs/session59-capture-request.md`.** The capture that decides
+  403–640 Hz is drive min at **LEVEL MAX**, and the method is **validated on a file already on disk,
+  not proposed** (§6 of `attack_drive_axis.py`). At LEVEL max the wiper shorts to the OD source so the
+  clean bleed is **exactly zero** (`level_blend_tf`), and LEVEL sits **after every nonlinearity**
+  (circuit.md), so it cannot move the clipper's operating point. At BLEND max the output then simply
+  **is** the OD path, and `h(f)` is a plain subtraction — no ladder, no taper, no `b0`, no solve, no
+  de-convolution. Pre-flight on the existing `drive-0700_level-1700_base-od.wav`: the **bridged-T
+  scoop is back at 6.0–6.1 dB** (vs 0.7 dB for the failed route), |G| is up ~8 dB into the
+  well-conditioned range, and the −30/−18 dBFS curves agree to ~0.1 dB. Only
+  `drive-0700_level-1700_attack-{boost,cut}_base-od.wav` are missing.
+  **Gate any capture set on the bridged-T scoop before reading a ratio off it.**
+* **(b)** unchanged: with `h(f)` in hand a proposal must make **+8 dB peaked at ~200 Hz on one throw
+  and a flat −3 dB on the other, from one 3-position switch**; session 58 §1 says cut needs **no
+  corners**. Do not fit a topology against 403–640 Hz until (a) lands.
+* **(c)** unchanged: the post-clipper linear class is closed on measurement and on Bode; the
+  remaining region is inside/before the clipper (`Clipper.h:309`).
+* **(d)** settle `b0` between the LEVEL and DRIVE axes before quoting any absolute A3 magnitude.
+* **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
+  A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+
+### A3 step 16 — h(f) is MEASURED whole-band by plain subtraction; 403–640 Hz is DECIDED; the throw is BROADBAND, and sessions 57/58's "202 Hz peak" is a bleed artefact (session 60)
+
+**The two requested captures landed** (`drive-0700_level-1700_attack-{boost,cut}_base-od.wav`), plus
+**two unrequested bonus files** at the same operating point,
+`drive-0700_level-1700_grunt-{flat,boost}_base-od.wav`, which turned out to matter (see §4 below).
+Tooling + analysis only — **nothing in `src/` or `tests/` changed**, and ctest was **RUN** (not
+assumed) at the pre-existing session-44 **16/17** (`OSValidationTest`, identical `amp 0.35: 2x −25.6
+/ 4x −32.1 / 8x −23.6`). New `analysis/attack_level_extract.py`, `analysis/extract_m36.py`. New
+report `analysis/reports/s60_matrix104.json`, proven a **STRICT SUPERSET** of `s59_matrix100.json`
+(all 100 present, **24 000 values bit-identical, worst |Δ| 0.000e+00**), so no session-54–59 number
+moves.
+
+**(1) The captures verified first.** All four parse through `captures.parse_capture`; `render_args`
+emits `--drive 0.000000 --level 1.000000 --blend 1.000000` for every one and differs from the flat
+reference in **exactly one flag** (`--attack 1`/`2`, or `--grunt 2`/`0`); 48 kHz / 83.700 s /
+float32; peaks 0.28–0.53 with no flat-topping.
+
+**(2) ⭐ THE ZERO-BLEED PREMISE IS BOUNDED BY MEASUREMENT, not trusted from the model.** The route
+rests on `level_blend_tf` giving exactly zero bleed at LEVEL max — a claim about an *ideal* pot. A
+real bleed cannot exceed the deepest |G| anywhere in the set, which is **−34.0 dB** (attack cut @
+40 Hz). That bounds the worst-case (fully coherent) dilution of `h` at **≤0.87 dB** across 80–640 Hz.
+⭐ **And a bleed common to all three files dilutes `h` TOWARD ZERO**, so every number below is a
+**LOWER bound on |h|** — residual bleed cannot manufacture the +8.6 dB, only shrink it.
+
+**(3) ⚠ THE PLAIN SUBTRACTION IS *NOT* h, AND THE PRE-FLIGHT THAT JUSTIFIED THIS REQUEST COULD NOT
+HAVE SEEN IT.** Session 59 step 6 validated the route by showing the **flat reference** agrees
+between −30 and −18 dBFS to ~0.1 dB. That does not transfer to the throws: **boost pushes ~8 dB more
+signal into the J201, which sits upstream of DRIVE and never idles.** Measured, boost's raw ratio
+moves **2.41 dB at 640 Hz** between those two levels while cut moves 0.27. Session 58's
+de-convolution identity `ratio = h + S_f(L+h) − S_f(L)` was therefore applied here too — where it is
+far better conditioned, because `S_f` is now a plain difference of two raw measurements rather than a
+solved quantity. Gates: recovery of a known `h` through a known compressor to **2.4e-11 dB**,
+liveness `h=0 → 0`, and **NO EXTRAPOLATION** (`L+h` must land inside the captured range or the cell
+prints `--`).
+
+**(4) ⭐⭐ AND THE FIX WAS A LEVEL THE MATRIX HAS NEVER READ.** `gen_test_signal.py` writes **two**
+clean-end sweeps — `sweep_clean` at −30 dBFS and **`sweep_clean_-36` at −36** — but
+`comprehensive_report.py`'s `ALL_SWEEP_LEVELS` stops at −30, so the −36 point has sat unread in
+**every capture in the matrix since the first capture session**. `analysis/extract_m36.py` pulls it
+out **pedal-side only** (no render, so no staleness risk) into a separate side file — deliberately
+**not** a change to `comprehensive_report.py`, which is a shared oracle with 7+ importers whose
+record shape and result-cache key would both have moved. Its self-test asserts the reference-segment
+convention rather than arguing it: the two conventions differ by **exactly +6.000 dB with 6.8e-08
+spread**, i.e. a constant, which cancels in every difference taken here.
+
+**(5) ⭐⭐ WITH −36 dBFS THE MEASUREMENT IS DEMONSTRABLY CONVERGED, so h is READ, not inferred.**
+Boost's two quietest levels (−36, −30) agree to **worst 0.065 dB** at every band — under the
+√2 × 0.144 = **0.204 dB** floor — including 508 (0.018) and 640 (0.065), the two bands that were
+still moving 1.5–2.4 dB between −30 and −18. At that level **`raw minus solved` is worst 0.027 dB**:
+there is nothing left to de-convolve, so the de-convolution is *confirmatory, not load-bearing*.
+⚠ **The read is from the converged levels only, NOT a mean over all of them** — averaging in the
+compressing rows would drag 640 Hz from its converged +7.25 to +5.48 purely by mixing members, the
+session-49-item-7 / session-58-item-3 trap.
+
+**(6) ⭐⭐ THE RESULT — 403–640 Hz IS DECIDED, AND THE THROW IS BROADBAND.**
+
+| h, dB | 40 | 50 | 64 | 80 | 101 | 127 | 160 | 202 | 254 | *320* | 403 | 508 | 640 | 806 | 1016 | 1280 | 1613 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **boost** | +7.95 | +10.14 | +9.08 | **+8.64** | +8.52 | +8.53 | +8.61 | +8.68 | +8.52 | *+0.53* | **+8.54** | **+8.13** | **+7.25** | +8.42 | +9.22 | +9.14 | +9.06 |
+| **cut** | −5.85 | +1.05 | +0.20 | **−0.79** | −1.38 | −1.70 | −1.87 | −2.00 | −2.40 | *−3.40* | **−1.66** | **−2.14** | **−2.40** | −2.29 | −2.43 | −2.72 | −2.93 |
+
+⭐ **Boost is a BROADBAND ~+8.6 dB, essentially flat from 80 Hz to 1.6 kHz (±1 dB), not a low-mid
+peak.** Cut is ~**−2 to −3 dB**, also broadly flat above ~100 Hz, tending to 0 at the LF end.
+
+**(7) ⭐⭐ WHICH MEANS SESSIONS 57/58's "PEAK AT ~202 Hz" IS A DILUTION ARTEFACT — computed, not
+argued.** An **independent** drive-min ATTACK pair already existed, captured on a different day at
+**LEVEL noon** where the bleed is *not* zero; referenced the same way it gives session 57's shape
+exactly — a pronounced **+4.50 dB peak at 202 Hz**. Predicting that curve from the bleed-free `h`
+plus the known LEVEL/BLEND coefficients (`a=0.180`, `b=0.142` at LEVEL noon vs `a=1`, `b=0` at max),
+phase-bracketed because the od-vs-clean phase is unmeasured, puts the **peak at 202 Hz — the same
+band as the measurement, and the same band as the |OD| maximum**. Dilution is weakest where |OD| is
+strongest, and |OD| peaks at the bridged-T's 202 Hz shoulder. ⇒ **the "resonance" was the bleed
+sculpting a flat gain.** ⚠ The envelope uses a nominal LEVEL taper and 4 of 9 bands sit 0.2–0.6 dB
+outside it, so the **peak LOCATION is the claim; the fit is not exact.**
+
+**(8b) ⚠⚠ CORRECTION — RAISED BY THE USER FROM AN FR CHART, CONFIRMED AT FULL RESOLUTION.** The
+user asked whether this effort was missing the pedal's small peak between the two large mid peaks.
+At 5.9 Hz bins on `ref-od`/drv_−12 those features are a sharp **MIN at 316.4 Hz** and a **MAX at
+421.9 Hz**. Two results, and the second corrects (8).
+⭐ **(i) THE BROADBAND RESULT SURVIVES.** At full resolution on the LEVEL-max set, `h` is smooth and
+flat ~+8.5 dB **everywhere outside a narrow 287–351 Hz window** — +8.50@381, +8.49@404,
+**+8.46@422**, +8.34@451, +8.03@510, +7.14@639, +8.27@809, +8.97@1002. **The 421.9 Hz peak cancels
+EXACTLY in the ratio**: it belongs to the shared path and is present identically in every ATTACK
+position, so it does not corrupt `h`, and 403/508/640 are not sitting on sharp features. The
+1/3-oct grid is adequate for `h` **except** across the notch.
+⛔ **(ii) BUT ATTACK MOVES THE CANCELLATION NOTCH — a pure broadband gain cannot.** Bleed-free,
+drive min: **cut 316.4 Hz (depth 14.9 dB) | boost 328.1 Hz (32.7) | flat 334.0 Hz (16.0)**, i.e. the
+null shifts ~18 Hz and **more than doubles in depth** on boost. Robust: identical **to the bin** at
+−36/−30/−18 dBFS, migrating only at −12 where compression starts (session 46's 334 → 299 Hz).
+⇒ **the ATTACK network IS two-path / interacts with the notch-forming network**, consistent with
+circuit.md's ATTACK rerouting C8 *inside* the treble network. **Full spec: a broadband ±gain AND a
+null moving 316.4/328.1/334.0 Hz at depth 14.9/32.7/16.0 dB.** ⭐ **This couples ATTACK to GAP #2** —
+the model's notch is destroyed by `trebleLadderDampR = 30k` (session 46), so ATTACK and GAP #2 are
+the SAME network and must be solved together. ⚠ These numbers came from an **ad-hoc probe**, not a
+gated tool.
+✅ **SUPERSEDED BY §4 "A3 step 17" (session 61), which reproduces every figure here to the bin and to
+0.03 dB under gates — and refines three things this paragraph got loose:** "identical to the bin at
+−36/−30/−18" is true of **frequency only** (boost's depth spreads 5.11 dB across those rows); the
+287–351 Hz exclusion window **under-covers** (measured: 269.5–369.1 boost, 269.5–521.5 cut); and
+"flat" is a strong description of **boost** (spread 22 % of its own size) but a weak one of **cut**
+(86 %, and the shared 421.9 Hz peak does **not** cancel there). Quote step 17's numbers.
+
+**(8) ⇒ THE BROADBAND SHAPE REQUIREMENT IS SIMPLER THAN RECORDED (but read (8b) first).** Session 57 concluded the network
+needs "a resonant/two-path element" and session 58 specified "+8 dB **peaked at ~200 Hz** on one
+throw and a flat −3 dB on the other". **Both of those shape claims are now superseded.** The
+measured requirement is: **one 3-position switch giving a broadband ~+8.6 dB on one throw, ~−2.4 dB
+on the other, and 0 in the middle, essentially flat across 40 Hz–1.6 kHz.** ⚠ "No resonator is
+required" was an OVER-CLAIM — see (8b)(ii). ⚠ It is a **pre-clipper** gain (session 59 item 4 measured that placement out-of-sample,
+~90× in rms residual), and 220 pF of C8 cannot produce it at 40 Hz — so this remains a refutation of
+the *assumed* `[ENG]` ladder, not of any drawn circuit.
+
+**(9) ⚠⚠ 320 Hz IS NOT A TRANSFER VALUE — do not fit to it.** It reads +0.53 (boost) / −3.40 (cut)
+and is level-stable at the quiet end, but it is a **1/3-octave sample sitting ON the TrebleAttack
+two-path cancellation notch**, which session 46 measured at full resolution as **316–334 Hz and
+MIGRATING with level** (334 → 299 Hz). A band average across a sharp, moving notch depends on where
+the notch sits inside the band, not on the network's gain there — session 46's own lesson ("never
+read a notch's depth off the 1/3-oct grid", which understated it by up to 20 dB). That ATTACK moves
+this band hard is real and expected (it reroutes C8 *inside* the network that forms the notch); the
+**number** is not a gain. 254 and 403 bracket it.
+
+**(10) ⚠ AND ONE GATE GENUINELY FAILED — recorded, not explained away.** The MODEL control
+de-convolves GRUNT (a schematic+BOM-verified **linear** cap bank at the clipper input, so a
+pre-clipper linear element is the model's ground truth *by construction*) and its solved `h` is
+**NOT** level-independent: spread **5.27 dB** (grunt flat) and **12.75 dB** (grunt boost). Two
+things make that readable rather than fatal. (a) GRUNT's `h` is ~**+20 dB**, so `L+h` leaves the
+captured range at every level except −30, and the only bands where a spread is computable at all are
+**403/508/640 — the bridged-T scoop floor**, where the OD fundamental is weakest and harmonic
+leakage from `f/2`, `f/3` is worst (session 58 item 4's mechanism, reproduced here independently on
+the model). (b) **The headline does not depend on the de-convolution at all** — at −36 dBFS raw and
+solved agree to 0.027 dB. ⇒ **the de-convolution degrades when `h` is large relative to the sampling
+of `S`, and at the scoop bands. Do not carry it to a large-`h` element without re-gating.**
+
+**(11) OUT-OF-SAMPLE vs SESSION 58, stated as a disagreement rather than resolved by fiat.** Boost
+agrees to **0.23–0.29 dB at 127–202 Hz** but differs by **+1.61 dB at 80 Hz** (rms 0.81); cut
+differs by **+1.09…+2.36 dB** at every band (rms 1.54) and, more importantly, in **shape** — session
+58 called cut "frequency-FLAT −3.2 dB, order 0, no corners", where this measures a gentle slope from
+−0.79 @80 to −2.40 @254. Both differences are **positive at every band and largest at LF**, i.e.
+common-mode, which is the signature of an error in the shared `flat` reference or in session 58's
+`b0`/taper machinery rather than in the throws. This route is the more direct one (plain subtraction,
+bleed bounded by measurement, convergence demonstrated on two quiet levels) and should be preferred,
+but the disagreement is **not yet explained**.
+
+**▶ NEXT, IN ORDER.**
+* **(a0)** ⭐⭐ **FIRST — make (8b) reproducible; it was measured in an ad-hoc probe and is in NO
+  committed tool, so it will otherwise be lost.** Write `analysis/attack_notch_probe.py`: full-
+  resolution `A.transfer` on the three LEVEL-max drive-min captures, locate the 250–400 Hz minimum
+  and its depth below the 200–270 Hz shoulder per ATTACK position, and report `h(f)` at full
+  resolution so the smooth region and the notch window are separated **by measurement, not by the
+  1/3-oct grid**. Needs a `--selftest` recovering a synthesised notch of known frequency/depth; the
+  −36/−30/−18/−12 level sweep printed (−12 is where it migrates, which is the tell that the quiet
+  rows are the trustworthy ones); and an explicit **NOTCH WINDOW** (~287–351 Hz) excluded BY NAME
+  from the broadband read. **Re-derive (8b)'s numbers from the tool and correct them if they move.**
+* **(a)** ⭐ then **propose the ATTACK topology against (6) AND (8b) together** — a broadband ±gain
+  **plus** a null moving 316.4/328.1/334.0 Hz. Gate on the whole-band table in (6), excluding 320 Hz
+  per (9), and on the matrix. **Do not propose a pure gain switch — (8b)(ii) rules it out.** Treat
+  this as the same problem as **GAP #2** (`trebleLadderDampR`), not a separate one.
+* **(b)** settle (11): the cut-shape disagreement with session 58, and the common-mode LF offset.
+  A cheap test is the optional pair `level-1700_attack-{boost,cut}_base-od.wav` (drive **noon**,
+  LEVEL max), which would re-measure session 58's own condition bleed-free.
+* **(c)** unchanged: the post-clipper linear class is closed on measurement and on Bode; the
+  remaining region is inside/before the clipper (`Clipper.h:309`).
+* **(d)** settle `b0` between the LEVEL and DRIVE axes before quoting any absolute A3 magnitude.
+* **(e)** unchanged behind that: `trebleLadderDampR` stays at 30k, the 4 `gain-n12` re-captures,
+  A4 re-grade + GATE-9, the `OSValidationTest` decision, then B / C / D.
+* **(f)** ⭐ **worth doing once, cheaply: fold `sweep_clean_-36` into the matrix properly.** (4)/(5)
+  show a level the report has never read was the difference between "undecided" and "converged" at
+  508/640 Hz. Adding it to `ALL_SWEEP_LEVELS` re-keys the result cache and changes every record's
+  shape, so it is a deliberate re-baseline, not a drive-by edit.
+
+---
+
+### A3 step 17 — item 8b is now a committed, gated measurement and it reproduces exactly; three refinements it did not make (session 61)
+
+Session 60's next-step **(a0)**. New `analysis/attack_notch_probe.py` + `analysis/reports/s61_attack_notch.json`.
+**Nothing in `src/` or `tests/` changed**, and ctest was **RUN** at the pre-existing session-44
+**16/17** (`OSValidationTest`, identical `amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`).
+
+**WHY THIS RAN FIRST.** Step 16 item 8b is the finding that rules out proposing a plain gain switch
+for ATTACK, and it couples ATTACK to GAP #2 — and it was measured in a throwaway script at the end of
+a session, in no committed tool. Nothing else in the queue is worth doing while the constraint that
+shapes it can evaporate.
+
+**THE TOOL.** Full-resolution `A.transfer` (nperseg 8192 ⇒ **5.86 Hz bins**) on the three LEVEL-max /
+drive-min captures, where the clean bleed is exactly zero by topology and the clipper is idle, so `h`
+is a plain per-bin subtraction. Definitions are stated once and not re-derived downstream: `f0` is the
+minimum of |H| in **250–400 Hz** (reported as the raw bin *and* a log-f parabolic refinement); `depth`
+is (max |H| over **200–270 Hz**) minus that minimum, with the upper shoulder printed beside it because
+the null sits between two peaks and one shoulder alone hides which side moved.
+
+**(1) ⭐ THE AD-HOC NUMBERS SURVIVE — to the bin and to 0.03 dB.**
+
+| at −30 dBFS | f0 bin | f0 refined | min dB | lo shoulder | up shoulder | **depth** | s60 item 8b |
+|---|---|---|---|---|---|---|---|
+| **cut** | 316.4 | 318.4 | −23.30 | −8.37 | −13.23 | **14.93** | 316.4 / 14.9 |
+| **boost** | 328.1 | 327.7 | −30.34 | +2.36 | −2.95 | **32.70** | 328.1 / 32.7 |
+| **flat** | 334.0 | 332.7 | −22.34 | −6.33 | −11.21 | **16.01** | 334.0 / 16.0 |
+
+⇒ **ATTACK moves the null 17.6 Hz — 3.0× the bin — and boost's depth is 2.04× flat's.** A pure
+broadband gain can do neither, so **the ATTACK network is two-path and interacts with the
+notch-forming network; ATTACK and GAP #2 are ONE problem.** Item 8b(ii) stands as written.
+
+**(2) ⚠ THE SELF-TEST FALSIFIED MY OWN GATE, WHICH IS WHY IT EXISTS.** Six synthesised notches of
+known frequency and depth (two-pole notch, `Qz = Qp·10^(depth/20)` so the depth is exact in closed
+form, `w0` prewarped so the bilinear maps the null to *exactly* f0 rather than near it) pushed through
+the identical stimulus, transfer estimate and locator. Frequency recovers to **worst 4.22 Hz** (gate:
+2 bins = 11.72 Hz). Depth does **not** behave as I assumed. My first gate declared a bin grid accurate
+on a BROAD notch and biased on a sharp one, and gated the broad case at ±1.5 dB — it **FAILED at
+−4.28 dB**, and the failure was correct:
+
+* **(i) shoulder contamination** — a broad notch's own skirt reaches into the 200–270 Hz reference
+  window, so the reference level is already attenuated and `shoulder − min` understates the depth.
+  This is **definitional, not estimator error**, and the self-test's `shoulder` column shows it
+  directly (~0 dB for the sharp cases, **−4.39 dB** at Qp 0.7).
+* **(ii) bin smearing** — a 5.86 Hz-bin CSD estimate cannot reach the floor of a sharp deep notch: a
+  true 33 dB notch at Qp 4 reads **28.71**.
+
+Both mechanisms **understate**. So the gate was rebuilt on the properties the verdict actually uses:
+depth **never over-states** (worst over-statement **+0.05 dB**, gate +0.20) and depth **RANKING**
+survives a doubling (true 16.0/33.0, gap 17.0 → read 14.9/29.8, gap 14.9). Plus liveness (unfiltered
+⇒ apparent depth 0.000 dB) and — the load-bearing one — **SEPARATION**: two notches synthesised
+17.6 Hz apart read as **18.2 Hz apart**, which is exactly the size of the shift item 8b claims.
+⭐ **General form of the lesson, and it is one this project keeps re-learning: gate the property the
+conclusion rests on, not an absolute accuracy the statistic does not have.** "Boost roughly doubles
+the depth" needs monotonicity and scale, not calibrated dB — and asserting the latter would have
+buried a real definitional bias under a passing test.
+
+**(3) ⭐ REFINEMENT — "identical to the bin at −36/−30/−18 dBFS" is true of FREQUENCY ONLY.**
+
+| f0 Hz / depth dB | −36 | −30 | −18 | −12 | −6 |
+|---|---|---|---|---|---|
+| **cut** | 316.4 / 14.9 | 316.4 / 14.9 | 316.4 / 15.0 | 316.4 / 14.5 | 316.4 / 10.3 |
+| **boost** | 328.1 / 33.0 | 328.1 / 32.7 | 328.1 / 27.9 | 328.1 / 20.7 | *316.4* / 17.6 |
+| **flat** | 334.0 / 16.1 | 334.0 / 16.0 | 334.0 / 15.2 | *316.4* / 14.0 | *316.4* / 14.4 |
+
+Frequency is identical to the bin across all three quiet rows at every position — item 8b's claim,
+confirmed. **Depth is not: boost spreads 5.11 dB over those same rows** (cut 0.07, flat 0.82). The
+mechanism is already on record — boost pushes ~8 dB more signal into the J201, which sits upstream of
+DRIVE and never idles (step 15 item 3) — so compression reaches boost first. ⇒ **quote the quietest
+row; treat depth as a bound and frequency as a value.** ⭐ And flat's null migrates **334 → 316.4 Hz**
+at −12 dBFS, reproducing session 46's 334 → 299 Hz direction on an independent capture set — which is
+the tell that the read has to come from the quiet end, not an average over levels.
+
+**(4) ⭐ REFINEMENT — the nominal 287–351 Hz exclusion window UNDER-COVERS.** Located by measurement
+(the contiguous region around the null where `|h − median|` exceeds the 0.204 dB floor, then
+re-derived against a median that window no longer pollutes) it is **269.5–369.1 Hz on boost** and
+**269.5–521.5 Hz on cut**. The medians move by 0.02 dB either way, so this is a refinement rather than
+a reversal — but the broadband read now excludes the **measured** window, by name.
+
+**(5) ⚠ REFINEMENT — "broadband flat" is a much stronger description of boost than of cut, and item 8b
+did not distinguish them.** Over 80 Hz–1.6 kHz excluding the measured window: **boost +8.64 dB, spread
+1.90 dB = 22 % of its own size**; **cut −2.39 dB, spread 2.05 dB = 86 %**, and cut needs a **252 Hz**
+exclusion window against boost's 100 Hz. The 421.9 Hz check says the same thing from another
+direction: that peak belongs to the shared path, so it must cancel in `h` — and it does on boost
+(range **0.47 dB** over 360–500 Hz) but **not on cut** (**1.16 dB**, 5.7× the floor). ⇒ **cut carries
+real structure over ~350–520 Hz.** ⭐ Worth connecting rather than filing separately: that is the same
+region and the same direction as step 16 item 11's unexplained cut-shape disagreement with session 58
+(which called cut frequency-flat with no corners, where step 16 measured a slope). **The two may be
+one item**, and next-step (b) is the test for it.
+
+**(6) A SMALL CORRECTION TO 8b(i) IN PASSING.** `flat |H|` varies **4.44 dB across the 1/3-octave band
+at 403 Hz** (0.80 at 508, 1.11 at 640), so "403/508/640 are not sitting on sharp features" is too
+strong for 403. What actually defends the 1/3-oct read is not the absence of a feature but that the
+feature is **shared and therefore cancels** — which (5) shows holds on boost and only partly on cut.
+Same distinction, better stated.
+
+**WHAT IS NOW THE RECORD.** The ATTACK specification a topology proposal must meet:
+
+* a **broadband gain** of **+8.64 dB (boost) / −2.39 dB (cut)**, flat to ±1 dB on boost across
+  80 Hz–1.6 kHz, less flat on cut per (5);
+* **AND a cancellation null at 316.4 / 328.1 / 334.0 Hz (cut / boost / flat)** with depth
+  **≥ 14.9 / 32.7 / 16.0 dB** — lower bounds, two mechanisms, both understating.
+
+⚠ Scope unchanged: ATTACK is `[ENG]`, so this is a specification, not a disagreement with a drawn
+circuit; magnitude only, so a notch depth constrains how exactly two paths cancel but measures no
+phase; and 320 Hz remains not a transfer value (step 16 item 9).
+
+---
+
+### A3 step 18 — the drawn ATTACK topology is REFUTED on the SIGN of the notch shift, and the specification splits into two jobs needing two switch poles (session 61)
+
+Session 60's next-step **(a)**, first move: the cheap reachability screen before any proposal, in the
+manner of sessions 49/56/57 — a refutation is worth more than a fit. New
+`analysis/attack_notch_screen.py`. **Nothing in `src/` or `tests/` changed.**
+
+**THE QUESTION.** Step 17 fixed the ATTACK specification as **two** requirements: a broadband
+±gain (**+8.64 / −2.39 dB**) — already refuted as reachable by the drawn ladder in session 57, where
+the shape statistic saturates at **+1.15 dB** against a required **+8.46** — and a **null that moves**
+(cut 316.4 / boost 328.1 / flat 334.0 Hz, depth ≥ 14.9 / 32.7 / 16.0 dB). The second had never been
+screened, and it is the half that rules out proposing a plain gain switch.
+
+**(1) ⭐ THE HEADLINE STATISTIC IS A SIGN, NOT A DISTANCE.** Relative to flat, the pedal moves the
+null **DOWN in BOTH throws** (cut −17.6 Hz, boost −5.9 Hz) and makes **boost 2.04× DEEPER**. A wrong
+magnitude can be a wrong value; **a wrong sign cannot** — no scaling of any component changes it. So
+the screen scores `f0_flat`, `depth_flat` and the four *differences*, with one parameter set covering
+all three positions (it is one network with a switch in it — the constraint that killed session 56's
+C8-alone screen and session 49's bridged-T Pareto).
+
+**(2) ⛔⛔ AND THE DRAWN NETWORK MOVES THE TWO THROWS IN OPPOSITE DIRECTIONS.** At the schematic
+`RdampC5 = 0` the notch sits at **320.3 Hz in ALL THREE positions** — spread **0.0 Hz** where the
+pedal's is 17.6 — and C8 swept over **four decades** (22 pF → 2.2 µF) never fixes the sign: cut always
+moves **UP** (to the 400 Hz window edge), boost **DOWN**. The mechanism is structural: boost puts C8
+in a **bridging** path (M↔P) and cut puts it in a **shunt to ground** at P, so the two throws add
+capacitance in different places and generically move a null opposite ways.
+
+**(3) ⭐⭐ A SIGN CENSUS MAKES THAT INDEPENDENT OF THE OPTIMISER — and localises it to ONE
+requirement.** 6000 random parameter sets over ±2 decades in all **12** ladder elements, classified by
+the three signs, counting only draws where the switch moves the null by more than one bin (782 of
+them):
+
+| (cut DOWN, boost DOWN, boost DEEPER) | count | share |
+|---|---|---|
+| (0, 1, 0) | 367 | 46.9 % |
+| (0, 0, 1) | 339 | 43.4 % |
+| (0, 1, 1) | 42 | 5.4 % |
+| (0, 0, 0) | 34 | 4.3 % |
+
+**0 of 782 match the pedal.** Per sign: *boost moves down* occurs in 52.3 % of draws, *boost is
+deeper* in 48.7 % — but **"cut moves DOWN" occurs in 0.0 %.** ⭐ A joint count of zero could be three
+possible signs that never co-occur; a **per-sign** count of zero is structural. **In this topology the
+cut throw can only move the null upward.** No optimiser is involved in that statement.
+
+**(4) THE FREE SEARCH AGREES AND SATURATES.** All 12 elements freed, DE with a pathology guard: cost
+**6.85 / 6.78 / 6.78** at ±1 / ±2 / ±3 decades — it moves **0.08 across two orders of magnitude of box
+widening**, at ~7× the point where every residual sits at its own resolution. ⭐ And it **switches the
+throws off** rather than trading, driving both shifts to **0.00 Hz** and both depth deltas to
+**0.00 dB** — session 57's "the objective cannot reach this direction" signature exactly. Gates ran
+first: liveness (C8 = 0 ⇒ spread **0.000e+00** in both f0 and depth) and a search gate recovering
+targets the family generated itself to cost **0.002 / 0.065**, i.e. a **~100× separation** from the
+6.78 residual. ⚠ The gate had to be tightened mid-session: its first version accepted targets whose
+null sat **on the 250–400 Hz search edge** (both shifts came out at exactly −150 Hz = the window
+width) and recovered them to 0.00000 — a railed target is recovered easily for the wrong reason, the
+same "an optimum on its own boundary is uninformative" rule as sessions 47/51.
+
+**(5) ⭐ THE DECOMPOSITION IS CLEAN, AND IT IS THE USEFUL PART.** The free search reproduces the
+**flat** position essentially exactly (f0 **333.9 vs 333.98 Hz**, depth **16.04 vs 16.01 dB**) — so the
+whole residual is the two throws' differentials. **The notch-forming network is fine; the switch's
+coupling into it is what is wrong.**
+
+**(6) ⭐⭐ SO WHAT *CAN* MAKE IT — and the answer says the switch needs more than one pole.**
+`RdampC5` (GAP #2's own constant, the damping in the C5 ladder leg) moves f0 **down** and **deepens**
+the null together, which is the pedal's boost direction. Tested:
+
+* **(a) `RdampC5` alone — 1 dof against 2 targets.** It nails **DEPTH at all three positions to
+  +0.1 / −0.1 / +0.0 dB** (Rd ≈ 6.06k / 624 Ω / 5.47k) ⭐ i.e. **the half of the spec that looked
+  exotic — a 2× depth change — is just a damping change.** ⛔ But every position's f0 lands at
+  **319–320 Hz** where the pedal spans 316.4–334.0, so one element cannot do both jobs.
+* **(b) `RdampC5` + `C5` switched together — 2 dof, 2 targets.** Hits all three (f0, depth) pairs to
+  cost 0.34 / 0.47 / 0.41 with sane, structured values: **Rd 6117 / 437 / 6117 Ω, C5 22.6 / 20.4 /
+  19.3 nF** (cut/boost/flat — note cut and flat share one Rd). ⚠ **This fit is not evidence:** 2 dof
+  against 2 targets hits them by construction.
+* **(c) ⭐ THE DECIDING TEST — the same setting's broadband gain.** `h boost` = **−0.14 / −0.34 /
+  −0.03 / +0.98 / +2.60 dB** at 100/200/400/800/1600 Hz against a required **+8.64**; `h cut` =
+  −1.00 / −1.72 / +1.69 / −0.07 / −0.77 against **−2.39**. ⛔ **Not close, and in the wrong place** —
+  the notch leg supplies ~0 dB of broadband gain. That is session 57's refutation arriving from the
+  other direction.
+
+**(7) ⇒ THE CONCLUSION, AND IT IS A DIRECTION FOR (a)'s PROPOSAL RATHER THAN A DEAD END.** The
+specification splits into **two jobs that no single element does**: the **notch triple is reachable**,
+but only by switching an element **inside the notch-forming ladder leg**; the **broadband ±gain is not
+reachable there at all**. ⇒ **stop looking for one element.** A 3-position switch with **more than one
+pole** — one section in the notch leg, one supplying broadband gain — is the shape of answer the
+measurement points at. ⭐ **There is a direct precedent in this project:** A2c-3 resolved the
+mid-frequency selector exactly this way, by recognising it as **2-POLE** (switching the across-lug cap
+together with the series cap) after single-element fits could match range *or* centre but never both,
+for the same structural reason (one element could not set two independent properties).
+
+⚠ Scope unchanged: **ATTACK is `[ENG]`** — the 3-way switch is not on our schematic at all, so what is
+refuted is the **assumed** topology, which nothing corroborated. Magnitude only. And `RdampC5` is
+shared with **GAP #2**, so whatever replaces this network must produce the notch *and* move it — one
+problem, not two.
+
+---
+
+### A3 step 19 — the multi-pole ATTACK topology is PROPOSED, and it MEETS the whole record: gain, depth and frequency come from three provably non-interacting groups (session 62)
+
+**Analysis + tooling only. NOTHING in `src/` or `tests/` changed**, and ctest was **RUN** (not
+assumed) at the pre-existing session-44 **16/17** — `OSValidationTest`, identical
+`amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`. New `analysis/attack_multipole_screen.py`, new
+`analysis/attack_tap_screen.py`, one additive change to `analysis/attack_notch_probe.py`. New
+reports `analysis/reports/s62_multipole.json`, `analysis/reports/s62_tap.json`. This is session 61's
+next-step (a).
+
+#### 0. The measurement is now machine-readable, and it is a strict superset
+
+`attack_notch_probe.py` wrote only a *summary* of `h` (median, spread, window). A topology proposal
+has to be scored on the **shape** of `h` across the band, which cannot be rebuilt from a median —
+and copying session 60's 1/3-oct table into the next tool by hand is the session-33 lost-sign trap.
+The probe now also writes the **full-resolution `h(f)` curve**, 40–2000 Hz at its own 5.86 Hz bins.
+
+⭐ Regenerated and proven a **strict superset** of the session-61 file: **all 184 shared values
+bit-identical, worst |Δ| 0.000e+00**, four new keys, none lost. So no session-61 number moves.
+
+#### 1. ⭐⭐ THE PROPOSAL, AND IT MEETS THE RECORD
+
+**ATTACK = a 3-throw switch with TWO POLES**, one per half of the specification:
+
+* **Pole A — a MOVING TAP on the R7/R8 divider (the broadband ±gain).** The drawn R8 is split and
+  the switch selects which node the coupling cap C7 hangs off:
+  `G –R7– M –Ra– T1 –Rb– T2 –Rc– T3 –R11– GND`, with **boost → T1, flat → T2, cut → T3**.
+* **Pole B — the C5 ladder leg (the notch).** The leg's damping `Rd` **and** `C5` switch per throw.
+
+Scored against the whole record, with each half tested on targets the other never saw:
+
+| | model | pedal | err |
+|---|---|---|---|
+| **h median boost** | **+8.53 dB** | +8.65 | 0.12 |
+| **h median cut** | **−2.31 dB** | −2.39 | 0.08 |
+| **f0 cut / boost / flat** | **316.3 / 328.1 / 333.9 Hz** | 316.4 / 328.1 / 334.0 | ≤ **0.1 Hz** |
+| **depth cut / boost / flat** | **14.75 / 32.69 / 15.87 dB** | 14.93 / 32.70 / 16.01 | ≤ **0.18 dB** |
+
+Values: **Rd = 6.04k / 478 Ω / 6.14k** and **C5 = 22.4 / 20.8 / 19.7 nF** (cut/boost/flat), on a tap
+divider **Ra 470k (pinned to the drawn R8) / Rb 506k / Rc 78.5k / R11 212k**.
+
+⭐ **The throw ORDER is not fitted.** `g(boost) > 0 > g(cut)` is measured and a resistive tap can
+only attenuate, so boost must be the highest tap. That is the one structural commitment, and it is
+forced by the data rather than chosen.
+
+⭐ **Cut and flat share their damping to within 2 % (6.04k vs 6.14k)** — session 61 item (10b) noticed
+that hint and it survives a completely different fit. Read physically: the switch **shorts the
+damping resistor in BOOST only**.
+
+#### 2. ⭐⭐ WHY THIS IS A PROPOSAL AND NOT A FIT — the three requirements are carried by three
+#### provably non-interacting groups
+
+Perturbing every element ±20 % about the fitted point separates all twelve cleanly, with no overlap:
+
+| group | d f0 | d depth | d h median | owns |
+|---|---|---|---|---|
+| tap divider `Ra Rb Rc R11` | **0.01–0.02 Hz** | 0.01–0.05 dB | 0.23–1.22 dB | the broadband gain |
+| damping `Rd` | **0.17 Hz** | **2.53 dB** | **0.00 dB** | the depth |
+| ladder RC `R7 R12 R14 C5 C6 C9` | **14–33 Hz** | 1.4–5.0 dB | **0.00 dB** | the frequency |
+
+⇒ the notch leg is **exactly broadband-neutral (0.00 dB)** and the tap is **exactly notch-neutral
+(0.01 Hz)**. The two-pole decomposition is therefore not an extra degree of freedom bolted on to
+make a fit work — it is **forced**, because no element in this network moves both.
+
+Mechanism, and it is simple: the tap's load is `C7 + R13 ≈ 1 MΩ` against a few hundred kΩ of rail,
+far too light to disturb the R7-vs-ladder cancellation up at node M.
+
+#### 3. ⚠ THE TOOL'S OWN HYPOTHESIS WAS REFUTED BY ITS OWN GATE, AND THE HEADER WAS CORRECTED
+
+`attack_tap_screen.py` was written to ask whether **ONE** pole could do both jobs — a moving tap
+changes gain *and* re-loads the rail, so it might move the null too. It does not: the tap moves `h`
+by 3.80 dB and f0 by **0.00 Hz**, and a fitted 1-pole tap leaves the null at 318.8 Hz in all three
+throws (**spread 0.04 Hz** against the pedal's 17.58). So **session 61's "more than one pole" is
+CONFIRMED, not superseded.** The docstring's original paragraph asserting the opposite was rewritten
+rather than left to print above a table contradicting it (the session-34 narrated-verdict trap).
+
+#### 4. ⭐ AND THE f0 SHORTFALL WAS ARBITRATION, NOT STRUCTURE — settled by separating the fits
+
+The *joint* fit (notch + 216 `h` bins in one objective) reached only **1.38 Hz** of f0 spread with
+`Rd` switched and **8.52 Hz** with `Rd`+`C5`, against the required 17.58 — which reads like a
+structural limit. It is not. Holding the tap divider (it is broadband-only, so it cannot help here)
+and aiming the notch section at the **six notch numbers alone** reaches **notch cost 0.000** and
+17.6 Hz of spread, and the broadband then **re-reads as a CHECK at 0.73 dB rms** with the medians in
+§1. The joint objective was simply trading 6 notch residuals against 216 broadband ones.
+
+⭐ **The general point: when a joint objective under-delivers on one requirement, separate the fits
+before calling it unreachable — if the halves are carried by non-interacting groups (§2), scoring
+them jointly buys nothing and costs arbitration.**
+
+⛔ **AND THE THIRD ROW IS THE CONTROL THAT MAKES THE OTHERS READABLE.** Adding `R12` to the switched
+set also reaches notch cost **0.000** — and its broadband check **explodes to 14.52 dB rms with
+h boost +28.84 dB**. Nine free values hit six notch numbers trivially, by a network that is
+broadband nonsense. The broadband re-read is doing real work; the notch cost alone is not evidence.
+
+#### 5. THE ELEMENT CENSUS THAT PRECEDED IT (`attack_multipole_screen.py`)
+
+Session 61 tried exactly one notch-leg candidate and flagged that 2 values against 2 targets per
+position hit them by construction. This screens **156 families** — every 1- and 2-element subset of
+the 12 ladder elements, × {C8 rerouting kept, removed} — fitting per-position values plus a shared
+free `RdampC5`, and scoring the thing the construction cannot buy: with pole 2 a flat scalar, the
+part of `h` that pole 1 leaves must already be FLAT, so only the **shape** is scored and the implied
+pole-2 gain `g` is read out as a prediction.
+
+⚠ **The NULL CONTROL is what makes the numbers readable, and it was computed, not assumed:** a pole 1
+that does nothing broadband scores **bb 2.34**. The best family reaches **1.49** and the best joint
+**1.34** — a real improvement, but nothing approaches the 1.0 floor, and the top 18 families span
+only 1.49–1.72. ⇒ **no element-value family is distinctly better than any other**, which is what
+sent the search to a topology (a changed CONNECTION) rather than another value.
+
+#### 6. GATES — all run first, and two of them fired
+
+* **SOLVER (new).** Both screens use a private vectorised 6-/8-node solver so DE is affordable. A
+  fast copy of a shared oracle is a silent-divergence trap, so it is *proved* equal, not assumed:
+  the multipole solver matches `eq_reference.treble_attack_tf` at **0.000e+00 dB/deg** over random
+  parameter sets; the tap network's exact degenerate case (Ra = R8, Rb+Rc+R11 = R11, tap = T1)
+  matches at **1.4e-14 dB**, and the short-based collapse is shown to BE a short by scaling it
+  (1 mΩ → 4.9e-7 dB, 1 Ω → 3.4e-6, 1 kΩ → 3.4e-3).
+* ⚠ **That solver gate FAILED TWICE FIRST, and both failures were the gate, not the code.** (a)
+  Collapsing `Ra` and `Rb` leaves T1 = T2 = **M** and only T3 on P — two taps on the wrong node,
+  reported as a 6 dB "failure" of a correct solver. (b) Using 1e-12 Ω as the short makes the
+  conductance 1e12 against a 2e-6 rail and the 8×8 solve loses every digit; **shrinking** the short
+  made the error *worse* (4.9e-7 → 7.0e-5 dB), which is the tell. **A degenerate case has to be
+  stated exactly, and a numerical short is only as good as its conditioning.**
+* **LIVENESS.** A switch moving nothing gives f0/depth/|h| spread **9.7e-08**; the drawn C8 moves f0
+  by 3.10 Hz so the probe demonstrably sees a switch.
+  ⚠ The first draft **gated** on the tap moving f0 — which would have converted §3's finding into a
+  tool failure. It now reports that number and gates only on the probe seeing the switch at all.
+* **SEARCH.** Targets the family definitionally can make, structured but not railed (a null on the
+  250–400 Hz search edge is recovered for the wrong reason): recovered to **0.00002–0.00135**.
+* **PATHOLOGY.** Dead/rippling responses rejected (session 57's +88 dB reachability artefact).
+
+#### 7. ⚠ WHAT IS AND IS NOT CLAIMED
+
+* **ATTACK is `[ENG]`** — the 3-way switch is not on our schematic at all. This proposes a topology;
+  it does not disagree with a drawn one, and nothing corroborates it independently.
+* **Only RATIOS are identified.** `h` is a ratio between switch positions, so any element common to
+  all three throws cancels out of it **by construction**. `Ra` sits above all three taps and duly
+  parked on whichever bound it started nearest (100 Ω and 10 MΩ scored the same) until it was pinned
+  to the drawn R8. The same applies to every shared element: a 12-value "wide" fit moved the joint
+  cost 4.45 → 4.40 while driving C9 to 288 nF — the classic unidentified-direction signature.
+* **The proposal moves a schematic-verified value.** It wants the P-to-ground resistance to be
+  ~797 kΩ split into three, against the drawn R11 = 470 kΩ. Since the switch itself is `[ENG]` the
+  surrounding rail is a proposal too, but this should be stated, not buried.
+* **Magnitude only**, and notch depths are **lower bounds** (probe gate 1(b), two understating
+  mechanisms), so the depth *ranking* carries the claim, not the calibrated dB.
+* **`C5` switching 19.7 → 22.4 nF is a ±7 % move**, i.e. inside cap tolerance as a *value*, but it is
+  a real requirement — it is what supplies the 17.6 Hz. Realise it as a small **parallel trim cap**
+  selected by the same pole (flat 19.7n base, +1.1n boost, +2.7n cut), not as three graded caps.
+* **This is a LINEAR, PRE-clipper screen** at the drive-min/LEVEL-max operating point where the
+  measurement was taken. It says nothing about behaviour at drive noon/max, which only a real render
+  through the full chain tests.
+
+#### 8. ⭐ GAP #2 FALLS OUT OF THE SAME ANSWER
+
+`trebleLadderDampR` = 30k destroys the notch (session 46). The proposal puts the flat position's
+damping at **6.14 kΩ** and boost's at **478 Ω** — i.e. **`trebleLadderDampR` stops being a single
+constant and becomes the switched pole B**. ATTACK and GAP #2 are one network and this answers both.
+
+#### 9. ▶ WHAT THIS SETS UP
+
+The proposal is now specific enough to build, and what it needs is a **topology** change to
+`TrebleAttack`, not the generic value-plumbing that session 50's open item described: a split rail
+with a switched output tap, plus per-position `Rd` and `C5`. `Rd=0`/collapsed taps must remain
+bit-identical to the shipped stage, and the plumbing must be verified BOTH ways (session 37 item 12).
+
+---
+
+### A3 step 20 — the two-pole ATTACK topology is BUILT, and it meets the NOTCH requirement exactly through the real chain; the broadband half is close but its SHAPE is not (session 63)
+
+**This is the first session since 44 to change `src/`.** Session 62's next-step (a). New
+`analysis/attack_topology_goldens.py`, `analysis/attack_render_gate.py`, `analysis/shape_gate.py`;
+`src/dsp/TrebleAttack.h` gains the topology, `FitParams.h`/`PedalChain.h` the plumbing,
+`tests/TrebleAttackTest.cpp` two new tests. **ctest 16/17** — the one failure is the pre-existing
+session-44 `OSValidationTest` at *identical* numbers (`amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`),
+unaffected by this work. ⚠ **Nothing is SHIPPED as a default**: every new value defaults to the
+drawn network, and the 63-capture matrix is the arbiter (as it was for `btC17` and `clipC15`).
+
+#### 1. ⭐⭐ THE BUILD NEEDS NO NEW NODES — the series collapse, and it is exact
+
+`attack_tap_screen.py` solves the split rail as an 8-node network. The C++ stage does not have to:
+**only the SELECTED tap carries a load** (C7, plus C8 when in circuit), so T1/T2/T3 are otherwise
+bare interior points of one series chain, and series resistors with no loaded intermediate node
+combine EXACTLY. Per throw the four-resistor rail collapses to the drawn two-resistor rail:
+
+| throw | tap | Rtop (M→P) | Rbot (P→GND) |
+|---|---|---|---|
+| boost | T1 | `Ra` | `Rb + Rc + R11` |
+| flat | T2 | `Ra + Rb` | `Rc + R11` |
+| cut | T3 | `Ra + Rb + Rc` | `R11` |
+
+So `N` stays at **7**, there are still three matrix inversions, and — the point — the default
+(`Ra = R8`, `Rb = Rc = 0`, `R11 = R11`) stamps **bit-identical values into the same 7×7** as the
+shipped stage. ⭐ **And `Rb`/`Rc` are only ever SUMMED, never inverted, so zero is exact.** That is
+the thing the screen tool could not do: its 8-node solve needed a numerical short, and session 62
+found that *shrinking* the short made the error WORSE (1e-12 Ω puts a 1e12 conductance against a
+2e-6 rail). The C++ path has no such term at all.
+
+⭐ **The collapse is GATED against an independent implementation, not against its own derivation.**
+`attack_topology_goldens.py` scores it vs `attack_tap_screen.tf_tap`'s uncollapsed 8-node solve **at
+the SPLIT point** (`Rb` = 506k, `Rc` = 78.5k, both large): worst **2.1e-14 dB** across all three
+throws. ⚠ The tool also prints the same check at the DEFAULT point (**3.6e-07 dB**, short-limited)
+and labels it a CONTROL — *that* case passes even for a wrong collapse, since every throw is then
+the drawn network, so it is not the gate.
+
+#### 2. ✅ PLUMBING VERIFIED BOTH WAYS, INCLUDING AGAINST THE PRE-CHANGE BINARY
+
+Session 37 item 12's trap (that binary is built by a hand-written `c++` command, not CMake) plus
+session 45 item 7a's. All checks on real renders of `attack-boost_base-od.wav`:
+
+* default vs **explicit-nominal** `--fit` of all 9 new keys → **bit-identical**;
+* default vs the proposal, vs **pole A alone**, vs **pole B alone**, vs `trebleC8=0` → all **differ**
+  (so each pole is independently live, not just the pair);
+* ⭐ **default vs a binary built from `git show HEAD:` of all four changed files → BIT-IDENTICAL** in
+  all three ATTACK throws AND at drive noon / LEVEL noon where the clipper is working. The topology
+  change is a true no-op at its defaults, not a numerically-close one.
+
+⚠ **`kC8` had to become fittable** (`trebleC8`, default 220 pF) because session 62 screened the
+proposal with **C8 REMOVED**; rendering it with 220 pF still in is not the thing that was screened.
+Note where C8 attaches when the tap moves: at the **selected tap**, because in the drawn circuit
+C8's top plate and C7 share node P. (`attack_tap_screen`'s optional `--c8` mode instead spans
+M↔T3, the whole rail — a different and less faithful choice. The proposal ran at C8 = 0, so the two
+never had to be reconciled; do not "fix" one to match the other without deciding which is the claim.)
+
+#### 3. ⭐⭐ THE NOTCH REQUIREMENT IS MET **TO THE BIN**, THROUGH THE FULL CHAIN
+
+`attack_render_gate.py` renders the real `PedalChain` at the measurement's own operating point
+(drive MIN / LEVEL MAX / BLEND MAX) and scores it exactly as `attack_notch_probe.py` scores the
+captures — plain subtraction of full-resolution transfers, no solve, no taper, no bleed model.
+
+| variant | f0 cut / boost / flat (Hz) | depth (dB) | f0 spread |
+|---|---|---|---|
+| **PEDAL** | **316.4 / 328.1 / 334.0** | 14.93 / 32.70 / 16.01 | **17.58 Hz** |
+| DRAWN (shipped defaults) | 398.4 / 398.4 / 398.4 | 9.02 / 8.38 / 8.95 | **0.00 Hz** |
+| **TWO-POLE PROPOSAL** | **316.4 / 328.1 / 334.0** | 18.51 / 36.62 / 20.31 | **17.58 Hz** |
+
+⭐ **Identical to the pedal at every throw, on the measurement's own 5.86 Hz bin grid**, and the
+DRAWN default is *dead* — one frequency in all three throws, spread 0.00 Hz, which is the pattern
+session 61 refuted on a sign (0 of 782 random draws). Depths run **3.6–4.3 dB DEEPER** than the
+pedal, which is allowed rather than an error: probe gate 1(b) established that both bias mechanisms
+(shoulder contamination, bin smearing) **understate**, so depth is a LOWER BOUND and the RANKING
+carries the claim — model boost/others = **1.9×**, pedal **2.1×**.
+
+⚠ **`f_bin`, NOT the parabola-refined `f_ref`.** The record (sessions 60–62) is quoted on the bin
+grid and those three values are exactly bins 54/56/57. A first draft of the gate used `f_ref` and
+reported the pedal as 318.4/327.7/332.7 — shifting every comparison by 1–2 Hz against a record
+measured the other way, i.e. the session-33 transcription trap in a new guise.
+
+#### 4. ⭐ THE BROADBAND HALF IS CLOSE, AND ITS SHORTFALL IS COMPRESSION — read from the quiet end
+
+At −30 dBFS the proposal's boost median is +7.43 dB against the pedal's +8.63, which reads like a
+1.2 dB network shortfall. It is not. Session 61 item 3's lesson (quote the QUIETEST row) settles it:
+
+| variant | throw | −36 dBFS | −30 dBFS | −18 dBFS | trend |
+|---|---|---|---|---|---|
+| PEDAL | boost | **+8.91** | +8.63 | +4.49 | +4.43 dB |
+| PEDAL | cut | −2.38 | −2.38 | −2.02 | −0.36 |
+| DRAWN | boost | +0.87 | +0.70 | +0.09 | +0.78 |
+| **PROPOSAL** | boost | **+8.28** | +7.43 | +1.97 | **+6.31** |
+| **PROPOSAL** | cut | **−2.29** | −2.24 | −1.16 | −1.13 |
+
+⇒ at the quiet end the requirement is **essentially met: +8.28 vs +8.91 (0.63 dB) and −2.29 vs
+−2.38 (0.09 dB)**. ⚠ **But the model compresses HARDER than the pedal** (+6.31 dB of level trend vs
++4.43), and the DRAWN default shows almost none (+0.78) *because it has no boost to compress* —
+which corroborates the mechanism. The tap raises what IC2_A sees, and `RailClamp` has been enabled
+since session 21. **Recorded, not resolved:** the pedal's boost compresses too, so this is a ~1.9 dB
+excess, not a new phenomenon — and it is A3/A5 headroom territory, not ATTACK's.
+
+#### 5. ⛔ WHAT IS **NOT** MET: THE SHAPE. Two residuals the (f0, depth) table cannot express
+
+⭐ **This is the session's methodological point, and it came from the USER: score the CURVE, not
+elements in isolation.** Both findings below are invisible in a median-and-depth read.
+
+**(a) The broadband SLOPE has the wrong sign, on both throws.** Over 80 Hz–1.6 kHz ex-window:
+
+| throw | model median | pedal | model slope | pedal slope | model spread | pedal |
+|---|---|---|---|---|---|---|
+| boost | +7.43 | +8.63 | **−1.39 dB/dec** | **+1.23** | 2.78 | 1.90 |
+| cut | −2.24 | −2.38 | **+0.10** | **−1.38** | **5.17** | 2.62 |
+
+Residual rms **1.27 dB (boost) / 0.83 (cut)** against the 0.204 dB floor — a **6× improvement** on
+the drawn network's 7.74 / 2.08, but not a match. Cut's spread is **2× the pedal's**, i.e. cut
+carries structure the tap does not make (the same region session 60 item 11 and session 61 item 5
+both flagged as an unexplained cut-shape disagreement — plausibly one item, still open).
+
+**(b) ⭐ THE NULLS ARE ~2× TOO BROAD — and the Q *ordering* is right.** Half-depth bandwidth:
+
+| variant | cut | boost | flat |
+|---|---|---|---|
+| PEDAL | 70.3 | **23.4** | 64.5 |
+| DRAWN | 134.8 | 134.8 | 134.8 |
+| **PROPOSAL** | 146.5 | **52.7** | 134.8 |
+
+⇒ **pole B does its job structurally** — boost's null is the sharp one, ratio **2.6×** against the
+pedal's **2.8×**, where the drawn network has no throw dependence at all — but **every** width is
+~2.1× too broad. A *uniform* factor across all three throws points at a SHARED element (the ladder
+RC / the shunts R12/R14), not at the switch. This is the same "centre right, range right, WIDTH
+wrong" residual A2c-2 found in the mid stage.
+
+⚠ **AND THE WIDTH STATISTIC HAD TO BE FIXED MID-SESSION.** The first version measured width at a
+fixed −6 dB below the shoulder, which is **confounded with depth** — a deeper null crosses any fixed
+contour further out, and this model IS deeper, so it reported ~1.6× "too wide" partly on its own
+extra depth. Referring the contour to each null's OWN half-depth removes it. Same rule as (c) below
+and as session 62's ratio-denominator guard: **normalise to something the feature under test does
+not itself move.**
+
+**(c) ⚠ AND THE PLOT'S FIRST NORMALISATION MANUFACTURED A THIRD "FINDING" THAT WAS NOT THERE.** The
+null overlay was normalised to the *median over 200–500 Hz*, a window that INCLUDES the null — so a
+model with a deeper null pulls that median down and paints its shoulders several dB high. That read
+as a real "wrong shoulder slope" until it was checked. Re-normalised to the lower shoulder (the
+200–270 Hz max, `locate_notch`'s own depth reference) both sets start at 0 as they must, and the
+genuine difference is visible instead: the model's approach to the null has a much broader low-side
+skirt, which is (b).
+
+#### 6. GATES — and TWO OF MINE WERE WRONG, both in ways worth keeping
+
+* **LIVENESS** drawn vs proposal, worst |Δh| = **10.14 dB**. OK.
+* **BLEED** ⚠ **the first version tested nothing.** It rendered BLEND = 0 and asserted the result was
+  far below BLEND = max, "proving the OD path is what is measured". But **BLEND = 0 is not silence —
+  it is 100 % CLEAN**, so at drive MIN (where the OD path is quiet) the two sit within a few dB and
+  it reported −5.7 dB / CHECK for a perfectly fine model. It measured the DRIVE knob. Replaced with
+  the claim that actually matters, checked against `LevelBlendTest`'s own oracle: at LEVEL = 1 /
+  BLEND = 1 the clean coefficient is **0.000e+00** and the OD coefficient **1.000000**, so `h` IS
+  the ATTACK ratio. (And a common bleed could only *shrink* |h|, so every `h` is also a lower bound.)
+* **CONVERGED** ⚠ **and its threshold was wrong too.** It gated |h(−36) − h(−30)| against the
+  0.204 dB difference floor and reported CHECK — **but the PEDAL fails that same threshold** (0.469 dB
+  at boost). Two reasons: boost genuinely spreads across level (item 4), and a WORST-over-249-bins
+  statistic is noise-dominated, which is why session 60's 1/3-oct read of the same thing was 0.065 dB.
+  Re-gated on the **rms**, against the **pedal's own value** as the yardstick: pedal boost 0.254 /
+  cut 0.028; model boost **0.832 (CHECK)** / cut 0.044. Boost's excess is item 4's compression.
+* ⭐ **GENERAL: gate against what the DEVICE does, not against an absolute floor the device itself
+  cannot meet.** Session 61 learned this for depth; both failures above are the same lesson on a new
+  quantity, found only because the pedal row was printed beside the model row.
+
+#### 7. ⭐⭐ NEW GENERAL INSTRUMENT: `analysis/shape_gate.py` — FR and THD decomposed as CURVES
+
+The user's session-63 point, generalised past ATTACK: **a single scalar cannot distinguish "the whole
+curve is 1 dB high" from "it tilts 2 dB" from "there is a 20 dB notch at 320 Hz", and those three
+have different causes and different fixes.** For each row the residual is projected onto an
+ORTHONORMAL basis in log f, so the four terms partition the mean square **exactly**:
+
+    rms² = LEVEL² + TILT² + CURVATURE² + LOCAL²
+
+`LOCAL` — what is left after the smooth shape is removed — is the term no previous gate had, and it
+is where a notch lives. On the frozen 63-capture baseline:
+
+| group | rows | rms(q) | level | tilt | curv | **LOCAL** | interior | rms(a) | worst LOCAL |
+|---|---|---|---|---|---|---|---|---|---|
+| OD ex `gain-n12` | 252 | 2.611 | 0.846 | 0.897 | 0.995 | **2.075** | 2.023 | 1.903 | −20.8 dB @ 12.9 k |
+| OD `gain-n12` [bad] | 16 | 5.218 | 2.670 | 2.865 | 1.083 | 3.274 | 3.100 | 4.991 | +21.4 @ 6451 |
+| CLEAN | 120 | 0.487 | 0.199 | 0.312 | 0.155 | 0.276 | 0.281 | 0.427 | +1.9 @ 4064 |
+
+⭐⭐ **THE HEADLINE: `LOCAL` IS THE DOMINANT PART OF THE OD RESIDUAL — 2.075 of 2.611, i.e. ~63 % of
+the mean square is NARROW STRUCTURE, not level, tilt or curvature.** Every A3 instrument to date has
+fitted smooth broadband shapes (bathtubs, corners, tapers, a min-phase correction network) against a
+residual whose largest single component is narrow features. **And the CLEAN path is the opposite** —
+`LOCAL` 0.276 against a 0.487 total, i.e. smooth-error-dominated, exactly as a well-fitted linear
+path should be. The contrast is what makes the OD number readable.
+
+⚠ **AND THE EDGE CONTROL IS WHAT MAKES IT A FINDING.** A least-squares polynomial has its worst
+leverage at the ENDS of the fit range, and the first run put every worst-LOCAL band at 25–32 Hz or
+4–13 kHz — exactly what that artefact looks like. Dropping the two outermost bands each side moves
+`LOCAL` only **2.075 → 2.023**, so it survives. Without that control the headline would have been
+polynomial edge behaviour.
+
+⚠ **`rms(q)` IS NOT `matrix_grade`'s NUMBER, and a first draft of the docstring claimed it was.**
+`matrix_grade` aggregates by ARITHMETIC mean of per-row band-RMS; the decomposition needs the
+QUADRATIC mean for the terms to partition the group total too. They differ systematically
+(2.611 vs 1.903 for OD ex `gain-n12`), so reading one as a regression against the other is pure
+arithmetic. Both are now printed — `rms(a)` reproduces `matrix_grade` exactly (1.903 / 4.991 / 0.427
+/ 1.573) — and `matrix_grade` remains the headline grade.
+
+**THD is decomposed the same way but in dB**, because it is a RATIO: in percent a multiplicative
+error at high THD swamps the same error at low THD and the "shape" is just wherever the pedal happens
+to distort most. OD ex `gain-n12`: **rms(q) 9.986 = level 6.736 / tilt 4.286 / curv 3.372 / LOCAL
+4.961**, i.e. THD error is **level-dominated** — the model's distortion AMOUNT is the biggest term —
+and its **worst LOCAL band is 320 Hz at −28.24 dB**, the notch band, showing up independently in THD
+as well as in FR.
+
+#### 8. ⭐⭐ AND THD CORROBORATES THE WHOLE ATTACK FINDING FROM A COMPLETELY DIFFERENT DIRECTION
+
+`shape_gate`'s THD-vs-level table ranks rows by their compression curve, and **every one of the worst
+rows is an `attack-boost` row, with the model's THD 9–14 dB LOW**:
+
+    drive-0700_attack-boost_blend-1430   -14.05 / -13.38 / -13.99 dB  (at -18 / -12 / -6 dBFS)
+    attack-boost_blend-1430              -13.01 / -11.34 /  -9.46
+    drive-0700_attack-boost              -12.07 / -11.98 / -12.50
+    attack-boost                         -11.59 / -10.44 /  -9.20
+
+That is **exactly what the DRAWN topology predicts**: in the shipped model ATTACK boost delivers
+~0 dB instead of +8.6 dB, so the clipper never sees the extra drive and cannot make the pedal's
+harmonics. ⭐ **So the ATTACK gap was measurable in THD all along, on rows that have been in the
+matrix since the first capture session — nothing new had to be captured, only a curve had to be
+looked at.** It also yields a falsifiable prediction for the topology: those rows must improve.
+
+
+#### 9. ⛔⛔ AND THE MATRIX — THE ARBITER — DOES **NOT** SUPPORT SHIPPING IT. NOTHING SHIPPED.
+
+The full 63-capture render landed at session end (`analysis/reports/s63_twopole.json`).
+
+    subset            shipped        twopole
+    OD ex gain-n12    1.903  (252)   2.218  (268)     tilt 0.95 -> 2.19
+    CLEAN             0.427  (120)   0.427  (120)     bit-identical (OD-path change)
+    ALL               1.573  (388)   1.791  (404)
+    row movement over the 388 SHARED rows: 33 better >0.5 dB, 32 worse, 136 bit-identical
+    biggest improvement -3.35 dB (level-1700_base-od, drv_-6)
+    worst regression    +3.92 dB (level-1700_gain-n12_base-od, drv_-6)
+
+⚠⚠ **DO NOT READ THOSE AGGREGATE ROWS AS A COMPARISON — THE MEMBERSHIP MOVED.** twopole has **284 OD
+rows against shipped's 268**, because the tap raises levels enough that 16 previously-SILENT rows
+(`max < -60 dB`, `matrix_grade`'s own exclusion) come into range. An rms over differently-populated
+row sets is not a ranking — the session-49 item-7 trap, and this is its fifth appearance in this
+project. **The valid comparison is the 388 shared rows**, and on those the verdict is a genuine wash
+on counts (33 vs 32) with the aggregate moving the wrong way.
+
+⭐ **AND THE DECOMPOSITION SAYS *WHY*, WHICH THE TOTAL CANNOT** (`shape_gate --vs`, 388 shared rows;
+note the tool's A column is the positional report and B is `--vs`, so read the signs carefully):
+
+| term | twopole | shipped | twopole − shipped |
+|---|---|---|---|
+| level | 1.031 | 0.878 | **+0.153 WORSE** |
+| tilt | 0.885 | 0.944 | −0.059 better |
+| curv | 1.008 | 0.836 | **+0.172 WORSE** |
+| **local** | **1.778** | **1.806** | **−0.028 better** |
+| rms | 2.454 | 2.371 | +0.083 worse |
+
+⇒ **the topology moves the two terms it was designed to move (LOCAL and TILT) in the RIGHT direction,
+and pays for it in LEVEL and CURVATURE.** That is exactly item 4's over-compression and item 5a's
+wrong slope sign, now measured across the whole matrix instead of at one operating point. It is a
+coherent, localised cost — not a diffuse failure — and it says the next move is the shape/headroom
+residual, not a retreat from the topology. **But the aggregate is the arbiter and it says no: NOTHING
+IS SHIPPED.** Same posture as `btC17` (session 49) and, for one session, `clipC15` (36 → 37).
+
+⚠ The LOCAL improvement is only **0.028 dB** — the notch fix is real (item 3 matches to the bin) but
+it is a tiny fraction of the matrix's LOCAL term. Read with item 7: LOCAL is 63 % of the OD residual
+and this fixes a small part of it, so **most of that narrow structure is something else** and is the
+single largest unexplored lead in A3.
+
+### A3 step 21 — the width requirement, the instrument that could not have measured it, and a bigger finding that is not ATTACK's (session 64)
+
+Session 63's next-step (a): the SHAPE/HEADROOM residual, named there as a **shared-element** fit
+(all three null widths ~2.1× too broad by the same factor ⇒ the ladder RC / R12 / R14, not the
+switch). Tooling + `src/` plumbing; **nothing shipped as a default** and every new value defaults to
+the drawn network. **ctest 16/17** — the one failure is the pre-existing session-44 `OSValidationTest`
+at *identical* numbers (`amp 0.35: 2x −25.6 / 4x −32.1 / 8x −23.6`). Baseline verified FIRST:
+`attack_render_gate.py --both` reproduces session 63's every figure exactly (notch 316.4/328.1/334.0,
+widths 146.5/52.7/134.8, slopes −1.39/+0.10, resid rms 1.27/0.83). New
+`analysis/attack_shape_screen.py`; `analysis/attack_notch_probe.py` and
+`analysis/attack_render_gate.py` gain the width statistic; **`src/dsp/TrebleAttack.h` gains
+`setLadder()`** (session 50's next-step (a), open from session 50 to 63).
+
+#### 1. WIDTH is now part of the shared notch oracle, and the record does not move
+
+`locate_notch()` gained `width` (half-depth **bin span** — the definition sessions 60–63 quote) and
+`width_i` (the same contour found by **linear interpolation** of its two crossings). Both are needed:
+the pedal's boost null is **4 bins wide**, so a raw bin span is quantised at ~±25 % — far too coarse
+to fit against, and it makes an optimiser chase a staircase. The record is quoted on the bin span so
+that a recorded number is never silently redefined (the `f_bin`-vs-`f_ref` rule).
+
+`attack_render_gate.py`'s **private copy** of the width function was deleted and it now calls the
+oracle — two implementations of one definition is the silent-divergence trap session 62 called out
+for the network solver. The probe's JSON also gained `mag_curve` (the raw per-throw magnitude over
+180–500 Hz): width is referred to a throw's **own** shoulder, so unlike `h` it cannot be rebuilt
+from the stored ratio.
+
+**Regenerated and proven a STRICT SUPERSET twice** (once for the width fields, once after the
+`refine_min` guard below): **1196 then 1454 shared leaves bit-identical, worst |Δ| 0.000e+00, 0
+lost.** So no session-60–63 number moves. Pedal widths, bin / interpolated:
+**70.3 / 23.4 / 64.5** and **77.9 / 27.1 / 71.9 Hz** (cut/boost/flat) — the bin column reproduces
+the record exactly.
+
+⭐ And the interpolated column immediately earned its keep: the DRAWN network's three widths are
+*identical* on the bin grid (134.8 Hz each) and **138.6 / 137.8 / 138.7** interpolated — they were
+never equal, only quantised to the same span.
+
+Two real defects fixed in passing, both on paths nobody had run:
+- `attack_render_gate.py --json` was a **`NameError`** (`bleed_sep_db=sep`; `sep` was deleted when
+  that gate was rewritten in session 63).
+- `refine_min()` **overflowed** (`2.0 ** vx` → `inf`) whenever a near-cancelling parabola threw the
+  vertex far outside its bracketing bins — harmless for `f_bin` (an argmin) but it returned `inf`
+  for `f_ref`. Now rejects an out-of-bracket vertex. Verified to move nothing recorded.
+
+#### 2. ⚠⚠ THE LOAD-BEARING METHOD FINDING: the fast network screen is NOT calibrated to the shipped chain, and every ATTACK screen since session 61 assumed it is
+
+At session 62's own proposal point, the treble-ladder-only Python solve against the **real render**:
+
+| | f0 (cut/boost/flat) | depth | half-depth width |
+|---|---|---|---|
+| ladder solve | 316.25 / 327.75 / 333.75 | 14.74 / 32.63 / 15.85 | 121.3 / 52.3 / 139.6 |
+| REAL RENDER | 316.4 / 328.1 / 334.0 | **18.51 / 36.62 / 20.31** | **150.6 / 59.6 / 138.6** |
+| agreement | **0.35 Hz** | **~4 dB out** | **up to 24 % out** |
+
+**Cause, measured not guessed.** `D(f) = render_dB − ladder_dB` is ONE shared downstream transfer to
+within ~0.6 dB (six curves = two very different ladder settings × three throws) and it **FALLS
+17.1 dB across 150–700 Hz** — the IC2_B bridged-T scoop heading for its 717 Hz minimum. Depth and
+width are both measured against a shoulder at 200–270 Hz, so that tilt sits *inside* them.
+
+⇒ **Session 62 fitted depth on an instrument ~4 dB offset from what ships.** Its reported 0.18 dB
+worst depth error was real *in the ladder solve* and became 3.6–4.3 dB through the chain — which
+session 63 observed and (correctly, depth being a lower bound) allowed, **without noting that the two
+instruments disagree**. They do, and a width fit cannot survive a 24 % scale error.
+
+**GATE C** transfers the requirement into the screen's own units and tests that transfer
+out-of-sample, in **both** directions between two different ladders. It **CHECKS**: ±5 Hz f0,
+±3.3 dB depth, **±10–27 % width**. So the tool declares itself a **LEVER FINDER** and names
+`attack_render_gate.py` as the arbiter — a render is 17.6 s and an optimiser needs thousands of
+evaluations, so the screen finds the lever and the render lands the value.
+
+⚠ **And GATE C's first anchor was wrong, in a way worth recording.** Calibrating on the **DRAWN
+default** failed by **62 Hz of f0 at every throw, identically** — and that identical-across-throws
+error is the tell: `tf_tap` takes ONE optional `c8` spanning M↔T3, so it can express the drawn
+**boost** throw (C8 bridges R8) and **cannot express cut or flat at all**. Passing `c8 = 0` models a
+drawn network with C8 *removed* — a different circuit from the one that renders, so the
+"calibration" was measuring a structural mismatch. **The drawn default is not a valid anchor for
+this solver.** The anchor is now a genuinely different ladder at C8 = 0, rendered by the tool itself
+(`--render-cal`).
+
+#### 3. ⭐ THE SHARED LADDER IS PLUMBED — session 50's next-step (a), open for 14 sessions
+
+`kR7 / kR12 / kR14 / kC9 / kC6` were `static constexpr` and reachable from **no** tool, which is why
+every A3 screen that wanted them had to work in Python instead of the shipped stage. Now
+`TrebleAttack::setLadder()` + `FitParams::{trebleR7, trebleLadderR12, trebleLadderR14, trebleC9,
+trebleC6}` + `PedalChain::applyParams` + both CLI `--fit` maps. `kG7/kG12/kG14` became runtime
+divisions of the same operands.
+
+**Verified in THREE directions** (session 37 item 12 / session 45 item 7a — "default == explicit
+nominal" passes on its own even when nothing was rebuilt, which is the trap, not the test):
+
+| check | result |
+|---|---|
+| `TrebleAttackTest` Test 10: default vs explicit-nominal `setLadder` | **BIT-IDENTICAL** |
+| Test 10: each of the five individually | **LIVE** (worst 4.9–13.3 dB) |
+| render: default vs explicit-nominal | **BIT-IDENTICAL** |
+| render: default vs a `--fit` on R12 / C9 | **DIFFER** |
+| render: default vs the **pre-`src`-change binary**, all three throws | **BIT-IDENTICAL** |
+
+Tests 8 and 9 still reproduce session 63 exactly (pole A alone +8.26 dB, pole B alone +0.21 dB,
+boost null 9.23 → 20.17 dB).
+
+⚠ All five are **schematic-verified** (circuit.md; covered by the R1–R54 / C1–C39 reconciliation), so
+moving one is a capture-vs-document disagreement of the `trebleC7` (147×) / `c21R` (10×) /
+`trebleWiperR` (1.4×) class — not a bug fix.
+
+#### 4. ⛔ THE CENSUS — no shared element is a width lever, and the tap is width-neutral
+
+±20 % on every shared value, at the proposal point:
+
+| lever | mean \|Δwidth\| (Hz) | \|Δf0\| (Hz) | **Δwidth per Hz of f0** |
+|---|---|---|---|
+| R7 | 38.90 | 25.25 | 1.5 |
+| R12 | 22.23 | 23.00 | 1.0 |
+| C6 | 16.79 | 18.25 | 0.9 |
+| C9 | 13.60 | 15.25 | 0.9 |
+| C5 | 13.81 | 24.25 | 0.6 |
+| R14 | 5.00 | 9.25 | 0.5 |
+| **C7** | 2.84 | **0.25** | **11.4** |
+| Ra / Rb / Rc / R11 | **0.07–0.32** | **0.00** | — (f0-neutral) |
+
+Every notch-forming element moves width and f0 **together at ~0.5–1.5 Hz per Hz**, and f0 already
+matches **to the bin**. Only C7 is width-selective, and its authority is small. ⭐ The **tap divider
+is width-NEUTRAL to ≤0.5 Hz and f0-neutral to 0.00 Hz**, which extends session 62's pole-independence
+result to the width statistic — so the notch fit PINS the tap and the broadband is fitted separately
+(session 62 item 4's rule: separate non-interacting groups rather than let one objective arbitrate).
+
+#### 5. ⚠ THE WIDTH IS REACHABLE — AND THE POINT THAT REACHES IT IS NOT A CANDIDATE
+
+At ±1 decade this looks like a hard conflict: the frontier trades f0 against width and every fit
+either holds f0 and stays ~1.3–1.6× too broad, or reaches the width with the f0 **spread collapsed**
+to 1.5–5 Hz against the required 17.5 (session 61's "switch the throws off rather than trade"
+signature). Seven single- and multi-element families all saturate at **cost 3.22–3.65**, and the
+17-dof family beats the 12-dof one by **0.4 %**.
+
+⛔ **But the BOX SWEEP forbids reading that as unreachability**, and that is the gate that mattered:
+cost moves **0.71 across 6× of box widening** (3.11 at ±1 decade → 2.40 at ±3), i.e. **not
+saturated**. Widening to ±3 decades then finds a point that meets **all nine numbers** — f0 to
+0.25–1.0 Hz with spread 18.2 Hz, width to −0.8 / +8.5 / +11.9 %.
+
+⇒ **and it is disqualified on its values, not on its cost:** **R7 × 572** (200 kΩ → **114 MΩ**),
+C6 × 62, C5 × 0.025, C9 × 0.032, C7 × 0.024, R14 × 20.4, the tap **on its bound**, and the broadband
+at **3.5× floor** with the boost slope overshooting to +2.58 dB/dec. That is session 62 item 4's
+"reachable via broadband nonsense" control, arriving on its own. **114 MΩ is 100× the largest
+resistor on the board.**
+
+⇒ **The width residual is NOT a value error in the shared ladder.** It is not refuted as
+unreachable, and it is not fittable at any plausible value — which is a different and more useful
+statement than either.
+
+#### 6. ⭐⭐ AND THE BIGGER FINDING IS NOT ATTACK'S AT ALL — `--tilt`
+
+`h` is a **ratio between throws**, so everything shared by all three cancels out of it *by
+construction* — which is precisely why every ATTACK instrument since session 57 has been blind to a
+shared error. **Width is not a ratio**: it is measured on one throw's own magnitude against that
+throw's own shoulder, so the **absolute** shape through the notch window is inside it. Measured
+directly (bleed-free by topology at LEVEL max / BLEND max, drive min), each curve referred to its own
+200 Hz value — drop over **200 → 480 Hz**:
+
+| | cut | boost | flat | slope, flat |
+|---|---|---|---|---|
+| **PEDAL** | −4.93 | −5.36 | **−4.88** | −16.6 dB/dec |
+| DRAWN model | −11.14 | −10.74 | **−11.05** | −28.4 dB/dec |
+| proposal | −11.27 | −12.84 | −13.47 | −38.1 dB/dec |
+
+**The model's OD path is 6.2 dB too dark across the notch window, in ALL THREE throws** (so it is
+shared, not an ATTACK property) and **level-independent to 0.02–0.15 dB** between −36 and −30 dBFS
+(so it is not an operating point — session 61 item 3's gate).
+
+⭐⭐ **AND THE ELEMENT IS NAMED, ARITHMETICALLY.** Over the same 200 → 480 Hz the **IC2_B bridged-T
+alone drops −10.79 dB** and the two Sallen-Keys together **−0.03 dB**. The drawn model measures
+**−11.05 dB** ⇒ the bridged-T accounts for it **to 0.26 dB** and nothing else in the chain has
+authority here. **The pedal's scoop is ~2.3× shallower through this window** — which is circuit.md
+**risk #1** verbatim ("depth is highly tolerance-sensitive … reshape to whatever the capture shows,
+including much shallower than ideal").
+
+⇒ **GAP #1b is REOPENED, on an axis that can see it.** Session 21 closed it on **output** dips over
+116 OD rows — in a region where the clean bleed sat **11–31 dB above** the OD path, so it was
+insensitive to the OD path's shape *by construction*. Session 51 item 8 already flagged that closure
+as "weaker than recorded". This measures the OD path's shape **directly and bleed-free**, and the
+model is 6.2 dB too dark by 480 Hz.
+
+#### 7. ⚠ AND THE OBVIOUS MECHANISM WAS TESTED AND REFUTED — the ~2.1× coincidence is a coincidence
+
+It is very tempting to join items 5 and 6: the tilt excess is ~2.1× *and* the width excess is ~2.1×,
+so the steeper background must be inflating the half-depth width. **Tested by removing only the tilt
+difference** (a first-order rotation about 200 Hz, which cannot create or destroy a null) and
+re-measuring the width with the same locator:
+
+| | width now | de-tilted | pedal | ratio after (before) |
+|---|---|---|---|---|
+| prop cut | 150.6 | 131.9 | 77.9 | **1.69×** (1.93×) |
+| prop boost | 59.6 | 47.2 | 27.1 | **1.74×** (2.20×) |
+| prop flat | 138.6 | 126.9 | 71.9 | **1.76×** (1.93×) |
+
+⇒ the excess tilt is worth about a **quarter** of the width excess; the rest is a genuine null-Q
+difference. And on the DRAWN network de-tilting makes the ratio **worse** (1.93 → 1.96, 2.12). **The
+two ~2.1× figures are unrelated.** Recorded because the joined reading is the natural one and it is
+wrong.
+
+#### 8. ⚠ THREE OF MY OWN GATES WERE WRONG FIRST — all three the same lesson
+
+- **GATE C's anchor** was the drawn default, which this solver cannot represent (item 2).
+- **GATE D** scored an **unmatchable broadband term** with the tap pinned, so it traded notch
+  accuracy against it and reported 0.857 — read as "weak optimiser" when it was the gate's own
+  construction. Notch-only, it recovers to 0.109. **A search gate must ask exactly the question whose
+  failure it is meant to make readable.**
+- **The bound check** covered only the shared values, and the **tap was quietly running to ×1/10** of
+  a 1-decade box. Now every free value is checked.
+- Plus the C5-trim parameterisation mapped the whole negative half of the box to exactly 0 — a
+  self-inflicted degeneracy; now linear on [0, 0.3·C5].
+
+⭐ **GENERAL: a gate built to make a failure readable has to be scored on the failing quantity
+alone.** Every one of these was caught only because the gate printed the number beside its verdict.
+
+#### 9. WHAT IS AND IS NOT SETTLED
+
+**Settled.** The width statistic and its oracle; the ladder's reachability from every tool; that no
+shared ladder element is a width lever at plausible values; that the tap is notch- and width-neutral;
+that the fast screen is a lever finder and not a depth/width instrument; and that the OD path carries
+a **6.2 dB, ATTACK-independent, level-independent shape error over 200–480 Hz that is the IC2_B
+bridged-T**.
+
+**NOT settled.** Why the nulls are ~1.7× too broad once the tilt is removed — that is a real null-Q
+difference with no identified carrier. Whether the pedal's shallower scoop is its bridged-T being
+shallower or something else compensating (the bridged-T is the only element in the *model* with
+authority here; that is not the same claim). And session 63 item 5(a)'s cut-shape disagreement, which
+is in the same region and may be one item with this.

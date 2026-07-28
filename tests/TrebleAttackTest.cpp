@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 static constexpr double PI = 3.14159265358979323846;
@@ -91,6 +92,64 @@ static double measureDb(double freq, double fs, TrebleAttack::Attack a, double d
     const int settle = static_cast<int>(std::max(2.0 * fs, 8.0 * period));
     const int measure = static_cast<int>(std::ceil(2.0 * period)) + 1;
 
+    double peak = 0.0;
+    for (int n = 0; n < settle + measure; ++n)
+    {
+        const double x = std::sin(2.0 * PI * freq * static_cast<double>(n) / fs);
+        const double y = stage.process(x);
+        if (n >= settle)
+            peak = std::max(peak, std::abs(y));
+    }
+    return (peak > 0.0) ? 20.0 * std::log10(peak) : -300.0;
+}
+
+// ---- Test 8's reference: the TWO-POLE ATTACK topology (session 62's proposal) ----
+// Regenerate with:  python3.11 analysis/attack_topology_goldens.py
+// ⚠ That script does not merely PRINT this table — it first gates the one piece of
+// new algebra in TrebleAttack.h, the per-throw SERIES COLLAPSE of the split top rail,
+// against attack_tap_screen.py's independent UNCOLLAPSED 8-node solve (worst 2.1e-14
+// dB at the split point). A golden table generated from the same derivation it is
+// meant to check would be circular; this one is not.
+static constexpr double kTapRa = 470.0e3, kTapRb = 506.0e3, kTapRc = 78.5e3, kTapR11 = 212.0e3;
+static constexpr double kC5Base = 19.7e-9, kC5TrimBoost = 1.1e-9, kC5TrimCut = 2.7e-9;
+static constexpr double kRdFlat = 6.14e3, kRdBoost = 478.0, kRdCut = 6.04e3;
+static constexpr double kPropC7 = 680.0e-12;   // the shipped trebleC7
+static const std::vector<Ref> kRefTwoPole = {
+    //  f Hz     boost       flat        cut
+    {     50.0,   76.1844,   67.6804,   64.3507 },
+    {    100.0,   73.0341,   64.6679,   61.1442 },
+    {    200.0,   65.0816,   57.1044,   53.1630 },
+    {    320.0,   38.7566,   41.5400,   37.9129 },
+    {    500.0,   60.9209,   52.4546,   50.6858 },
+    {   1000.0,   66.1470,   57.6584,   55.3804 },
+    {   2000.0,   67.3080,   58.7961,   56.4347 },
+};
+
+// Configure a stage at the two-pole proposal (C8 REMOVED — that is what session 62
+// actually screened, so leaving 220 pF in would not be the same proposal).
+static void configureTwoPole(TrebleAttack& stage)
+{
+    stage.setC7(kPropC7);
+    stage.setC8(0.0);
+    stage.setAttackTap(kTapRa, kTapRb, kTapRc, kTapR11);
+    // ⚠ setNotchDamp() writes ALL THREE throws by design, so per-throw values must
+    // come after it — the same ordering constraint PedalChain::applyParams obeys.
+    stage.setNotchDamp(kRdFlat);
+    stage.setNotchLeg(TrebleAttack::Attack::Flat, kC5Base, kRdFlat);
+    stage.setNotchLeg(TrebleAttack::Attack::Boost, kC5Base + kC5TrimBoost, kRdBoost);
+    stage.setNotchLeg(TrebleAttack::Attack::Cut, kC5Base + kC5TrimCut, kRdCut);
+}
+
+static double measureTwoPoleDb(double freq, double fs, TrebleAttack::Attack a)
+{
+    TrebleAttack stage;
+    stage.prepare(fs);
+    configureTwoPole(stage);
+    stage.setAttack(a);
+
+    const double period = fs / freq;
+    const int settle = static_cast<int>(std::max(2.0 * fs, 8.0 * period));
+    const int measure = static_cast<int>(std::ceil(2.0 * period)) + 1;
     double peak = 0.0;
     for (int n = 0; n < settle + measure; ++n)
     {
@@ -229,6 +288,182 @@ int main()
                     ideal, damped, damped - ideal, pass ? "PASS" : "FAIL");
         if (! pass)
             ++failures;
+    }
+
+    // ---- Test 8: the TWO-POLE ATTACK topology vs the oracle -----------------
+    // Validates BOTH new poles at once at session 62's proposed point: the moving
+    // tap on the split top rail (pole A) and the per-throw C5/Rd notch leg (pole B).
+    // The reference comes from analysis/attack_topology_goldens.py, which gates the
+    // series collapse against an independent 8-node solve before printing it.
+    std::printf("\n=== TWO-POLE ATTACK topology vs oracle @ 48 kHz ===\n");
+    for (int pi = 0; pi < 3; ++pi)
+    {
+        std::printf("--- ATTACK = %s ---\n", names[pi]);
+        for (const auto& r : kRefTwoPole)
+        {
+            if (r.f > 2000.0)
+                continue; // HF is bilinear warp; Test 2 covers that mechanism
+            const double meas = measureTwoPoleDb(r.f, 48000.0, positions[pi]);
+            const double ref = refFor(r, positions[pi]);
+            const double err = std::abs(meas - ref);
+            // ⚠ 320 Hz sits ON the cancellation null, and a first draft of this test
+            // pre-loosened it to 1.5 dB on the reasoning that a null's depth is a
+            // difference of near-equal terms and so must discretise badly. MEASURED,
+            // it does not: the error there is 0.002-0.042 dB, the same order as every
+            // smooth band. The loosened tolerance was therefore removed — a gate
+            // slacker than the data needs is a gate that will not catch a regression.
+            const double tol = 0.25;
+            const bool pass = err <= tol;
+            std::printf("  f=%8.1f  meas=%8.3f  ref=%8.3f  err=%.3f dB (tol %.2f)  %s\n",
+                        r.f, meas, ref, err, tol, pass ? "PASS" : "FAIL");
+            if (! pass)
+                ++failures;
+        }
+    }
+
+    // ---- Test 9: the two poles do the two jobs, and do them SEPARATELY ------
+    // This is the structural claim, not a value check: session 62's whole case for a
+    // TWO-pole switch is that the broadband gain and the notch are carried by
+    // non-interacting groups. Assert exactly that, so a future refactor that
+    // accidentally couples them fails here rather than silently degrading a fit.
+    std::printf("\n=== Two poles, two jobs, no cross-talk ===\n");
+    {
+        // (a) POLE A ALONE (tap split, notch leg shared): must move the broadband
+        //     level a lot and the ~320 Hz null essentially not at all.
+        auto measure = [](double freq, TrebleAttack::Attack a, bool tap, bool leg) {
+            TrebleAttack stage;
+            stage.prepare(48000.0);
+            stage.setC7(kPropC7);
+            stage.setC8(0.0);
+            if (tap)
+                stage.setAttackTap(kTapRa, kTapRb, kTapRc, kTapR11);
+            stage.setNotchDamp(kRdFlat);
+            if (leg)
+            {
+                stage.setNotchLeg(TrebleAttack::Attack::Boost, kC5Base + kC5TrimBoost, kRdBoost);
+                stage.setNotchLeg(TrebleAttack::Attack::Cut, kC5Base + kC5TrimCut, kRdCut);
+                stage.setNotchLeg(TrebleAttack::Attack::Flat, kC5Base, kRdFlat);
+            }
+            stage.setAttack(a);
+            const double period = 48000.0 / freq;
+            const int settle = static_cast<int>(std::max(2.0 * 48000.0, 8.0 * period));
+            const int meas = static_cast<int>(std::ceil(2.0 * period)) + 1;
+            double peak = 0.0;
+            for (int n = 0; n < settle + meas; ++n)
+            {
+                const double x = std::sin(2.0 * PI * freq * static_cast<double>(n) / 48000.0);
+                const double y = stage.process(x);
+                if (n >= settle)
+                    peak = std::max(peak, std::abs(y));
+            }
+            return (peak > 0.0) ? 20.0 * std::log10(peak) : -300.0;
+        };
+        // Broadband probe at 1 kHz (well clear of the null); notch depth as the
+        // 320 Hz level relative to the 254 Hz shoulder, the probe's own convention.
+        const double tapBoost = measure(1000.0, TrebleAttack::Attack::Boost, true, false)
+                                - measure(1000.0, TrebleAttack::Attack::Flat, true, false);
+        const double legBoost = measure(1000.0, TrebleAttack::Attack::Boost, false, true)
+                                - measure(1000.0, TrebleAttack::Attack::Flat, false, true);
+        const bool aGain = tapBoost > 6.0;    // pole A carries the broadband gain
+        const bool bFlat = std::abs(legBoost) < 0.5; // pole B is broadband-NEUTRAL
+        std::printf("  pole A alone, boost-vs-flat @1 kHz: %+7.2f dB  (want > +6)   %s\n",
+                    tapBoost, aGain ? "PASS" : "FAIL");
+        std::printf("  pole B alone, boost-vs-flat @1 kHz: %+7.2f dB  (want ~0)     %s\n",
+                    legBoost, bFlat ? "PASS" : "FAIL");
+        if (! aGain)
+            ++failures;
+        if (! bFlat)
+            ++failures;
+
+        // Pole B must be what deepens boost's null. Depth measured against the
+        // 254 Hz shoulder so a broadband level change cannot masquerade as depth.
+        const double depthTapOnly = measure(254.0, TrebleAttack::Attack::Boost, true, false)
+                                    - measure(320.0, TrebleAttack::Attack::Boost, true, false);
+        const double depthBoth = measure(254.0, TrebleAttack::Attack::Boost, true, true)
+                                 - measure(320.0, TrebleAttack::Attack::Boost, true, true);
+        const bool deepens = depthBoth > depthTapOnly + 5.0;
+        std::printf("  boost null depth re 254 Hz: pole A only %.2f -> both %.2f dB   %s\n",
+                    depthTapOnly, depthBoth, deepens ? "PASS" : "FAIL");
+        if (! deepens)
+            ++failures;
+    }
+
+    // ---- Test 10: the SHARED ladder is plumbed, BOTH WAYS -------------------
+    // Session 64. R7/R12/R14/C9/C6 were `static constexpr` and reachable from no
+    // tool (session 50's next-step (a)); they are now setLadder(). The standing rule
+    // for this kind of change is session 37 item 12 / session 45 item 7a: verify
+    // plumbing in BOTH directions, because "default == explicit nominal" passes on
+    // its own even when NOTHING was actually rebuilt — that is the trap, not the test.
+    {
+        std::printf("\n-- Test 10: setLadder plumbing, both directions ---------------\n");
+        constexpr double kR7 = 200.0e3, kR12 = 6.8e3, kR14 = 22.0e3;
+        constexpr double kC9 = 22.0e-9, kC6 = 22.0e-9;
+
+        // A short frequency-response fingerprint, taken through the real stage.
+        const auto fingerprint = [](bool call, double r7, double r12, double r14,
+                                    double c9, double c6) {
+            TrebleAttack stage;
+            stage.prepare(48000.0);
+            if (call)
+                stage.setLadder(r7, r12, r14, c9, c6);
+            stage.setAttack(TrebleAttack::Attack::Flat);
+            std::vector<double> out;
+            for (double freq : { 101.0, 202.0, 320.0, 640.0, 2000.0 })
+            {
+                stage.reset();
+                const int settle = 24000, n_ = 48000;
+                double peak = 0.0;
+                for (int n = 0; n < n_; ++n)
+                {
+                    const double y = stage.process(
+                        std::sin(2.0 * PI * freq * static_cast<double>(n) / 48000.0));
+                    if (n >= settle)
+                        peak = std::max(peak, std::abs(y));
+                }
+                out.push_back(peak);
+            }
+            return out;
+        };
+        const auto same = [](const std::vector<double>& a, const std::vector<double>& b) {
+            if (a.size() != b.size())
+                return false;
+            for (size_t i = 0; i < a.size(); ++i)
+                if (std::memcmp(&a[i], &b[i], sizeof(double)) != 0)
+                    return false;
+            return true;
+        };
+
+        const auto base = fingerprint(false, 0, 0, 0, 0, 0);              // never call setLadder
+        const auto nominal = fingerprint(true, kR7, kR12, kR14, kC9, kC6); // explicit drawn values
+        const bool noop = same(base, nominal);
+        std::printf("  default vs explicit-nominal setLadder: %s   %s\n",
+                    noop ? "BIT-IDENTICAL" : "DIFFER",
+                    noop ? "PASS" : "FAIL (the default is not the drawn network)");
+        if (! noop)
+            ++failures;
+
+        // ...and every one of the five must be INDIVIDUALLY live, or a --fit key is
+        // silently inert (the session-20 `--input-trim` defect: a value that parses,
+        // is accepted, and never reaches the DSP).
+        struct { const char* name; double r7, r12, r14, c9, c6; } probes[] = {
+            { "R7  x1.3", kR7 * 1.3, kR12, kR14, kC9, kC6 },
+            { "R12 x1.3", kR7, kR12 * 1.3, kR14, kC9, kC6 },
+            { "R14 x1.3", kR7, kR12, kR14 * 1.3, kC9, kC6 },
+            { "C9  x1.3", kR7, kR12, kR14, kC9 * 1.3, kC6 },
+            { "C6  x1.3", kR7, kR12, kR14, kC9, kC6 * 1.3 },
+        };
+        for (const auto& p : probes)
+        {
+            const auto got = fingerprint(true, p.r7, p.r12, p.r14, p.c9, p.c6);
+            const bool live = ! same(base, got);
+            double worst = 0.0;
+            for (size_t i = 0; i < got.size(); ++i)
+                worst = std::max(worst, std::abs(20.0 * std::log10(got[i] / base[i])));
+            std::printf("  %s: %s (worst %.3f dB)   %s\n", p.name,
+                        live ? "LIVE" : "INERT", worst, live ? "PASS" : "FAIL");
+            if (! live)
+                ++failures;
+        }
     }
 
     std::printf("\n%s\n", failures == 0 ? "All tests passed." : "Some tests FAILED.");

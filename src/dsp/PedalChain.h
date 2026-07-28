@@ -226,6 +226,28 @@ public:
             treble.setSourceZ(z.ro, z.rq2, z.rp, z.cp);
         }
         treble.setNotchDamp(f.trebleLadderDampR); // session-19: shallow the 322 Hz notch
+        // ---- The two-pole ATTACK topology (session 62's proposal; defaults = the
+        // drawn network exactly). ⚠ ORDER MATTERS: setNotchDamp() above writes all
+        // three throws by design, so the per-throw overrides must follow it.
+        treble.setAttackTap(f.attackTapRa, f.attackTapRb, f.attackTapRc, f.attackTapR11);
+        {
+            // A negative per-throw damping means "inherit trebleLadderDampR" (see
+            // FitParams), so the shipped default is a genuine no-op here.
+            const double rdBoost = (f.attackDampBoost >= 0.0) ? f.attackDampBoost
+                                                              : f.trebleLadderDampR;
+            const double rdCut = (f.attackDampCut >= 0.0) ? f.attackDampCut
+                                                          : f.trebleLadderDampR;
+            treble.setNotchLeg(TrebleAttack::Attack::Flat, f.trebleC5, f.trebleLadderDampR);
+            treble.setNotchLeg(TrebleAttack::Attack::Boost,
+                               f.trebleC5 + f.attackC5TrimBoost, rdBoost);
+            treble.setNotchLeg(TrebleAttack::Attack::Cut,
+                               f.trebleC5 + f.attackC5TrimCut, rdCut);
+        }
+        treble.setC8(f.trebleC8);                 // session-62: 0 removes the drawn ATTACK cap
+        // The SHARED ladder (session 64; session 50's next-step (a) finally closed). Not
+        // switched by ATTACK — the switch's two poles are setAttackTap/setNotchLeg above.
+        treble.setLadder(f.trebleR7, f.trebleLadderR12, f.trebleLadderR14,
+                         f.trebleC9, f.trebleC6);
         treble.setC7(f.trebleC7);                 // session-34: A3 step-3a, IC2_A LF headroom
         odCoupling.setC(f.clipC15);                // session-36: A3 step-3b, C15 coupling into IC2_B
 

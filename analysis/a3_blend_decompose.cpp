@@ -76,6 +76,18 @@ int main(int argc, char** argv)
     const double fs = 48000.0;
     double inputRef = GainStaging::kInputRefNominal;
 
+    // ATTACK position, session 55. Like kInputRef this is NOT a FitParams member —
+    // it is a PedalChain::Params switch index (0=Flat, 1=Boost, 2=Cut, matching
+    // analysis/captures.py::_ATTACK_IDX) — so it is special-cased rather than added
+    // to kFitKeys, which is a table of `double FitParams::*`.
+    // Why it exists: session 54's condition axis measured the PEDAL's OD transfer at
+    // both ATTACK positions but could print no `H_req` for them, because this tool
+    // hardcoded `p.attackIdx = 0` and there was therefore no model side at all — the
+    // ATTACK half of that localiser could only ever run pedal-vs-pedal. GRUNT was
+    // already reachable (argv[1]); ATTACK was the one condition in the matrix that
+    // was not.
+    int attackIdx = 0;                        // Flat (_REF_OD) — the shipped default
+
     // Trailing key=value pairs override FitParams, so a candidate element can be
     // swept across the whole DRIVE axis without a rebuild (session 34, A3 step 3a:
     // the gate is a drive SWEEP, so every candidate needs all five CSVs).
@@ -89,6 +101,23 @@ int main(int argc, char** argv)
         {"trebleC7", &FitParams::trebleC7},
         {"clipC15", &FitParams::clipC15},
         {"trebleLadderDampR", &FitParams::trebleLadderDampR},
+        {"attackTapRa", &FitParams::attackTapRa},
+        {"attackTapRb", &FitParams::attackTapRb},
+        {"attackTapRc", &FitParams::attackTapRc},
+        {"attackTapR11", &FitParams::attackTapR11},
+        {"trebleC5", &FitParams::trebleC5},
+        {"attackC5TrimBoost", &FitParams::attackC5TrimBoost},
+        {"attackC5TrimCut", &FitParams::attackC5TrimCut},
+        {"attackDampBoost", &FitParams::attackDampBoost},
+        {"attackDampCut", &FitParams::attackDampCut},
+        {"trebleC8", &FitParams::trebleC8},
+        // The SHARED ladder (session 64; session 50's next-step (a)). These were
+        // static constexpr in TrebleAttack.h and reachable from NO tool until now.
+        {"trebleR7", &FitParams::trebleR7},
+        {"trebleLadderR12", &FitParams::trebleLadderR12},
+        {"trebleLadderR14", &FitParams::trebleLadderR14},
+        {"trebleC9", &FitParams::trebleC9},
+        {"trebleC6", &FitParams::trebleC6},
         {"clipC11", &FitParams::clipC11}, {"clipA0", &FitParams::clipA0},
         // The switched GRUNT caps, added session 38 so the GRUNT SPAN can be scanned
         // at the shipped state. Session 23's "no interior minimum" scan predates
@@ -126,6 +155,17 @@ int main(int argc, char** argv)
         const std::string k = a.substr(0, eq);
         bool hit = false;
         if (k == "kInputRef") { inputRef = std::atof(a.c_str() + eq + 1); hit = true; }
+        if (k == "attackIdx")
+        {
+            attackIdx = std::atoi(a.c_str() + eq + 1);
+            if (attackIdx < 0 || attackIdx > 2)
+            {
+                std::fprintf(stderr, "attackIdx must be 0=Flat, 1=Boost or 2=Cut, got '%s'\n",
+                             a.c_str() + eq + 1);
+                return 1;
+            }
+            hit = true;
+        }
         for (const auto& fk : kFitKeys)
             if (k == fk.name) { fp.*(fk.member) = std::atof(a.c_str() + eq + 1); hit = true; }
         if (! hit) { std::fprintf(stderr, "unknown fit key '%s'\n", k.c_str()); return 1; }
@@ -147,7 +187,9 @@ int main(int argc, char** argv)
     // labelled it "Boost centre (ref-od baseline)", which is wrong; at LF C8's
     // 220 pF makes it near-inert, but at drive noon it moves the clipper's
     // operating point, so do not inherit that setting.
-    p.attackIdx = 0;                          // Flat  (_REF_OD)
+    // ⚠ Overridable since session 55 (`attackIdx=` above); the DEFAULT is unchanged
+    // at Flat, so every existing CSV/tool is bit-identical unless it asks otherwise.
+    p.attackIdx = attackIdx;                  // Flat  (_REF_OD) unless overridden
     p.gruntIdx = gruntArg;                    // _REF_OD = cut (1)
     p.loMidFreq = 1;                          // 500 Hz  (_REF_OD)
     p.hiMidFreq = 1;                          // 1.5 kHz (_REF_OD)
@@ -185,8 +227,12 @@ int main(int argc, char** argv)
                             1016, 1613, 2560, 4064, 6451, 10240};
 
     const char* gname = gruntArg == 0 ? "BOOST" : gruntArg == 1 ? "CUT" : "FLAT";
-    std::printf("# a3_blend_decompose grunt=%s drive=%.3f dBFS=%.1f amp=%.6f V fs=%.0f\n",
-                gname, drive, dbfs, amp, fs);
+    const char* aname = attackIdx == 1 ? "BOOST" : attackIdx == 2 ? "CUT" : "FLAT";
+    // ATTACK is in the header so a CSV states its own operating point: these files are
+    // read by name from a dozen tools, and a condition that lives only in the filename
+    // is the stale-artefact trap (session 45 item 7a, session 37 item 12).
+    std::printf("# a3_blend_decompose grunt=%s attack=%s drive=%.3f dBFS=%.1f amp=%.6f V fs=%.0f\n",
+                gname, aname, drive, dbfs, amp, fs);
     std::printf("# ref = BLEND 0 (full clean, = blend-0700). full/od/clean at BLEND max.\n");
     std::printf("# f,ref_re,ref_im,full_re,full_im,od_re,od_im,cl_re,cl_im,resid_db\n");
 
