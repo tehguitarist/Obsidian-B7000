@@ -376,6 +376,9 @@ def screen_targets(cal):
 SHARED = ["R7", "R12", "R14", "C5", "C9", "C6", "C7"]
 TAP = ["Ra", "Rb", "Rc", "R11"]
 BOX = 1.0                                                 # decades, each side (see box_sweep)
+# ⚠ The record quotes f0 on the 5.86 Hz measurement grid, so an f0 rms below a quarter bin is
+# not a real difference between two candidates -- see the ranking note in best_point().
+F0_TIE_BINS = 0.25
 
 
 def build(x, shared, fit_tap):
@@ -847,37 +850,64 @@ class TapCost:
         return float(np.sqrt(np.mean(np.square(br))))
 
 
-def best_point(tgt, quick):
-    """The best available compromise, searched at the WIDEST box the sweep showed still helping,
-    with f0 weighted hard because f0 is the requirement that already matches TO THE BIN and the
-    one session 61 proved the drawn topology cannot reach at all (0 of 782 draws).
+def best_point(tgt, quick, boxes=(1.0, 3.0)):
+    """The best available compromise, with f0 weighted hard because f0 is the requirement that
+    already matches TO THE BIN and the one session 61 proved the drawn topology cannot reach at
+    all (0 of 782 draws).
 
     Two stages, because the census proves the groups do not interact (session 62 item 4's rule):
       1 NOTCH   shared ladder + per-throw pole B, tap PINNED, scored on the 9 notch numbers only.
       2 BROADBAND  tap alone re-fitted on h, with the notch section frozen -- the tap moves width
                 by <=0.5 Hz and f0 by 0.00 Hz, so it cannot undo stage 1.
+
+    ⚠⚠ THE SEARCH BOX IS NOW SWEPT, NOT FIXED AT 3.0 -- session 66. The old version searched box
+    3.0 only, justified in its own header as "the sweep showed 1.0 was still constraining". That
+    justification came from session 64's box sweep, which was run against a requirement transferred
+    through a calibration built on a WRONG RENDER CONDITION (session 65: a missing `--grunt` flag).
+    At the corrected calibration box 1.0 is NOT constraining -- it reaches the nine numbers with no
+    element on a bound -- while box 3.0 wanders three decades out to values that are worse on the
+    f0/width ranking AND unrealisable in FitParams. ⭐ GENERAL: a SEARCH SETTING justified by a
+    measurement is as perishable as any other number derived from it; when the measurement is
+    corrected the setting has to be re-derived, not carried. Sweeping removes the choice entirely
+    and puts the comparison in the tool's own output, where the next session can see it.
     """
     print("\n" + "=" * 104)
-    print("THE BEST AVAILABLE POINT -- box 3.0 (the sweep showed 1.0 was still constraining),")
-    print("f0 weighted hard, then the tap re-fitted on the broadband ALONE.")
+    print("THE BEST AVAILABLE POINT -- box SWEPT (see the docstring: fixing it at 3.0 was")
+    print("justified by session 64's now-void calibration), f0 weighted hard, then the tap")
+    print("re-fitted on the broadband ALONE.")
     print("=" * 104)
-    best = None
-    for w_f0 in (10.0, 30.0, 100.0):
-        c, x, parts = run(SHARED, tgt, fit_tap=False, quick=quick, wt_bb=0.0, w_f0=w_f0, box=3.0)
-        if parts is None:
-            continue
-        f0s = [parts[2]["notch"][p][0] for p in POSITIONS]
-        ws = [parts[2]["notch"][p][2] for p in POSITIONS]
-        print("  w_f0 %6.1f | f0 rms %5.2f bins (spread %5.1f Hz) | width rms %5.2f "
-              "| widths %6.1f %6.1f %6.1f"
-              % (w_f0, parts[3], max(f0s) - min(f0s), parts[4], *ws))
-        # rank on f0 first (it must stay on the bin), then width
-        key = (round(parts[3], 2), round(parts[4], 2))
-        if best is None or key < best[0]:
-            best = (key, w_f0, x, parts)
+    best, rows = None, []
+    for box in boxes:
+        for w_f0 in (1.0, 3.0, 10.0, 30.0, 100.0):
+            c, x, parts = run(SHARED, tgt, fit_tap=False, quick=quick, wt_bb=0.0, w_f0=w_f0,
+                              box=box)
+            if parts is None:
+                continue
+            f0s = [parts[2]["notch"][p][0] for p in POSITIONS]
+            ws = [parts[2]["notch"][p][2] for p in POSITIONS]
+            nb = sum(1 for xi in x if abs(abs(xi) - box) < 0.03 * box)
+            worst = max(abs(xi) for xi in x[:len(SHARED)])
+            print("  box %4.1f w_f0 %6.1f | f0 rms %5.2f bins (spread %5.1f Hz) | width rms %5.2f"
+                  " | widths %6.1f %6.1f %6.1f | worst shared x%.3g | %d on bound"
+                  % (box, w_f0, parts[3], max(f0s) - min(f0s), parts[4], *ws, 10.0 ** worst, nb))
+            # ⚠⚠ RANK f0 TO THE RESOLUTION THE RECORD HAS, NOT TO FULL PRECISION -- session 66.
+            # A first version ranked on round(f0_rms, 2) and 0.06 bins beat 0.07 bins, which then
+            # decided the winner AGAINST a point with 8.2 % width error in favour of one with
+            # 12.7 %. 0.01 bins is 0.06 Hz; the pedal's f0 is quoted on a 5.86 Hz grid, so that
+            # difference does not exist in the measurement. Anything at or under a QUARTER bin is
+            # therefore treated as equally on-the-bin and width breaks the tie. ⭐ GENERAL: a
+            # ranking key must be quantised to the resolution of the quantity it ranks, or search
+            # noise in the tightest term silently outvotes a real difference in the next one.
+            key = (max(round(parts[3], 2), F0_TIE_BINS), round(parts[4], 2), box)
+            rows.append(dict(box=box, w_f0=w_f0, f0_rms=parts[3], w_rms=parts[4],
+                             dep_rms=parts[5], f0=f0s, width=ws, spread=max(f0s) - min(f0s),
+                             worst_shared=10.0 ** worst, n_on_bound=nb,
+                             x=[float(v) for v in x]))
+            if best is None or key < best[0]:
+                best = (key, w_f0, x, parts, box)
     if best is None:
         return None
-    _, w_f0, x, parts = best
+    _, w_f0, x, parts, box = best
     base, rd, c5t = build(x, SHARED, False)
 
     # ---- stage 2: the tap, on the broadband alone --------------------------------------------
@@ -890,7 +920,8 @@ def best_point(tgt, quick):
     for e, xi in zip(TAP, rt.x):
         base[e] = PROP[e] * 10.0 ** xi
     st = full_stats(base, rd, c5t)
-    print("\n  chosen (w_f0 = %.0f), tap re-fitted on h alone (rms %.3f x floor):" % (w_f0, rt.fun))
+    print("\n  chosen (box = %.1f, w_f0 = %.0f), tap re-fitted on h alone (rms %.3f x floor):"
+          % (box, w_f0, rt.fun))
     print("    %-6s | %-22s | %-22s | %s"
           % ("throw", "f0 Hz got/want", "depth dB got/want", "width Hz got/want"))
     for pos in POSITIONS:
@@ -902,7 +933,7 @@ def best_point(tgt, quick):
         print("    h %-5s median %+6.2f (pedal %+6.2f)  slope %+6.2f dB/dec"
               % (q, st["shape"][q][0], float(np.median(REC["h"][q])), st["shape"][q][1]))
     names = list(SHARED) + ["Rd " + p for p in POSITIONS] + ["C5t " + p for p in POSITIONS]
-    ob = [e for e, xi in zip(names, x) if abs(abs(xi) - 3.0) < 0.09] \
+    ob = [e for e, xi in zip(names, x) if abs(abs(xi) - box) < 0.03 * box] \
         + [e for e, xi in zip(TAP, rt.x) if abs(abs(xi) - 1.0) < 0.03]
     print("    shared: %s" % "  ".join("%s %.4g (x%.3g)" % (e, base[e], base[e] / PROP[e])
                                        for e in SHARED))
@@ -934,7 +965,7 @@ def best_point(tgt, quick):
     print("\n  as --fit (⚠ SCREEN units -- the RENDER is the arbiter, gate C says this screen is")
     print("  only a lever finder; land it with attack_render_gate.py --fits-json):")
     print("    " + " ".join("--fit " + f for f in fits))
-    return dict(w_f0=w_f0, on_bound=ob, fits=fits, tap_bb_rms=float(rt.fun),
+    return dict(w_f0=w_f0, box=box, on_bound=ob, fits=fits, tap_bb_rms=float(rt.fun), rows=rows,
                 got={p: list(st["notch"][p]) for p in POSITIONS},
                 shape={q: list(st["shape"][q]) for q in THROWS})
 

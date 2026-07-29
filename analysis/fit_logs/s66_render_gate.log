@@ -1,0 +1,135 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+========================================================================================================
+DOES THE BUILT TWO-POLE ATTACK TOPOLOGY MEET THE RECORD? -- scored as a CURVE
+========================================================================================================
+  chain: OfflineRender (the real PedalChain), drive MIN / LEVEL MAX / BLEND MAX
+  curve: 40-2000 Hz at 5.86 Hz bins; broadband read over 80-1600 Hz EXCLUDING the
+         287-351 Hz notch window BY NAME (it is a null, not a gain)
+  floor: h is a difference of two measurements => 0.204 dB
+
+  loading the PEDAL reference through attack_notch_probe's own capture gate...
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+  ok.
+
+  candidate from analysis/reports/s66_best.json:
+    attackTapRa=47000 attackTapRb=66413.8 attackTapRc=9892.67 attackTapR11=30874.6 trebleR7=1.51801e+06 trebleLadderR12=2651.84 trebleLadderR14=51848.3 trebleC9=5.16705e-09 trebleC6=1.06359e-07 trebleC7=1.54942e-10 trebleC5=1.14299e-08 attackC5TrimBoost=5.79203e-10 attackC5TrimCut=1.35537e-09 trebleLadderDampR=3894.66 attackDampBoost=298.127 attackDampCut=3859.4 trebleC8=0
+
+  rendering 3 variant(s) x 3 throws...
+  ok.
+
+========================================================================================================
+GATES
+========================================================================================================
+  0 CONDITION  render flags vs drive-0700_level-1700_base-od.wav: 0 flag(s) differ   OK
+      (--master 0.500000 --blend 1.000000 --level 1.000000 --drive 0.000000 --lo 0.500000 --lo-mid 0.500000 --hi-mid 0.500000 --hi 0.500000 --grunt 1 --lo-mid-freq 1 --hi-mid-freq 1 --dist-engage 1 --bypass 0)
+  1 LIVENESS   skipped (single variant; run --both)
+  3 BLEED      at LEVEL=1/BLEND=1 the clean coefficient is 0.000e+00 and the OD coefficient
+               is 1.000000  =>  OK -- h IS the ATTACK ratio, no bleed to dilute it
+               (a common bleed could only shrink |h|, never manufacture +8.6 dB --
+                session 60 item 2 -- so every h below is also a LOWER bound on |h|.)
+  4 CONVERGED  the two quietest levels must agree AS WELL AS THE PEDAL'S DO:
+      PEDAL boost                rms 0.254 dB, worst bin 0.469 dB   <- the yardstick
+      PEDAL cut                  rms 0.028 dB, worst bin 0.053 dB   <- the yardstick
+      dflt                 boost rms 0.016 dB, worst bin 0.045 dB   OK
+      dflt                 cut   rms 0.004 dB, worst bin 0.010 dB   OK
+      prop                 boost rms 0.039 dB, worst bin 0.088 dB   OK
+      prop                 cut   rms 0.002 dB, worst bin 0.004 dB   OK
+      cand                 boost rms 0.007 dB, worst bin 0.017 dB   OK
+      cand                 cut   rms 0.000 dB, worst bin 0.001 dB   OK
+
+========================================================================================================
+THE BROADBAND CURVE -- h(f) model vs pedal, whole-band, level AND shape
+========================================================================================================
+
+  DRAWN (shipped defaults)
+  MODEL row then PEDAL row; slope is dB/decade over the flat region, so a matching
+  median with a mismatched slope is visible instead of averaging away.
+  throw    median   spread    slope resid rms  resid pk   peak at
+  boost     +0.84     2.30    +3.19      7.55     -8.71     222.7 Hz
+            +8.63     1.90    +1.23   <- PEDAL (249 bins, floor 0.204 dB)
+  cut       -0.34     0.79    -0.93      2.01     +2.94     281.2 Hz
+            -2.38     2.62    -1.38   <- PEDAL (249 bins, floor 0.204 dB)
+
+  TWO-POLE PROPOSAL
+  MODEL row then PEDAL row; slope is dB/decade over the flat region, so a matching
+  median with a mismatched slope is visible instead of averaging away.
+  throw    median   spread    slope resid rms  resid pk   peak at
+  boost     +8.49     2.95    +0.56      0.66     -2.56     351.6 Hz
+            +8.63     1.90    +1.23   <- PEDAL (249 bins, floor 0.204 dB)
+  cut       -2.30     5.14    -0.00      0.83     -2.50      82.0 Hz
+            -2.38     2.62    -1.38   <- PEDAL (249 bins, floor 0.204 dB)
+
+  CANDIDATE (s66_best.json)
+  MODEL row then PEDAL row; slope is dB/decade over the flat region, so a matching
+  median with a mismatched slope is visible instead of averaging away.
+  throw    median   spread    slope resid rms  resid pk   peak at
+  boost     +8.54     2.53    +0.06      0.67     +1.55     673.8 Hz
+            +8.63     1.90    +1.23   <- PEDAL (249 bins, floor 0.204 dB)
+  cut       -2.28     7.60    -0.31      0.86     -2.78     281.2 Hz
+            -2.38     2.62    -1.38   <- PEDAL (249 bins, floor 0.204 dB)
+
+========================================================================================================
+BROADBAND MEDIAN vs STIMULUS LEVEL -- is a shortfall the NETWORK or COMPRESSION?
+========================================================================================================
+  variant                throw   -36 dBFS  -30 dBFS  -18 dBFS   trend toward quiet
+  PEDAL                  boost      +8.91     +8.63     +4.49   +4.43 dB from -18 to -36
+  PEDAL                  cut        -2.38     -2.38     -2.02   -0.36 dB from -18 to -36
+  dflt                   boost      +0.84     +0.84     +0.64   +0.21 dB from -18 to -36
+  dflt                   cut        -0.34     -0.34     -0.28   -0.07 dB from -18 to -36
+  prop                   boost      +8.53     +8.49     +7.24   +1.28 dB from -18 to -36
+  prop                   cut        -2.30     -2.30     -2.21   -0.09 dB from -18 to -36
+  cand                   boost      +8.54     +8.54     +8.37   +0.17 dB from -18 to -36
+  cand                   cut        -2.28     -2.28     -2.27   -0.01 dB from -18 to -36
+
+========================================================================================================
+THE NOTCH TRIPLE -- (f0, depth) per throw. Depth is a LOWER BOUND, so the RANKING
+carries the claim, not the calibrated dB.
+========================================================================================================
+  variant                    f0 cut/boost/flat Hz     depth cut/boost/flat dB  f0 spread
+  PEDAL                       316.4  328.1  334.0     14.93  32.70  16.01     17.58 Hz
+  DRAWN (shipped defaults)    398.4  398.4  398.4      3.26   3.08   3.21      0.00 Hz
+  TWO-POLE PROPOSAL           316.4  328.1  334.0     14.42  33.26  15.79     17.58 Hz
+  CANDIDATE (s66_best.json)   316.4  328.1  334.0     15.36  29.81  16.44     17.58 Hz
+
+  ⚠ AND THE WIDTH, which (f0, depth) cannot express and the OVERLAY PLOT made obvious.
+     Bin span is the RECORD's definition; the interpolated column is what a fit should
+     use, because the pedal's boost null is only ~4 bins wide (see locate_notch).
+  variant                    half-depth BIN span (Hz) INTERPOLATED (Hz)       
+  PEDAL                        70.3   23.4   64.5      77.9   27.1   71.9
+  DRAWN (shipped defaults)    152.3  152.3  152.3     153.8  156.1  154.5
+  TWO-POLE PROPOSAL           111.3   41.0  134.8     118.0   46.6  136.6
+  CANDIDATE (s66_best.json)    64.5   29.3   70.3      67.9   35.0   74.0
+  ⭐ ORDER is the structural claim: the pedal moves the null DOWN in BOTH throws re flat
+     and makes boost ~2x DEEPER. Session 61 found 0 of 782 random draws of the DRAWN
+     topology reproduce that pattern, so matching the ORDER is the real result.
+
+========================================================================================================
+COARSE TABLE -- the same thing at named frequencies, so the curve read and the band read
+can be COMPARED rather than one silently replacing the other
+========================================================================================================
+       f Hz      pedal         dflt         prop         cand     <- h boost
+       41.0      +8.57        -0.01        +8.58        +8.32
+       64.5      +9.02        -0.02        +8.53        +8.25
+       82.0      +8.61        -0.02        +8.49        +8.21
+       99.6      +8.53        -0.02        +8.44        +8.17
+      128.9      +8.54        -0.03        +8.35        +8.11
+      158.2      +8.60        -0.03        +8.26        +8.04
+      199.2      +8.68        -0.02        +8.07        +7.90
+      252.0      +8.57        +0.00        +7.52        +7.46
+      287.1      +7.83        +0.02        +6.03        +6.44   (NOTCH WINDOW -- not a gain)
+      322.3      -1.50        +0.05        -5.61        -2.20   (NOTCH WINDOW -- not a gain)
+      351.6      +8.18        +0.07        +5.62        +8.94
+      380.9      +8.50        +0.10        +7.85        +9.18
+      421.9      +8.46        +0.14        +8.49        +9.02
+      451.2      +8.34        +0.17        +8.53        +8.89
+      509.8      +8.03        +0.24        +8.56        +8.76
+      638.7      +7.14        +0.43        +8.56        +8.64
+      808.6      +8.27        +0.72        +8.53        +8.58
+     1002.0      +8.97        +1.09        +8.51        +8.55
+     1300.8      +8.76        +1.69        +8.47        +8.52
+     1599.6      +8.60        +2.27        +8.42        +8.51
+
+  wrote build/attack_render_gate/h_curves.png
+  wrote analysis/reports/s66_render_gate.json

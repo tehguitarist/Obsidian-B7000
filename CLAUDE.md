@@ -104,6 +104,102 @@ high, execute routine work cheap) is what should persist.
 
 > Update this at the start/end of each session so progress doesn't rely on conversation history.
 > **⚠ RESUME POINT = `docs/phase9-validation.md` §0 (READ IT FIRST). Latest below.**
+> **CURRENT (session 66, 2026-07-29): ▶ PHASE 9 / A3 STEP 23 — ⭐⭐ SESSION 64's "THE WIDTH IS
+> REACHABLE ONLY AT ABSURD VALUES" DOES **NOT** SURVIVE THE CORRECTED CALIBRATION. THE WIDTH IS
+> REACHABLE AT **±1 DECADE WITH NOTHING ON A BOUND**, AND THE **RENDER CONFIRMS IT**: the null
+> widths go **1.51/1.72/1.90× the pedal's → 0.87/1.29/1.03×** while f0 stays IDENTICAL TO THE BIN at
+> all three throws (spread 17.58 Hz). ⛔ **The candidate is NOT shippable and is NOT proposed** — it
+> trades the width for broadband SHAPE and moves the level trend further from the pedal. Session
+> 65's next-step (a). Tooling + analysis only; **NOTHING in `src/` or `tests/` changed**; **ctest
+> 16/17** (the pre-existing session-44 `OSValidationTest`, identical `amp 0.35: 2x −25.6 / 4x −32.1
+> / 8x −23.6`). Baseline verified FIRST: GATE B recovers synthesised widths to ≤0.03 % and GATE C
+> reproduces session 65's calibration TO THE DIGIT before anything was touched. Full detail
+> `docs/phase9-validation.md` §4 "A3 step 23".**
+> **(1) ⛔ THE REFUTATION, AND WHAT WAS CARRYING THE OLD ANSWER WAS A **SEARCH SETTING**.** Session
+> 64 concluded the nine notch numbers were reachable **only** at `R7 ×572` (200 k → 114 MΩ), `C6
+> ×62`, `C5/C9/C7 ×0.02–0.03`, tap on its bound. At the corrected calibration the frontier reaches
+> them **inside the default ±1 decade box**: `w_f0 30` gives **f0 rms 0.07 bins, spread 18.0 Hz
+> (want 17.5), widths 74.0/32.4/81.0 (want 80.1/30.4/73.5), worst shared element ×7.6, NOTHING on a
+> bound.** Session 64's rows were f0 rms 0.67–8.0 bins / width rms 21–47 %, with the spread
+> collapsing to 1.5–5.0 Hz wherever the width was reached — session 61's "switch the throws off
+> rather than trade" signature. **That signature is GONE.**
+> ⚠⚠ **`best_point()` searched box 3.0 ONLY**, justified in its own header as *"the sweep showed 1.0
+> was still constraining"* — true of session 64's box sweep, which was run against the requirement
+> transferred through the **wrong-`--grunt` calibration**. Swept, the two halves separate totally:
+> **box 1.0 → f0 rms 0.06–0.52 bins, worst shared ×4.6–×8.6 | box 3.0 → f0 rms 0.31–1.30 bins,
+> worst shared ×120–×790.** Box 3.0 is WORSE on the ranking at every weight and gets there via three
+> decades of component change. ⭐ **GENERAL: A SEARCH SETTING JUSTIFIED BY A MEASUREMENT IS AS
+> PERISHABLE AS ANY NUMBER DERIVED FROM IT** — when the measurement is corrected the setting must be
+> re-derived, not carried. The box is now SWEPT and each row prints `worst shared multiplier` +
+> `n on bound`, so the trade is visible instead of inherited.
+> **(2) ⚠ A RANKING DEFECT IN MY OWN FIRST VERSION, caught before it picked the candidate.** The
+> first swept run chose `w_f0 = 100` because its f0 rms was **0.06 bins against 0.07** — and that
+> cost **12.7 % width error instead of 8.2 %** plus a 4.02 dB depth shortfall at cut. **0.01 bins is
+> 0.06 Hz and the pedal's f0 is quoted on a 5.86 Hz grid, so the difference does not exist in the
+> data**: search noise in the tightest term was outvoting a real difference in the next. Key now
+> quantised at `F0_TIE_BINS = 0.25` (a quarter bin), width breaking the tie. ⭐ **GENERAL: quantise
+> a ranking key to the RESOLUTION of the quantity it ranks.**
+> **(3) ⭐⭐ THE ARBITER AGREES — `attack_render_gate --both --fits-json`
+> (`analysis/reports/s66_render_gate.json`; GATE 0 CONDITION 0 flags differ, BLEED clean coeff
+> 0.000e+00, CONVERGED OK on all three variants):**
+> **f0 316.4/328.1/334.0 = the pedal TO THE BIN, spread 17.58 Hz** (drawn: 398.4 ×3, 0.00 Hz);
+> **WIDTH (interp) 67.9/35.0/74.0 vs the pedal's 77.9/27.1/71.9 ⇒ ×0.87/1.29/1.03**, where the
+> session-63 proposal reads 118.0/46.6/136.6 ⇒ ×1.51/1.72/1.90. Depth 15.36/29.81/16.44 vs
+> 14.93/32.70/16.01. ⭐ **And it is NOT bought back out of the depth statistic** — the obvious
+> artefact route, given session 63 item 6(c) had to replace a fixed −6 dB contour with half-depth
+> for exactly this reason: **cut and flat both got DEEPER (14.42 → 15.36, 15.79 → 16.44) AND
+> narrower**, boost shallower and narrower, so there is no consistent depth→width coupling.
+> **(4) ⛔ WHY IT IS NOT SHIPPED — a TRADE, not an improvement, and the gate prints both sides.**
+> **Boost slope +0.56 → +0.06** (pedal +1.23 — session 65's headline improvement given back) and
+> **cut spread 5.14 → 7.60** (pedal 2.62), with residual rms FLAT (0.66 → 0.67 / 0.83 → 0.86): the
+> coarse table shows it undershooting through 41–252 Hz (+8.32 → +7.46 where the pedal holds ~+8.6)
+> and overshooting above the notch (+8.94/+9.18/+9.02 at 351.6/380.9/421.9 vs +8.18/+8.50/+8.46).
+> **Level trend moves AWAY: +1.28 → +0.17 dB vs the pedal's +4.43.** `attackTapRa` **rests on its
+> bound** (×0.1). **Five schematic-verified ladder values move 2.4–7.6×** (`R7 ×7.59`, `R12 ×0.39`,
+> `R14 ×2.36`, `C9 ×0.235`, `C6 ×4.83`, plus `C7 ×0.228` on top of its 147×) — a capture-vs-document
+> claim of the `trebleC7`/`c21R` class, five times over. And **the 63-capture matrix has not judged
+> it**, having judged the plain proposal AGAINST shipping (s63 item 0, `OD ex gain-n12` 1.903 →
+> 2.218). ⇒ **the deliverable is a REACHABILITY result: the width residual is NOT a structural limit
+> of the two-pole topology, and what remains open has moved from WIDTH to BROADBAND SHAPE + LEVEL
+> TREND.**
+> **(5) WHAT ELSE MOVED.** The `--fit` family costs fall **3.22–3.65 → 2.03–2.18**, and the ordering
+> flips: session 64 recorded *"17 dof beats 12 dof by 0.4 %"*, now the over-parameterised 17-dof
+> family **LOSES** to `{R12,C9}` at 12 dof (2.1169 vs 2.0311) on its broadband (2.6037 vs 2.1221).
+> All families still miss flat's f0 badly (312–316 vs 333.75) — **arbitration, not reachability**;
+> the frontier reaches it once the non-interacting groups are scored apart (session 62 item 4).
+> ⭐ **The Cp / J201-drain-pole diagnostic is UNCHANGED IN CONCLUSION and changed in every number**:
+> freeing the one capacitance that cannot be scaled with the ladder moves the cost 0.6577 → 0.6577
+> (s64: 3.1114 → 3.1114) ⇒ still not the constraint. ⚠ The box sweep still prints "NOT saturated"
+> (span 0.79 across 6×, and NON-monotonically — box 3.0 scores worse than 2.0, i.e. DE failing in a
+> bigger space, not the objective); that verdict is now **moot rather than informative**, since the
+> requirement is met inside the smallest box tested. ⚠ **GATE C still reads CHECK** (±16 % of width
+> out-of-sample), so the screen stays a LEVER FINDER and the render stays the arbiter.
+> **(6) ⚠ ARTEFACT HYGIENE.** `analysis/reports/s66_shape_screen.json` was written by the **pre-edit**
+> `best_point()` (box fixed at 3.0), so its `best` block is stale; it has been replaced in place by
+> `{"SUPERSEDED_BY": "analysis/reports/s66_best.json", "why": …, "stale_object": …}` rather than left
+> as a plausible-looking object for a future session to read. Its `frontier`/`fits`/
+> `scale_diagnostic` blocks are unaffected and are what (1) and (5) quote.
+> **▶ NEXT, IN ORDER: (a)** ⭐⭐ **the OPEN item is now BROADBAND SHAPE, and cut is the worst of it** —
+> the candidate and the proposal both leave cut's slope near 0 against the pedal's −1.38 with the
+> spread 2–3× too large, and (4) shows width and shape currently TRADE. The cheap test is still the
+> optional capture pair `level-1700_attack-{boost,cut}_base-od.wav` (drive **noon**, LEVEL max),
+> which also settles whether this and s60 item 11 / s61 item 5 are ONE item. **(b)** the LEVEL-TREND
+> gap is now the second-clearest ATTACK number (pedal +4.43 dB, prop +1.28, cand +0.17) and it is
+> **not** ATTACK's own network — it is how hard the boost throw drives the clipper, i.e. A3/A5
+> territory; do not fit ATTACK against it. **(c)** ⭐ `shape_gate`'s **63 % LOCAL** finding still
+> deserves its own pass (`--top N` + the LOCAL-curve plot) — unaffected by any of this and still the
+> single largest unexplored lead in A3. **(d)** unchanged: `b0` between the LEVEL and DRIVE axes
+> before quoting any absolute A3 magnitude; then the 4 `gain-n12` re-captures, A4 re-grade + GATE-9,
+> the `OSValidationTest` decision, then B / C / D. **(e)** ⭐ still worth doing once: fold
+> `sweep_clean_-36` into the matrix properly (a deliberate re-baseline).
+> ⚠ **UNCOMMITTED at session close:** `CLAUDE.md`, `docs/phase9-validation.md`,
+> `analysis/attack_shape_screen.py` (swept box + `F0_TIE_BINS` + per-row JSON). **Nothing in `src/`
+> or `tests/`.**
+> ⚠ Gitignored but regenerated: `analysis/reports/s66_{shape_screen,best,render_gate}.json`,
+> `analysis/fit_logs/s66_*.log`, new `build/attack_render_gate/cand_*.wav` (+ their `.args.json`
+> condition stamps), and `build/attack_render_gate/h_curves.png` now carries the CANDIDATE curve.
+> The session-60 captures are gitignored and exist only on this machine — **back them up.**
+> ── prior session ──
 > **CURRENT (session 65, 2026-07-29): ▶ PHASE 9 / A3 STEP 22 — ⛔⛔ SESSION 64's HEADLINE DOES NOT
 > SURVIVE: THE "6.2 dB OD-PATH SHAPE ERROR ATTRIBUTED TO THE BRIDGED-T" WAS A **MISSING `--grunt`
 > FLAG**, AND GAP #1b IS RE-CLOSED. ⭐⭐ AND WITH IT FIXED THE TWO-POLE ATTACK PROPOSAL IS
