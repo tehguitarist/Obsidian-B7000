@@ -98,6 +98,61 @@ def pmap(fn, items, jobs=None, ordered=True):
         return list(pool.map(fn, items))
 
 
+def pmap_cpu(fn, items, jobs=None, ordered=True, initializer=None, initargs=()):
+    """`pmap` for CPU-BOUND work: same contract, but PROCESSES instead of threads.
+
+    ** Pick this one when the per-item work is numpy, not a subprocess. ** The distinction is not
+    stylistic, it is the difference between a speedup and a slowdown, and it was measured on this
+    repo's own `a3_phase_solve.fit_band` workload (160 beta candidates x 23 bands, each a
+    181 x 1201 grid):
+
+            serial   8.05 s
+            threads 13.12 s   (0.61x -- SLOWER)
+            procs    1.80 s   (4.47x)          ... identical results either way
+
+    `fit_band` runs 181 small numpy ops per call, and numpy only releases the GIL around big
+    contiguous ufunc loops -- on arrays this small the interpreter holds it nearly the whole time,
+    so threads just add contention. A render sweep is the opposite: the thread is parked in
+    `subprocess.run` waiting on a child PROCESS, holding no GIL at all, and threads win because
+    they skip pickling entirely.
+
+    ** COST: `fn` and every item must be PICKLABLE, and `fn` must be importable by name. ** So it
+    has to be a module-level function (not a closure or a lambda), and its arguments plain data.
+    Under `spawn` (the macOS default) each worker re-imports the parent module, so a script using
+    this needs its top-level work behind `if __name__ == "__main__":` or it runs once per worker.
+    That is exactly why several tools here keep their cost objects at module level -- see the note
+    in `attack_notch_screen.py`.
+
+    ** CHUNKSIZE IS NOT OPTIONAL HERE. ** `ProcessPoolExecutor.map` defaults to chunksize=1, i.e.
+    one pickle round-trip per item -- fine for 7 renders, pathological for the hundreds of small
+    items this path is for. Measured on `a3_phase_solve --selftest` (160 candidates, a SMALL
+    synthetic workload where each item is milliseconds): chunksize=1 turned a 6 s serial run into
+    34 s. Batching the items so each worker gets a handful amortises both the IPC and the one-off
+    spawn cost, and changes nothing about the results or their order.
+
+    ** KEEP THE PER-ITEM PAYLOAD SMALL -- use `initializer` for anything shared. ** Every item is
+    pickled and shipped separately, so folding a constant payload into each one multiplies it by
+    the item count. Measured on `a3_phase_solve.fit_beta` (160 candidates sharing one band table):
+    payload-in-every-item gave 1.46x, the same run with the table sent once per worker via
+    `initializer` gave 6.5x. `chunksize` cannot rescue that -- it batches the round-trips, not
+    the bytes.
+    """
+    items = list(items)
+    n = resolve_jobs(jobs)
+    if n <= 1 or len(items) <= 1:
+        if initializer is not None:
+            initializer(*initargs)
+        return [fn(x) for x in items]
+    workers = min(n, len(items))
+    # A few chunks per worker: enough to keep them evenly fed when item costs vary, few enough
+    # that per-task IPC is negligible. chunksize=1 is the default and is pathological for the
+    # hundreds-of-small-items case this path exists for.
+    chunk = max(1, len(items) // (workers * 8))
+    with cf.ProcessPoolExecutor(max_workers=workers, initializer=initializer,
+                                initargs=initargs) as pool:
+        return list(pool.map(fn, items, chunksize=chunk))
+
+
 def add_jobs_arg(ap, help_extra=""):
     """Register the house-standard --jobs/-j flag on an argparse parser."""
     ap.add_argument("--jobs", "-j", type=int, default=None,

@@ -59,6 +59,9 @@ import sys
 
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from parallel import pmap_cpu  # noqa: E402
+
 REPORT = "analysis/reports/comprehensive_data.json"
 
 # (drive knob value, capture file). ref-od IS drive noon (captures.py::_REF_OD).
@@ -218,16 +221,50 @@ def solve(pedal, model, beta_db):
     return res
 
 
-def fit_beta(pedal, model):
-    """One global bleed level. Scan; the per-band fit is re-run at each candidate."""
+_BETA_BANDS = None
+
+
+def _beta_init(bands):
+    """Seed the shared band table ONCE per worker process.
+
+    The table is identical for all 160 candidates, so passing it inside each item would pickle it
+    160 times and throttle the pool -- measured, that alone is the difference between 1.46x and
+    6.5x. Sent via the pool initializer instead, so each worker pays for it once.
+    """
+    global _BETA_BANDS
+    _BETA_BANDS = bands
+
+
+def _beta_cost(beta_db):
+    """Total per-band residual at ONE candidate bleed level. The unit of parallelism.
+
+    Module-level and taking a single float, because `pmap_cpu` runs it in a PROCESS pool: both
+    the function and its argument have to pickle, and the argument is shipped per item.
+    """
+    tot = 0.0
+    for t_db, mu in _BETA_BANDS:
+        (_, j, _), _ = fit_band(t_db, mu, beta_db, n_theta=181, n_s=1201)
+        tot += j
+    return beta_db, tot
+
+
+def fit_beta(pedal, model, jobs=None):
+    """One global bleed level. Scan; the per-band fit is re-run at each candidate.
+
+    ** 160 candidates x 23 bands x a 181 x 1201 grid each -- this is the tool's whole runtime, and
+    the candidates are completely independent. ** Parallelised with `pmap_cpu` (PROCESSES): the
+    work is small-array numpy, so threads are measurably SLOWER here (0.61x) while processes give
+    4.47x with identical results -- see the table in parallel.pmap_cpu.
+
+    The scan is a pure argmin over independent candidates, so the parallel form is bit-identical:
+    `pmap_cpu` returns them in scan order and the tie-break below (strict `<`, i.e. FIRST minimum
+    wins) is applied in that same order, exactly as the serial loop did.
+    """
+    bands = [(pedal[b], [model[d][b][0] for d, _ in DRIVES]) for b in PROBE_BANDS]
+    scored = pmap_cpu(_beta_cost, [k / 10.0 for k in range(-260, -100)], jobs=jobs,
+                      initializer=_beta_init, initargs=(bands,))
     best = None
-    for k in range(-260, -100):
-        beta_db = k / 10.0
-        tot = 0.0
-        for b in PROBE_BANDS:
-            mu = [model[d][b][0] for d, _ in DRIVES]
-            (_, j, _), _ = fit_band(pedal[b], mu, beta_db, n_theta=181, n_s=1201)
-            tot += j
+    for beta_db, tot in scored:
         if best is None or tot < best[1]:
             best = (beta_db, tot)
     return best[0]
