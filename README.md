@@ -1,5 +1,9 @@
 # Obsidian B7000
 
+![CI](https://github.com/tehguitarist/Obsidian-B7000/actions/workflows/ci.yml/badge.svg?branch=main)
+[![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://opensource.org/license/agpl-v3)
+[![Downloads](https://img.shields.io/github/downloads/tehguitarist/Obsidian-B7000/total)](https://somsubhra.github.io/github-release-stats/?username=tehguitarist&repository=Obsidian-B7000&page=1&per_page=30)
+
 A circuit-accurate bass overdrive/DI preamp plugin (AU/VST3, JUCE 8) modelled directly from the
 schematic of a **Darkglass B7K Ultra** — solved as a Wave Digital Filter from real component
 values rather than approximated by ear. No neural captures, so turning the knob isn't moving between captures, it's reacting like the real pedal.
