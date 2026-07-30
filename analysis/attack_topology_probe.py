@@ -139,6 +139,15 @@ def make_cost(bands, tb, tc):
 
 def opt(fn, width, seed, quick):
     box = [(-width, width)] * len(KEYS)
+    # ** DELIBERATELY SERIAL -- do not "fix" this by adding workers=-1. ** Two reasons, both
+    # specific to this call: (a) scipy only parallelises DE by forcing updating="deferred", which
+    # changes the search TRAJECTORY (the population stops seeing the current best within a
+    # generation), so the recovered numbers move -- and session 57's recorded verdict here is a
+    # SATURATION result quoted to 3 decimals (3.029/3.028/3.028/3.028 dB across 7.5 orders of
+    # magnitude of box widening), which only means anything if it reproduces; (b) `fn` is a
+    # closure over the band data, so a process pool cannot pickle it anyway, and the objective is
+    # pure numpy on a small nodal solve -- a thread pool would just contend on the GIL. The
+    # expensive tools in this repo are render-bound, not DE-bound. See .claude/rules/build.md.
     r = differential_evolution(fn, box, seed=seed, maxiter=120 if quick else 400,
                                popsize=12 if quick else 24, tol=1e-8, polish=True,
                                init='sobol')

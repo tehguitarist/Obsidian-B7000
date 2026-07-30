@@ -55,6 +55,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import analyze as A
 import phase_harmonics as PH   # reuse its LS complex-harmonic extractor (§3t.6 step 3)
 from captures import parse_capture, render_args, load_capture, RENDER_BIN
+from parallel import pmap, race_check
 from scipy.io import wavfile
 from scipy.optimize import minimize
 
@@ -303,36 +304,79 @@ def _split_flags(params):
     return extra, own
 
 
-def render_phase(params):
-    """Render the short 1 kHz tone at DRIVE-MIN through the plug; return model ψ3 (deg)."""
-    extra, own = _split_flags(params)
-    parsed = parse_capture(DRIVE_MIN_CAP)
-    o = f"/tmp/fit_phase1k_{os.getpid()}.wav"
-    subprocess.run([RENDER_BIN, PHASE_IN, o, "--os", "8"] + own + render_args(parsed, extra),
+def _render_one(job):
+    """ONE render + its reduction. The unit of parallelism for a whole objective evaluation.
+
+    Handles both render kinds so the profile settings and the phase tone go into a SINGLE
+    concurrent batch (see `render_eval`) rather than two back-to-back ones. Everything it touches
+    is per-item -- its own argv, its own output path, its own numpy -- and it RETURNS its value
+    instead of writing into a shared dict, so there is no cross-item state to race on.
+    """
+    kind, cap, lbl, own, extra = job
+    parsed = parse_capture(cap)
+    # ⚠ PID-qualified: these render outputs are per-EVALUATION scratch, and two fit runs
+    # (e.g. an A/B of a fenced vs unfenced bound) would otherwise clobber each other's
+    # renders through fixed filenames and silently score each other's parameter points.
+    # ⚠ Within one evaluation the PID is IDENTICAL across the concurrent renders (they are
+    # threads), so it is the LABEL that keeps them apart -- which is why `render_eval` asserts
+    # the paths are distinct via race_check() instead of trusting DRIVE_CAPS to be duplicate-free.
+    o = f"/tmp/fit_{lbl.replace(':','')}_{os.getpid()}.wav"
+    src = PHASE_IN if kind == "phase" else SHORT_IN
+    subprocess.run([RENDER_BIN, src, o, "--os", "8"] + own + render_args(parsed, extra),
                    check=True, capture_output=True)
     r = A.load(o)
+    # steady window: last ~0.6 s (after smoother settle), trimmed
     seg = r[int(0.5 * FS):int(1.15 * FS)]
-    H, _, _ = PH.fit_harmonics(seg, PHASE_TONE)
-    return PH.rel_phase(H)[3]
+    if kind == "phase":
+        H, _, _ = PH.fit_harmonics(seg, PHASE_TONE)
+        return kind, lbl, PH.rel_phase(H)[3]
+    return kind, lbl, _profile(seg)
 
 
-def render_profiles(params):
-    """Render the short tone through the plug at each drive setting; return {label: profile}."""
+def render_eval(params, want_phase, jobs=None):
+    """Every render ONE objective evaluation needs, as one concurrent batch -> (profiles, ψ3).
+
+    ** This is the hot loop of the whole calibration effort. ** `cost()` calls it once per
+    objective evaluation and a fit runs up to 400 iterations x 3 starts, so the six renders it
+    needs (five DRIVE_CAPS settings + the drive-min phase tone) dominate the run: serially that
+    is ~6 render-times per evaluation, and batched it is ~1. Doing profiles and phase TOGETHER
+    rather than one batch after the other is worth the last 2x -- the phase render is a single
+    item, so on its own it leaves every worker but one idle.
+
+    ** Bit-identical, not merely equivalent. ** The renders were already independent (separate
+    `OfflineRender` processes, separate output files); serial order was only ever determining the
+    order of a result list, and `pmap` preserves that. It also re-raises the first exception, so
+    `cost()`'s `except subprocess.CalledProcessError` -> score 1e6 path for an infeasible point
+    still behaves exactly as before instead of crashing the fit.
+
+    `jobs=1` restores a plain serial loop for debugging. Callers already inside a pool
+    (`jfet_even_screen`, `joint_even_fit`) are detected and run serially -- see parallel.py.
+    """
     extra, own = _split_flags(params)
-    out = {}
-    for cap, lbl in DRIVE_CAPS:
-        parsed = parse_capture(cap)
-        # ⚠ PID-qualified: these render outputs are per-EVALUATION scratch, and two fit runs
-        # (e.g. an A/B of a fenced vs unfenced bound) would otherwise clobber each other's
-        # renders through fixed filenames and silently score each other's parameter points.
-        o = f"/tmp/fit_{lbl.replace(':','')}_{os.getpid()}.wav"
-        subprocess.run([RENDER_BIN, SHORT_IN, o, "--os", "8"] + own + render_args(parsed, extra),
-                       check=True, capture_output=True)
-        r = A.load(o)
-        # steady window: last ~0.6 s (after smoother settle), trimmed
-        seg = r[int(0.5 * FS):int(1.15 * FS)]
-        out[lbl] = _profile(seg)
-    return out
+    jobs_list = [("profile", cap, lbl, own, extra) for cap, lbl in DRIVE_CAPS]
+    if want_phase:
+        jobs_list.append(("phase", DRIVE_MIN_CAP, "phase1k", own, extra))
+    race_check([f"/tmp/fit_{lbl.replace(':','')}_{os.getpid()}.wav"
+                for _, _, lbl, _, _ in jobs_list])
+    res = pmap(_render_one, jobs_list, jobs=jobs)
+    prof = {lbl: v for kind, lbl, v in res if kind == "profile"}
+    psi3 = next((v for kind, _, v in res if kind == "phase"), None)
+    return prof, psi3
+
+
+def render_phase(params, jobs=None):
+    """Render the short 1 kHz tone at DRIVE-MIN through the plug; return model ψ3 (deg)."""
+    return render_eval(params, want_phase=True, jobs=jobs)[1]
+
+
+def render_profiles(params, jobs=None):
+    """Render the short tone through the plug at each drive setting; return {label: profile}.
+
+    Kept as a public entry point because five other tools import it (`ceilk_pivot_check`,
+    `clipk_pivot_check`, `expandbeta_gate`, `clipc11_grid_probe`, `scratch_ceilk_clipk_probe`) --
+    they all inherit the concurrency for free with no change at their end.
+    """
+    return render_eval(params, want_phase=False, jobs=jobs)[0]
 
 
 # ---- Monotonicity feasibility gate -----------------------------------------------
@@ -436,8 +480,10 @@ def cost(params, targets, verbose=False):
         # consistent so a verbose call on an infeasible point can't TypeError.
         return (1e6, None) if verbose else 1e6
     try:
-        prof = render_profiles(params)
-        psi3 = render_phase(params) if PHASE_TARGET is not None else None
+        # ONE concurrent batch for all six renders (5 drive profiles + the phase tone) -- see
+        # render_eval(). Was two serial passes; the results and the failure behaviour are
+        # unchanged, only the wall clock.
+        prof, psi3 = render_eval(params, want_phase=PHASE_TARGET is not None)
     except subprocess.CalledProcessError:
         return (1e6, None) if verbose else 1e6
     total = 0.0

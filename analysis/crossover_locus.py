@@ -30,6 +30,7 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from grunt_span_probe import peak, SPAN_LO, SPAN_HI, GATE_TARGETS  # noqa: E402
+from parallel import pmap  # noqa: E402
 
 BIN = "build/a3_blend_decompose"
 DRIVE_MIN = 0.0
@@ -114,16 +115,30 @@ def crossover_table():
         print(f"    {'':<6}  |OD| = |bleed| at {fx:.1f} Hz" if fx else f"    {'':<6}  no crossing in band")
 
 
-def scan(spec):
+def _scan_one(job):
+    """One swept value: locate the flat and boost peaks. The unit of parallelism.
+
+    Safe to run concurrently because `run()` reads the decomposition off the child's STDOUT
+    (capture_output=True) rather than through a scratch file -- there is no per-item path to
+    collide on at all, which is why this one needs no race_check().
+    """
+    key, v = job
+    ff, fy = locate("flat", [(key, v)])
+    bf, by = locate("boost", [(key, v)])
+    return v, ff, fy, bf, by
+
+
+def scan(spec, jobs=None):
     key, vals = spec.split("=", 1)
     vals = [v.strip() for v in vals.split(",")]
     print(f"\n### LOCUS — {key} swept; peak of the drive-min GRUNT span (flat and boost)")
     print(f"    pedal target: flat {GATE_TARGETS['flat'][0]:.1f} Hz {GATE_TARGETS['flat'][1]:+.2f} dB"
           f" | boost {GATE_TARGETS['boost'][0]:.1f} Hz {GATE_TARGETS['boost'][1]:+.2f} dB")
     print(f"    {key:>12} | {'flat Hz':>8} {'dB':>7} {'d(oct)':>7} | {'boost Hz':>9} {'dB':>7} {'d(oct)':>7}")
-    for v in vals:
-        ff, fy = locate("flat", [(key, v)])
-        bf, by = locate("boost", [(key, v)])
+    # Swept values are independent (each is its own set of decomposition runs). pmap keeps them
+    # in sweep order, so the printed table is byte-identical to the serial one -- the rows are
+    # collected first and printed after, rather than streamed as they finish.
+    for v, ff, fy, bf, by in pmap(_scan_one, [(key, v) for v in vals], jobs=jobs):
         print(f"    {v:>12} | {ff:8.1f} {fy:+7.2f} {math.log2(ff / GATE_TARGETS['flat'][0]):+7.2f}"
               f" | {bf:9.1f} {by:+7.2f} {math.log2(bf / GATE_TARGETS['boost'][0]):+7.2f}")
 

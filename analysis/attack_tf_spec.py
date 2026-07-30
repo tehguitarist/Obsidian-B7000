@@ -131,6 +131,11 @@ def fit(fn, box, f, tgt, quick, seed=1):
     def cost(p):
         return math.sqrt(float(np.mean(resid(p) ** 2)))
 
+    # ** DELIBERATELY SERIAL -- see the same note in attack_topology_probe.opt(). ** workers=-1
+    # forces updating="deferred" and moves the search trajectory, and this tool's recorded result
+    # is a SATURATION claim (boost saturates at 0.31-0.35 dB across rising orders, session 58)
+    # that is only readable if the orders are comparable run-to-run. `cost` is also a closure, so
+    # it is unpicklable, and the objective is cheap numpy -- there is no render in this loop.
     r = differential_evolution(cost, box, seed=seed, tol=1e-10, init='sobol',
                                maxiter=150 if quick else 500,
                                popsize=15 if quick else 30, polish=True)

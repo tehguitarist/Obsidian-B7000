@@ -62,6 +62,7 @@ import numpy as np
 import analyze as A
 import fit_nonlinear as F
 from captures import parse_capture, render_args, RENDER_BIN
+from parallel import pmap, race_check
 
 FS = 48000
 LOG = "analysis/fit_logs/step6_clipper_onset_gate.log"
@@ -77,21 +78,38 @@ K_SWEEP = [0.87, 1.2, 1.7, 2.4, 3.4, 4.8, 6.8, 9.6]
 LEG_MIN_DB = 6.0                 # (A) pre-registered bar
 
 
-def render_ramp(point, K, rails=False):
-    out = {}
-    for cap, lbl in F.DRIVE_CAPS:
-        extra = []
-        for k, v in F.HELD.items():
-            extra += ["--fit", f"{k}={v:.9g}"]
-        for k, v in zip(F.FIT_KEYS, point):
-            extra += ["--fit", f"{k}={v}"]
-        extra += ["--fit", f"railEnabled={1 if rails else 0}"]
-        parsed = parse_capture(cap)
-        o = f"/tmp/cog_{lbl.replace(':', '')}.wav"
-        subprocess.run([RENDER_BIN, F.SHORT_IN, o, "--os", "8", "--input-ref", f"{K:g}"]
-                       + render_args(parsed, extra), check=True, capture_output=True)
-        r = A.load(o)
-        out[lbl] = F._profile(r[int(0.5 * FS):int(1.15 * FS)])
+def _ramp_one(job):
+    """ONE drive setting of ONE K value: render + reduce. The unit of parallelism."""
+    cap, lbl, point, K, rails = job
+    extra = []
+    for k, v in F.HELD.items():
+        extra += ["--fit", f"{k}={v:.9g}"]
+    for k, v in zip(F.FIT_KEYS, point):
+        extra += ["--fit", f"{k}={v}"]
+    extra += ["--fit", f"railEnabled={1 if rails else 0}"]
+    parsed = parse_capture(cap)
+    o = f"/tmp/cog_{lbl.replace(':', '')}.wav"
+    subprocess.run([RENDER_BIN, F.SHORT_IN, o, "--os", "8", "--input-ref", f"{K:g}"]
+                   + render_args(parsed, extra), check=True, capture_output=True)
+    r = A.load(o)
+    return lbl, F._profile(r[int(0.5 * FS):int(1.15 * FS)])
+
+
+def render_ramp(point, K, rails=False, jobs=None):
+    """The five-drive H3-H2 ramp at one kInputRef. The five renders run CONCURRENTLY.
+
+    The gate sweeps 8 K values x 5 drive settings = 40 renders; batching each K's five makes it
+    8 render-times instead of 40, bit-identical (independent processes, per-label output files,
+    result keyed by label).
+
+    ** The OUTER K loop stays serial ON PURPOSE. ** The scratch paths are qualified by LABEL only,
+    so two K values running at once would write the same `/tmp/cog_<lbl>.wav` and silently score
+    each other's renders -- the exact class of defect race_check() exists to catch. Five is
+    already at the default worker count, so parallelising K as well would buy little anyway.
+    """
+    jobs_list = [(cap, lbl, point, K, rails) for cap, lbl in F.DRIVE_CAPS]
+    race_check([f"/tmp/cog_{lbl.replace(':', '')}.wav" for _, lbl, _, _, _ in jobs_list])
+    out = dict(pmap(_ramp_one, jobs_list, jobs=jobs))
     return {l: out[l]["H3"] - out[l]["H2"] for l in LABELS}
 
 

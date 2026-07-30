@@ -75,6 +75,7 @@ import analyze as A                                    # noqa: E402
 import captures as C                                   # noqa: E402  (the capture -> render-args map)
 with redirect_stdout(io.StringIO()):
     import attack_notch_probe as P                     # noqa: E402  (locator, windows, floors)
+from parallel import pmap, race_check                  # noqa: E402
 
 RENDER = "build/OfflineRender_artefacts/Release/OfflineRender"
 OUTDIR = "build/attack_render_gate"
@@ -182,15 +183,25 @@ def transfer_of(path, orig, seg):
     return A.transfer(A.seg_of(x, seg), A.seg_of(orig, seg))
 
 
-def model_curves(tag, fits, orig, levels):
-    """{position: {level: (f, mag_dB)}} for the rendered model."""
-    out = {}
-    for pos in P.POSITIONS:
-        path = render(tag, pos, fits)
-        out[pos] = {}
-        for L, seg in levels:
-            out[pos][L] = transfer_of(path, orig, seg)
-    return out
+def _curves_one(job):
+    """One ATTACK position: render it and take its transfer at every level. Unit of parallelism."""
+    tag, pos, fits, orig, levels = job
+    path = render(tag, pos, fits)
+    return pos, {L: transfer_of(path, orig, seg) for L, seg in levels}
+
+
+def model_curves(tag, fits, orig, levels, jobs=None):
+    """{position: {level: (f, mag_dB)}} for the rendered model.
+
+    The three ATTACK positions render CONCURRENTLY -- they are independent conditions, each
+    writing its own `<tag>_<pos>.wav` (plus its own `.args.json` condition stamp), so the
+    parallel form is bit-identical. race_check() pins that the paths really are distinct, since
+    a `tag` collision here would put two positions in one file and the stamp check would then
+    happily validate whichever wrote last.
+    """
+    jobs_list = [(tag, pos, fits, orig, levels) for pos in P.POSITIONS]
+    race_check([os.path.join(OUTDIR, "%s_%s.wav" % (tag, pos)) for pos in P.POSITIONS])
+    return dict(pmap(_curves_one, jobs_list, jobs=jobs))
 
 
 # =============================================================================================
