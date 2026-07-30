@@ -103,6 +103,43 @@ just when a run already feels slow:
   cache mtimes / `pmset -g log` before concluding a parallel run regressed; sleep/throttling can
   masquerade as a parallelism problem.
 
+### Authoring or editing a test/harness: build in parallelism, don't retrofit it
+
+The bullets above are about how you *run* things; this is the checklist for the moment you're
+**writing a new `tests/*.cpp` exe, a new `analysis/*.py` harness, or editing an existing one's
+loop/sweep structure** — the point where it's cheap to get right and easy to forget, because the
+code compiles/runs fine serially and nothing forces the question.
+
+- **New ctest exe (`tests/*Test.cpp`)**: if it internally sweeps more than a handful of independent
+  cases (knob positions, drive settings, switch positions, seeds, candidate values) inside ONE
+  `add_test()` binary, don't default to a serial `for` loop over them. Prefer whichever fits the
+  case: (a) split the sweep into several `add_test()` registrations of the same binary with a
+  case-selecting CLI arg, so `ctest -j` parallelises them for free with zero code-level concurrency;
+  or (b) if the cases must share one process (e.g. expensive shared setup), farm them out with
+  `std::async`/a small thread pool inside the test — each case is almost always independent (a
+  fresh WDF/render instance per case), so there's rarely a correctness reason to serialise. Either
+  way, register the exe with `add_test()` so `ctest -j $(sysctl -n hw.ncpu)` covers it.
+- **New `analysis/*.py` harness**: write the *first draft* with a process pool
+  (`concurrent.futures.ProcessPoolExecutor` / `multiprocessing.Pool`) around the per-item work —
+  per-candidate, per-capture, per-band, per-knob-position — not a serial loop you plan to
+  parallelise "once it's slow." The bullets above cover the invocation side (`--jobs`/`-j`); this is
+  the authoring side, and it needs to happen before the first real run, not after timing one.
+- **Modifying an existing serial test or script**: if your edit adds a new independent axis to
+  sweep (a new candidate parameter, a new capture subset, a new band list, a new knob range) and the
+  loop is still serial, parallelise it as part of the SAME change — don't leave a "parallelise this
+  later" note beside code you're already touching; that note is exactly the kind that never gets
+  picked up (see the file-wide rule about a stale handover reading as current).
+- **Prove the parallel version is a no-op once, before trusting it as the default**: bit-identical
+  output vs. a serial run on a small case (as session 28 did for `comprehensive_report.py`), or an
+  explicit comment if exact bit-identity isn't the right bar (e.g. floating-point reduction order
+  legitimately differs). This project has hit real shared-mutable-accumulator and un-guarded-
+  cache-write bugs from naive parallelisation before — the check is one extra run; the bug it
+  catches is a silently wrong baseline.
+- **The exceptions are the same ones as above**: something that measures timing/CPU load itself, or
+  genuinely shares mutable state it hasn't been made safe for. State the exception in a comment
+  next to the serial loop, not just in a commit message, so the next person editing that file
+  doesn't copy "serial for-loop" as the house style.
+
 ## Testing pattern (validate every stage before moving on)
 
 - Linear stages: pure chowdsp_wdf console exes (no JUCE) — verify frequency response vs the
