@@ -226,7 +226,7 @@ def main():
     print()
     print(f"  {'capture':<20}{'LEVEL':>6}{'peak THD dB':>12}{'  n12':>8}"
           f"{'  DISCREP':>10}{'   rung':>9}{' n12':>6}{'  pad':>7}")
-    disc, pads = [], []
+    disc, pads, interiors = [], [], []
     for lv, nm, n12f in LEVEL_LADDER:
         a, b = thd_ladder(nm, orig), thd_ladder(n12f, orig)
         ia, ib = int(np.argmax(a)), int(np.argmax(b))
@@ -234,25 +234,46 @@ def main():
         pad = LADDER_STEPS[ib] - LADDER_STEPS[ia]
         disc.append((lv, float(a[ia] - b[ib])))
         pads.append(pad)
+        interiors.append(interior)
         print(f"  {nm.replace('_base-od.wav','').replace('.wav',''):<20}{lv:6.2f}"
               f"{a[ia]:12.1f}{b[ib]:8.1f}{a[ia]-b[ib]:+10.1f}"
               f"{LADDER_STEPS[ia]:+9d}{LADDER_STEPS[ib]:+6d}{pad:+7d}"
               f"{'' if interior else '   (ENDPOINT -- discard)'}")
     print()
-    print("  Both turning points are interior, so both columns are real measurements.")
+    # ⚠⚠ EVERYTHING BELOW IS COMPUTED. It used to be four hardcoded sentences asserting "both
+    # turning points are interior" and quoting DISCREP "+15.6 / +13.6 / +2.9 / +1.0" -- session 48's
+    # numbers, narrated. When the four gain-n12 captures were RE-RECORDED (session 70) that prose
+    # printed directly above a table reading +0.4 / -0.0 / -0.5 / +0.8 with every row flagged
+    # ENDPOINT, i.e. it contradicted its own output twice over. Fifth occurrence of the session-34
+    # narrated-verdict trap in this project. A verdict in a string outlives the condition it
+    # described; derive it or delete it.
+    n_int = sum(interiors)
+    print(f"  {n_int} of {len(interiors)} capture pairs have BOTH turning points interior.")
+    if n_int < len(interiors):
+        print("  ⚠ A turning point AT A LADDER END is not a measurement of the turnover -- the")
+        print("    invariance argument needs the maximum to be bracketed. Rows flagged ENDPOINT")
+        print("    above are NOT evidence in either direction.")
+        print("  ⭐ AND NOTE WHY THIS CAN HAPPEN ON *GOOD* CAPTURES: if the pad really is ~12 dB,")
+        print("    the n12 curve's turnover sits ~12 dB higher in rung terms and runs off the top")
+        print("    of the ladder. So this test LOSES RESOLUTION exactly when the captures are")
+        print("    correct -- absence of a verdict here is not a verdict of absence.")
     print("  A pure gain change of ANY kind gives 0.0 in the DISCREP column.")
     print(f"    DISCREP : {', '.join(f'{v:+.1f}' for _, v in disc)} dB")
     print(f"    pad     : {', '.join(f'{p:+d}' for p in pads)} dB  "
           f"(the harness applies 12.07 to all four; ladder resolution is +-1.5 dB)")
     print()
+    worst = max(abs(v) for _, v in disc)
+    off_pad = [p for p in pads if abs(p - 12) > 3]
     print("  Two readings, and they are independent:")
-    print("   (a) the PAD is not 12.07 dB on any of them -- so even the level the")
-    print("       harness renders these at is wrong, by 3 to 9 dB; and")
-    print("   (b) the DISCREP is nonzero, which no pad value can repair.  It is")
-    print("       decisive on ref-od and level-0930 (+15.6 / +13.6 dB) and small on")
-    print("       the two hottest LEVEL settings (+2.9 / +1.0) -- so state it as")
-    print("       'two captures are badly wrong and two are mildly wrong', not as a")
-    print("       uniform group failure.")
+    print(f"   (a) the PAD reads {', '.join(f'{p:+d}' for p in pads)} dB against the harness's 12.07"
+          f" -- {len(off_pad)} of {len(pads)} are more than 3 dB off; and")
+    print(f"   (b) the worst |DISCREP| is {worst:.1f} dB, which no pad value can repair.")
+    if worst < 1.5:
+        print("       ⇒ At this size the turnover is consistent with a pure gain change, i.e. with")
+        print("         these being genuine -12 dB re-takes. ⚠ But see the ENDPOINT note above")
+        print("         before treating that as a pass -- the MATRIX is the decisive test now.")
+    else:
+        print("       ⇒ Decisive: a nonzero turnover difference is not reachable by any gain.")
     print()
     print("  ⭐ DISCREP falls as LEVEL rises, which is what clean-bleed dilution")
     print("     predicts (more OD against a fixed bleed = less dilution of the")

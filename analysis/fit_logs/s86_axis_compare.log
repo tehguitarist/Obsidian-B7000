@@ -1,0 +1,77 @@
+=== GATE 0 -- BASELINE, BOTH SIDES ===
+  harmonic axis: worst per-band |dk| 0.005 dB, pooled |dk| 0.004 dB (n=110, rms 1.95)
+  shape gate:    worst |d(20log10 s)| vs record 0.027 dB, beta -16.80 dB
+  PASS
+
+GATE 1 -- is theta = 0 a FENCE or a SYMMETRY POINT?
+   202 Hz  |cost(+e) - cost(-e)|  at 0: 0.000e+00   at 180: 0.000e+00
+   254 Hz  |cost(+e) - cost(-e)|  at 0: 0.000e+00   at 180: 3.411e-13
+    40 Hz  |cost(+e) - cost(-e)|  at 0: 0.000e+00   at 180: 1.599e-14
+  worst 3.411e-13  =>  SYMMETRY POINTS -- theta resting at an endpoint is NOT bound-resting; restrict on s, not theta
+
+GATE 2 -- ORDER INDEPENDENCE of k (the harmonic axis's own premise)
+      Hz   k(all)  k(H2,H3)  k(H6,H7)  |split|
+     100   -10.64     -7.96    -11.18     3.23
+     200    -6.14     -5.61     -6.37     0.76
+     400    -4.99     -5.59     -6.52     0.93
+  worst 100 Hz at 3.23 dB, against a median of 0.84 dB elsewhere (3.8x)
+
+=== A3's CURVE ON TWO INDEPENDENT AXES ===
+  both columns are 'dB by which the model's OD sits below where it should,
+  relative to its own clean bleed' -- same sign, same units, same frequency
+
+      Hz   shape 20log10 s         interval  |k| harmonic         interval    verdict    gap
+     100             +4.43 [+3.46, +5.29]         10.64 [+6.49,+14.79]   DISJOINT   1.19
+     200             +5.20 [+4.33, +7.00]          6.14 [+4.61, +8.26]    OVERLAP   0.00
+     400             +7.60 [+5.21, +9.12]          4.99 [+4.11, +7.51]    OVERLAP   0.00
+
+  2 of 3 bands OVERLAP.
+  ⇒ on ALL orders the disagreement is ONE band, 100 Hz, by 1.19 dB.
+    That band is the harmonic axis's thinnest (n=24 over 11 clusters), it FAILS GATE 2 (3.23 dB of order
+    split vs 0.84 dB elsewhere), and it has the least DILUTION LEVERAGE (see below).
+
+=== THE SAME COMPARISON ON THE ROBUST ORDER SUBSET (H2, H3) ===
+      Hz   dilution d_mdl    shape         interval  |k| H2,H3         interval    verdict
+     100    2.2.. 24.4 dB    +4.43 [+3.46, +5.29]       7.96 [+4.50,+14.10]    OVERLAP
+     200    2.9.. 35.1 dB    +5.20 [+4.33, +7.00]       5.61 [+5.04, +7.97]    OVERLAP
+     400    4.7.. 43.0 dB    +7.60 [+5.21, +9.12]       5.59 [+4.71, +7.68]    OVERLAP
+
+  3 of 3 bands OVERLAP on the robust subset.
+  ⇒ ⭐⭐ THE SHAPE DISAGREEMENT DOES NOT SURVIVE. On the order subset the
+    harmonic axis itself designates as robust, EVERY band is compatible with
+    the drive axis. The two instruments describe ONE curve, and session 85
+    item 5's 'the SHAPE disagrees' should not be carried forward.
+  ⚠ What that does NOT license: calling the curve FLAT. The intervals are
+    wide (shape gate 1.8-3.9 dB, harmonic axis 3.2-9.9 dB), so what is
+    established is compatibility, not a shape. Quote A3 as ~5-7 dB over
+    100-400 Hz and do not fit a slope to either column.
+
+=== THE SHAPE GATE'S OWN CONDITIONING ACROSS ITS CORE SET ===
+  (the +0.25 dB joint (s, theta) interval, in dB of s -- printed because the
+   'the deficit RISES with frequency' claim is carried by the widest of them)
+      Hz  20log10 s   width   theta    rms
+      20     +10.40    3.88   145.8  0.104
+      25      +6.81    1.79   153.4  0.107
+      32      +4.31    0.54   170.4  0.128
+      40      +3.15    0.75   170.4  0.100
+      50      +2.64    1.00   150.9  0.139
+      64      +2.72    1.13   130.1  0.122
+      80      +3.57    1.25   111.5  0.104
+     101      +4.43    1.83    95.0  0.230
+     127      +5.05    2.21    77.0  0.234
+     160      +5.34    3.04    53.8  0.267
+     202      +5.20    2.67     0.0  0.362
+     254      +4.68    3.12     0.0  0.347
+     403      +7.60    3.92    87.4  0.108
+     508      +9.04    5.79    81.8  0.031
+
+  CORE score, all 14 bands            = 5.808 dB
+  ex theta-at-a-symmetry-point [202, 254]  (12 bands) = 5.939 dB   <- session 51's proposed restriction
+  ex s-interval > 2.5 dB       (8 bands) = 4.287 dB   <- the MEASURED one; drops [20, 160, 202, 254, 403, 508]
+
+  ⇒ the two restrictions do not select the same bands, and only the second
+    is justified by the quantity being scored. Neither changes the ranking of
+    a candidate on its own -- freeze whichever set is used at the SHIPPED
+    baseline and never re-derive it per candidate (self-selecting-scores).
+
+wrote analysis/reports/s86_axis_compare.json

@@ -146,6 +146,60 @@ def worst_local(loc, freqs):
     return float(loc[i]), float(freqs[i])
 
 
+def band_census(rows, freqs):
+    """WHICH BANDS carry the group's LOCAL mean square -- and is each one SYSTEMATIC or not?
+
+    Session 63 measured LOCAL at ~63 % of the OD mean square and asked "which features?". The
+    per-row `worst_local` column cannot answer that: it reports one band per row, so a feature
+    present in every row at moderate size loses to a different one-off excursion in each. This
+    aggregates across the fixed row set instead, per band:
+
+        rms_k    = sqrt(mean_rows(loc_k^2))     how much LOCAL lives at band k
+        mean_k   = mean_rows(loc_k)             the SIGNED average -- a shared feature keeps its sign
+        coh_k    = |mean_k| / rms_k  in [0,1]   COHERENCE across rows
+        share_k  = rms_k^2 / sum_j rms_j^2      the band's share of the group's LOCAL mean square
+
+    ⭐ COHERENCE IS THE POINT, not the share. A share says a band is noisy; only the sign tells you
+    whether it is ONE feature. coh -> 1 means every row is displaced the same way there, which is a
+    shared circuit feature (a notch the model lacks, a corner in the wrong place). coh -> 0 means the
+    rows disagree in sign, so the band's energy is row-dependent -- capture spread, an
+    operating-point difference, or several features that cancel -- and fitting one element against it
+    would be fitting a mean of things that are not the same thing.
+
+    ⚠ EDGE BANDS ARE NOT EVIDENCE ON THEIR OWN. A least-squares polynomial has its worst leverage at
+    the ends of the fit range, so an unmodelled smooth roll-off at the lowest/highest band lands in
+    LOCAL looking narrow (see `local_interior`). The census prints every band including the edges and
+    MARKS them, rather than dropping them silently -- an edge band with high coherence is still a
+    real disagreement, it just is not evidence of a NARROW feature.
+    """
+    ks = sorted(rows)
+    L = np.stack([rows[k]["local_curve"] for k in ks], axis=0)      # rows x bands
+    rms = np.sqrt(np.mean(L ** 2, axis=0))
+    mean = np.mean(L, axis=0)
+    tot = float(np.sum(rms ** 2))
+    coh = np.where(rms > 1e-12, np.abs(mean) / np.maximum(rms, 1e-12), 0.0)
+    return {"freqs": np.asarray(freqs, dtype=float), "rms": rms, "mean": mean,
+            "coh": coh, "share": rms ** 2 / tot if tot > 0 else rms * 0.0, "n": len(ks)}
+
+
+def print_census(c, label, top=12, drop=2):
+    n = len(c["freqs"])
+    print("\n  LOCAL BY BAND -- %s  (%d rows, one fixed row set)" % (label, c["n"]))
+    print("  %6s %8s %8s %7s %7s   %s" % ("Hz", "rms", "mean", "coh", "share", "note"))
+    order = np.argsort(-c["share"])[:top]
+    for i in sorted(order, key=lambda j: c["freqs"][j]):
+        edge = i < drop or i >= n - drop
+        note = "EDGE (polynomial leverage -- not narrow-feature evidence)" if edge else \
+               ("SYSTEMATIC" if c["coh"][i] >= 0.7 else
+                ("mixed" if c["coh"][i] >= 0.4 else "INCOHERENT (rows disagree in sign)"))
+        print("  %6.0f %8.3f %+8.3f %7.2f %6.1f%%   %s"
+              % (c["freqs"][i], c["rms"][i], c["mean"][i], c["coh"][i], 100 * c["share"][i], note))
+    inner = slice(drop, n - drop)
+    sh_edge = float(np.sum(c["share"]) - np.sum(c["share"][inner]))
+    print("  --> top %d bands hold %.1f%% of the group's LOCAL mean square; the %d EDGE bands hold %.1f%%"
+          % (top, 100 * float(np.sum(c["share"][order])), 2 * drop, 100 * sh_edge))
+
+
 # =============================================================================================
 # gates
 # =============================================================================================
@@ -206,6 +260,32 @@ def selftest():
     print("        it slightly, so LOCAL is a LOWER BOUND on a narrow feature (and the 1/3-oct grid")
     print("        is a second, larger lower bound -- session 46 measured -3.4 banded vs -24 at")
     print("        full resolution). LOCAL says WHERE to look, not how deep.")
+    print("\n  3 COHERENCE -- the band census must separate ONE SHARED feature from a band that is")
+    print("    merely noisy. Both cases below inject the SAME energy at the SAME band, so `share`")
+    print("    cannot tell them apart; only the sign across rows can. If this fails, a census row")
+    print("    reading 'SYSTEMATIC' is not evidence of a shared feature.")
+    rng = np.random.default_rng(11)
+    k320 = int(np.argmin(np.abs(fa - 320.0)))
+    print("      %-34s %9s %8s %8s   %s" % ("case", "top band", "share", "coh", "verdict"))
+    for name, coherent, want_hi in [("same-sign -8 dB at 320 Hz  ", True, True),
+                                    ("random-sign +-8 dB at 320 Hz", False, False)]:
+        rws = {}
+        for j in range(40):
+            d = rng.normal(0.0, 0.6, len(fa)) + 2.0 * u + 1.0
+            sgn = -1.0 if coherent else (1.0 if rng.random() < 0.5 else -1.0)
+            d[k320] += sgn * 8.0
+            rws[("cap%02d" % j, "sw")] = decompose(d, Q)
+        c = band_census(rws, fa)
+        i = int(np.argmax(c["share"]))
+        hit = abs(c["freqs"][i] - 320.0) < 1.0
+        good = hit and ((c["coh"][i] > 0.9) if want_hi else (c["coh"][i] < 0.3))
+        ok &= good
+        print("      %-34s %8.0f %7.1f%% %8.2f   %s"
+              % (name, c["freqs"][i], 100 * c["share"][i], c["coh"][i],
+                 "OK" if good else "FAIL"))
+    print("      ⇒ identical share, opposite coherence -- so `coh` is what carries a SHARED-feature")
+    print("        claim, and `share` on its own never does.")
+
     print("\n  %s" % ("GATES PASS" if ok else "GATES FAIL"))
     return ok
 
@@ -213,6 +293,22 @@ def selftest():
 # =============================================================================================
 # rows
 # =============================================================================================
+def rowset_of(path):
+    """The capture set of another report -- for `--rowset`, i.e. FREEZING membership.
+
+    ⚠ THIS EXISTS BECAUSE THE TRAP FIRED AGAIN (session 69). `comprehensive_data.json` grew from 100
+    to 104 captures between session 63 and now, so this tool's own headline moved 2.611 -> 3.040
+    with **every shared row bit-identical** (verified: worst |Δ| 0.000e+00 across all four terms on
+    all 252). Nothing was wrong and nothing had regressed -- 16 rows had been ADDED, and they are the
+    worst rows in the matrix (rms 6.890). An rms over differently-populated sets is not a ranking;
+    that is the session-49 item-7 trap, and this is its sixth appearance in this project. Pass
+    `--rowset OLD.json` to score today's file on yesterday's membership, which is the only way an
+    A/B across a capture-set change means anything.
+    """
+    c = json.load(open(path))["captures"]
+    return set(c.keys()) if isinstance(c, dict) else {x.get("file") for x in c}
+
+
 def fr_rows(path, only=None):
     bands, caps = MG.load(path)
     idx = MG.band_idx(bands, GRADE_LO, GRADE_HI)
@@ -337,6 +433,13 @@ def main():
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--png", default=None)
     ap.add_argument("--json", default=None)
+    ap.add_argument("--rowset", default=None,
+                    help="restrict to another report's capture set (freeze membership for an A/B)")
+    ap.add_argument("--census", action="store_true",
+                    help="LOCAL by BAND with a coherence column -- WHICH features carry LOCAL")
+    ap.add_argument("--by", default=None,
+                    help="comma-separated filename tokens to split the census by (e.g. "
+                         "grunt-boost,grunt-flat,attack-boost,attack-cut,level-1700)")
     args = ap.parse_args()
 
     if args.selftest and not selftest():
@@ -353,7 +456,31 @@ def main():
     print("    look at full resolution, it does not measure the feature (session 46).")
 
     fs, rows = fr_rows(args.report, args.only)
+    if args.rowset:
+        keep = rowset_of(args.rowset)
+        before = len(rows)
+        rows = {k: v for k, v in rows.items() if k[0] in keep}
+        print("  ⚠ MEMBERSHIP FROZEN to %s: %d -> %d rows (%d dropped)"
+              % (args.rowset, before, len(rows), before - len(rows)))
     out = {"fr": report("FR  (plugin_dB - pedal_dB)", rows, args.top)}
+
+    if args.census:
+        print("\n" + "=" * 104)
+        print("LOCAL BY BAND -- which features carry the LOCAL term (session 63's 63 %% question)")
+        print("=" * 104)
+        n12 = lambda k: "gain-n12" in k[0]                                         # noqa: E731
+        od = {k: r for k, r in rows.items() if r["is_od"] and not n12(k)}
+        cl = {k: r for k, r in rows.items() if not r["is_od"]}
+        for lbl, rs in [("OD ex gain-n12", od), ("CLEAN", cl)]:
+            if rs:
+                print_census(band_census(rs, fs), lbl, args.top)
+        if args.by:
+            for tok in [t.strip() for t in args.by.split(",") if t.strip()]:
+                rs = {k: r for k, r in od.items() if tok in k[0]}
+                if len(rs) >= 4:
+                    print_census(band_census(rs, fs), "OD ex n12 :: %s" % tok, args.top)
+                else:
+                    print("\n  (skipped %s -- only %d rows, too few for a census)" % (tok, len(rs)))
 
     tfs, trows, tlevel = thd_rows(args.report, args.only)
     if trows:
@@ -408,7 +535,7 @@ def main():
             import matplotlib
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
-            fig, ax = plt.subplots(1, 2, figsize=(13, 5))
+            fig, ax = plt.subplots(1, 3, figsize=(19, 5))
             for k, r in sorted(rows.items(), key=lambda kv: -kv[1]["local"])[:6]:
                 ax[0].semilogx(fs, r["local_curve"], lw=1.3, label="%s %s" % (k[0][:22], k[1]))
             ax[0].set_title("LOCAL residual (smooth shape removed) -- narrow features only")
@@ -423,6 +550,24 @@ def main():
             ax[1].set_ylabel("dB rms"); ax[1].legend(fontsize=8)
             ax[1].set_title("Where the FR error lives, by group")
             ax[1].grid(True, axis="y", alpha=0.3)
+            # panel 3: the band census -- WHICH bands carry LOCAL, and are they coherent?
+            # ⭐ the CLEAN trace is the control: if the OD trace is a real feature rather than an
+            # artefact of the decomposition, CLEAN must stay flat and incoherent at the same band.
+            n12 = lambda k: "gain-n12" in k[0]                                     # noqa: E731
+            for lbl, rs, col in [("OD ex gain-n12",
+                                  {k: r for k, r in rows.items() if r["is_od"] and not n12(k)}, "C3"),
+                                 ("CLEAN",
+                                  {k: r for k, r in rows.items() if not r["is_od"]}, "C0")]:
+                if not rs:
+                    continue
+                c = band_census(rs, fs)
+                ax[2].semilogx(c["freqs"], c["rms"], col, lw=1.6, label="%s  LOCAL rms" % lbl)
+                ax[2].semilogx(c["freqs"], c["coh"] * max(c["rms"]), col, lw=1.0, ls="--",
+                               alpha=0.6, label="%s  coherence (scaled)" % lbl)
+            ax[2].axvline(320.0, color="k", lw=0.8, ls=":", alpha=0.7)
+            ax[2].set_title("LOCAL by BAND + coherence (dotted = 320 Hz)")
+            ax[2].set_xlabel("Hz"); ax[2].set_ylabel("dB rms")
+            ax[2].grid(True, which="both", alpha=0.3); ax[2].legend(fontsize=6)
             os.makedirs(os.path.dirname(args.png) or ".", exist_ok=True)
             fig.tight_layout(); fig.savefig(args.png, dpi=120)
             print("\n  wrote %s" % args.png)

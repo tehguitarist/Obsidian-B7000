@@ -90,9 +90,33 @@ import analyze as A                                # noqa: E402
 import captures as C                               # noqa: E402
 
 CAPDIR = "analysis/captures"
-FLAT = "drive-0700_level-1700_base-od.wav"
-THROWS = {"cut": "drive-0700_level-1700_attack-cut_base-od.wav",
-          "boost": "drive-0700_level-1700_attack-boost_base-od.wav"}
+
+# The bleed-free ATTACK triple exists at TWO drive settings. Both share the LEVEL-max/BLEND-max
+# mechanism (wiper shorted to the OD source ⇒ zero clean bleed by topology, and LEVEL sits after
+# every nonlinearity so it cannot move the clipper's operating point). They differ ONLY in whether
+# the clipper is idle, which is exactly the axis session 68 needed:
+#   drive-min   the clipper is idle, so h(f) is the ATTACK network's own LINEAR transfer.
+#   drive-noon  the clipper is working. If h is really a drive-independent linear pre-clipper
+#               transfer, it must read the SAME here. If it moves, part of what sessions 60-66
+#               attributed to the ATTACK network is operating-point, not network.
+# ⚠ Default stays drive-min so every figure sessions 60-66 recorded is reproduced untouched.
+CONDS = {
+    "drive-min": dict(
+        flat="drive-0700_level-1700_base-od.wav",
+        throws={"cut": "drive-0700_level-1700_attack-cut_base-od.wav",
+                "boost": "drive-0700_level-1700_attack-boost_base-od.wav"},
+        blurb="drive MIN / LEVEL max / BLEND max ⇒ zero clean bleed by topology, clipper IDLE.",
+        recorded=True),
+    "drive-noon": dict(
+        flat="level-1700_base-od.wav",
+        throws={"cut": "level-1700_attack-cut_base-od.wav",
+                "boost": "level-1700_attack-boost_base-od.wav"},
+        blurb="drive NOON / LEVEL max / BLEND max ⇒ zero clean bleed by topology, clipper WORKING.",
+        recorded=False),
+}
+COND = "drive-min"                                 # set by --cond; module-level so load_all sees it
+FLAT = CONDS[COND]["flat"]
+THROWS = CONDS[COND]["throws"]
 POSITIONS = ["cut", "boost", "flat"]               # ordered as step 16 item 8b quotes them
 
 # Stimulus level -> sweep segment. The two quiet rows are the near-linear ones; -12 is where
@@ -108,6 +132,15 @@ UPPER_WIN = (380.0, 470.0)                         # the 421.9 Hz maximum on the
 WIDTH_WIN = (240.0, 420.0)                         # where the null's own skirts are measured
 NOTCH_EXCLUDE = (287.0, 351.0)                     # NOMINAL exclusion window -- verified, not trusted
 BROAD_WIN = (80.0, 1600.0)                         # where h is claimed flat
+
+# Flat-topping gate (see load_all). Measured separation, not guessed (session 68): the longest run
+# of samples pinned within 0.05% of peak is <=4 on every clean capture in this set, and 20 / 86 / 120
+# on hard-clipped mutations of one of them (at 0.999 / 0.9885 / 1.0). A run of 8 therefore sits 2x
+# above the clean worst case and 2.5x below the barely-clipped one.
+FLATTOP_PIN_TH = 0.9995                            # "pinned" = within 0.05% of peak
+FLATTOP_MIN_RUN = 8                                # consecutive pinned samples to reject
+FLATTOP_MIN_PEAK = 0.95                            # scope: the CONVERTER's ceiling, not the pedal's
+LOOSE_TH = 0.985                                   # reported only -- see the warning in load_all
 
 SHARED_PEAK = 421.9                                # must CANCEL in h (item 8b(i))
 TAKE_FLOOR = 0.144
@@ -348,7 +381,7 @@ def load_all(orig):
     print("\n" + "=" * 104)
     print("GATE 3. CAPTURES -- verified BEFORE anything is read off them")
     print("=" * 104)
-    print("  %-52s %8s %6s %7s %6s" % ("file", "len/orig", "lag", "peak", "runs"))
+    print("  %-52s %8s %6s %7s %6s %8s" % ("file", "len/orig", "lag", "peak", "loose", "pinned"))
     out = {}
     for pos in POSITIONS:
         fn = FLAT if pos == "flat" else THROWS[pos]
@@ -361,14 +394,32 @@ def load_all(orig):
             sys.exit("%s is TRUNCATED (%.3f of reference) -- missing segments read as zeros" % (fn, frac))
         x, lag = A.align(x, orig)
         pk = float(np.max(np.abs(x)))
-        # longest CONSECUTIVE near-peak run -- the real flat-topping signature. A single hot sample
-        # is a transient, not clipping (session 53's own screen made exactly this distinction).
-        near = (np.abs(x) > 0.985 * pk).astype(np.int8)
-        edges = np.flatnonzero(np.diff(np.concatenate(([0], near, [0]))))
-        runs = int(np.max(edges[1::2] - edges[0::2])) if len(edges) else 0
-        print("  %-52s %8.3f %6d %7.3f %6d" % (fn, frac, lag, pk, runs))
-        if runs > 16:
-            sys.exit("%s looks flat-topped (%d consecutive near-peak samples)" % (fn, runs))
+
+        def longest_run(th):
+            near = (np.abs(x) >= th * pk).astype(np.int8)
+            e = np.flatnonzero(np.diff(np.concatenate(([0], near, [0]))))
+            return int(np.max(e[1::2] - e[0::2])) if len(e) else 0
+
+        # ⚠⚠ RUN LENGTH AT A LOOSE THRESHOLD IS NOT THE FLAT-TOPPING SIGNATURE, and the previous
+        # version of this gate (>16 samples above 0.985*peak) was a FALSE POSITIVE GENERATOR.
+        # A sine spends ~5.5% of its period above 98.5% of its peak, so at the 20 Hz end of the log
+        # sweep that is ~30 samples at 48 kHz -- entirely normal. Measured (session 68): all six
+        # bleed-free ATTACK captures put their longest loose run inside `sweep_drv_-6`, with the
+        # samples still CURVING 1.3-1.5% of peak, and the long-trusted `level-1700_base-od.wav`
+        # -- in the matrix since session 22 -- scores 19. The old test therefore rejected a
+        # reference capture, which is how it was caught.
+        # The real defect (session 24 lost 14 files to it) is a plateau PINNED at one value at the
+        # CONVERTER's ceiling. So gate on a TIGHT pin threshold plus a near-full-scale peak. This is
+        # strictly MORE discriminating for real clipping, not slacker -- mutation-tested at 0.9885
+        # (session-24 style), 1.0 and 0.999, against an unclipped 0.98-peak control.
+        # ⚠ A plateau BELOW full scale is the PEDAL's own rail limiting -- real signal we are here
+        # to measure -- so it is reported, never rejected.
+        loose, pinned = longest_run(LOOSE_TH), longest_run(FLATTOP_PIN_TH)
+        print("  %-52s %8.3f %6d %7.3f %6d %8d" % (fn, frac, lag, pk, loose, pinned))
+        if pk >= FLATTOP_MIN_PEAK and pinned >= FLATTOP_MIN_RUN:
+            sys.exit("%s is FLAT-TOPPED: %d consecutive samples pinned within %.2f%% of a %.4f "
+                     "peak (near full scale) -- the session-24 capture defect."
+                     % (fn, pinned, 100.0 * (1.0 - FLATTOP_PIN_TH), pk))
         out[pos] = x
     print("  ⇒ all three full length, aligned, no flat-topping.")
     return out
@@ -393,7 +444,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--json", default=None, help="write the measured table to this path")
+    ap.add_argument("--cond", default="drive-min", choices=sorted(CONDS),
+                    help="which bleed-free ATTACK triple to read (default drive-min = the "
+                         "sessions 60-66 record; drive-noon has the clipper working)")
     args = ap.parse_args()
+
+    # Rebind the module-level capture names the loader reads. Default is drive-min, so a plain
+    # invocation is byte-for-byte the sessions 60-66 run.
+    global COND, FLAT, THROWS
+    COND = args.cond
+    FLAT = CONDS[COND]["flat"]
+    THROWS = CONDS[COND]["throws"]
 
     if not os.path.exists(A.ORIG):
         sys.exit("reference stimulus not found at %s -- run analysis/gen_test_signal.py" % A.ORIG)
@@ -403,7 +464,7 @@ def main():
     print("THE ATTACK NOTCH AT FULL RESOLUTION -- and h(f) with the notch window separated by")
     print("MEASUREMENT rather than by the 1/3-octave grid")
     print("=" * 104)
-    print("  drive min / LEVEL max / BLEND max ⇒ zero clean bleed by topology, clipper idle.")
+    print("  CONDITION %s: %s" % (COND, CONDS[COND]["blurb"]))
     print("  %.2f Hz bins | floors: take-to-take %.3f dB, h (a difference) %.3f dB"
           % (A.FS / 8192.0, TAKE_FLOOR, DIFF_FLOOR))
 
@@ -460,17 +521,23 @@ def main():
                  "a genuine local peak" if interior else
                  "may be skirt: depth understated further"))
 
-    print("\n  vs session 60 item 8b (an AD-HOC probe -- this tool is now the record):")
-    print("  %-7s %12s %12s | %12s %12s" % ("pos", "f0 s60", "f0 here", "depth s60", "depth here"))
-    moved = []
-    for pos in POSITIONS:
-        f0s, ds = S60_8B[pos]
-        n = head[pos]
-        print("  %-7s %12.1f %12.1f | %12.1f %12.2f" % (pos, f0s, n["f_bin"], ds, n["depth"]))
-        if abs(n["f_bin"] - f0s) > A.FS / 8192.0 or abs(n["depth"] - ds) > 1.0:
-            moved.append(pos)
-    print("  ⇒ %s" % ("REPRODUCED within one bin / 1 dB at every position." if not moved
-                      else "MOVED at: %s -- correct step 16 item 8b." % ", ".join(moved)))
+    # ⚠ S60_8B was measured at DRIVE MIN. Comparing another condition against it would report a
+    # real operating-point difference as "the record moved", which is the opposite of the truth.
+    if CONDS[COND]["recorded"]:
+        print("\n  vs session 60 item 8b (an AD-HOC probe -- this tool is now the record):")
+        print("  %-7s %12s %12s | %12s %12s" % ("pos", "f0 s60", "f0 here", "depth s60", "depth here"))
+        moved = []
+        for pos in POSITIONS:
+            f0s, ds = S60_8B[pos]
+            n = head[pos]
+            print("  %-7s %12.1f %12.1f | %12.1f %12.2f" % (pos, f0s, n["f_bin"], ds, n["depth"]))
+            if abs(n["f_bin"] - f0s) > A.FS / 8192.0 or abs(n["depth"] - ds) > 1.0:
+                moved.append(pos)
+        print("  ⇒ %s" % ("REPRODUCED within one bin / 1 dB at every position." if not moved
+                          else "MOVED at: %s -- correct step 16 item 8b." % ", ".join(moved)))
+    else:
+        print("\n  (no session-60 comparison: that record is DRIVE-MIN and this run is %s." % COND)
+        print("   Comparing them would report an operating-point difference as a moved record.)")
 
     # ------------------------------------------------------------------ gate 4: level sweep
     print("\n" + "=" * 104)
@@ -579,15 +646,42 @@ def main():
         print("         h over %g-%g Hz, ex MEASURED window: median %+6.2f mean %+6.2f "
               "range %+6.2f..%+6.2f spread %5.2f dB   <-- the read"
               % (BROAD_WIN[0], BROAD_WIN[1], med, mean, mn, mx, mx - mn))
+        # ⚠⚠ SWALLOW GUARD. `grow` assumes the picture is "a narrow notch on a flat background", so
+        # it walks outward while |h - med| exceeds the floor. If h instead has a broad SLOPE, the walk
+        # does not stop and the "notch window" eats most of the band -- leaving the "broadband median"
+        # computed from whatever sliver survives, and PRINTED AS THOUGH IT WERE BROADBAND. Measured
+        # at drive noon (session 68): boost's window came out 0.0-1154.3 Hz, so its quoted +4.64 dB
+        # "broadband" read was really 1154-1600 Hz only, while h actually ran +9.76 -> +4.16 dB.
+        # A window this wide is a finding about h's SHAPE, not a notch. Say so; never print it bare.
+        frac = (min(win2[1], BROAD_WIN[1]) - max(win2[0], BROAD_WIN[0])) / (BROAD_WIN[1] - BROAD_WIN[0])
+        swallowed = frac > 0.40
+        if swallowed:
+            print("         ⛔ THAT READ IS NOT BROADBAND: the measured window covers %.0f%% of "
+                  "%g-%g Hz," % (100.0 * frac, *BROAD_WIN))
+            print("            so the median above is only the %.0f-%.0f Hz remainder. h has a broad"
+                  % (win2[1], BROAD_WIN[1]))
+            print("            SLOPE here (%+.2f..%+.2f dB, spread %.2f over the FULL band), not a"
+                  % (nmn, nmx, nmx - nmn))
+            print("            narrow notch ⇒ quote the ex-NOMINAL row and the slope, not this one.")
         report[pos] = dict(median=med, mean=mean, window=list(win2),
                            window_nominal_ok=not wide, spread=mx - mn,
-                           median_nominal=nm, spread_nominal=nmx - nmn)
-    print("\n  ⚠ THE NOMINAL 287-351 Hz WINDOW UNDER-COVERS on both throws, so the read above uses")
-    print("    the MEASURED window. Session 60 item 8b quoted the nominal one; correct it. The two")
-    print("    medians differ by %.2f dB (boost) / %.2f dB (cut), so this is a refinement, not a"
-          % (abs(report["boost"]["median"] - report["boost"]["median_nominal"]),
-             abs(report["cut"]["median"] - report["cut"]["median_nominal"])))
-    print("    reversal -- but it is the spread, not the centre, that the flatness claim rests on.")
+                           median_nominal=nm, spread_nominal=nmx - nmn,
+                           window_frac_of_broad=frac, broadband_read_valid=not swallowed)
+    # Computed, not narrated: which throws actually under-cover, and whether the correction is a
+    # refinement or a reversal, both follow from the numbers above.
+    under = [p for p in ("boost", "cut") if not report[p]["window_nominal_ok"]]
+    dmed = {p: abs(report[p]["median"] - report[p]["median_nominal"]) for p in ("boost", "cut")}
+    if under:
+        print("\n  ⚠ THE NOMINAL %g-%g Hz WINDOW UNDER-COVERS on: %s. Session 60 item 8b quoted the"
+              % (NOTCH_EXCLUDE[0], NOTCH_EXCLUDE[1], ", ".join(under)))
+        print("    nominal one; correct it. The medians differ by %.2f dB (boost) / %.2f dB (cut), so"
+              % (dmed["boost"], dmed["cut"]))
+        print("    this is a %s -- and it is the spread, not the centre, that flatness rests on."
+              % ("REFINEMENT" if max(dmed.values()) < 1.0 else
+                 "REVERSAL at that size: re-read the broadband claim from scratch"))
+    else:
+        print("\n  ⇒ the nominal %g-%g Hz window COVERS the measured one on both throws."
+              % NOTCH_EXCLUDE)
 
     # ------------------------------------------------------------------ the shared peak cancels
     print("\n" + "=" * 104)
@@ -617,15 +711,37 @@ def main():
     d = {p: head[p]["depth"] for p in POSITIONS}
     f0 = {p: head[p]["f_bin"] for p in POSITIONS}
     span = max(f0.values()) - min(f0.values())
-    print("  (1) ATTACK MOVES THE NULL: cut %.1f / boost %.1f / flat %.1f Hz -- a %.1f Hz spread,"
-          % (f0["cut"], f0["boost"], f0["flat"], span))
-    print("      %.1fx the %.2f Hz bin, and gate 1(e) demonstrated that a shift this size RESOLVES"
-          % (span / (A.FS / 8192.0), A.FS / 8192.0))
-    print("      (17.6 Hz synthesised, read as 18.2). Identical to the bin at -36/-30/-18 dBFS.")
-    print("  (2) AND CHANGES ITS DEPTH: cut %.1f / boost %.1f / flat %.1f dB -- boost is %.2fx flat."
-          % (d["cut"], d["boost"], d["flat"], d["boost"] / d["flat"] if d["flat"] else float("nan")))
-    print("      ⇒ a PURE BROADBAND GAIN CANNOT DO EITHER. The ATTACK network is two-path and")
-    print("        interacts with the notch-forming network ⇒ ATTACK and GAP #2 are ONE problem.")
+    # ⚠⚠ THIS VERDICT IS COMPUTED, NOT NARRATED. Its first version was four hardcoded sentences
+    # asserting "ATTACK MOVES THE NULL" and "a PURE BROADBAND GAIN CANNOT DO EITHER" -- which printed
+    # verbatim above a 0.0 Hz spread the first time this tool was pointed at drive noon. That is the
+    # session-34 stale-narration trap (a verdict in a string outlives the condition it described) and
+    # the project has now hit it four times. Both claims are therefore DERIVED below and each states
+    # the opposite conclusion when the data says so.
+    bins = A.FS / 8192.0
+    moves = span > bins                                  # a shift has to clear one bin to exist
+    depth_ratio = d["boost"] / d["flat"] if d["flat"] else float("nan")
+    changes_depth = abs(depth_ratio - 1.0) > 0.25         # 25% -- well outside gate 1(b)'s bias
+    print("  (1) DOES ATTACK MOVE THE NULL?  cut %.1f / boost %.1f / flat %.1f Hz -- a %.1f Hz "
+          "spread, %.1fx the %.2f Hz bin."
+          % (f0["cut"], f0["boost"], f0["flat"], span, span / bins, bins))
+    if moves:
+        print("      ⇒ YES. Gate 1(e) demonstrated a shift this size RESOLVES (17.6 Hz")
+        print("        synthesised, read as 18.2 Hz).")
+    else:
+        print("      ⇒ ⛔ NO -- the three throws put the null in the SAME bin at this condition.")
+        print("        Gate 1(e) showed a 17.6 Hz shift WOULD resolve if present, so this is a")
+        print("        real absence, not a resolution limit.")
+    print("  (2) DOES IT CHANGE THE DEPTH?  cut %.1f / boost %.1f / flat %.1f dB -- boost is %.2fx flat."
+          % (d["cut"], d["boost"], d["flat"], depth_ratio))
+    print("      ⇒ %s" % ("YES." if changes_depth else "⛔ NO -- the three depths agree within 25%."))
+    if moves or changes_depth:
+        print("  ⇒ A PURE BROADBAND GAIN CANNOT DO THAT. The ATTACK network is two-path and")
+        print("    interacts with the notch-forming network ⇒ ATTACK and GAP #2 are ONE problem.")
+    else:
+        print("  ⇒ ⛔ AT THIS CONDITION THE NULL CARRIES NO ATTACK DEPENDENCE AT ALL -- neither")
+        print("    frequency nor depth. Whatever makes the null here is SHARED across the throws,")
+        print("    so this condition cannot constrain the ATTACK network's notch behaviour. Do NOT")
+        print("    read a topology specification off it; use the condition where the throws differ.")
     print("  (3) h stays BROADBAND outside that window: boost %+.2f dB (spread %.2f), cut %+.2f dB"
           % (report["boost"]["median"], report["boost"]["spread"], report["cut"]["median"]))
     print("      (spread %.2f) over %g-%g Hz -- so item 8b(i) survives at full resolution."

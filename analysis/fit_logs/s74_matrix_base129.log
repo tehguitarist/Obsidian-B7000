@@ -1,0 +1,170 @@
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+find_captures: skipped 26 non-matrix .wav (not key-value filenames): a3tones_blend-0700.wav, a3tones_blend-0930.wav, a3tones_blend-1200.wav, a3tones_blend-1430.wav, a3tones_blend-1700.wav, a3tones_drive-1700_blend-0930.wav, a3tones_drive-1700_blend-1200.wav, a3tones_drive-1700_blend-1430.wav, a3tones_drive-1700_blend-1700.wav, jfet_ladder_drive-0930.wav, jfet_ladder_drive-1430.wav, jfet_ladder_drive-max.wav, jfet_ladder_drive-min.wav, jfet_ladder_drive-noon.wav, jfet_ladder_level-1700_drive-min.wav, jfet_ladder_level-1700_drive-noon.wav, notch_drive-0700_level-1700_attack-boost.wav, notch_drive-0700_level-1700_attack-cut.wav, notch_drive-0700_level-1700_attack-flat.wav, notch_drive-0700_level-1700_grunt-boost.wav, notch_drive-0700_level-1700_grunt-flat.wav, notch_level-1700_attack-boost.wav, notch_level-1700_attack-cut.wav, notch_level-1700_attack-flat.wav, notch_level-1700_grunt-boost.wav, notch_level-1700_grunt-flat.wav
+Comprehensive report: 129 captures | OS=8x | 30 bands
+  THD coverage: 27/30 bands
+
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(1/129) [1/129] ? D0.50 BL1.00 ... cached
+(2/129) [2/129] ? D0.50 BL0.25 ... cached
+(3/129) [4/129] ? D0.50 BL0.75 ... cached
+(4/129) [3/129] ? D0.50 BL0.50 ... cached
+(5/129) [5/129] ? D0.50 BL1.00 ... cached
+(6/129) [7/129] ? D0.50 BL0.50 ... cached
+(7/129) [6/129] ? D0.50 BL0.25 ... cached
+(8/129) [8/129] ? D0.50 BL0.75 ... cached
+(9/129) [9/129] ? D0.50 BL1.00 ... cached
+(10/129) [10/129] ? D0.50 BL1.00 ... cached
+(11/129) [11/129] ? D0.50 BL1.00 ... cached
+(12/129) [12/129] ? D0.50 BL1.00 ... cached
+(13/129) [13/129] ? D0.50 BL0.00 ... cached
+(14/129) [14/129] ? D0.50 BL0.25 ... cached
+(15/129) [15/129] ? D0.50 BL0.50 ... cached
+(16/129) [16/129] ? D0.50 BL0.75 ... cached
+(17/129) [17/129] ? D0.00 ... cached
+(18/129) [18/129] ? D0.00 BL1.00 ... cached
+(19/129) [19/129] ? D0.00 BL0.00 ... cached
+(20/129) [20/129] ? D0.00 BL0.25 ... cached
+(21/129) [21/129] ? D0.00 BL0.50 ... cached
+(22/129) [22/129] ? D0.00 BL0.75 ... cached
+(23/129) /Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+[24/129] ? D0.00 BL0.00 ... cached
+(24/129) [23/129] ? D0.00 BL1.00 ... cached
+(25/129) [26/129] ? D0.00 BL0.50 ... cached
+(26/129) [25/129] ? D0.00 BL0.25 ... cached
+(27/129) [27/129] ? D0.00 BL0.75 ... cached
+(28/129) [28/129] ? D0.00 BL1.00 ... cached
+(29/129) [29/129] ? D0.00 BL0.25 ... cached
+(30/129) [31/129] ? D0.00 BL0.75 ... cached
+(31/129) [30/129] ? D0.00 BL0.50 ... cached
+(32/129) [32/129] ? D0.00 BL1.00 ... cached
+(33/129) [33/129] ? D0.00 BL1.00 ... cached
+(34/129) [35/129] ? D0.00 BL1.00 ... cached
+(35/129) [34/129] ? D0.00 BL1.00 ... cached
+(36/129) [36/129] ? D0.00 BL1.00 ... cached
+(37/129) [37/129] ? D0.00 BL1.00 ... cached
+(38/129) [38/129] ? D0.00 BL1.00 ... cached
+(39/129) [39/129] ? D0.00 BL1.00 ... cached
+(40/129) [40/129] ? D0.00 BL1.00 ... cached
+(41/129) [43/129] ? D0.25 BL1.00 ... cached
+(42/129) [41/129] ? D0.25 BL1.00 ... cached
+(43/129) [42/129] ? D0.25 BL1.00 ... cached
+(44/129) [44/129] ? D0.25 BL1.00 ... cached
+(45/129) [45/129] ? D0.25 BL1.00 ... cached
+(46/129) [47/129] ? D1.00 BL1.00 ... cached
+(47/129) [46/129] ? D0.75 BL1.00 ... cached
+(48/129) [48/129] ? D1.00 BL0.25 ... cached
+(49/129) [49/129] ? D1.00 BL0.50 ... cached
+(50/129) [50/129] ? D1.00 BL0.75 ... cached
+(51/129) [53/129] ? D1.00 BL0.50 ... cached
+(52/129) [51/129] ? D1.00 BL1.00 ... cached
+(53/129) [52/129] ? D1.00 BL0.25 ... cached
+(54/129) [54/129] ? D1.00 BL0.75 ... cached
+(55/129) [56/129] ? D1.00 BL0.00 ... cached
+(56/129) [55/129] ? D1.00 BL1.00 ... cached
+(57/129) [58/129] ? D1.00 BL0.50 ... cached
+(58/129) [57/129] ? D1.00 BL0.25 ... cached
+(59/129) [59/129] ? D1.00 BL0.75 ... cached
+(60/129) [62/129] ? D1.00 BL1.00 ... cached
+(61/129) [61/129] ? D1.00 BL1.00 ... cached
+(62/129) [60/129] ? D1.00 BL1.00 ... cached
+(63/129) [63/129] ? D1.00 BL1.00 ... cached
+(64/129) [64/129] ? D1.00 BL1.00 ... cached
+(65/129) [66/129] ? D0.50 BL1.00 ... cached
+(66/129) [67/129] ? D0.50 BL0.25 ... cached
+(67/129) [65/129] ? D1.00 BL1.00 ... cached
+(68/129) [69/129] ? D0.50 BL0.75 ... cached
+(69/129) [68/129] ? D0.50 BL0.50 ... cached
+(70/129) [70/129] ? D0.50 BL1.00 ... cached
+(71/129) [71/129] ? D0.50 BL0.25 ... cached
+(72/129) [72/129] ? D0.50 BL0.50 ... cached
+(73/129) [73/129] ? D0.50 BL0.75 ... cached
+(74/129) [74/129] ? D0.50 BL1.00 ... cached
+(75/129) [75/129] ? D0.50 BL1.00 ... cached
+(76/129) [76/129] ? D0.50 BL1.00 ... cached
+(77/129) [77/129] ? D0.50 BL1.00 ... cached
+(78/129) [78/129] ? D0.50 BL1.00 ... cached
+(79/129) [81/129] ? D0.50 BL1.00 ... cached
+(80/129) [82/129] ? D0.50 BL1.00 ... cached
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(81/129) [85/129] ? D0.50 BL1.00 ... cached
+(82/129) [86/129] ? D0.50 BL1.00 ... cached
+(83/129) [87/129] ? D0.50 BL1.00 ... cached
+(84/129) [88/129] ? D0.50 BL1.00 ... cached
+(85/129) [89/129] ? D0.50 BL1.00 ... cached
+(86/129) [90/129] ? D0.50 BL1.00 ... cached
+(87/129) [91/129] ? D0.50 BL1.00 ... cached
+(88/129) [92/129] ? D0.50 BL1.00 ... cached
+(89/129) [93/129] ? D0.50 BL1.00 ... cached
+(90/129) [94/129] ? D0.50 BL1.00 ... cached
+(91/129) [95/129] ? D0.50 BL1.00 ... cached
+(92/129) [96/129] ? D0.50 BL1.00 ... cached
+(93/129) [97/129] ? D0.50 BL1.00 ... cached
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(94/129) [98/129] ? D0.50 BL1.00 ... cached
+(95/129) [99/129] ? D0.50 BL1.00 ... cached
+(96/129) [100/129] ? D0.50 BL1.00 ... cached
+(97/129) [101/129] ? D0.50 BL1.00 ... cached
+(98/129) [102/129] ? D0.50 BL1.00 ... cached
+(99/129) [103/129] ? D0.50 BL1.00 ... cached
+(100/129) [104/129] ? D0.50 BL1.00 ... cached
+(101/129) [105/129] ? D0.50 BL1.00 ... cached
+(102/129) [106/129] ? D0.50 BL1.00 ... cached
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(103/129) [109/129] ? D0.50 BL1.00 ... cached
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(104/129) [110/129] ? D0.50 BL1.00 ... cached
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+(105/129) [108/129] ? D0.50 BL1.00 ... done
+(106/129) [113/129] ? D0.50 BL1.00 ... cached
+(107/129) [114/129] ? D0.50 BL1.00 ... cached
+(108/129) [84/129] ? D0.50 BL1.00 ... done
+(109/129) [116/129] ? D0.50 BL1.00 ... cached
+(110/129) [83/129] ? D0.50 BL1.00 ... done
+(111/129) [112/129] ? D0.50 BL1.00 ... done
+(112/129) [119/129] ? D0.50 BL1.00 ... cached
+(113/129) [80/129] ? D0.50 BL1.00 ... done
+(114/129) [121/129] ? D0.50 BL1.00 ... cached
+(115/129) [122/129] ? D0.50 BL1.00 ... cached
+(116/129) [123/129] ? D0.50 BL1.00 ... cached
+(117/129) [124/129] ? D0.50 BL1.00 ... cached
+(118/129) [125/129] ? D0.50 BL1.00 ... cached
+(119/129) [126/129] ? D0.50 BL1.00 ... cached
+(120/129) [127/129] ? D0.50 BL1.00 ... cached
+(121/129) [128/129] ? D0.50 BL1.00 ... cached
+(122/129) [129/129] ? D0.50 BL1.00 ... cached
+(123/129) [79/129] ? D0.50 BL1.00 ... done
+(124/129) [111/129] ? D0.50 BL1.00 ... done
+(125/129) [107/129] ? D0.50 BL1.00 ... done
+(126/129) [115/129] ? D0.50 BL1.00 ... done
+(127/129) [118/129] ? D0.50 BL1.00 ... done
+(128/129) [117/129] ? D0.50 BL1.00 ... done
+(129/129) [120/129] ? D0.50 BL1.00 ... done
+
+129/129 captures analysed (117 from cache).
+wrote analysis/reports/s74_baseline129.json  (2918778 bytes)

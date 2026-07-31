@@ -97,6 +97,15 @@ wdft::DiodeT<double, decltype(next), wdft::DiodeQuality::Best, AccurateOmega> d 
 
 ### Asymmetric clip modes & even harmonics — use a PER-POLARITY diode mismatch
 
+> ⛔⛔ **FOR THIS PROJECT, "check the captures" DOES NOT APPLY TO EVEN HARMONICS.** `analysis/captures/`
+> is a recording of the Neural DSP emulation, and its **even-order ladder is ~27 dB below the real
+> B7K's** (odd orders match to the dB — see `.claude/rules/reference-sources.md` §4). So a capture-fit
+> even-harmonic target here is not merely noisy, it is systematically wrong in one direction, and a
+> fit that "matches the captures" on H2/H4 has matched an emulator with essentially no asymmetry
+> mechanism. Sessions 5–7 and session 44 all fitted asymmetry against that target. Fit even-order
+> structure to the hardware ladder in `reference-sources.md` §4, and let the ND matrix govern
+> everything the correction should NOT move. The odd-order guidance below is unaffected.
+
 **Check captures for asymmetric harmonics on EVERY saturation stage, even ones the schematic draws
 as a textbook-symmetric antiparallel pair.** The schematic tells you the nominal topology, not the
 component tolerance or the DC bias point the real circuit actually sits at — both of which show up

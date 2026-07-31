@@ -206,6 +206,11 @@ chase.
 
 ## 6b. Validating clipping: harmonics, saturation, and the "go hotter" trap
 
+> ⛔ **PROJECT-SPECIFIC OVERRIDE (2026-07-29):** "compare to captures" is invalid for the **even/odd
+> balance** below. Our captures are the Neural DSP emulation, whose even-order harmonics sit ~27 dB
+> under the real B7K's while its odd orders match exactly. Use `.claude/rules/reference-sources.md`
+> §4 for the even/odd target; the THD-vs-drive taper guidance below is unaffected.
+
 Don't validate the drive/clipping by THD alone — compare the **harmonic profile** to captures.
 Play a steady **low-frequency tone** (~220 Hz, so H2..H8 all fall below Nyquist *and* below the
 tone-control corner, i.e. un-filtered), FFT it, and read the harmonic amplitudes for plugin vs real:

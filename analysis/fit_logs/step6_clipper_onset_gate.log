@@ -13,47 +13,42 @@ here would be a real null.
 POINT: PHYSICAL clipper (A0=25, sat 3.15/3.85)
 ----------------------------------------------------------------------------------------------------
    K (V/FS)  @-6dBFS |     min    9:30    noon    2:30     max |  min->noon  min err  ramp rms
-       0.87    0.43V |   -25.1   -25.1   -24.7   -21.6   -14.3 |       +0.4     -1.9     13.97   <- current anchor
-       1.20    0.60V |   -22.4   -22.3   -21.9   -17.6    -3.3 |       +0.5     +0.8     10.03
-       1.70    0.85V |   -19.5   -19.4   -18.8   -10.3    +8.0 |       +0.6     +3.7      7.29
-       2.40    1.20V |   -17.0   -16.9   -16.0    +3.0   +11.5 |       +1.0     +6.2      6.26
-       3.40    1.70V |   -15.7   -15.4   -13.3    +9.3   +16.5 |       +2.4     +7.5      8.93
-       4.80    2.40V |   -17.1   -16.5    -8.3   +15.5    +5.9 |       +8.9     +6.1      7.58
-       6.80    3.40V |   -27.2   -23.0    +4.0   +10.7   +13.5 |      +31.2     -4.0      9.81
-       9.60    4.80V |   -19.2   -21.0   +10.4   +10.1   +17.5 |      +29.6     +4.0     12.71
+       0.87    0.43V |   -28.7   -28.7   -28.6   -28.6   -27.1 |       +0.0     -5.5     20.44   <- current anchor
+       1.20    0.60V |   -25.9   -25.9   -25.9   -25.8   -22.4 |       +0.0     -2.7     17.56
+       1.70    0.85V |   -23.0   -23.0   -23.0   -22.9   -11.2 |       +0.0     +0.2     13.32
+       2.40    1.20V |   -20.6   -20.6   -20.6   -20.1    -5.4 |       +0.0     +2.6     10.99
+       3.40    1.70V |   -19.3   -19.3   -19.2   -15.4    -5.3 |       +0.0     +3.9      9.05
+       4.80    2.40V |   -20.9   -20.8   -20.6    -7.2   -10.8 |       +0.3     +2.3      7.93
+       6.80    3.40V |   -32.1   -31.6   -24.8    -5.9   -13.8 |       +7.3     -8.9     11.50
+       9.60    4.80V |   -21.8   -22.2   -14.0    -7.8   -13.0 |       +7.8     +1.4      7.65
 
   capture: min->noon +12.6, min err 0.0, ramp rms 0.00
-  (A) best min->noon leg  : +31.2 dB at K=6.80 (baseline +0.4, gain +30.8)  [bar +6.0]
-  (B) best whole-ramp rms : 6.26 at K=2.40 (baseline 13.97, 55% better)
-  (C) drive-min at best-rms K: -17.0 vs capture -23.2 (err +6.2 dB)
-  (D) implied input level : 2.40 V/FS = 1.20 V peak at the
+  (A) best min->noon leg  : +7.8 dB at K=9.60 (baseline +0.0, gain +7.8)  [bar +6.0]
+  (B) best whole-ramp rms : 7.65 at K=9.60 (baseline 20.44, 63% better)
+  (C) drive-min at best-rms K: -21.8 vs capture -23.2 (err +1.4 dB)
+  (D) implied input level : 9.60 V/FS = 4.80 V peak at the
       -6 dBFS 'hot bass' rung (a hot ACTIVE bass is ~1-2 V peak; a passive ~0.1-1 V)
 
-  ** JOINT VERDICT — one K satisfying (A) AND (C) AND (B) together: NONE **
-     Authority is REAL and LARGE (see (B): a fully PHYSICAL clipper goes from
-     unreachable to a better ramp than session 15 got from ANY clipper shape),
-     but onset position ALONE does not reproduce the ramp: wherever the min->noon
-     leg steepens, drive-min lifts off the capture with it. Read as NECESSARY but
-     NOT SUFFICIENT — K belongs in the fit, it is not by itself the answer.
+  ** JOINT VERDICT — one K satisfying (A) AND (C) AND (B) together: K=9.60 **
 
 ----------------------------------------------------------------------------------------------------
 POINT: session-15 beta-only fitted
 ----------------------------------------------------------------------------------------------------
    K (V/FS)  @-6dBFS |     min    9:30    noon    2:30     max |  min->noon  min err  ramp rms
-       0.87    0.43V |   -19.8   -19.4   -17.3    +4.8    +3.1 |       +2.6     +3.3      3.88   <- current anchor
-       1.20    0.60V |   -17.3   -16.8   -14.1    +5.9    +6.1 |       +3.2     +5.9      4.73
-       1.70    0.85V |   -14.8   -14.2    -9.9    +5.4   +10.1 |       +4.9     +8.4      6.59
-       2.40    1.20V |   -13.1   -12.1    -2.1    +9.6    +6.8 |      +11.0    +10.1      8.43
-       3.40    1.70V |   -12.6   -10.6    +8.7   +16.4    -1.8 |      +21.3    +10.6     12.86
-       4.80    2.40V |   -13.2    -7.3   +11.6    +2.2    -6.1 |      +24.8    +10.0     12.89
-       6.80    3.40V |   -12.5    +1.0   +20.1    -3.3    -1.0 |      +32.6    +10.6     17.68
-       9.60    4.80V |    -6.9    +8.0   +28.7    -2.5    +5.9 |      +35.6    +16.3     23.19
+       0.87    0.43V |   -23.5   -23.5   -23.4   -22.0    -4.4 |       +0.1     -0.3     12.16   <- current anchor
+       1.20    0.60V |   -20.9   -20.9   -20.9   -18.3    -0.7 |       +0.1     +2.2      9.97
+       1.70    0.85V |   -18.5   -18.5   -18.5   -11.5    +0.5 |       +0.1     +4.6      7.11
+       2.40    1.20V |   -16.9   -16.9   -16.8    -4.1    -3.0 |       +0.1     +6.2      5.24
+       3.40    1.70V |   -16.7   -16.7   -15.9    -2.4    -9.7 |       +0.8     +6.4      6.55
+       4.80    2.40V |   -18.2   -18.0   -10.1    -5.4   -17.6 |       +8.0     +5.0      9.21
+       6.80    3.40V |   -20.6   -18.4    -6.5   -14.3   -34.4 |      +14.2     +2.5     17.46
+       9.60    4.80V |   -21.2   -10.5    -8.1   -25.6   -47.0 |      +13.1     +2.0     25.07
 
   capture: min->noon +12.6, min err 0.0, ramp rms 0.00
-  (A) best min->noon leg  : +35.6 dB at K=9.60 (baseline +2.6, gain +33.0)  [bar +6.0]
-  (B) best whole-ramp rms : 3.88 at K=0.87 (baseline 3.88, 0% better)
-  (C) drive-min at best-rms K: -19.8 vs capture -23.2 (err +3.3 dB)
-  (D) implied input level : 0.87 V/FS = 0.43 V peak at the
+  (A) best min->noon leg  : +14.2 dB at K=6.80 (baseline +0.1, gain +14.1)  [bar +6.0]
+  (B) best whole-ramp rms : 5.24 at K=2.40 (baseline 12.16, 57% better)
+  (C) drive-min at best-rms K: -16.9 vs capture -23.2 (err +6.2 dB)
+  (D) implied input level : 2.40 V/FS = 1.20 V peak at the
       -6 dBFS 'hot bass' rung (a hot ACTIVE bass is ~1-2 V peak; a passive ~0.1-1 V)
 
   ** JOINT VERDICT — one K satisfying (A) AND (C) AND (B) together: NONE **

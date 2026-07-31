@@ -1,0 +1,262 @@
+SELFTEST
+  GATE 1 recovery  true d=  0.00  ->   0.00000  spread 0.00e+00  n=6   PASS
+  GATE 1 recovery  true d=  0.50  ->   0.50000  spread 0.00e+00  n=6   PASS
+  GATE 1 recovery  true d=  3.00  ->   3.00000  spread 0.00e+00  n=6   PASS
+  GATE 1 recovery  true d= 12.00  ->  12.00000  spread 0.00e+00  n=6   PASS
+  GATE 2 liveness  parity-split contamination: spread 4.000 dB, even +6.000 vs odd +2.000   PASS
+  GATE 3 law recovery  rho (0.9+0j) -> (0.9000000000000004+0j)  |err| 3.33e-16  rms 1.73e-15 dB   PASS
+  GATE 3 law recovery  rho (2.5-1.2j) -> (2.5-1.1999999999999993j)  |err| 6.66e-16  rms 1.26e-15 dB   PASS
+  GATE 4 law discriminates  correct taper rms 0.00e+00 dB vs wrong taper 0.6309 dB   PASS
+  GATE 5 anchor leak is one-signed  clean 6.7877 -> leaky 6.7747 dB (must fall)   PASS
+  GATE 6 balance recovery  true k= -6.0 ->  -6.00 dB  rms 0.0000 dB (n=10)   PASS
+  GATE 6 balance recovery  true k= -2.0 ->  -2.00 dB  rms 0.0000 dB (n=10)   PASS
+  GATE 6 balance recovery  true k= +3.5 ->  +3.50 dB  rms 0.0000 dB (n=10)   PASS
+  GATE 6b fit REFUSES a constant-Delta shape  rms 3.53 dB (must be >> 0.29)   PASS
+  -> PASS
+
+REPORT analysis/reports/s74_baseline129.json   129 captures
+  groups with a BLEND-max/LEVEL-max anchor AND >=1 diluted cell: 14
+  groups dropped (no anchor, or anchor only): 7
+    - D0.25                        no bleed-free anchor  (1 cells)
+    - D0.25 atk1 grn1              no bleed-free anchor  (1 cells)
+    - D0.25 atk2 grn1              no bleed-free anchor  (1 cells)
+    - D0.25 grn1                   no bleed-free anchor  (1 cells)
+    - D0.25 grn2                   no bleed-free anchor  (1 cells)
+    - D0.75 grn1                   no bleed-free anchor  (1 cells)
+    - D1.00 grn2                   anchor but no diluted cell  (0 cells)
+  cells EXCLUDED because the OD path is out of circuit (BLEND=0 or LEVEL=0): 5
+    -- `d` is infinite by construction there; the model returns +141 .. +363 dB.
+  cells dropped for fewer than 3 measurable orders: 170
+
+325 (group, cell, sweep, band) measurements, 53 distinct diluted captures
+
+GATE A  ORDER-INDEPENDENCE (the premise: `d` must be the same at every order)
+  pedal order-to-order spread   median  4.24  p90 13.33  max 44.63 dB
+  model order-to-order spread   median  0.00  p90  0.05  max  0.06 dB
+  pedal EVEN-minus-ODD `d`      median +0.11  10-90 -2.68 .. +3.76 dB
+  cells within the 3.0 dB spread gate: 110 of 325 (34 %)
+  => CHECK -- `d` is NOT order-independent; the premise does not hold here
+  ⭐ the MODEL's spread is ~0 while the PEDAL's is not, so this is a property of the CAPTURES,
+     not of the extraction -- which is what GATE A2 exists to identify.
+
+GATE A2  IS THE SPREAD THE PEDAL'S OWN NOISE FLOOR?  (H2/H3 vs H6/H7)
+  pedal  d(H2,H3) median  10.77   d(H6,H7) median  11.29 dB
+  pedal  d(low) - d(high)   median  +0.23  10-90  -2.52 ..  +5.03 dB   (n=251)
+  MODEL  d(low) - d(high)   median  -0.00  10-90  -0.00 ..  +0.04 dB   (n=251)  <- the CONTROL
+  Spearman rho of d(order) vs that order's own anchor level: median +0.200  (n=325)
+     positive => the orders with least headroom give the smallest `d` = the flooring signature
+  => no flooring signature; all six orders may be pooled
+
+GATE B  MONOTONICITY (dilution must FALL as the knob adds OD)
+  ladders with >=3 points: 8   violating by more than the 0.288 dB floor: 2
+  => CHECK
+
+THE RESULT -- `d` = fundamental dilution in dB;  Delta = pedal - model
+  (Delta > 0  =>  the pedal dilutes MORE  =>  the model's OD sits too HIGH vs its own bleed)
+
+  group                  capture                                            B     L   d_ped   d_mdl   Delta   spr
+  ---------------------------------------------------------------------------------------------------------------
+  D0.00                  drive-0700_grunt-boost_base-od.wav              1.00  0.50    4.47    7.92   -3.45  1.78
+  D0.00 atk1 grn1        drive-0700_attack-boost_base-od.wav             1.00  0.50    6.63   15.61   -8.98  2.88
+  D0.00 atk1 grn1        drive-0700_attack-boost_blend-0930_base-od.wav  0.25  0.50   39.71   43.76   -4.05  5.07
+  D0.00 atk1 grn1        drive-0700_attack-boost_blend-1200_base-od.wav  0.50  0.50   22.05   34.02  -11.98  3.53
+  D0.00 atk1 grn1        drive-0700_attack-boost_blend-1430_base-od.wav  0.75  0.50   12.17   25.06  -12.90  3.36
+  D0.00 atk2 grn1        drive-0700_attack-cut_base-od.wav               1.00  0.50   16.45   18.10   -1.65  6.60
+  D0.00 atk2 grn1        drive-0700_attack-cut_blend-1200_base-od.wav    0.50  0.50   33.22   35.18   -1.96  3.36
+  D0.00 atk2 grn1        drive-0700_attack-cut_blend-1430_base-od.wav    0.75  0.50   24.81   27.78   -2.97  1.97
+  D0.00 grn1             drive-0700_base-od.wav                          1.00  0.50   14.01   17.14   -3.13 13.79
+  D0.00 grn1             drive-0700_blend-1200_base-od.wav               0.50  0.50   24.01   32.90   -8.89 12.13
+  D0.00 grn1             drive-0700_blend-1430_base-od.wav               0.75  0.50   16.52   25.57   -9.05 14.16
+  D0.00 grn1             drive-0700_level-0930_base-od.wav               1.00  0.25   20.44   17.52   +2.92 12.26
+  D0.00 grn1             drive-0700_level-1430_base-od.wav               1.00  0.75    7.52   12.16   -4.63  4.48
+  D0.00 grn2             drive-0700_grunt-flat_base-od.wav               1.00  0.50    6.70    8.48   -1.78  3.91
+  D0.50                  grunt-boost_base-od.wav                         1.00  0.50    4.14    7.37   -3.23  1.21
+  D0.50                  grunt-boost_blend-0930_base-od.wav              0.25  0.50   27.02   30.18   -3.16  4.94
+  D0.50                  grunt-boost_blend-1200_base-od.wav              0.50  0.50   16.92   21.78   -4.85  2.15
+  D0.50                  grunt-boost_blend-1430_base-od.wav              0.75  0.50    8.38   15.09   -6.70  1.73
+  D0.50 atk1 grn1        attack-boost_base-od.wav                        1.00  0.50    3.89    9.00   -5.11  1.93
+  D0.50 atk1 grn1        attack-boost_blend-0930_base-od.wav             0.25  0.50   29.30   34.51   -5.21  3.42
+  D0.50 atk1 grn1        attack-boost_blend-1200_base-od.wav             0.50  0.50   17.57   23.94   -6.37  2.96
+  D0.50 atk1 grn1        attack-boost_blend-1430_base-od.wav             0.75  0.50    9.34   17.05   -7.72  3.53
+  D0.50 atk2 grn1        attack-cut_base-od.wav                          1.00  0.50    7.02   10.62   -3.60  2.64
+  D0.50 atk2 grn1        attack-cut_blend-0930_base-od.wav               0.25  0.50   36.63   42.75   -6.12  4.34
+  D0.50 atk2 grn1        attack-cut_blend-1200_base-od.wav               0.50  0.50   25.02   28.53   -3.50  6.42
+  D0.50 atk2 grn1        attack-cut_blend-1430_base-od.wav               0.75  0.50   15.13   20.46   -5.33  4.58
+  D0.50 grn1             blend-0930_base-od.wav                          0.25  0.50   39.05   42.75   -3.70 10.86
+  D0.50 grn1             blend-1200_base-od.wav                          0.50  0.50   24.47   27.57   -3.10  5.81
+  D0.50 grn1             blend-1430_base-od.wav                          0.75  0.50   14.55   19.02   -4.47  4.37
+  D0.50 grn1             level-0815_base-od.wav                          1.00  0.12   14.92   11.99   +2.93  9.02
+  D0.50 grn1             level-0930_base-od.wav                          1.00  0.25    9.76   11.76   -1.99  4.19
+  D0.50 grn1             level-1045_base-od.wav                          1.00  0.38    7.56   11.30   -3.74  4.77
+  D0.50 grn1             level-1315_base-od.wav                          1.00  0.62    6.57    9.43   -2.86  2.93
+  D0.50 grn1             level-1430_base-od.wav                          1.00  0.75    5.22    7.71   -2.49  2.47
+  D0.50 grn1             level-1545_base-od.wav                          1.00  0.88    2.41    5.00   -2.59  1.63
+  D0.50 grn1             ref-od.wav                                      1.00  0.50    7.30   10.56   -3.26  3.79
+  D0.50 grn2             grunt-flat_base-od.wav                          1.00  0.50    4.91    7.39   -2.48  4.25
+  D0.50 grn2             grunt-flat_blend-0930_base-od.wav               0.25  0.50   29.65   32.99   -3.34  3.74
+  D0.50 grn2             grunt-flat_blend-1200_base-od.wav               0.50  0.50   16.82   21.91   -5.09  5.10
+  D0.50 grn2             grunt-flat_blend-1430_base-od.wav               0.75  0.50   10.02   15.23   -5.21  3.84
+  D1.00                  drive-1700_grunt-boost_base-od.wav              1.00  0.50    3.91    7.32   -3.41  9.87
+  D1.00 atk1 grn1        drive-1700_attack-boost_base-od.wav             1.00  0.50    3.75    7.91   -4.16  2.67
+  D1.00 atk1 grn1        drive-1700_attack-boost_blend-0930_base-od.wav  0.25  0.50   25.67   30.84   -5.17  2.55
+  D1.00 atk1 grn1        drive-1700_attack-boost_blend-1200_base-od.wav  0.50  0.50   15.61   22.46   -6.84  3.23
+  D1.00 atk1 grn1        drive-1700_attack-boost_blend-1430_base-od.wav  0.75  0.50    8.66   15.68   -7.02  2.70
+  D1.00 atk2 grn1        drive-1700_attack-cut_base-od.wav               1.00  0.50    3.21    7.70   -4.49  5.81
+  D1.00 atk2 grn1        drive-1700_attack-cut_blend-0930_base-od.wav    0.25  0.50   27.83   32.98   -5.15  6.87
+  D1.00 atk2 grn1        drive-1700_attack-cut_blend-1200_base-od.wav    0.50  0.50   14.91   22.39   -7.48  8.73
+  D1.00 atk2 grn1        drive-1700_attack-cut_blend-1430_base-od.wav    0.75  0.50    8.32   15.54   -7.22  6.18
+  D1.00 grn1             drive-1700_base-od.wav                          1.00  0.50    3.75    7.82   -4.07  6.01
+  D1.00 grn1             drive-1700_blend-0930_base-od.wav               0.25  0.50   26.34   31.17   -4.83  8.35
+  D1.00 grn1             drive-1700_blend-1200_base-od.wav               0.50  0.50   15.83   22.42   -6.59 13.14
+  D1.00 grn1             drive-1700_blend-1430_base-od.wav               0.75  0.50    9.26   15.61   -6.35 10.66
+
+HEADLINE -- Delta_d pooled, split by whether a TAPER error can contribute
+  LEVEL ladder (blend = 1)     n=  55  median  -2.82  mean  -3.43  10-90  -5.98 ..  -1.56 dB
+  BLEND ladder (level = 0.5)   n=  55  median  -5.31  mean  -5.77  10-90  -8.38 ..  -3.59 dB
+  ALL diluted cells            n= 110  median  -4.22  mean  -4.60  10-90  -7.89 ..  -1.96 dB
+  ROBUST: H2/H3 only           n= 110  median  -4.26  mean  -4.63  10-90  -8.12 ..  -2.01 dB
+
+⭐ Delta vs DILUTION -- binned on the MODEL's own exact `d`, so the binning
+  coordinate carries none of the pedal's noise.  An ARTEFACT grows with dilution; a
+  real balance error does not.
+       model d bin    n  Delta(all)  Delta(H2/H3)  spread_ped
+            0-5 dB   10       -1.61         -1.73        1.69
+           5-10 dB   33       -3.06         -2.85        1.87
+          10-20 dB   34       -5.07         -5.43        1.82
+         20-inf dB   33       -5.50         -5.38        1.95
+  observed swing across the bins: 3.89 dB against an effect of -4.22 dB
+
+⭐⭐ ONE CONSTANT BALANCE ERROR, FITTED ACROSS THE WHOLE DILUTION RANGE
+  k = -6.50 dB   rms residual 1.95 dB   over n=110 cells spanning d_mdl 2.2 .. 43.0 dB
+       model d bin    n  observed  predicted   resid
+            0-5 dB   10     -1.61      -1.71   +0.10
+           5-10 dB   33     -3.06      -3.13   +0.08
+          10-20 dB   34     -5.07      -4.80   -0.27
+         20-inf dB   33     -5.50      -6.06   +0.56
+  => the trend IS a constant balance error -- 1 parameter, 4 bins, 110 cells, residual 1.95 dB
+  => k = -6.50 dB: the model's OD sits too LOW vs its own bleed, i.e. A3's known direction
+  ⚠ the POOLED Delta (-4.22 dB) is NOT this number and must not be quoted as it --
+    it is a mixture over dilution depths, so it UNDER-reads |k| by construction.
+
+PER BAND -- A3's CURVE on this axis (k, not the pooled Delta: see above)
+     100 Hz   n=  24  k -10.64 dB  rms  2.11   (pooled Delta median  -4.57)
+     200 Hz   n=  42  k  -6.14 dB  rms  1.57   (pooled Delta median  -3.99)
+     400 Hz   n=  44  k  -4.99 dB  rms  2.49   (pooled Delta median  -4.93)
+
+PER GROUP (operating point)
+  D0.00                  n=   6  k  -6.14 dB  rms  0.64   (pooled Delta median  -2.72)
+  D0.00 atk1 grn1        n=   8  k -14.94 dB  rms  2.93   (pooled Delta median  -9.47)
+  D0.00 atk2 grn1        n=   1  -- too few cells to fit k   (pooled Delta median  -2.97)
+  D0.00 grn1             n=   1  -- too few cells to fit k   (pooled Delta median  -2.70)
+  D0.00 grn2             n=   1  -- too few cells to fit k   (pooled Delta median  -4.79)
+  D0.50                  n=  19  k  -5.69 dB  rms  1.08   (pooled Delta median  -4.32)
+  D0.50 atk1 grn1        n=  14  k -10.14 dB  rms  1.62   (pooled Delta median  -6.55)
+  D0.50 atk2 grn1        n=   5  k  -4.33 dB  rms  0.97   (pooled Delta median  -2.86)
+  D0.50 grn1             n=  19  k  -7.06 dB  rms  1.45   (pooled Delta median  -2.24)
+  D0.50 grn2             n=   9  k  -4.87 dB  rms  1.80   (pooled Delta median  -3.79)
+  D1.00                  n=   2  -- too few cells to fit k   (pooled Delta median  -1.31)
+  D1.00 atk1 grn1        n=  19  k  -7.22 dB  rms  1.77   (pooled Delta median  -5.29)
+  D1.00 atk2 grn1        n=   1  -- too few cells to fit k   (pooled Delta median  -4.71)
+  D1.00 grn1             n=   5  k  -5.13 dB  rms  1.62   (pooled Delta median  -4.27)
+
+⭐ CROSS-CHECK -- the known ATTACK gap, which this tool was not built to see
+    drive  default k  atk BOOST k   excess  atk CUT k   excess
+    D0.00         --       -14.94       --         --       --
+    D0.50      -7.06       -10.14    -3.08      -4.33    +2.73
+    D1.00      -5.13        -7.22    -2.08         --       --
+  => a BOOST excess that is negative and shrinks with drive, with CUT much smaller, is the
+     signature sessions 57/60 predict.  `--` = that group had < 3 usable cells (drive min is
+     the thin end here: weak harmonics put most of its cells under the reference floor).
+
+GATE C  THE MODEL'S OWN MIXING LAW (known law, one free complex ratio)
+  fits: 69  (>=3 ladder points each, so >=1 spare equation)   INFEASIBLE: model 0, pedal 0
+  MODEL law residual   median 0.003  p90 0.016  max 0.029 dB
+  PEDAL law residual   median 0.848  p90 1.775  max 4.390 dB
+  => MODEL PASS (floor 0.288 dB) -- this is a KNOWN-ANSWER check on the extraction, not a result
+  ⚠ the PEDAL residual is NOT the same kind of number: it is fitted with the MODEL's tapers,
+     which are measurably wrong (sessions 51/54), so a non-zero residual there is expected
+     and is a taper statement, not a balance statement.
+
+  |rho| = |clean_1 / OD_1| at the top of the LEVEL pot, in dB (-20log10|G| in `a3_blend_axis`'s notation):
+  group                  sweep               Hz   n      mdl      ped  ped-mdl
+  D0.00 atk1 grn1        sweep_drv_-12      400   3    17.81     6.98   -10.83
+  D0.00 atk1 grn1        sweep_drv_-18      400   3    17.85     2.74   -15.11
+  D0.00 atk1 grn1        sweep_drv_-6       200   3    14.42     2.87   -11.55
+  D0.00 atk1 grn1        sweep_drv_-6       400   4    18.90    13.40    -5.49
+  D0.00 atk2 grn1        sweep_drv_-6       400   3    19.03    16.62    -2.41
+  D0.00 grn1             sweep_drv_-6       200   5    14.42     5.92    -8.50
+  D0.00 grn1             sweep_drv_-6       400   5    18.97    14.42    -4.54
+  D0.50                  sweep_drv_-12      100   4    -0.94    -3.86    -2.92
+  D0.50                  sweep_drv_-12      200   4     4.18     0.01    -4.17
+  D0.50                  sweep_drv_-12      400   4    12.08     7.18    -4.90
+  D0.50                  sweep_drv_-18      100   4    -6.76    -8.64    -1.88
+  D0.50                  sweep_drv_-18      200   4    -1.68    -4.96    -3.28
+  D0.50                  sweep_drv_-18      400   4     6.23     1.47    -4.77
+  D0.50                  sweep_drv_-6       100   3     5.04    -0.31    -5.34
+  D0.50                  sweep_drv_-6       200   4    10.13     6.57    -3.56
+  D0.50                  sweep_drv_-6       400   4    18.04    13.04    -5.00
+  D0.50 atk1 grn1        sweep_drv_-12      100   3     4.73    -3.26    -7.99
+  D0.50 atk1 grn1        sweep_drv_-12      200   4     5.84    -0.06    -5.90
+  D0.50 atk1 grn1        sweep_drv_-12      400   4    12.14     6.93    -5.21
+  D0.50 atk1 grn1        sweep_drv_-18      200   4     5.33    -5.27   -10.60
+  D0.50 atk1 grn1        sweep_drv_-18      400   4     8.88     2.53    -6.34
+  D0.50 atk1 grn1        sweep_drv_-6       100   3     6.14     0.55    -5.59
+  D0.50 atk1 grn1        sweep_drv_-6       200   4    10.18     3.85    -6.33
+  D0.50 atk1 grn1        sweep_drv_-6       400   4    17.86    12.19    -5.67
+  D0.50 atk2 grn1        sweep_drv_-12      400   3    12.16     8.08    -4.09
+  D0.50 atk2 grn1        sweep_drv_-6       200   3    10.18     4.75    -5.43
+  D0.50 atk2 grn1        sweep_drv_-6       400   4    17.87    12.19    -5.67
+  D0.50 grn1             sweep_drv_-12      200   8     5.82    -0.85    -6.67
+  D0.50 grn1             sweep_drv_-12      400   9    12.16    11.48    -0.67
+  D0.50 grn1             sweep_drv_-18      400   9     8.94     8.47    -0.47
+  D0.50 grn1             sweep_drv_-6       100   8     6.14     3.95    -2.19
+  D0.50 grn1             sweep_drv_-6       200   9    10.19     3.75    -6.43
+  D0.50 grn1             sweep_drv_-6       400  10    17.86    12.28    -5.58
+  D0.50 grn2             sweep_drv_-12      100   3    -0.77    -5.50    -4.74
+  D0.50 grn2             sweep_drv_-12      200   4     4.08     0.86    -3.23
+  D0.50 grn2             sweep_drv_-12      400   4    11.89     7.57    -4.32
+  D0.50 grn2             sweep_drv_-18      100   3    -6.57   -21.99   -15.42
+  D0.50 grn2             sweep_drv_-18      200   4    -1.75    -6.30    -4.55
+  D0.50 grn2             sweep_drv_-18      400   4     6.06     2.47    -3.59
+  D0.50 grn2             sweep_drv_-6       100   3     5.15     0.24    -4.92
+  D0.50 grn2             sweep_drv_-6       200   4    10.02     4.21    -5.81
+  D0.50 grn2             sweep_drv_-6       400   4    17.85    13.15    -4.70
+  D1.00 atk1 grn1        sweep_drv_-12      100   4    -0.77    -4.86    -4.09
+  D1.00 atk1 grn1        sweep_drv_-12      200   4     4.08    -0.46    -4.53
+  D1.00 atk1 grn1        sweep_drv_-12      400   4    12.12     6.31    -5.81
+  D1.00 atk1 grn1        sweep_drv_-18      100   4    -6.65   -10.02    -3.37
+  D1.00 atk1 grn1        sweep_drv_-18      200   4    -1.97    -6.14    -4.17
+  D1.00 atk1 grn1        sweep_drv_-18      400   4     5.75     0.88    -4.88
+  D1.00 atk1 grn1        sweep_drv_-6       100   4     6.50    -0.05    -6.55
+  D1.00 atk1 grn1        sweep_drv_-6       200   4    10.19     3.61    -6.58
+  D1.00 atk1 grn1        sweep_drv_-6       400   4    18.10    10.25    -7.85
+  D1.00 atk2 grn1        sweep_drv_-12      100   3    -0.77    -6.80    -6.04
+  D1.00 atk2 grn1        sweep_drv_-12      200   4     4.10    -1.18    -5.28
+  D1.00 atk2 grn1        sweep_drv_-12      400   4    12.07     5.28    -6.79
+  D1.00 atk2 grn1        sweep_drv_-18      100   3    -6.65    -9.77    -3.13
+  D1.00 atk2 grn1        sweep_drv_-18      200   4    -1.99    -4.02    -2.03
+  D1.00 atk2 grn1        sweep_drv_-18      400   4     5.78     2.29    -3.49
+  D1.00 atk2 grn1        sweep_drv_-6       100   3     6.50    -4.52   -11.03
+  D1.00 atk2 grn1        sweep_drv_-6       200   4    10.19     0.95    -9.24
+  D1.00 atk2 grn1        sweep_drv_-6       400   4    18.09     9.60    -8.49
+  D1.00 grn1             sweep_drv_-12      100   4    -0.77    -5.64    -4.87
+  D1.00 grn1             sweep_drv_-12      200   4     4.11    -1.32    -5.44
+  D1.00 grn1             sweep_drv_-12      400   4    12.09     6.90    -5.19
+  D1.00 grn1             sweep_drv_-18      100   3    -6.65   -12.19    -5.54
+  D1.00 grn1             sweep_drv_-18      200   4    -1.99    -6.39    -4.40
+  D1.00 grn1             sweep_drv_-18      400   4     5.78     1.82    -3.96
+  D1.00 grn1             sweep_drv_-6       100   4     6.51     0.04    -6.47
+  D1.00 grn1             sweep_drv_-6       200   4    10.19     0.31    -9.88
+  D1.00 grn1             sweep_drv_-6       400   4    18.09    11.16    -6.93
+
+⚠ NOT CLAIMED
+  * `pedal_db` is the NEURAL DSP capture, not hardware (`reference-sources.md`).  A3 is a
+    LINEAR-path / mixing quantity, and per §1 ND tracks hardware to <= 1.4 dB there, so the
+    captures DO have authority over this statistic -- unlike the even-order harmonic ones.
+  * `d` is indexed by KNOB POSITION and the pedal's tapers differ from the model's, so a
+    per-cell Delta mixes taper conformity with the OD/clean balance.  The two-ladder split
+    above is the discriminator, not a single number.
+  * The anchor's zero-bleed premise is TOPOLOGICAL, bounded at <= 0.87 dB (session 60 item 2)
+    and one-signed (GATE 5), so it cannot manufacture a Delta.
+
+wrote analysis/reports/s85_a3_harmonic_axis.json

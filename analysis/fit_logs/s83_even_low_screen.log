@@ -1,0 +1,655 @@
+==========================================================================================
+GATE 0 -- extractor identity on a synthesised ladder (closed-form answer)
+==========================================================================================
+  H2 want -14.0 got -14.0  H3 want -23.5 got -23.5  H4 want -31.0 got -31.0  H5 want -40.0 got -40.0  H6 want -47.0 got -47.0
+  worst |error| = 4.214e-12 dB   inharmonic residual -266.8 dB   PASS
+  liveness: adding a -34 dB inharmonic tone moves the residual -266.8 -> -34.0 dB   PASS
+  crossing locator: want -32.000 dBFS, got -32.000   PASS
+  first-upward-crossing only: -12 dB is crossed twice (rising -32.00, falling -16.00); got -32.00 dBFS   PASS
+
+  GATE 0 -> PASS
+
+==========================================================================================
+EVEN-ORDER CANDIDATE SCREEN -- the 1 kHz axis, BOTH anchors, reported SEPARATELY
+==========================================================================================
+  captures            : 76
+  renderer            : build/OfflineRender_artefacts/Release/OfflineRender  (OS 8, --trim-latency)
+  condition           : DERIVED per file via captures.render_args(parse_capture())
+
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:303: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- REFERENCE (ND captures): window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.022 dB   contaminated (> 1.0 dB): 0
+       0.022 dB    -33 dBFS   drive-0700_attack-cut_blend-0930_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-cut_blend-0930_base-od.wav
+       0.013 dB    -30 dBFS   drive-0700_attack-cut_blend-0930_base-od.wav
+       0.012 dB    -36 dBFS   drive-0700_blend-0930_base-od.wav
+       0.008 dB    -33 dBFS   drive-0700_blend-0930_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- REFERENCE (ND captures): inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -17.9 dB   median -50.0 dB   cells over the limit: 98 of 912
+        -17.9 dB     -3 dBFS   drive-1700_level-1700_attack-cut_base-od.wav
+        -18.1 dB    -18 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+        -18.1 dB    -24 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -18.1 dB    -27 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+
+==========================================================================================
+GATE 3b -- correction SIGN, against a closed-form case
+==========================================================================================
+  generated (H2-H3) = +0.00 dB   chain tilt c23 = g(3f)-g(2f) = +6.00 dB
+  a meter at the output reads -6.00 dB
+  de-embed as out + c23 = +0.00   (want +0.00)   PASS
+  the session-78 form out - c23 = -12.00   -- doubles the tilt, correctly REJECTED
+
+  GATE 3b -> PASS
+
+==========================================================================================
+FILTER CORRECTIONS (GATE 3) -- measured on the BLEED-FREE captures/renders
+==========================================================================================
+  ND    H2-H3 correction +0.56 dB      model +1.48 dB   ⇒ net +0.92 dB
+  ⚠ the model correction is the SHIPPED chain's LINEAR FR, and every candidate
+    here moves an EVEN term whose leading part is a*w^2/2, so T'(0) -- and with it
+    the small-signal transfer -- is unchanged.  That is an argument, so it is also
+    CHECKED below: an even-only lever must leave the ODD orders alone (H3 CONTROL).
+
+  reference reaches the low-drive anchor in 24 captures, median H2-H3 = +10.12 dB
+  reference reaches the mid-drive anchor in 30 captures, median H2-H3 = -11.93 dB
+
+==========================================================================================
+CANDIDATE  shipped   fit = (shipped defaults)
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [shipped]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.017 dB   contaminated (> 1.0 dB): 0
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [shipped]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -12.6 dB   median -48.3 dB   cells over the limit: 121 of 912
+        -12.6 dB    -12 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -12.6 dB    -12 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.8 dB     -3 dBFS   level-1700_grunt-boost_base-od.wav
+        -12.8 dB    -15 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+
+==========================================================================================
+CANDIDATE  a=1.2   fit = ['jfetSatNeg=1.2']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [a=1.2]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.017 dB   contaminated (> 1.0 dB): 0
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [a=1.2]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst +2.1 dB   median -48.4 dB   cells over the limit: 121 of 912
+         +2.1 dB     -3 dBFS   drive-1700_level-1700_base-od.wav
+        -12.6 dB    -15 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+        -12.7 dB     -3 dBFS   level-1700_grunt-boost_base-od.wav
+        -12.7 dB     -3 dBFS   level-1700_grunt-flat_base-od.wav
+
+==========================================================================================
+CANDIDATE  a=1.9   fit = ['jfetSatNeg=1.9']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [a=1.9]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.017 dB   contaminated (> 1.0 dB): 0
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [a=1.9]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -12.6 dB   median -48.3 dB   cells over the limit: 121 of 912
+        -12.6 dB    -15 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+        -12.6 dB    -15 dBFS   drive-1700_level-1700_base-od.wav
+        -12.6 dB     -9 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.6 dB     -3 dBFS   level-1700_grunt-flat_base-od.wav
+
+==========================================================================================
+CANDIDATE  a=3.0   fit = ['jfetSatNeg=3.0']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [a=3.0]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.018 dB   contaminated (> 1.0 dB): 0
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [a=3.0]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -12.4 dB   median -48.0 dB   cells over the limit: 124 of 912
+        -12.4 dB     -9 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.5 dB     -9 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -12.6 dB    -12 dBFS   drive-1700_level-1700_attack-cut_base-od.wav
+        -12.6 dB    -12 dBFS   drive-1700_level-1700_base-od.wav
+
+==========================================================================================
+CANDIDATE  a=4.5   fit = ['jfetSatNeg=4.5']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [a=4.5]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.049 dB   contaminated (> 1.0 dB): 0
+       0.049 dB     -9 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+       0.049 dB     -9 dBFS   drive-1700_grunt-boost_base-od.wav
+       0.019 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.019 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [a=4.5]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -7.9 dB   median -47.6 dB   cells over the limit: 126 of 912
+         -7.9 dB     -9 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -10.6 dB     -9 dBFS   drive-1700_level-1700_base-od.wav
+        -12.1 dB     -9 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.5 dB    -12 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+
+==========================================================================================
+CANDIDATE  SQ a=1.75   fit = ['jfetSatNeg=1.75', 'jfetCeilNeg=0.28571']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [SQ a=1.75]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.018 dB   contaminated (> 1.0 dB): 0
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [SQ a=1.75]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -12.3 dB   median -48.4 dB   cells over the limit: 122 of 912
+        -12.3 dB     -6 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -12.4 dB     -9 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.4 dB     -9 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -12.6 dB    -15 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+
+==========================================================================================
+CANDIDATE  SQ a=1.9 s=0.40   fit = ['jfetSatNeg=1.9', 'jfetCeilNeg=0.26316', 'jfetSatPos=0.40']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [SQ a=1.9 s=0.40]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.586 dB   contaminated (> 1.0 dB): 0
+       0.586 dB     -3 dBFS   drive-1700_grunt-boost_base-od.wav
+       0.579 dB     -3 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+       0.018 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [SQ a=1.9 s=0.40]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst +2.4 dB   median -48.3 dB   cells over the limit: 122 of 912
+         +2.4 dB     -3 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.4 dB     -9 dBFS   drive-1700_level-1700_attack-boost_base-od.wav
+        -12.4 dB     -9 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.4 dB     -9 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+
+==========================================================================================
+CANDIDATE  CTL jfetSatPos   fit = ['jfetSatPos=0.20']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [CTL jfetSatPos]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.017 dB   contaminated (> 1.0 dB): 0
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.016 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [CTL jfetSatPos]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -9.7 dB   median -48.3 dB   cells over the limit: 121 of 912
+         -9.7 dB     -6 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -12.5 dB    -12 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+        -12.6 dB    -12 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.7 dB    -15 dBFS   drive-1700_level-1700_grunt-flat_base-od.wav
+
+==========================================================================================
+CANDIDATE  CTL jfetCeilNeg   fit = ['jfetCeilNeg=0.33']
+==========================================================================================
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+/Users/leighpierce/Git/Obsidian-B7000/analysis/analyze.py:24: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  sr, x = wavfile.read(path)
+==========================================================================================
+GATE 1 -- MODEL [CTL jfetCeilNeg]: window settling, two halves of each cell's own window must agree
+==========================================================================================
+  cells 912   worst |H2/H3 half-vs-half| = 0.017 dB   contaminated (> 1.0 dB): 0
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-0930_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_level-1700_attack-boost_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1200_base-od.wav
+       0.017 dB    -36 dBFS   drive-0700_attack-boost_blend-1430_base-od.wav
+  ⚠ the stimulus gives 0.8 s tones against ~220 ms of output-coupling settling,
+    so this is measured, not assumed.  The ladder ASCENDS, so each cell's
+    contaminating neighbour is the QUIETER one -- the benign direction.
+
+==========================================================================================
+GATE 2 -- MODEL [CTL jfetCeilNeg]: inharmonic residual under -25 dB re fundamental
+==========================================================================================
+  worst -11.6 dB   median -48.4 dB   cells over the limit: 121 of 912
+        -11.6 dB     -3 dBFS   drive-1700_level-1700_grunt-boost_base-od.wav
+        -12.7 dB     -3 dBFS   level-1700_attack-boost_base-od.wav
+        -12.7 dB     -3 dBFS   level-1700_grunt-boost_base-od.wav
+        -12.7 dB     -3 dBFS   level-1700_grunt-flat_base-od.wav
+
+==========================================================================================
+GATE L -- the override must REACH the binary, and only the intended lever may move
+==========================================================================================
+  candidate               max|dH2| whole ladder   |dH2| AT the low anchor
+  a=1.2                                4.080 dB                  3.266 dB
+  a=1.9                                8.169 dB                  6.834 dB
+  a=3.0                               12.206 dB                 10.749 dB
+  a=4.5                               15.770 dB                 14.273 dB
+  SQ a=1.75                            7.467 dB                  6.281 dB
+  SQ a=1.9 s=0.40                      8.185 dB                  6.977 dB
+  CTL jfetSatPos                       4.311 dB                  0.032 dB
+  CTL jfetCeilNeg                      3.932 dB                  0.003 dB
+  ⇒ LIVENESS is the ladder column; the CONTROL claim is the anchor column.  A lever
+    that is large on the ladder and ~0 at the anchor is inert WHERE THE STATISTIC IS
+    READ, which is a far sharper discriminator than a globally-dead control.
+
+==========================================================================================
+MEMBERSHIP -- the FIXED common set every candidate is scored on
+==========================================================================================
+   low-drive anchor: reference 24, per-candidate [32, 32, 33, 32, 32, 32, 32, 32, 32], FIXED intersection 22
+   mid-drive anchor: reference 30, per-candidate [18, 18, 18, 18, 18, 18, 18, 18, 18], FIXED intersection 16
+  ⚠ the fixed set is what the table below uses.  A candidate's own set differs
+    because raising H2 lifts cells over the measurability margin -- scoring on
+    those would compare differently-populated sets
+    (`aggregate-moved-check-membership-first`).
+
+==========================================================================================
+d(H2-H3) = model - ND, AT EACH ANCHOR SEPARATELY.  There is no combined column.
+==========================================================================================
+  candidate                 d(low)          p10..p90    d(mid)          p10..p90     sel
+  shipped                    -7.93  -12.05..  -3.51    +10.94   +5.86.. +22.31        
+  a=1.2                      -5.47   -8.36..  -1.43    +11.53   +6.11.. +22.50   4.15x
+  a=1.9                      -2.38   -5.28..  +2.33    +12.40   +6.49.. +22.80   3.81x
+  a=3.0                      +1.61   -2.46..  +4.64    +13.46   +7.26.. +23.25   3.79x
+  a=4.5                      +5.15   +0.33..  +8.19    +14.94   +8.46.. +23.83   3.27x
+  SQ a=1.75                  -3.00   -5.19..  +1.87    +12.23   +6.41.. +22.74   3.84x
+  SQ a=1.9 s=0.40            -2.28   -4.69..  +2.59    +12.40   +6.50.. +22.80   3.88x
+  CTL jfetSatPos             -8.38  -12.57..  -3.54    +10.90   +5.71.. +22.31     inf
+  CTL jfetCeilNeg            -7.65  -11.87..  -3.41    +10.94   +5.94.. +22.31     inf
+
+  reference (ND) at the fixed set: low +10.12   mid -11.51 dB
+  ⇒ d(low) should move toward 0 (ND lies BETWEEN us and hardware there, so the
+    first ~8 dB is monotone toward both); d(mid) should NOT move (the model is
+    already ~at hardware there -- session 72's 94 %, 88 % against measured ND).
+
+==========================================================================================
+GATE B -- the SHIPPED point must reproduce the session-79 record
+==========================================================================================
+   low-drive d(H2-H3): got -7.93   recorded -7.93   |d| 0.00 dB   PASS
+   mid-drive d(H2-H3): got +10.94   recorded +10.94   |d| 0.00 dB   PASS
+  ⚠ the recorded figures are on each side's NATIVE set; this table is on the
+    FIXED intersection, so a small offset is expected and is bounded by the
+    tolerance, not explained away.
+
+==========================================================================================
+PER-ORDER ABSOLUTES at each anchor (model), beside ND -- a pair statistic cancels
+common-mode error exactly, so these are printed too
+==========================================================================================
+  --- low-drive anchor, 22 captures ---
+      candidate                   H2      H3      H4      H5      H6
+      ND (reference)           -32.4   -42.0   -64.4   -86.7  -102.4
+      shipped                  -42.1   -42.0   -60.1   -70.2   -90.8
+      a=1.2                    -38.8   -42.0   -59.9   -70.5   -89.1
+      a=1.9                    -35.4   -42.0   -59.5   -71.1   -87.3
+      a=3.0                    -31.9   -42.0   -58.4   -71.6   -84.4
+      a=4.5                    -28.4   -42.0   -56.3   -71.3   -81.4
+      SQ a=1.75                -36.0   -42.0   -59.6   -70.4   -87.6
+      SQ a=1.9 s=0.40          -35.4   -42.0   -59.5   -70.3   -87.0
+      CTL jfetSatPos           -42.4   -42.0   -59.6   -70.3   -90.2
+      CTL jfetCeilNeg          -41.9   -42.0   -60.3   -70.1   -90.8
+
+  --- mid-drive anchor, 16 captures ---
+      candidate                   H2      H3      H4      H5      H6
+      ND (reference)           -24.1   -12.0   -34.6   -42.7   -57.5
+      shipped                  -14.8   -12.0   -32.9   -37.7   -45.5
+      a=1.2                    -14.6   -12.0   -32.2   -37.7   -45.5
+      a=1.9                    -14.3   -12.0   -31.8   -37.8   -45.5
+      a=3.0                    -13.7   -12.0   -29.2   -37.7   -45.3
+      a=4.5                    -13.0   -12.0   -26.2   -37.7   -45.0
+      SQ a=1.75                -14.4   -12.0   -32.1   -37.7   -45.5
+      SQ a=1.9 s=0.40          -14.3   -12.0   -31.9   -37.8   -45.4
+      CTL jfetSatPos           -14.8   -12.0   -32.7   -37.7   -45.3
+      CTL jfetCeilNeg          -14.8   -12.0   -32.9   -37.7   -45.5
+
+==========================================================================================
+ODD-ORDER CONTROL -- an EVEN-only lever must leave the ODD orders alone
+==========================================================================================
+  ⚠⚠ IT MUST BE H5, NOT H3.  The first version of this gate scored H3 and could
+  only ever return 0.00 dB: every side is ANCHORED on its own H3/H1 crossing, so
+  H3 is pinned to the anchor value BY CONSTRUCTION.  A control whose answer is
+  fixed by the construction of the measurement tests nothing, however reassuring
+  a table of zeros looks.  H5 is odd and NOT pinned, so it can actually fail.
+  If an odd order moves as much as H2, the candidate is not an even-order
+  correction at all -- it is a drive/level change, and the model's linear filter
+  correction (held fixed across candidates) would no longer be valid either.
+  --- low-drive ---
+      a=1.2                  dH2  +3.26   dH5  -0.27   |dH5/dH2|  0.08   (dH3 +0.00 = pinned by the anchor)
+      a=1.9                  dH2  +6.61   dH5  -0.89   |dH5/dH2|  0.13   (dH3 +0.00 = pinned by the anchor)
+      a=3.0                  dH2 +10.16   dH5  -1.33   |dH5/dH2|  0.13   (dH3 +0.00 = pinned by the anchor)
+      a=4.5                  dH2 +13.64   dH5  -1.05   |dH5/dH2|  0.08   (dH3 +0.00 = pinned by the anchor)
+      SQ a=1.75              dH2  +6.09   dH5  -0.16   |dH5/dH2|  0.03   (dH3 +0.00 = pinned by the anchor)
+      SQ a=1.9 s=0.40        dH2  +6.67   dH5  -0.02   |dH5/dH2|  0.00   (dH3 +0.00 = pinned by the anchor)
+      CTL jfetSatPos         dH2  -0.30   dH5  -0.06   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+      CTL jfetCeilNeg        dH2  +0.13   dH5  +0.19   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+  --- mid-drive ---
+      a=1.2                  dH2  +0.16   dH5  -0.03   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+      a=1.9                  dH2  +0.50   dH5  -0.11   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+      a=3.0                  dH2  +1.09   dH5  -0.01   |dH5/dH2|  0.01   (dH3 +0.00 = pinned by the anchor)
+      a=4.5                  dH2  +1.78   dH5  -0.08   |dH5/dH2|  0.04   (dH3 +0.00 = pinned by the anchor)
+      SQ a=1.75              dH2  +0.43   dH5  -0.09   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+      SQ a=1.9 s=0.40        dH2  +0.51   dH5  -0.12   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+      CTL jfetSatPos         dH2  -0.03   dH5  -0.01   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+      CTL jfetCeilNeg        dH2  +0.00   dH5  -0.00   |dH5/dH2|   nan   (dH3 +0.00 = pinned by the anchor)   (dH2 < 1.0 dB -- inert here, ratio not meaningful)
+
+==========================================================================================
+H4 -- THE COST d(H2-H3) CANNOT SEE
+==========================================================================================
+  d(H2-H3) is blind to H4 by construction, and H4 is not a free ride: at the low
+  anchor the model already sits ABOVE ND on H4 while sitting BELOW it on H2, so a
+  lever that raises both improves one and worsens the other
+  (`difference-statistics-hide-common-mode`).
+
+  ⚠⚠ BUT THIS ROW HAS NEVER BEEN GUARDED, AND THE ANCHOR SUBSET DOES NOT GUARD IT
+  (session 83).  `msub`/`nsub` select on `ok23` -- H2 AND H3 measurable -- because
+  the headline statistic is the H2-H3 pair.  `ok45` is computed per hit and is
+  simply never consulted here, so every H4 number printed since session 80 is a
+  median over cells selected for H2/H3 reliability and NOT for H4's.  That matters
+  because a floored Hn is not a measurement: the LS fit returns whatever noise
+  projects onto that basis vector, bounded BELOW by roughly the cell's residual, so
+  a floored value reads too HIGH.  On the MODEL side that biases (model - ND)
+  UPWARD -- which is exactly the direction of the claim being made.  The support
+  and the reference-guarded read are therefore printed below, and the guard is on
+  the REFERENCE (`floor-guard-belongs-on-the-reference`, session 74 item 6 --
+  guarding on the model selects away the cells where the model under-produces).
+  --- low-drive, ND H4 = -64.4 dB, 22 cells in the fixed set ---
+      SUPPORT: reference H4 measurable (H4 > residual + 6 dB) in 21 of 22 cells; reference H2 in 22 of 22 (the control -- the headline statistic's own order)
+      candidate                unpaired  med(m)-med(ND)   PAIRED med(m-ND)   PAIRED, guarded
+      shipped                                +4.30 dB           +4.45 dB          +3.04 dB   (model H4 measurable 22/22)
+                             ⚠ per-cell d(H4) spread over the 22 cells: p10 -8.4 .. p90 +18.7, full -18.1 .. +23.8 dB (41.9 dB WIDE) -- the median is a summary of THAT
+                             dropped by the guard: blend-1430_base-od.wav  d(H4) +23.8 dB (ND H4 -83.5 vs its residual -88.0)
+      a=1.2                                  +4.46 dB           +4.63 dB          +2.90 dB   (model H4 measurable 22/22)
+      a=1.9                                  +4.92 dB           +5.58 dB          +3.65 dB   (model H4 measurable 22/22)
+      a=3.0                                  +6.04 dB           +7.78 dB          +6.02 dB   (model H4 measurable 22/22)
+      a=4.5                                  +8.07 dB           +8.69 dB          +8.45 dB   (model H4 measurable 22/22)
+      SQ a=1.75                              +4.76 dB           +5.32 dB          +3.42 dB   (model H4 measurable 22/22)
+      SQ a=1.9 s=0.40                        +4.92 dB           +5.78 dB          +3.91 dB   (model H4 measurable 22/22)
+      CTL jfetSatPos                         +4.78 dB           +3.79 dB          +3.11 dB   (model H4 measurable 22/22)
+      CTL jfetCeilNeg                        +4.15 dB           +4.34 dB          +3.03 dB   (model H4 measurable 22/22)
+
+  --- mid-drive, ND H4 = -34.6 dB, 16 cells in the fixed set ---
+      SUPPORT: reference H4 measurable (H4 > residual + 6 dB) in 16 of 16 cells; reference H2 in 16 of 16 (the control -- the headline statistic's own order)
+      candidate                unpaired  med(m)-med(ND)   PAIRED med(m-ND)   PAIRED, guarded
+      shipped                                +1.76 dB           +1.98 dB          +1.98 dB   (model H4 measurable 16/16)
+                             ⚠ per-cell d(H4) spread over the 16 cells: p10 -3.7 .. p90 +9.3, full -7.9 .. +13.7 dB (21.6 dB WIDE) -- the median is a summary of THAT
+      a=1.2                                  +2.44 dB           +1.24 dB          +1.24 dB   (model H4 measurable 16/16)
+      a=1.9                                  +2.77 dB           +3.75 dB          +3.75 dB   (model H4 measurable 16/16)
+      a=3.0                                  +5.38 dB           +6.12 dB          +6.12 dB   (model H4 measurable 16/16)
+      a=4.5                                  +8.38 dB           +8.13 dB          +8.13 dB   (model H4 measurable 16/16)
+      SQ a=1.75                              +2.51 dB           +3.59 dB          +3.59 dB   (model H4 measurable 16/16)
+      SQ a=1.9 s=0.40                        +2.76 dB           +4.47 dB          +4.47 dB   (model H4 measurable 16/16)
+      CTL jfetSatPos                         +1.89 dB           +1.95 dB          +1.95 dB   (model H4 measurable 16/16)
+      CTL jfetCeilNeg                        +1.75 dB           +1.98 dB          +1.98 dB   (model H4 measurable 16/16)
+
+  ⇒ low-drive: H4 IS supported -- 21/22 reference-measurable cells (H2 control 22/22). PAIRED median +4.45 dB, guarded +3.04 dB.
+     ⚠⚠ BUT the per-cell spread is 41.9 dB WIDE, so this median is a weak summary however many cells back it: dropping the 1 unmeasurable cell(s) moves it 1.41 dB.  Quote the
+     TREND in `a` (robust to the guard), never the absolute level.
+  ⇒ mid-drive: H4 IS supported -- 16/16 reference-measurable cells (H2 control 16/16). PAIRED median +1.98 dB, guarded +1.98 dB.
+     ⚠⚠ BUT the per-cell spread is 21.6 dB WIDE, so this median is a weak summary however many cells back it: dropping the 0 unmeasurable cell(s) moves it 0.00 dB.  Quote the
+     TREND in `a` (robust to the guard), never the absolute level.
+
+==========================================================================================
+VERDICT (computed from the table, not narrated)
+==========================================================================================
+  a=1.2                  low-drive |error| 7.93 -> 5.47 (gain +2.46)   mid-drive |error| 10.94 -> 11.53 (cost +0.59)
+  a=1.9                  low-drive |error| 7.93 -> 2.38 (gain +5.56)   mid-drive |error| 10.94 -> 12.40 (cost +1.46)
+  a=3.0                  low-drive |error| 7.93 -> 1.61 (gain +6.32)   mid-drive |error| 10.94 -> 13.46 (cost +2.52)
+  a=4.5                  low-drive |error| 7.93 -> 5.15 (gain +2.79)   mid-drive |error| 10.94 -> 14.94 (cost +4.00)
+  SQ a=1.75              low-drive |error| 7.93 -> 3.00 (gain +4.93)   mid-drive |error| 10.94 -> 12.23 (cost +1.29)
+  SQ a=1.9 s=0.40        low-drive |error| 7.93 -> 2.28 (gain +5.66)   mid-drive |error| 10.94 -> 12.40 (cost +1.46)
+  CTL jfetSatPos         low-drive |error| 7.93 -> 8.38 (gain -0.45)   mid-drive |error| 10.94 -> 10.90 (cost -0.04)
+  CTL jfetCeilNeg        low-drive |error| 7.93 -> 7.65 (gain +0.28)   mid-drive |error| 10.94 -> 10.94 (cost +0.00)
+  ⭐ d(low) crosses ZERO at jfetSatNeg ~ 2.56 (swept 0.76..4.50); |d(low)| is worse on BOTH sides of it, which is the non-degeneracy signature.
+     ⚠ 'crosses zero' means 'equals ND', NOT 'equals hardware'.  ND lies
+     BETWEEN us and hardware at this anchor, so this is the far edge of the
+     move that is free against the 129-capture matrix, not the target.
+
+  ⇒ best low-drive movement net of mid-drive cost: SQ a=1.9 s=0.40
+  ⚠ LOCATED, NOT PROPOSED.  The 129-capture matrix has not judged this, and
+    per reference-sources.md section 1(0) the MID-drive regime must be expected
+    to regress there while the LOW-drive regime should improve -- report BOTH.
+
+  wrote analysis/reports/s83_even_low_screen.json

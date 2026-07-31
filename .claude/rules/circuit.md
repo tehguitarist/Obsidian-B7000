@@ -31,6 +31,17 @@
 >
 > Everything else (JFET front end, CD4049UBE clipper, base EQ topology, buffers, power) IS
 > schematic-verified from primary p.4 — unchanged from the original-B7K analysis.
+>
+> ⚠⚠ **AND THE OTHER SIDE OF EVERY CAPTURE-VS-DOCUMENT DISAGREEMENT IN THIS FILE MOVED (2026-07-29).**
+> Every "the captured unit" / "the pedal" / "a behavioural match to the unit we recorded" note below
+> — `trebleC7` 147×, `clipC15` 423×, `c21R` 10×, `R36` 3k3→4k7, the `[ENG]` mid-cap table, the C13
+> "third branch" reasoning — was fitted to **a recording of the Neural DSP Darkglass plugin, not to a
+> hardware B7K Ultra.** So the standing "third branch" (*the document is right AND the captured unit
+> differs*) is now more precisely: **the document is right AND the emulation we fitted to differs.**
+> That does not invalidate those fits — ND tracks hardware to ≤1.4 dB on the linear path, which is
+> where all four of those constants live — but it means none of them is evidence about a physical
+> board, and `c21R` in particular is now known to be matched to ND rather than to hardware.
+> **See `.claude/rules/reference-sources.md` before quoting any of them as a fact about the pedal.**
 
 ## Schematics
 

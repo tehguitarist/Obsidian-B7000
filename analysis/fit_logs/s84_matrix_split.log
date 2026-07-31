@@ -1,0 +1,247 @@
+============================================================================================
+PER-ORDER HARMONIC STRUCTURE vs the capture matrix
+============================================================================================
+                    ship : 129 captures, overrides []
+                    a1.9 : 129 captures, overrides ['jfetSatNeg=1.9']
+                   SQ1.9 : 129 captures, overrides ['jfetSatNeg=1.9', 'jfetCeilNeg=0.26316', 'jfetSatPos=0.40']
+                    a1.3 : 129 captures, overrides ['jfetSatNeg=1.3']
+                    a2.0 : 129 captures, overrides ['jfetSatNeg=2.0']
+                    a2.5 : 129 captures, overrides ['jfetSatNeg=2.5']
+                    a3.0 : 129 captures, overrides ['jfetSatNeg=3.0']
+                    a3.5 : 129 captures, overrides ['jfetSatNeg=3.5']
+                    a4.0 : 129 captures, overrides ['jfetSatNeg=4.0']
+                    a5.6 : 129 captures, overrides ['jfetSatNeg=5.6']
+  reference (row 0)      : ship
+  cells                  : 270 (file,sweep,order) -> 661 band values | reference floor -60 dB
+  ⭐ BLEED-FREE ONLY      : 270 cells at LEVEL=max/BLEND=max, where the clean bleed is exactly ZERO
+  model Hn below -100 dB   : 0 of 661 band values in `ship` (extractor floor, not a value -> read the MEDIAN)
+  ⚠ `pedal_db` is the NEURAL DSP capture. Per reference-sources.md §1 the ODD
+    orders are authoritative (ND == hardware) and the EVENS are NOT (ND runs
+    ~27 dB below hardware), so the two groups are reported separately.
+
+SIGNED MEDIAN over pooled band values, dB   -- HEADLINE; negative = model LOW
+ order       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6   parity
+--------------------------------------------------------------------------------------------------------------------
+    H2      +2.59     +5.19     +5.87     +3.85     +5.38     +6.01     +6.89     +7.66     +8.50    +10.28   EVEN
+    H3      -0.46     -0.66     -0.95     -0.59     -0.67     -0.81     -0.98     -1.29     -1.55     -2.30   odd
+    H4      +3.17     +4.05     +4.55     +3.47     +4.12     +4.87     +6.15     +6.57     +7.52     +8.02   EVEN
+    H5      -0.74     -1.15     -1.38     -1.02     -1.21     -1.00     -1.07     -1.36     -1.38     -1.85   odd
+    H6      +3.44     +5.49     +5.64     +5.59     +5.25     +5.55     +6.21     +6.06     +5.92     +7.84   EVEN
+    H7      +0.25     -2.20     -1.98     -0.60     -2.46     -2.69     -2.03     -1.43     -0.78     +0.82   odd
+
+SIGNED mean (plugin - pedal), dB   -- tail-sensitive, read beside the median
+ order       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6   parity
+--------------------------------------------------------------------------------------------------------------------
+    H2      +2.89     +5.83     +6.56     +4.52     +6.02     +6.87     +7.60     +8.25     +8.83    +10.36   EVEN
+    H3      -2.25     -2.92     -5.10     -2.40     -2.76     -3.02     -3.21     -3.30     -3.50     -4.36   odd
+    H4      +0.95     +3.28     +3.98     +2.09     +3.48     +4.38     +5.14     +5.76     +6.28     +7.64   EVEN
+    H5      -0.90     -1.18     -0.12     -2.10     -1.08     -0.92     -0.79     -0.63     -0.99     +0.45   odd
+    H6      +2.65     +3.71     +4.30     +3.52     +4.13     +4.59     +4.89     +5.69     +6.25     +7.39   EVEN
+    H7      -0.38     -1.80     -0.69     -0.75     -2.06     -1.77     -1.12     -0.26     +1.04     +2.71   odd
+
+mean |error|, dB
+ order       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6   parity
+--------------------------------------------------------------------------------------------------------------------
+    H2       7.79      7.11      7.37      7.05      7.19      7.73      8.29      8.82      9.34     10.73   EVEN
+    H3       7.16      7.49      9.21      7.17      7.29      7.32      7.26      7.43      7.60      8.19   odd
+    H4       9.64      8.90      9.02      9.10      8.89      8.86      9.02      9.21      9.43      9.97   EVEN
+    H5       8.85      8.76      7.94      9.83      8.66      8.60      8.86      9.64     10.77     10.88   odd
+    H6      10.51     11.13     10.74     10.56     10.81     10.69     10.69     10.26     10.37     10.87   EVEN
+    H7       8.74      9.38      8.78      8.78      9.65      9.41      9.13      8.90      8.70      9.63   odd
+
+  EVEN (not authoritative) mean|e|:       9.32      9.05      9.04      8.90      8.96      9.09      9.33      9.43      9.71     10.52   Δ -0.27 -0.27 -0.41 -0.35 -0.22 +0.02 +0.11 +0.40 +1.21
+      odd  (AUTHORITATIVE) mean|e|:       8.25      8.54      8.65      8.59      8.53      8.44      8.42      8.66      9.02      9.57   Δ +0.29 +0.40 +0.34 +0.28 +0.19 +0.17 +0.41 +0.77 +1.32
+     ALL  (mixed -- see ⚠) mean|e|:       8.78      8.79      8.84      8.75      8.75      8.77      8.88      9.04      9.37     10.05   Δ +0.01 +0.06 -0.03 -0.03 -0.02 +0.09 +0.26 +0.59 +1.26
+
+PAIRED bootstrap of Δmean|e| vs the reference (10k resamples over cells)
+ group       cand   mean|e|        Δ   95% CI of Δ
+  EVEN       ship      9.25    +0.00   [  +0.00,   +0.00]
+  EVEN       a1.9      8.93    -0.32   [  -0.95,   +0.39]
+  EVEN      SQ1.9      8.95    -0.30   [  -1.02,   +0.46]
+  EVEN       a1.3      8.81    -0.44   [  -0.78,   -0.11]  SIGNIFICANT
+  EVEN       a2.0      8.86    -0.39   [  -0.98,   +0.20]
+  EVEN       a2.5      9.01    -0.24   [  -0.90,   +0.38]
+  EVEN       a3.0      9.26    +0.01   [  -0.72,   +0.72]
+  EVEN       a3.5      9.38    +0.13   [  -0.70,   +0.93]
+  EVEN       a4.0      9.68    +0.43   [  -0.47,   +1.27]
+  EVEN       a5.6     10.50    +1.25   [  +0.26,   +2.22]  SIGNIFICANT
+
+   odd       ship      8.21    +0.00   [  +0.00,   +0.00]
+   odd       a1.9      8.48    +0.27   [  -0.20,   +0.75]
+   odd      SQ1.9      8.65    +0.44   [  -0.37,   +1.26]
+   odd       a1.3      8.56    +0.35   [  +0.03,   +0.72]  SIGNIFICANT
+   odd       a2.0      8.46    +0.25   [  -0.25,   +0.76]
+   odd       a2.5      8.38    +0.17   [  -0.43,   +0.76]
+   odd       a3.0      8.37    +0.16   [  -0.51,   +0.80]
+   odd       a3.5      8.63    +0.42   [  -0.29,   +1.11]
+   odd       a4.0      9.01    +0.81   [  +0.04,   +1.58]  SIGNIFICANT
+   odd       a5.6      9.54    +1.34   [  +0.29,   +2.34]  SIGNIFICANT
+
+   ALL       ship      8.73    +0.00   [  +0.00,   +0.00]
+   ALL       a1.9      8.71    -0.02   [  -0.44,   +0.41]
+   ALL      SQ1.9      8.80    +0.07   [  -0.50,   +0.61]
+   ALL       a1.3      8.69    -0.05   [  -0.29,   +0.21]
+   ALL       a2.0      8.66    -0.07   [  -0.48,   +0.32]
+   ALL       a2.5      8.69    -0.04   [  -0.50,   +0.39]
+   ALL       a3.0      8.82    +0.08   [  -0.43,   +0.56]
+   ALL       a3.5      9.01    +0.27   [  -0.29,   +0.79]
+   ALL       a4.0      9.35    +0.61   [  +0.00,   +1.19]  SIGNIFICANT
+   ALL       a5.6     10.03    +1.29   [  +0.55,   +1.99]  SIGNIFICANT
+
+DRIVE-REGIME SPLIT -- binned on the REFERENCE's own H3/H1 (the anchors' own axis)
+  BLEED-FREE subset only: 270 of 270 cells (LEVEL=max AND BLEND=max) -- see the comment in-file for why this is forced
+  --- H3/H1 <= -42 dB, 22 H2 band values  <- LOW-drive anchor ---
+     order     n       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6
+        H2    22      -6.54     +0.53     +1.90     -2.00     +0.92     +2.84     +4.42     +5.75     +6.90     +9.81
+        H3    17      -3.94     -4.19     -9.65     -4.06     -4.21     -4.31     -4.41     -4.52     -4.62     -4.95
+        H4     5      -6.85     +1.10     +0.96     -2.28     +1.56     +1.47     +1.31     +1.16     +2.04     +5.05   ⚠ THIN
+        H5     1      +0.05     +1.69     +3.08     +0.97     +1.79     +2.21     +2.54     +2.81     +3.02     +3.50   ⚠ THIN
+        H6     1     +12.80     +4.88     +4.71     +9.66     +3.84     -3.86    -15.34     -0.96     +3.77    +10.18   ⚠ THIN
+        H7     1      +3.11     +2.75     +1.36     +3.00     +2.70     +2.43     +2.12     +1.80     +1.47     +0.38   ⚠ THIN
+    ⚠ H4, H5, H6, H7 rest on <10 band values in this bin -- the header's 22 is the H2 count and does NOT apply to them.
+     H2-H3      -2.61     +4.72    +11.55     +2.05     +5.13     +7.16     +8.83    +10.26    +11.52    +14.76   <- the session-79 statistic
+    PAIRED median of (cand - ship) per cell -- the correct statistic for comparing candidates:
+        H2    22      +0.00     +7.92     +8.15     +4.63     +8.36    +10.30    +11.88    +13.21    +14.37    +17.29
+        H3    17      +0.00     -0.10     -3.27     -0.04     -0.11     -0.17     -0.22     -0.27     -0.32     -0.48
+        H4     5      +0.00     +1.05     +1.04     +0.51     +1.14     +1.56     +2.48     +3.77     +4.96     +8.07   ⚠ THIN
+        H5     1      +0.00     +1.64     +3.03     +0.92     +1.73     +2.16     +2.49     +2.75     +2.97     +3.45   ⚠ THIN
+        H6     1      +0.00     -7.93     -8.09     -3.14     -8.96    -16.66    -28.14    -13.76     -9.03     -2.62   ⚠ THIN
+        H7     1      +0.00     -0.36     -1.75     -0.11     -0.41     -0.68     -0.99     -1.31     -1.64     -2.73   ⚠ THIN
+    ⚠ differencing the LEVELS table by eye disagrees with the paired statistic by up to 7.27 dB (worst: H4 a2.0).  Quote the PAIRED row.
+  --- -42 .. -34 dB, 12 H2 band values ---
+     order     n       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6
+        H2    12      -6.63     +1.21     +2.11     -2.05     +1.65     +3.58     +5.15     +6.48     +7.63    +10.55
+        H3    12      -2.83     -3.26     -2.45     -3.05     -3.29     -3.43     -3.55     -3.65     -3.73     -3.84
+        H4     9      -3.39     -1.78     +0.37     -1.94     -1.54     +0.09     +1.67     +3.06     +4.26     +7.26   ⚠ THIN
+        H5     7      -2.32     -3.70     +1.32     -4.55     -4.13     -6.59     -7.74     -5.46     -2.96     +4.42   ⚠ THIN
+        H6     3     -11.98     -2.73     -2.14     -6.29     -2.27     -0.28     +1.33     +2.71     +3.95     +7.33   ⚠ THIN
+        H7     2      -7.68    -16.76     -5.28    -10.05    -20.81    -11.42     -7.39     -4.70     -2.60     +2.00   ⚠ THIN
+    ⚠ H4, H5, H6, H7 rest on <10 band values in this bin -- the header's 12 is the H2 count and does NOT apply to them.
+     H2-H3      -3.80     +4.47     +4.55     +1.00     +4.94     +7.01     +8.70    +10.13    +11.37    +14.39   <- the session-79 statistic
+    PAIRED median of (cand - ship) per cell -- the correct statistic for comparing candidates:
+        H2    12      +0.00     +7.24     +8.24     +4.09     +7.67     +9.57    +11.12    +12.43    +13.56    +16.36
+        H3    12      +0.00     -0.20     -1.27     -0.09     -0.22     -0.33     -0.45     -0.47     -0.46     -0.48
+        H4     9      +0.00     +4.80     +6.23     +1.79     +5.34     +7.79     +9.83    +11.56    +13.06    +16.88   ⚠ THIN
+        H5     7      +0.00     +0.48     +6.41     -1.39     +0.45     +0.09     +0.87     +3.12     +3.86    +10.77   ⚠ THIN
+        H6     3      +0.00     +5.27     +2.33     +2.94     +5.60     +7.06     +8.30     +9.38    +10.34    +12.93   ⚠ THIN
+        H7     2      +0.00     -9.08     +2.40     -2.37    -13.13     -3.74     +0.28     +2.98     +5.08     +9.68   ⚠ THIN
+    ⚠ differencing the LEVELS table by eye disagrees with the paired statistic by up to 7.51 dB (worst: H6 SQ1.9).  Quote the PAIRED row.
+  --- -34 .. -26 dB, 36 H2 band values ---
+     order     n       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6
+        H2    36      +5.12     +6.85     +7.41     +5.75     +7.10     +7.95     +8.40     +8.71     +9.09    +10.16
+        H3    36      +1.43     +1.03     +0.88     +1.25     +0.96     +0.82     +0.77     +0.61     +0.50     +0.34
+        H4    36      +2.67     +3.92     +4.09     +3.18     +4.01     +4.56     +5.60     +6.15     +7.23     +7.72
+        H5    34      -0.59     -1.31     -1.60     -1.08     -1.30     -1.34     -1.52     -1.61     -1.72     -2.11
+        H6    26      +2.56     +3.46     +4.15     +3.10     +3.49     +3.64     +3.78     +3.93     +4.07     +4.50
+        H7    24      -1.15     -3.91     -4.77     -2.46     -4.31     -3.80     -2.76     -2.76     -2.67     +0.71
+     H2-H3      +3.69     +5.82     +6.53     +4.50     +6.14     +7.12     +7.63     +8.10     +8.59     +9.82   <- the session-79 statistic
+    PAIRED median of (cand - ship) per cell -- the correct statistic for comparing candidates:
+        H2    36      +0.00     +1.25     +1.79     +0.58     +1.36     +1.92     +2.53     +3.15     +3.72     +4.96
+        H3    36      +0.00     -0.29     -0.69     -0.13     -0.33     -0.47     -0.47     -0.43     -0.44     -0.69
+        H4    36      +0.00     +0.61     +1.42     +0.20     +0.68     +1.44     +2.10     +2.87     +3.16     +4.21
+        H5    34      +0.00     -0.17     -0.45     -0.10     -0.19     -0.27     -0.36     -0.45     -0.55     -0.90
+        H6    26      +0.00     +0.71     +1.09     +0.38     +0.76     +1.01     +1.24     +1.35     +1.26     +1.31
+        H7    24      +0.00     -0.71     -0.69     -0.28     -0.78     -1.16     -0.85     -0.58     +0.46     +2.93
+    ⚠ differencing the LEVELS table by eye disagrees with the paired statistic by up to 2.94 dB (worst: H7 SQ1.9).  Quote the PAIRED row.
+  --- -26 .. -18 dB, 33 H2 band values ---
+     order     n       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6
+        H2    33      +6.25     +7.39     +7.44     +6.82     +7.49     +7.93     +8.34     +8.73     +9.10    +10.60
+        H3    34      +0.38     +0.27     -0.07     +0.33     +0.26     +0.20     -0.07     -0.13     -0.20     -0.57
+        H4    33      +6.95     +7.70     +8.32     +7.33     +7.74     +8.24     +8.73     +9.15     +9.65    +12.03
+        H5    34      +0.36     -0.09     -0.55     +0.18     -0.14     -0.33     -0.17     -0.20     -0.41     -0.69
+        H6    29      +8.62     +9.78     +9.39     +9.53     +9.56     +9.49     +9.49     +9.49     +9.68    +11.02
+        H7    30      -0.36     -1.59     -1.86     -0.16     -1.63     -1.16     -1.09     -0.54     -0.71     -1.17
+     H2-H3      +5.87     +7.12     +7.51     +6.49     +7.23     +7.73     +8.41     +8.86     +9.30    +11.16   <- the session-79 statistic
+    PAIRED median of (cand - ship) per cell -- the correct statistic for comparing candidates:
+        H2    33      +0.00     +0.76     +1.27     +0.37     +0.82     +1.16     +1.49     +1.82     +2.13     +3.00
+        H3    34      +0.00     -0.15     -0.26     -0.07     -0.17     -0.24     -0.32     -0.39     -0.47     -0.85
+        H4    33      +0.00     +0.74     +1.14     +0.34     +0.82     +1.07     +1.38     +1.68     +1.97     +2.73
+        H5    34      +0.00     -0.33     -0.58     -0.17     -0.36     -0.53     -0.64     -0.81     -1.00     -2.02
+        H6    29      +0.00     +0.62     +0.98     +0.30     +0.67     +0.97     +1.21     +1.43     +1.67     +2.36
+        H7    30      +0.00     -0.42     -0.55     -0.18     -0.47     -0.71     -0.88     -0.87     -0.93     -1.61
+    ⚠ differencing the LEVELS table by eye disagrees with the paired statistic by up to 2.35 dB (worst: H4 a5.6).  Quote the PAIRED row.
+  --- -18 .. -12 dB, 11 H2 band values ---
+     order     n       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6
+        H2    11      +4.12     +6.64     +6.94     +5.37     +6.84     +7.25     +7.48     +8.40     +9.52    +11.07
+        H3    11      -0.78     -1.40     -1.90     -1.18     -1.45     -1.26     -0.87     -0.89     -0.92     -1.04
+        H4    10      +5.04     +6.24     +6.38     +5.70     +6.31     +6.62     +6.83     +6.97     +6.97     +5.19
+        H5    11      -0.37     -0.58     -2.27     -0.37     -0.92     -0.64     -0.84     -1.36     -1.44     -2.95
+        H6    10      +7.81    +10.03    +10.12     +9.59    +10.10    +10.44    +10.74    +11.03    +11.30    +11.19
+        H7    11      +2.42     -0.99     +2.99     +4.75     -2.39     -4.18     -0.55     +0.67     +2.92     +8.22
+     H2-H3      +4.90     +8.04     +8.84     +6.55     +8.29     +8.51     +8.34     +9.29    +10.44    +12.11   <- the session-79 statistic
+    PAIRED median of (cand - ship) per cell -- the correct statistic for comparing candidates:
+        H2    11      +0.00     +0.99     +1.24     +0.49     +1.07     +1.46     +1.94     +2.19     +2.51     +3.54
+        H3    11      +0.00     -0.34     -0.86     -0.14     -0.37     -0.53     -0.69     -0.86     -1.03     -1.63
+        H4    10      +0.00     +0.95     +1.35     +0.49     +1.01     +1.28     +1.53     +1.93     +2.35     +3.32
+        H5    11      +0.00     -0.75     -1.65     -0.60     -0.82     -1.18     -1.58     -1.49     -1.83     -2.97
+        H6    10      +0.00     +1.05     +1.35     +0.53     +1.13     +1.51     +2.43     +2.60     +2.57     +2.93
+        H7    11      +0.00     -2.16     -0.23     -0.90     -2.40     -3.71     -2.45     -1.39     +1.09     +5.66
+    ⚠ differencing the LEVELS table by eye disagrees with the paired statistic by up to 3.41 dB (worst: H2 a5.6).  Quote the PAIRED row.
+  --- H3/H1 >  -12 dB, 20 H2 band values  <- MID-drive anchor ---
+     order     n       ship      a1.9     SQ1.9      a1.3      a2.0      a2.5      a3.0      a3.5      a4.0      a5.6
+        H2    20      +2.03     +4.26     +6.66     +3.22     +4.50     +5.65     +6.61     +7.40     +8.07     +9.63
+        H3    20      -2.62     -4.12     -5.09     -3.70     -4.19     -4.59     -5.05     -4.65     -5.09     -6.59
+        H4    20      +1.36     +3.13     +3.42     +2.35     +3.05     +3.43     +3.92     +4.34     +4.71     +5.65
+        H5    20      -2.98     -1.93     -1.94     -2.32     -2.06     -1.62     -1.90     -2.96     -3.54     -3.11
+        H6    20      +2.27     +3.83     +4.00     +2.75     +3.93     +4.34     +4.75     +4.90     +5.24     +4.90
+        H7    20      +1.73     -1.11     +1.46     +0.81     -1.68     -1.06     -1.29     -0.34     +0.21     +4.10
+     H2-H3      +4.66     +8.38    +11.74     +6.92     +8.69    +10.25    +11.66    +12.05    +13.17    +16.22   <- the session-79 statistic
+    PAIRED median of (cand - ship) per cell -- the correct statistic for comparing candidates:
+        H2    20      +0.00     +2.28     +2.63     +1.15     +2.43     +3.14     +3.72     +4.20     +4.59     +5.50
+        H3    20      +0.00     -0.66     -1.44     -0.25     -0.75     -1.16     -1.25     -1.74     -2.31     -4.73
+        H4    20      +0.00     +1.67     +2.15     +0.86     +1.79     +2.35     +2.84     +3.26     +3.63     +4.53
+        H5    20      +0.00     -0.75     -0.80     -0.38     -0.82     -1.22     -1.66     -2.15     -2.68     -4.82
+        H6    20      +0.00     +1.45     +1.57     +0.77     +1.54     +1.95     +2.22     +2.38     +2.44     +2.51
+        H7    20      +0.00     -1.85     -1.91     -0.77     -2.05     -3.03     -3.61     -1.48     -1.98     +1.53
+    ⚠ differencing the LEVELS table by eye disagrees with the paired statistic by up to 4.69 dB (worst: H5 a5.6).  Quote the PAIRED row.
+  ⚠ MOST OF THE MATRIX LIES BETWEEN THE TWO ANCHORS, so this is a continuum,
+    not a binary split -- and d(H2-H3) changes SIGN somewhere inside it.  Read
+    the trend across bins; do not collapse it to one number.
+
+THE REFERENCE'S OWN STRUCTURE (median Hn/H1, dB) -- ND measured, not the chart
+           sweep       H2      H3      H4      H5      H6      H7    H2-H3   H4-H5
+   sweep_drv_-12    -28.7   -26.2   -38.2   -31.2   -33.4   -29.8     -2.4    -7.1
+   sweep_drv_-18    -34.4   -26.9   -41.7   -30.6   -34.6   -30.7     -7.5   -11.1
+    sweep_drv_-6    -25.9   -25.4   -34.6   -28.4   -29.1   -30.0     -0.5    -6.2
+  the chart's ND column has H3 = -12 dB at 'mid drive'.  Measured on
+  these anchors: MAX H3/H1 = -7.1 dB (drive-0700_level-1700_attack-boost_base-od.wav / sweep_drv_-6), hottest per-sweep MEDIAN -25.4 dB,
+  and 20 band value(s) sit at or above -12 dB.
+  ⇒ that operating point IS present in the matrix -- do NOT repeat the retired
+    claim that it is not.  What the SWEPT anchors cannot do is match the chart's
+    CONVENTION: they sample 100/200/400 Hz, so a 100 Hz anchor's H3 lands at
+    300 Hz beside ND's own ~320 Hz notch, and the bridge to the chart's 800 Hz
+    tone is -9..-24 dB and capture-dependent.  Use `nd_tone_ladder.py` (the 1 kHz
+    `lvl_` ladder, pair correction -0.02 dB) for any chart comparison.
+
+WHERE d(H2-H3) COMES FROM  (the statistic harmonic_ladder/jfet_even_screen score)
+      cand    d(H2)    d(H3)   d(H2-H3)   from H3 sag  stat
+      ship    +0.00    +0.00      +0.00            0%  median
+      a1.9    +2.60    -0.20      +2.81            7%  median
+     SQ1.9    +3.28    -0.50      +3.78           13%  median
+      a1.3    +1.27    -0.14      +1.40           10%  median
+      a2.0    +2.80    -0.22      +3.01            7%  median
+      a2.5    +3.43    -0.35      +3.78            9%  median
+      a3.0    +4.30    -0.52      +4.82           11%  median
+      a3.5    +5.07    -0.84      +5.91           14%  median
+      a4.0    +5.91    -1.09      +7.00           16%  median
+      a5.6    +7.69    -1.84      +9.53           19%  median
+      ship    +0.00    +0.00      +0.00            0%  mean
+      a1.9    +2.95    -0.67      +3.62           19%  mean
+     SQ1.9    +3.68    -2.85      +6.53           44%  mean
+      a1.3    +1.63    -0.15      +1.78            9%  mean
+      a2.0    +3.13    -0.51      +3.65           14%  mean
+      a2.5    +3.98    -0.77      +4.75           16%  mean
+      a3.0    +4.72    -0.96      +5.68           17%  mean
+      a3.5    +5.36    -1.05      +6.41           16%  mean
+      a4.0    +5.94    -1.25      +7.19           17%  mean
+      a5.6    +7.47    -2.11      +9.58           22%  mean
+  ⭐ a difference statistic cannot separate 'H2 rose' from 'H3 fell'. A positive
+     share here is improvement bought by degrading the AUTHORITATIVE column.
+
+Deficit by stimulus level (over H2..H7)   median | mean
+           sweep      ship     a1.9    SQ1.9     a1.3     a2.0     a2.5     a3.0     a3.5     a4.0     a5.6  |     ship     a1.9    SQ1.9     a1.3     a2.0     a2.5     a3.0     a3.5     a4.0     a5.6
+   sweep_drv_-12     +2.03    +2.44    +2.97    +1.85    +2.53    +3.10    +3.75    +4.34    +4.55    +5.40  |    +1.09    +1.51    +1.90    +1.36    +1.78    +2.06    +2.60    +3.00    +3.28    +4.12
+   sweep_drv_-18     +1.72    +3.22    +3.24    +2.41    +3.29    +4.16    +4.59    +5.19    +5.63    +7.00  |    +1.29    +2.46    +1.95    +1.95    +2.54    +2.83    +3.06    +3.22    +3.62    +4.11
+    sweep_drv_-6     +0.07    +0.50    +1.22    +0.41    +0.51    +0.65    +0.85    +1.03    +1.52    +2.64  |    -0.11    +0.33    +0.73    -0.07    +0.35    +0.80    +0.97    +1.38    +1.49    +2.43
+
+  wrote analysis/reports/s84_matrix_harmonics.json
