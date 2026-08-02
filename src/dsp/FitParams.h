@@ -180,7 +180,73 @@ struct FitParams
     // NEITHER closed form is sufficient: the constraint couples s, a and jfetCeilNeg, so
     // a fitter must scan the slope NUMERICALLY (fit_nonlinear.py does). **
     double jfetSatPos = 0.4559;  // s: square-law knee (gate volts) — session-44 A5 re-fit (was 0.20072)
-    double jfetSatNeg = 0.76054; // a: even strength (signed) — session-44 A5 re-fit (was 3.1769)
+    double jfetSatNeg = 1.9;     // a: even strength (signed) — session-91 (was 0.76054, session-44
+                            // A5; 3.1769 before that). THE LOW-DRIVE EVEN-ORDER MOVE, located
+                            // session 80 and matrix-judged 81/82/84; shipped on the user's
+                            // weighting decision, session 91.
+                            //
+                            // WHY. `reference-sources.md` §4: hardware is strongly even-dominant
+                            // at LOW drive (H2-H3 ~ +18.5 dB) where ND has essentially no
+                            // even-order mechanism. Session 79 measured our model on ND's OWN
+                            // device (not the demoted chart) and found we sat at +1.4 against
+                            // ND's +10.1 — i.e. on the FAR side of ND, ~-104 %, not the +2 %
+                            // session 72 believed. So the first ~7.9 dB of this move goes toward
+                            // BOTH references at once. In the 129-capture matrix's own output
+                            // domain the low-drive H2 deficit is 6.5 dB, spent at a ~= 1.77-1.81
+                            // (measured crossing 1.77, bracketed 1.30->1.90), so 1.9 sits at the
+                            // EDGE of the free region and lands low-drive H2 on ND at +0.53.
+                            //
+                            // WHAT IT COSTS (session 84, paired medians vs shipped, per order per
+                            // regime — never pooled, the two regimes have OPPOSITE signs and the
+                            // pooled bootstrap ranks nothing):
+                            //   LOW  H2 +7.92 (ND carries NO authority here, §1) | H3 -0.10
+                            //   MID  H2 +2.28 (no authority)                     | H3 -0.66, H5 -0.75
+                            // The cost lands on the odd orders, which ARE authoritative — but at
+                            // <=0.75 dB, against a 7.92 dB gain on the column hardware cares about.
+                            //
+                            // ⚠ IT BREAKS THE SQUARE-LAW IDENTITY 2*a*cn = 1, DELIBERATELY. That
+                            // identity held EXACTLY at the old point (2*0.76054*0.65743 = 1.000);
+                            // here it reads 2.498. Session 84 rendered the identity-honouring
+                            // alternative (SQ a=1.9 s=0.40) on the full matrix: it buys +0.23 dB
+                            // on the no-authority column and pays -1.45 dB on the authoritative
+                            // one at the low anchor (+0.30/-0.42 at mid), because forcing cn down
+                            // 2.5x moves the compression knee 4.6x closer to the origin — the
+                            // extra even content and the odd suppression are ONE mechanism. So
+                            // the identity is affordable but NOT free, and the free move wins.
+                            // Do not "restore" the identity without re-reading session 84.
+                            //
+                            // MONOTONICITY GATED, session 91, against the REAL header (not a
+                            // transcription): |a|*s = 0.866. Shipped point passes as the
+                            // known-answer, a=6.5 folds back as the mutation check, and the true
+                            // fold-back threshold measures **a = 5.333** (|a|*s = 2.431) — BELOW
+                            // the 2.598 even-bump bound quoted in JfetStage.h, because that bound
+                            // is for the bump in isolation and the asymmetric core tightens it.
+                            // 1.9 has 2.81x headroom. ⚠ Session 73's rejected a ~= 5.7 was past
+                            // the real threshold, i.e. not merely worse but non-monotone.
+                            //
+                            // ⚠⚠ KNOWN COST THE 129-CAPTURE MATRIX CANNOT SEE — ALIASING.
+                            // `OSValidationTest`'s 8x alias/signal floor moves **-23.6 -> -17.3 dB**
+                            // (amp 0.35) when this constant goes 0.76054 -> 1.9. Attribution is
+                            // clean and was measured by reverting THIS constant alone: at 0.76054
+                            // with c21R already at 130k the test reproduces the 45-session record
+                            // to the digit (2x -25.6 / 4x -32.1 / 8x -23.6), so c21R contributes
+                            // nothing and this constant owns all of it. The matrix renders at OS=8
+                            // and grades FR/THD/harmonics AT BANDS — it never measures inharmonic
+                            // energy, so no amount of matrix work would have caught this.
+                            // ⚠ NOT established as genuine aliasing. The 8x column is non-monotone
+                            // in amplitude both before and after, and at a=1.9 it spikes 7 dB at
+                            // amp 0.35 with clean values either side (-40.5 at 0.20, -38.1 at
+                            // 0.70) — the signature of one harmonic folding onto a bin, not a
+                            // broadband rise. The test's metric also counts every FFT bin further
+                            // than ±3 bins from a harmonic as "alias", so a shape with MORE
+                            // harmonic content inflates it through window leakage alone. But
+                            // `instrument-defect-is-a-hypothesis` (s90) applies: that is an
+                            // argument, not a measurement. Settling it needs a bin-exact f0,
+                            // mainlobe-POWER summation (`peak-bin-amplitude-scallops`) and a
+                            // convergence check against a much higher OS factor.
+                            // ⇒ carried to PHASE 10 B (perf/HQ pass), where the OSValidationTest
+                            // decision already lives. Shipped with the user's explicit agreement,
+                            // session 91, with this cost on the table.
     // ---- Asymmetric drain-current CEILING (added 2026-07-22) ----------------
     // The step-2 re-fit REJECTED its own result and diagnosed why: the capture's
     // H2 grows +6 dB across the drive sweep and the unbounded model's grew
@@ -269,8 +335,53 @@ struct FitParams
     // tone stack's effective INPUT impedance, which is a nominal ~10k estimate,
     // not a single schematic part. It sets a ~159 Hz highpass that audibly shapes
     // bass, so it is a real fit knob (fit alongside the tone stack).
-    double c21R = 220.0e3;  // session-28 A2d (was 100k, session-18; nominal 10k). Corner ~7.2 Hz.
+    double c21R = 130.0e3;  // session-91: RE-AIMED AT HARDWARE (was 220k, session-28 A2d; 100k
+                            // session-18; nominal 10k). Corner ~12.2 Hz (was 7.2).
                             //
+                            // ⭐ THE REFERENCE CHANGED, NOT THE MEASUREMENT. Everything below this
+                            // paragraph is the session-28 fit against the ND captures, and it is
+                            // still correct AS A FIT TO ND — 220k really is where the ND captures
+                            // put this corner. What changed is that `analysis/captures/` was
+                            // confirmed (session 71) to be a recording of the Neural DSP plugin,
+                            // and `.claude/rules/reference-sources.md` §1 makes HARDWARE the
+                            // authority for "broadband linear tilt, LF and HF corners". §2's
+                            // hardware column is 1.1 dB below ND at 20 Hz where 220k had us
+                            // matched to ND at -0.4. So this is a deliberate, priced departure
+                            // from the captures toward hardware — a PASS under §5 rule 2, NOT a
+                            // correction of session 28.
+                            //
+                            // DERIVED, NOT TRANSCRIBED: `analysis/c21_hw_anchor.py` (6 known-answer
+                            // gates) fits the corner over every §2 LF anchor. ⚠ The target is
+                            // `HW - MODEL`, not §2's published `HW - ND`: measured over the 168
+                            // CLEAN rows of s90_baseline129_h1.json the model was ALREADY 0.40 dB
+                            // below ND at 20 Hz and 0.16 at 30 Hz, so a third of the move was
+                            // already made by other constants. Fitting the raw §2 delta gives
+                            // 121k and OVERSHOOTS; fitting the remainder gives 133.1k / 11.96 Hz,
+                            // nearest E24 130k. (The session-71 handover's flagged "130-150k"
+                            // brackets this while being derived from ONE frequency and the raw
+                            // delta — agreeing with a recorded range is not evidence the
+                            // derivation was sound.)
+                            //
+                            // MEASURED at 130k, 129 captures, 504 rows, membership identical:
+                            //   * hardware: worst remaining error vs §2 0.70 -> **0.17 dB**
+                            //   * OD IMPROVES on every gate row (the OD path's LF ran hot vs ND —
+                            //     the A3/GAP #3 symptom — and this pulls it down): band-RMS
+                            //     2.697 -> 2.652, OD 25-100 Hz median 1.13 -> 1.03, OD
+                            //     100 Hz-8 kHz p90 5.27 -> 5.05, THD level 6.20 -> 6.16, OD tilt
+                            //     1.97 -> 1.46.  219/320 OD rows improve; worst OD row +0.07 dB.
+                            //   * CLEAN pays: median 0.23 -> 0.26, p90 0.77 -> 0.82 (over its 0.80
+                            //     bar), band-RMS 0.432 -> 0.453.  Confined to 25-100 Hz (that
+                            //     region's p90 0.67 -> 0.84); 100 Hz-8 kHz IMPROVES 0.73 -> 0.72
+                            //     and 8-16.3 kHz is unchanged.  No row worse by >0.5 dB.
+                            //   * bypass.wav is bit-identical in all 4 sweeps — inert BY
+                            //     CONSTRUCTION (chain out of circuit), the known-answer control.
+                            // 150k was also rendered (s91_c21_150k.json): it keeps CLEAN p90 at
+                            // exactly 0.80 but takes only 55 % of the hardware move (0.32 dB) and
+                            // is OUTSIDE what either individual §2 anchor asks for (139k @20 Hz,
+                            // 116k @30 Hz) — chosen to protect a gate row, not supported by the
+                            // reference. Rejected with the user, session 91.
+                            //
+                            // ---- the session-28 ND fit, retained as the record of record ----
                             // Session 18 moved 10k -> 100k (159 -> 15.9 Hz) and closed most of a
                             // 6-15 dB bass deficit. Session 28 found the REST of it: over the 30
                             // clean captures the plugin was still uniformly bass-light below
@@ -325,7 +436,11 @@ struct FitParams
     // unmodelled damping R) that shallows the cancellation. 0 = ideal deep notch;
     // fit to the capture's -3.4 dB DEPTH (dsp.md "fit the corner/depth to capture";
     // the notch FREQUENCY moves little with it). See analysis/od_taps_probe.cpp.
-    double trebleLadderDampR = 30.0e3;  // ohms; session-19 Phase-9 A/B fit (was implicit 0).
+    // ⭐ SHIPPED SESSION 100 at 15372.9 (was 30k). Session 62 predicted this constant would
+    // stop being one shared value and become the switched pole B, and that is what landed:
+    // it now sets only the FLAT throw, with attackDampBoost/attackDampCut overriding the
+    // other two (7055.36 / 118.022). See the session-100 block under the ATTACK tap below.
+    double trebleLadderDampR = 15372.9;  // ohms; s99. Session-19 Phase-9 A/B fit was 30k (was implicit 0).
                             // Fit on the clean OD captures (notch region 127-640 Hz):
                             // low-mid RMS 3.64 -> 1.96 dB across 6 flat-EQ OD captures, HF
                             // (1-6 kHz) cost only +0.11 dB (the knee; 40k trades +0.12 HF for
@@ -370,30 +485,87 @@ struct FitParams
     // proposal also wants the tap-to-ground resistance to sum to ~797k against the
     // drawn R11 = 470k; since the switch is [ENG] the surrounding rail is a proposal
     // too, but state that rather than bury it.
-    double attackTapRa = 470.0e3;    // ohms; M -> T1 (boost tap). Default = the drawn R8.
-    double attackTapRb = 0.0;        // ohms; T1 -> T2 (flat tap).  Default 0 = taps collapsed.
-    double attackTapRc = 0.0;        // ohms; T2 -> T3 (cut tap).   Default 0 = taps collapsed.
-    double attackTapR11 = 470.0e3;   // ohms; T3 -> GND. Default = the drawn R11.
+    // ⭐⭐ SHIPPED SESSION 100 — the whole 17-value ATTACK/treble-ladder block below is
+    // the session-99 fitted candidate, landed on the user's explicit re-authorisation to
+    // break from the schematic where the reference requires it (the session-51 standing
+    // authorisation, reaffirmed at the top of session 100). READ THIS BEFORE READING ANY
+    // "the drawn X" COMMENT BELOW — those describe the PRIOR defaults, not what ships.
+    //
+    // ⚠⚠ WHAT THIS IS, AND WHAT IT IS NOT. It is an **OD-path ABSOLUTE-LEVEL fix that
+    // happens to live in the ATTACK ladder**. It is NOT a 320 Hz notch fix, and it does
+    // NOT close GAP #2 — measured, the 320 Hz band moves only 9.54 -> 9.21 dB mean |Δ|
+    // over the same 320 OD rows, and the notch requirement it was built for is still
+    // UNMET (width 1.28/1.46/1.38x, depth +4 dB). Do not book it against GAP #2.
+    // What it actually fixes: the prior default sat **9-12 dB light at every sub-band on
+    // the ATTACK BOOST throw** (cut was already right and stays so; flat improves):
+    //     pedal - render, boost throw, bleed-free:  LF +10.90  LM +11.68  M +10.69  HM +9.19
+    //     after:                                       +0.53      +1.36     +0.50     +0.64
+    //
+    // THE 129-CAPTURE MATRIX ACCEPTS IT — the first ATTACK candidate in the project's
+    // history it has not refused, beating the s91 baseline on 8 of the 9 gated OD/THD
+    // statistics (504 shared rows, membership identical, CLEAN **bit-identical**):
+    //     OD band-RMS ex gain-n12   2.664 -> 2.409     THD (OD) level  4.279 -> 3.663
+    //     OD 25-100 Hz  med/p90     1.024/6.065 -> 0.860/4.971
+    //     OD 100 Hz-8k  med/p90     0.742/5.089 -> 0.568/4.458
+    //     OD 8-16.3 kHz med/p90     0.662/8.076 -> 0.566/8.058
+    //     OD p99  14.408 -> 14.661  ⚠ the ONLY gated statistic that got worse
+    //     rows better >0.5 dB / worse:  111 / 36
+    //
+    // ⭐ It is also the cleanest candidate the project has produced on the identifiability
+    // axes: **0 of 17 values rest on a bound**, realisable, worst shared re-scale x15.8 —
+    // and `C7` comes back to x1.11, i.e. essentially its prior value, from the s97 point's
+    // x0.244 (the element session 94 attributed about half its matrix regression to).
+    //
+    // ⚠ HOW IT WAS FOUND, AND WHY THE EARLIER "REACHABLE" RESULTS ARE CORRECTED, NOT
+    // BEATEN. Sessions 94 and 97 both reported the corrected ATTACK requirement REACHED
+    // (width rms 0.34 and 0.41). Both were scored by objectives that could not see the OD
+    // path's absolute low-end level, and both had quietly PAID for the notch shape with
+    // it — measured per sub-band, their LF residual is **-42 dB** and **-22 dB**. Give the
+    // objective an LF-visible term (session 99's per-sub-band `g`) and the same search
+    // reaches LF to -1.4 dB while width collapses 0.41 -> 4.25, in ALL TEN rows of a sweep
+    // spanning 100x in f0 weight and 3x in box. That is saturation, not a weight choice:
+    // **the notch width/depth and the absolute OD level are in genuine CONFLICT in this
+    // topology.** If the notch itself is wanted, it is now a TOPOLOGY question (a missing
+    // degree of freedom), not a fitting one — do not point another search at it.
+    //
+    // Provenance: analysis/attack_shape_screen.py --best (per-sub-band `g`, GATE F1-F5) ->
+    // analysis/attack_d_extrapolation_gate.py (GATE H, REQUIRED: `g` is an extrapolation
+    // at 1.20 decades against F4's tested 0.23) -> analysis/attack_stepped_gate.py
+    // --fits-json -> the 129-capture matrix. Reports: s99_attack_best_subband.json,
+    // s99_d_extrapolation.json, s99_attack_stepped_cand.json, s99_attack_cand.json.
+    double attackTapRa = 392663.0;   // ohms; M -> T1 (boost tap).  s99 (was 470k = the drawn R8)
+    double attackTapRb = 420440.0;   // ohms; T1 -> T2 (flat tap).  s99 (was 0 = taps collapsed)
+    double attackTapRc = 77481.0;    // ohms; T2 -> T3 (cut tap).   s99 (was 0 = taps collapsed)
+    double attackTapR11 = 163933.0;  // ohms; T3 -> GND.            s99 (was 470k = the drawn R11)
 
     // Pole B, the notch leg. `trebleC5` is the base cap (all positions); the two
     // trims are ADDITIVE, i.e. a small parallel cap selected by the same pole —
     // which is how a +-7 % move should be realised, not as three graded caps.
-    double trebleC5 = 22.0e-9;       // farads; the drawn C5. 0 trims => all positions equal.
-    double attackC5TrimBoost = 0.0;  // farads added to trebleC5 in the BOOST throw
-    double attackC5TrimCut = 0.0;    // farads added to trebleC5 in the CUT throw
+    // ⚠ THE TRIMS MUST BOTH BE >= 0 AND FLAT MUST BE THE SMALLEST OF THE THREE THROWS —
+    // there is no `attackC5TrimFlat`, so a fitted point whose flat C5 is not the smallest
+    // CANNOT BE EXPRESSED HERE. The screen printed that warning for 35 sessions without
+    // ranking on it and duly selected an unrealisable point the moment an unrelated
+    // ranking fix changed the winner (session 97); `realisable()` is now the FIRST term of
+    // its key. The s99 point below is realisable — cut 8.277n / boost 8.058n / flat 7.957n.
+    double trebleC5 = 7.95747e-9;         // farads; s99 (was 22n, the drawn C5) = flat throw
+    double attackC5TrimBoost = 1.00053e-10;  // farads added to trebleC5 in the BOOST throw; s99 (was 0)
+    double attackC5TrimCut = 3.19622e-10;    // farads added to trebleC5 in the CUT throw;   s99 (was 0)
 
     // Per-throw damping. NEGATIVE = "inherit trebleLadderDampR" (the sentinel keeps
     // every existing `--fit trebleLadderDampR=` tool behaving exactly as before —
     // it still sets all three throws). A negative resistance is physically
     // meaningless, so the sentinel is unambiguous.
-    double attackDampBoost = -1.0;   // ohms, or < 0 to inherit trebleLadderDampR
-    double attackDampCut = -1.0;     // ohms, or < 0 to inherit trebleLadderDampR
+    double attackDampBoost = 7055.36;  // ohms, or < 0 to inherit trebleLadderDampR; s99 (was -1)
+    double attackDampCut = 118.022;    // ohms, or < 0 to inherit trebleLadderDampR; s99 (was -1)
 
     // C8 — the 220 pF cap the DRAWN switch reroutes. Fittable ONLY so that the
     // two-pole proposal, which does not use C8 at all, can actually be rendered:
     // attack_tap_screen.py screened it at C8 = 0, so a render that leaves 220 pF in
     // is NOT the thing that was screened. kC8 (220p) = the drawn stage.
-    double trebleC8 = 220.0e-12;     // farads; 0 removes it (the proposal's condition)
+    // ⚠ SHIPPED AT 0 IN SESSION 100. The two-pole ATTACK topology does not use C8 at all,
+    // and every screen that produced the shipped point ran at C8 = 0 — a render leaving
+    // 220 pF in is NOT the thing that was screened, measured or accepted by the matrix.
+    double trebleC8 = 0.0;           // farads; s99 (was 220p = the drawn C8). kC8 = the drawn stage.
 
     // ---- The SHARED treble ladder (TrebleAttack.h::setLadder) ----------------
     // Session 50's next-step (a), open from session 50 to 63: R7 and the C9/C6 +
@@ -410,8 +582,13 @@ struct FitParams
     // ⚠ ALL FIVE ARE SCHEMATIC-VERIFIED (circuit.md; covered by the R1-R54 / C1-C39
     // BOM reconciliation), so moving one is a capture-vs-document disagreement of the
     // same class as trebleC7 (147x), c21R (10x) and trebleWiperR (1.4x) — not a bug
-    // fix. Defaults are the drawn values and a default render is BIT-IDENTICAL to the
-    // pre-session-64 stage (TrebleAttackTest Test 10).
+    // fix.
+    // ⚠ CORRECTED SESSION 100: this paragraph used to end "Defaults are the drawn values
+    // and a default render is BIT-IDENTICAL to the pre-session-64 stage (TrebleAttackTest
+    // Test 10)." THE FIRST CLAUSE IS NO LONGER TRUE — all five ship moved (below). The
+    // second clause was never about FitParams: Test 10 compares the TrebleAttack STAGE's
+    // own internal defaults (kR7/kR12/kR14/kC9/kC6) against explicit drawn values, so it
+    // still passes and is still meaningful, but it does NOT certify the shipped constants.
     //
     // ⚠ AND THE SENSITIVITY CENSUS SAYS DO NOT EXPECT A FREE LUNCH (session 64,
     // `analysis/attack_shape_screen.py --census`): every one of these moves the null's
@@ -420,11 +597,17 @@ struct FitParams
     // Hz of f0) and its authority is small. The tap divider (attackTapRa/Rb/Rc/R11) is
     // width-NEUTRAL to <=0.5 Hz, which extends session 62's pole-independence result
     // to the width statistic.
-    double trebleR7 = 200.0e3;          // ohms; the drawn R7 (G -> M on the top rail)
-    double trebleLadderR12 = 6.8e3;     // ohms; the drawn R12 (L1 -> GND)
-    double trebleLadderR14 = 22.0e3;    // ohms; the drawn R14 (L2 -> GND)
-    double trebleC9 = 22.0e-9;          // farads; the drawn C9 (L1 -> L2)
-    double trebleC6 = 22.0e-9;          // farads; the drawn C6 (L2 -> M)
+    // ⚠⚠ ALL FIVE MOVED IN SESSION 100 (the s99 point) AND ALL FIVE ARE SCHEMATIC-VERIFIED,
+    // so this is the largest single departure-from-the-drawn-network in the project — five
+    // BOM-reconciled values at once, C6 by a factor of 16. It is a deliberate, authorised,
+    // priced departure, NOT a bug fix, and it is what carries the OD-level repair above.
+    // The multipliers are against the drawn values, and the worst of them (x8.23) is the
+    // MILDEST shared re-scale of any ATTACK winner the project has produced.
+    double trebleR7 = 1.64563e6;        // ohms; s99, x8.23 (drawn R7 = 200k;   G -> M on the top rail)
+    double trebleLadderR12 = 27131.0;   // ohms; s99, x3.99 (drawn R12 = 6.8k;  L1 -> GND)
+    double trebleLadderR14 = 48500.9;   // ohms; s99, x2.20 (drawn R14 = 22k;   L2 -> GND)
+    double trebleC9 = 1.28153e-8;       // farads; s99, x0.583 (drawn C9 = 22n; L1 -> L2)
+    double trebleC6 = 1.39228e-9;       // farads; s99, x0.0633 (drawn C6 = 22n; L2 -> M)
 
     // ---- C7, the coupling cap into IC2_A (TrebleAttack.h::setC7) ------------
     // Phase 9 / A3 step 3a (session 34, SHIPPED session 35). At the schematic 100n
@@ -453,7 +636,13 @@ struct FitParams
     // is REQUIRED somewhere in the OD path ahead of IC2_A; C7 is the cheapest
     // placement, not a proven one.
     // ▶ A schematic-checker pass on C7 / R11 / R13 / the node-P network is OWED.
-    double trebleC7 = 680.0e-12;  // farads; schematic/BOM value is 100n (see above)
+    // ⭐ SESSION 100 moved it only x1.11, to 755.764p, as part of the s99 ATTACK/ladder
+    // point. That mildness is a RESULT, not an accident: session 94's rejected candidate
+    // wanted C7 x0.1 and session 97's x0.244, and session 94 attributed about HALF its
+    // +27 dB matrix regression to that element alone. The candidate the matrix finally
+    // accepted leaves C7 essentially where session 35 put it. Everything above still
+    // stands — the 147x-vs-schematic story, and the owed schematic-checker pass.
+    double trebleC7 = 755.764e-12;  // farads; s99, x1.11 of the s35 680p. Schematic/BOM is 100n (see above)
 
     // ---- C15, the clipper-output coupling cap into IC2_B (PedalChain::OdCoupling)
     // Phase 9 / A3 step 3b (session 36). NOT MODELLED AT ALL until this session —

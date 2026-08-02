@@ -427,7 +427,17 @@ public:
     // STRICTLY POSITIVE TERMS for every w, L>0 — T'(w) > 0 unconditionally, no
     // coupling with s/a/L to track (unlike every prior reshape in this file — the
     // even bump's OWN bound, |a|*s < 2.598, is unaffected and still applies
-    // separately). The fold-back region only exists for beta < -2.5/(3*L^2), i.e.
+    // separately).
+    // ⚠ BUT |a|*s < 2.598 IS THE BUMP IN ISOLATION, AND THE COMBINED SHAPE IS
+    // TIGHTER (measured session 91, scanning THIS function on a 3 uV grid at the
+    // shipped s/cPos/cNeg/beta): g folds back at **a = 5.333, |a|*s = 2.431**, not
+    // at 5.699/2.598. The bump's bound ignores the core's own negative curvature
+    // near the cutoff-side knee, which subtracts from the bump's slope before the
+    // bump alone would turn over. Quote 2.598 as an upper bound on the admissible
+    // region, never as the region — and scan the real function before shipping any
+    // (a, s, cNeg) triple. Session 73's rejected a ~= 5.7 sits PAST this threshold,
+    // so it was non-monotone, not merely worse-scoring.
+    // The fold-back region only exists for beta < -2.5/(3*L^2), i.e.
     // strictly outside this branch's beta >= 0 regime. Still scanned numerically in
     // JfetStageTest AND fit_nonlinear.py (memory: verify-extremum-derived-bounds —
     // an analytic derivation has been wrong here before; this one was additionally

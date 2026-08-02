@@ -20,6 +20,7 @@ import argparse
 import concurrent.futures as cf
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -47,7 +48,7 @@ OUTPUT_JSON = "analysis/reports/comprehensive_data.json"
 #   * capture files never change, so their side never needs recomputing.
 # Bump CACHE_VERSION when analyse_one's MATH changes (the args/binary won't).
 CACHE_DIR = "analysis/reports/cache"
-CACHE_VERSION = "1"
+CACHE_VERSION = "2"   # session 90: fr_at_bands now stores all three FR reads (see FR_METHODS)
 # Leave 2 cores for the OS/editor; cap at 8 because each worker peaks ~600 MB
 # (reference + capture + render + FFT buffers) and 8 x 600 MB is comfortable on
 # a 16 GB machine while 10+ starts competing for memory bandwidth.
@@ -59,11 +60,11 @@ def _file_sig(path):
     return f"{os.path.basename(path)}:{st.st_size}:{st.st_mtime_ns}"
 
 
-def _cache_key(path, args, os_factor, binpath, bands):
+def _cache_key(path, args, os_factor, binpath, bands, fr_method):
     h = hashlib.sha1()
     for part in (CACHE_VERSION, _file_sig(path), _file_sig(binpath),
                  "|".join(map(str, args)), f"os={os_factor}",
-                 ",".join(f"{b:.1f}" for b in bands)):
+                 ",".join(f"{b:.1f}" for b in bands), f"fr={fr_method}"):
         h.update(part.encode())
     return h.hexdigest()
 
@@ -126,19 +127,44 @@ def render_plugin(binpath, args, out_path, os_factor):
     return True
 
 
+# The three FR reads, all computed from ONE render so the choice is a post-processing decision
+# rather than a re-render (session 90).  See analyze.transfer / transfer_h1 / band_read.
+#   csd     the historical read: point sample of the cross-spectral-density estimate
+#   h1      point sample of the Farina H1-only (harmonic-rejecting) read
+#   h1band  H1, power-averaged over each band's own 1/3-octave width  <- the repaired instrument
+FR_METHODS = ("csd", "h1", "h1band")
+DEFAULT_FR_METHOD = "h1band"
+
+
 def fr_at_bands(cap_al, ren_al, orig, sweep_name, bands):
-    """Return (plugin_db, pedal_db, gain_db_applied) at each band."""
+    """Return ({method: {'plugin_db','pedal_db'}}, gain_db_applied) at each band.
+
+    The reference is `sweep_clean` for EVERY sweep level, as it always has been: the driven sweeps
+    are the same sweep at a hotter level, so deconvolving against the clean one scales the result
+    by a constant (+12 dB at -18 dBFS, etc.) that is identical on both sides and cancels in the
+    delta.  Changing it would move every absolute FR number for no gain in the graded quantity."""
     inp = A.seg_of(orig, "sweep_clean")
     cap_seg = A.seg_of(cap_al, sweep_name)
     ren_seg = A.seg_of(ren_al, sweep_name)
     ren_seg_aligned = A.frac_align(ren_seg, cap_seg)
     _, gain_db = A.null_depth(cap_seg, ren_seg_aligned)
 
-    f, H_cap = A.transfer(cap_seg, inp)
-    f, H_ren = A.transfer(ren_seg, inp)
-    plugin_db = [float(np.interp(b, f, H_ren)) + gain_db for b in bands]
-    pedal_db = [float(np.interp(b, f, H_cap)) for b in bands]
-    return plugin_db, pedal_db, float(gain_db)
+    f_c, H_cap = A.transfer(cap_seg, inp)
+    f_r, H_ren = A.transfer(ren_seg, inp)
+    g_c, G_cap = A.transfer_h1(cap_seg, inp)
+    g_r, G_ren = A.transfer_h1(ren_seg, inp)
+
+    out = {}
+    for name, (fc, hc, fr_, hr, mode) in {
+        "csd":    (f_c, H_cap, f_r, H_ren, "point"),
+        "h1":     (g_c, G_cap, g_r, G_ren, "point"),
+        "h1band": (g_c, G_cap, g_r, G_ren, "band"),
+    }.items():
+        out[name] = {
+            "plugin_db": [v + gain_db for v in A.band_read(fr_, hr, bands, mode)],
+            "pedal_db": A.band_read(fc, hc, bands, mode),
+        }
+    return out, float(gain_db)
 
 
 def thd_at_bands(cap_al, ren_al, orig, sweep_name, band_source_map):
@@ -228,12 +254,12 @@ def short_id(parsed):
 
 
 def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_source_map,
-                extra_fit=None, use_cache=True):
+                extra_fit=None, use_cache=True, fr_method=DEFAULT_FR_METHOD):
     """Return (record_or_None, was_cached)."""
     args = C.render_args(parsed) + list(extra_fit or [])
 
     if use_cache and not keep_dir:
-        key = _cache_key(path, args, os_factor, binpath, bands)
+        key = _cache_key(path, args, os_factor, binpath, bands, fr_method)
         cached = _cache_load(key)
         if cached is not None:
             return cached, True
@@ -281,8 +307,16 @@ def analyse_one(path, parsed, orig, binpath, os_factor, keep_dir, bands, band_so
         }
 
         for sw in ALL_SWEEP_LEVELS:
-            plugin_db, pedal_db, gain_db = fr_at_bands(cap_al, ren_al, orig, sw, bands)
-            result["fr"][sw] = {"plugin_db": plugin_db, "pedal_db": pedal_db, "gain_db_applied": gain_db}
+            methods, gain_db = fr_at_bands(cap_al, ren_al, orig, sw, bands)
+            # `plugin_db`/`pedal_db` stay the top-level keys every downstream tool already reads;
+            # `methods` carries all three reads so a method change never needs a re-render.
+            result["fr"][sw] = {
+                "plugin_db": methods[fr_method]["plugin_db"],
+                "pedal_db": methods[fr_method]["pedal_db"],
+                "gain_db_applied": gain_db,
+                "fr_method": fr_method,
+                "methods": methods,
+            }
 
         for sw in DRIVEN_SWEEPS:
             plugin_pct, pedal_pct, sources = thd_at_bands(
@@ -313,10 +347,11 @@ _W = {}
 
 
 def _worker_init(binpath, os_factor, keep_dir, bands, band_source_map, extra_fit, use_cache,
-                 orig=None):
+                 fr_method, orig=None):
     _W.update(orig=A.load(A.ORIG) if orig is None else orig, binpath=binpath,
               os_factor=os_factor, keep_dir=keep_dir, bands=bands,
-              band_source_map=band_source_map, extra_fit=extra_fit, use_cache=use_cache)
+              band_source_map=band_source_map, extra_fit=extra_fit, use_cache=use_cache,
+              fr_method=fr_method)
 
 
 def _worker_task(item):
@@ -324,14 +359,15 @@ def _worker_task(item):
     try:
         res, cached = analyse_one(path, parsed, _W["orig"], _W["binpath"], _W["os_factor"],
                                   _W["keep_dir"], _W["bands"], _W["band_source_map"],
-                                  extra_fit=_W["extra_fit"], use_cache=_W["use_cache"])
+                                  extra_fit=_W["extra_fit"], use_cache=_W["use_cache"],
+                                  fr_method=_W["fr_method"])
         return idx, res, cached, None
     except Exception as exc:  # a bad capture must not abort the whole run
         return idx, None, False, f"{type(exc).__name__}: {exc}"
 
 
 def run_captures(caps, jobs, orig, binpath, os_factor, keep_dir, bands, band_source_map,
-                 extra_fit, use_cache):
+                 extra_fit, use_cache, fr_method):
     """Analyse every capture, returning results in capture order."""
     results = [None] * len(caps)
     n_cached = 0
@@ -344,7 +380,8 @@ def run_captures(caps, jobs, orig, binpath, os_factor, keep_dir, bands, band_sou
             sys.stderr.write("cached\n" if cached else "done\n" if res else "FAILED\n")
         sys.stderr.flush()
 
-    init_args = (binpath, os_factor, keep_dir, bands, band_source_map, extra_fit, use_cache)
+    init_args = (binpath, os_factor, keep_dir, bands, band_source_map, extra_fit, use_cache,
+                 fr_method)
 
     if jobs <= 1:
         # Serial path runs _worker_task in THIS process, so seed the globals here
@@ -420,11 +457,24 @@ def main():
     ap.add_argument("--fit", action="append", default=[], metavar="K=V",
                     help="pass a FitParams override to EVERY render (repeatable), e.g. --fit c21R=53000 "
                          "— for testing a candidate value across the matrix WITHOUT rebuilding")
+    ap.add_argument("--render-arg", action="append", default=[], metavar="'FLAG VALUE'",
+                    help="pass RAW OfflineRender flags to EVERY render (repeatable), e.g. "
+                         "--render-arg '--input-ref 0.9'. Unlike --fit this is not restricted to "
+                         "FitParams fields, so it reaches the two GainStaging scalars "
+                         "(kInputRef / kOutputMakeup) that live outside FitParams by design. "
+                         "The value is shlex-split, so QUOTE the whole flag+value as one argument "
+                         "-- argparse would otherwise swallow a leading '--' as an option of its "
+                         "own. It flows into the per-capture cache key like any other arg, so a "
+                         "change busts exactly the affected records.")
     ap.add_argument("--no-cache", action="store_true",
                     help="ignore the per-capture result cache (force re-render + re-analyse)")
     ap.add_argument("--out", default=OUTPUT_JSON,
                     help="output JSON path (use a scratch path for subset/candidate runs so the "
                          "baseline report is not overwritten)")
+    ap.add_argument("--fr-method", default=DEFAULT_FR_METHOD, choices=FR_METHODS,
+                    help=f"which FR read populates plugin_db/pedal_db (default {DEFAULT_FR_METHOD}); "
+                         "ALL of them are stored under fr[sweep]['methods'] either way, so this is "
+                         "a post-processing choice and switching it needs no re-render")
     ap.add_argument("--jobs", "-j", type=int, default=DEFAULT_JOBS,
                     help=f"worker processes (default {DEFAULT_JOBS} = cores-2, capped at 8; each "
                          "holds ~600 MB). --jobs 1 runs serially, same results, easier to debug")
@@ -438,7 +488,7 @@ def main():
     bands = [round(b, 1) for b in A.fractional_octave_freqs(20.0, 20000.0, 3)]
     band_source_map = build_band_source_map(bands)
 
-    fit_args = []
+    fit_args = [tok for chunk in a.render_arg for tok in shlex.split(chunk)]
     for kv in a.fit:
         fit_args += ["--fit", kv]
 
@@ -450,13 +500,14 @@ def main():
 
     use_cache = not a.no_cache
     sys.stderr.write(f"Comprehensive report: {len(caps)} captures | OS={a.os}x | {len(bands)} bands"
+                     f" | FR={a.fr_method}"
                      f"{' | fit=' + ','.join(a.fit) if a.fit else ''}"
                      f"{' | cache OFF' if not use_cache else ''}\n")
     sys.stderr.write(f"  THD coverage: {sum(1 for _, s in band_source_map if s != 'na')}/{len(bands)} bands\n\n")
 
     jobs = max(1, min(a.jobs, len(caps)))
     results, n_cached = run_captures(caps, jobs, orig, a.bin, a.os, a.keep_renders, bands,
-                                     band_source_map, fit_args, use_cache)
+                                     band_source_map, fit_args, use_cache, a.fr_method)
 
     ok = [r for r in results if r]
     sys.stderr.write(f"\n{len(ok)}/{len(results)} captures analysed ({n_cached} from cache).\n")
@@ -471,6 +522,8 @@ def main():
             "num_captures": len(ok),
             "num_bands": len(bands),
             "bands": bands,
+            "fr_method": a.fr_method,
+            "fr_methods_stored": list(FR_METHODS),
             "thd_anchors": list(THD_ANCHORS),
             "harmonic_orders": list(HARMONIC_ORDERS),
             "driven_sweeps": list(DRIVEN_SWEEPS),

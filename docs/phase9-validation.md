@@ -31,30 +31,104 @@
 "Current step".** They are deliberately kept in one place; this section is the Phase-9-specific
 detail behind them.
 
-### Current grade (129 captures, shipped defaults, `analysis/reports/s74_baseline129.json`)
+### Current grade (129 captures, shipped defaults, `analysis/reports/s91_shipped.json`)
 
-| subset | rows | band-RMS | median \|Δ\| | p90 | max |
-|---|---|---|---|---|---|
-| OD ex gain-n12 | 320 | **2.743** | 0.85 | 5.87 | 36.2 |
-| CLEAN | 168 | **0.408** | 0.21 | 0.66 | 1.99 |
-| THD (OD) | 228 | 9.292 | — | — | level term **6.202** |
+Graded **25 Hz – 16.3 kHz** on the **H1-only, band-averaged** FR read (session 90 — see "The FR
+instrument" below). Membership is identical to the s90 and s74 baselines (504 shared rows, 0
+exclusive), so all three ARE comparable; the s74 figures were 2.743 / 0.408 measured at
+25 Hz – 12.9 kHz on the CSD read.
+
+| subset | rows | band-RMS | median \|Δ\| | p90 | max | s90 shipped, for the diff |
+|---|---|---|---|---|---|---|
+| OD ex gain-n12 | 320 | **2.664** | 0.79 | 5.49 | 40.8 | 2.697 / 0.81 / 5.62 / 40.2 |
+| CLEAN | 168 | **0.453** | 0.26 | 0.82 | 3.15 | 0.432 / 0.23 / 0.77 / 3.15 |
+| THD (OD) | 228 | 7.520 | — | — | level term **4.279** | 9.292, level **6.202** |
+
+⚠ **SESSION 91 SHIPPED TWO CONSTANTS** — `c21R` 220k → 130k (hardware-directed, `reference-sources.md`
+§2) and `jfetSatNeg` 0.76054 → 1.9 (low-drive even-order). The CLEAN cost is the deliberate, priced
+consequence of the first; the **THD collapse 6.202 → 4.279 is a side effect of the second** and was
+not the objective. See `CLAUDE.md` "Where we are".
 
 Reproduce with:
 
 ```bash
-/opt/homebrew/bin/python3.11 analysis/matrix_grade.py analysis/reports/s74_baseline129.json
+/opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s91_shipped.json
 ```
 
-⭐ **CLEAN is finished** (97.1 % of band values within ±1 dB). Regression-guard it, do not fit it.
+`release_gate.py` is the release gate itself — thresholds in its `GATE` constant, every reported cell
+computed, non-zero exit while any gated row is over. `matrix_grade.py` still gives the per-row
+band-RMS and the A-vs-B row movement.
+
+✅ **CLEAN's gated row was SPLIT IN TWO in session 96 and all four rows now SHIP on both baselines** —
+`100 Hz–8 kHz ≤0.30/≤0.80` (s91 0.215/0.719, s90 0.226/0.727) and `8–16.3 kHz ≤0.40/≤1.40` (s91
+0.340/1.308, s90 0.347/1.309). The pooled `100 Hz–16.3 kHz` row it replaces failed BOTH baselines
+(0.808 / 0.802) because it averaged a fine 19-band midband with a bad 4-band tail; the session-89
+midband bars survive the split unchanged. Decided with the user in session 95, derivation of record
+in `docs/clean-gate-split-handover.md`. ⚠ Session 91's pool change (25–100 Hz excluded as
+hardware-governed) made the row HARDER, not easier — that is the trap that produced the split, not a
+carve-out. CLEAN remains otherwise finished: regression-guard it, do not fit it. ⚠ Its 8–16.3 kHz
+region is now explicitly gated rather than diluted, and is still CLEAN's worst.
+
+### The FR instrument (session 90, Phase 9 item 0) — repaired, validated, and it changed little
+
+`analyze.transfer()` is a cross-spectral-density estimate. Session 89 reasoned that it could not
+separate a swept sine's harmonics from its fundamental, so every FR number taken at drive — the whole
+release gate — carried unknown nonlinear contamination, and "ND aliases" vs "our instrument is
+contaminated" were indistinguishable.
+
+**Built:** `analyze.transfer_h1()`, an H1-only read that rejects harmonics structurally — after
+Farina deconvolution the N-th harmonic response sits `T·ln(N)/R` ahead of the linear one in TIME
+(1.00 s for H2 on this sweep), so a window narrower than that spacing contains the linear response
+and nothing else. `farina_deconv()` is now shared with `harmonic_thd_curve()` so an FR number and a
+THD number from one capture cannot silently come from different deconvolutions.
+
+**Gated:** `analysis/h1_fr_gate.py --selftest` — KA-1 linear recovery, KA-2 harmonic rejection at a
+brutal H2/H3 = −10/−14 dB, KA-3 a mutation (widening the gate past the H1→H2 spacing must FAIL
+KA-2), KA-4 the spacing assumption asserted against `gen_test_signal`'s own constants, KA-5 a real
+static nonlinearity whose known answer is the tanh describing function.
+
+**Result — the premise did not survive.** Graded on the same 129 renders, all three reads stored per
+row so membership is identical by construction:
+
+| | CSD (old) | H1 | H1 band-avg |
+|---|---|---|---|
+| OD band-RMS | 2.95 | 2.99 | 2.70 |
+| OD 8–16.3 kHz p90 | 8.73 | 8.50 | 8.07 |
+| 12901.6 Hz max, OD | 36.18 | 35.32 | 33.23 |
+
+Harmonic rejection moves the HF tail by 0.1–0.9 dB and the headline the *wrong* way; the modest gain
+is from band-averaging, a sampling choice. KA-2 explains it: an exponential sweep already separates
+orders in time (~1 s/octave) against a 170 ms Welch window, and **the CSD passes KA-2 as well**.
+
+⚠ The one mechanism that defeats both instruments is an alias folding **onto** the fundamental at
+`f = FS/(N+1)` — 16.0 kHz (H2), 12.0 kHz (H3) — coincident in both time and frequency, a limit of the
+STIMULUS rather than of either estimator (KA-5's 1× arms). It is the only measurement-side
+explanation left for the HF tail, and no better read can remove it.
+
+⚠ **Two reporting choices to know.** (1) `band_read(mode="band")` power-averages each band over its
+own 1/3-octave width, because `transfer_h1` returns a 0.046 Hz grid where a point sample can land in
+the bottom of a notch — measured 24 dB of difference on one row, which would be a sampling artefact
+read as an error. The CSD's 5.9 Hz bins made a point sample already a local average, which is why
+this never mattered before. (2) `harmonic_thd_curve` keeps its own ±40 ms Hann H1 gate: its H1 is
+only the denominator of `Hn/H1` and every historical harmonic number was read through it. **The two
+H1s must not be quoted interchangeably.**
 
 ### The work, in order
 
 Full detail in `CLAUDE.md` "Open work, in order". In brief:
 
+0. ✅ **DONE session 90** — the FR instrument (above). Nothing shipped from it; it was a measurement
+   correction, and it refuted its own motivating premise.
 1. `c21R` 220k → ~130–150k (hardware-authoritative; we are matched to ND).
 2. `jfetSatNeg` → ≈1.9 — blocked on a weighting judgement, **not** on more matrix runs.
 3. The THD `level` term (6.2 dB) — the largest number on the board, never had its own session.
-4. Re-fit the two-pole ATTACK against session 70's **corrected** spec, then ship-or-park.
+4. ⭐ **RE-SCOPED session 93.** The two-pole ATTACK re-fit. The arbiter was scoring a **stepped-sine**
+   pedal spec against a **swept**-read render — an instrument-only delta of −29.1 % width at boost,
+   i.e. the whole residual. Fixed by `analysis/attack_stepped_gate.py` (both sides stepped, 5 computed
+   gates). In matched units the s62/63 proposal misses **f0 spread 17.72 vs 7.13 Hz (2.49×)** —
+   the statistic session 63 called closed — plus widths 1.66 / **2.70** / 2.00× and boost depth
+   −5.73 dB. The width excess is worst at **boost**, not flat as the swept read said, which changes
+   which element the fit should target. **Not a width-only problem.** See `CLAUDE.md` item 4.
 5. **A3** — one timeboxed carrier hunt inside/before the clipper, then a fitted correction network.
 6. A4 re-grade + the GATE-9 report → the `OSValidationTest` decision → Phase 10.
 
@@ -67,10 +141,67 @@ several were re-opened once already and closed again at the cost of a session ea
 
 ### Known-bad rows (excluded explicitly, never silently)
 
-The **16 `gain-n12` OD rows** are a CAPTURE defect, localised session 48: their THD turnover — which
-no input or output gain can move — differs from their normal-gain twins' by up to 15.6 dB, and the
-input pad their turnover position implies is 3–9 dB, not the 12.07 the harness renders them at. They
-are **broken out in every `matrix_grade` print, not dropped.** The fix is a re-capture of 4 files.
+✅ **THE `gain-n12` EXCLUSION IS RETIRED — SESSION 111, on the user's decision. Those rows are GRADED.**
+Session 48 localised a real defect (the session ran with the interface SEND 12.071 dB down while the
+harness rendered the model at full level, so every *nonlinear* comparison on those files was invalid).
+Both halves of the fix have since landed — `captures.render_args` emits `--input-trim` from the
+MEASURED delta whenever `gainSessionDb` is non-zero, and the four exposed files were re-captured
+2026-07-29 — and session 106's **GATE N** (`analysis/gain_session_gate.py`) re-ran session 48's *own*
+instrument, THD turnover, which no record or output gain can move: 4 of 4 discriminating pairs
+recover **12.376 / 11.412 / 12.016 / 12.012 dB** against the harness's 12.071, with the inversion
+calibrated at 0 / 6 / 12.071 on known answers. Session 48's "implied pad 3–9 dB" does not reproduce.
+
+⛔ **What GATE N does NOT certify**, stated because retiring an exclusion is where an overclaim goes
+unchallenged: it certifies the CURRENT files (the defective ones were overwritten by the re-capture,
+so it is *not* evidence session 48 was wrong), and it certifies them on a **nonlinear** statistic. On
+the absolute/linear axis GATE O5 bounds the residual provenance offset at a **0.334 dB span** across
+bands — a *tilt*, which the report's per-row gain match does not remove — and that residue is the
+**reference's**: our model side is a pure 12.0710 dB shift to 1.8e-08. These rows are **cheap, not
+clean.**
+
+**Measured cost at `s110_baseline.json`** (131 captures; `release_gate.py`, dropout cell excluded):
+
+| | ex `gain-n12` (pre-s111) | **graded (s111)** | |
+|---|---|---|---|
+| OD rows | 322 | **342** | |
+| OD band-RMS | 2.265 | **2.327** | ⚠ +0.062 |
+| OD 100 Hz–8 kHz median | 0.489 ✅ STRETCH | **0.531 ⚠ over** | ⛔ **re-opens the one OD row s109 closed** |
+| OD 25–100 Hz median | 0.825 | 0.917 | ⚠ |
+| OD 8–16.3 kHz p90 | 7.101 | 7.451 | ⚠ |
+| OD p99 | 12.893 | **12.809** | ⭐ |
+| THD (OD) level term | 3.065 ⚠ over | **2.986 ✅ SHIP** | ⛔ see the warning below |
+| CLEAN, all four rows | 0.453 | **0.453** unchanged | ✅ (n12 CLEAN rows were never excluded) |
+| rows over SHIP | 7 | **7** | composition changed, count did not |
+
+⚠ **That is NOT session 106's "+0.020 dB, n 320 → 336"**, which was measured on the s109 report. s110
+added a re-captured `drive-1700_level-1700_grunt-boost_gain-n12` twin, so the group is **20 rows now,
+not 16**, and that twin is the worst of it (per-row band-RMS 3.41 / 4.29 / 4.90 / 8.95). It is also
+the **only healthy capture of DRIVE max × LEVEL max × GRUNT boost at the `drv_-12` rung** — both
+full-send captures of that condition are reference dropouts there — so retiring the exclusion
+**restores coverage the session-110 dropout exclusion had removed.**
+
+⛔⛔ **DO NOT BOOK THE THD ROW'S NEW `SHIP` AS A MODEL IMPROVEMENT.** The gated term is an UNSIGNED
+rms, and the two populations it now pools have **opposite signs**: at full send the model
+over-distorts (**signed +1.414 dB**, n 229) and at the 12.071 dB lower send it **under**-distorts
+(**−0.772 dB**, n 15). An rms over that union is smaller than either population's own error, so the
+number fell for a membership reason. `release_gate.py` prints the three-way split under the row on
+every run so the mixture cannot be misread.
+
+⭐⭐ **AND THAT MIXTURE IS ITSELF THE FINDING — the retired rows are the only ones in the matrix at a
+second operating point, so they are the only rows that can see the SLOPE of the distortion-vs-input
+law.** Paired against their own full-send twins (identical settings, send 12.071 dB apart, so every
+nuisance cancels): dropping the send moves the model's signed THD level term by **−1.106 dB mean /
+−1.039 median, 11 of 14 same-signed.** ⇒ the model's distortion rises with input level **faster than
+the reference's** — too little at low input, too much at high input. That is the same defect GATE Q
+named ("the OD path saturates too early") measured on an **independent axis**: GATE Q varies the
+sweep's own level, this varies the interface send. ⚠ Quote the **sign**, not the size — per-pair
+scatter runs −3.1 … +2.4 dB, and GATE N's own send calibration carries up to 0.66 dB of error on one
+pair. **Measured, not gated.**
+
+⚠ Still excluded, on their own separate grounds: the **2 reference ladder dropout cells** (session
+109/110 — detected per render by `matrix_grade.find_dropouts`, never named) and, inside **GATE M
+only**, the `gain-n12` A3 pair — whose exclusion now rests on session 108's P4 (do not pool over an
+operating point the pedal itself sets), **not** on the retired capture defect.
 
 ## 1. Method
 
@@ -254,7 +385,7 @@ it is driven — the gate that separated GAP #3a from #3b. Both need no captures
 | Gap | State | Next move |
 |---|---|---|
 | **A3** — OD too weak vs the clean bleed, ≈5–7 dB over 100–400 Hz | MEASURED to death by two corroborating instruments; **no carrier found in ~20 sessions.** No single element (s50) and no post-clipper linear element of any order (s52) can supply it. Only region not ruled out: **inside/before the clipper** | ONE timeboxed session, then fall back to a fitted correction network |
-| **GAP #2 / ATTACK** — the ~320 Hz notch, +26 dB, largest single-band error | Two-pole topology BUILT in `src/` (defaults to a no-op), but its spec was **corrected in s70** and it has not been re-fitted since | Re-fit against the corrected spec, then ship-or-park |
+| **GAP #2 / ATTACK** — the ~320 Hz notch, +26 dB, largest single-band error | ⛔⛔ **RE-SCOPED s99: the notch shape and the OD path's ABSOLUTE low-end level are in CONFLICT in this topology.** Re-fitted against the corrected s70 spec three times; each "reachable" result was bought by spending the LF level (s94 width rms 0.34 at **LF −42 dB**; s97 0.41 at **−22 dB**). With an LF-visible term the same search reaches **LF −1.4 dB** and width collapses to **4.25 in all ten rows** of a sweep spanning 100× in `w_f0` and 3× in box — saturated, i.e. unreachable, not a weight choice. f0 and its spread hold throughout (6.78 Hz vs the pedal's 7.13) | **Not "re-fit again."** Either accept a level-correct / shape-approximate point, or find the missing degree of freedom — the width+depth deficit is now a TOPOLOGY question, not a fitting one |
 | **Even-order, low drive** — `jfetSatNeg` | LOCATED (≈1.9) and matrix-judged. ⛔ Stop rendering `a` candidates — the matrix has said all it can | A weighting judgement, not a measurement |
 | **THD `level` term, 6.2 dB** | The largest single number in the project. Never had a dedicated session | Own pass, from the THD decomposition |
 | **`c21R`** | We sit at 7.2 Hz, matched to ND; hardware wants ~11–12 Hz ≈ 130–150k | One constant + one matrix run |

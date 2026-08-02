@@ -1,13 +1,396 @@
-# Session log — Phase 9 handover archive (sessions 1–88)
+# Session log — Phase 9 handover archive (sessions 1–93, 100)
 
-> Moved out of `CLAUDE.md` in session 89 (2026-07-31). This is the **verbatim** archive of the
-> per-session handover blocks that used to live in that file's "Current step" section — nothing
+> Moved out of `CLAUDE.md` in session 89 (2026-07-31). Sessions 1–88 are the **verbatim** archive of
+> the per-session handover blocks that used to live in that file's "Current step" section — nothing
 > has been edited, only relocated, because it was 6,914 lines of always-loaded context describing
-> work that is now summarised in `CLAUDE.md` and `docs/phase9-gap-log.md`.
+> work that is now summarised in `CLAUDE.md` and `docs/phase9-gap-log.md`. Sessions 89+ are written
+> here directly, short, and the summary stays in `CLAUDE.md`.
 >
 > **Read order for a fresh session: `CLAUDE.md` → `.claude/rules/reference-sources.md` →
 > `docs/phase9-validation.md` §0. Come here only to recover the detail behind a specific
 > session's finding.** Newest first, as it was written.
+
+---
+
+## SESSION 100 (2026-08-01) — **the s99 ATTACK/treble-ladder candidate SHIPPED.** 17 constants, the
+## largest departure-from-the-drawn-network in the project. A DECISION session, not a measurement one.
+
+**The question.** Session 99 closed with its next step being a judgement call, explicitly not more
+measurement: ship the s99 candidate or reject it as too many fitted constants for the gain. The user
+answered it — *"we're now breaking from the schematic where we need to to get everything together.
+that guidance holds moving forward"* — which is the session-51 standing authorisation reaffirmed, and
+it addresses the only objection on the table.
+
+**What shipped.** 17 values in `src/dsp/FitParams.h`, treble/ATTACK region only. No other source
+file, no `tests/` change. Full per-value table in `CLAUDE.md` "Uncommitted at session 100"; the
+fullest narrative record is the session-100 block in `FitParams.h` itself.
+
+**Result (129 captures, 504 shared rows, membership identical, CLEAN bit-identical):** OD band-RMS
+ex gain-n12 **2.664 → 2.409**, THD (OD) level **4.279 → 3.663**, OD 25–100 Hz p90 6.065 → 4.971,
+OD 100 Hz–8 kHz p90 5.089 → 4.458. 111 rows better >0.5 dB against 36 worse. **OD p99 14.408 →
+14.661 is the only gated statistic that got worse.** 8 rows remain over SHIP; none closed.
+
+**⛔ It is NOT a notch fix and must not be booked against GAP #2.** The 320 Hz band moves only
+9.54 → 9.21 dB mean |Δ| over the same 320 OD rows, and the notch requirement is still unmet (width
+1.28/1.46/1.38×, depth +4 dB). What it repairs is the ATTACK **boost** throw sitting 9–12 dB light at
+every sub-band. It is an OD-path absolute-level fix that happens to live in the ATTACK ladder.
+
+**The acceptance check, and the two ways it nearly failed to be one.** Shipped defaults must render
+identically to the original 17-flag `--fit` list, else a value is in the wrong field.
+1. The first attempt used `ARGS="--master 0.5 …"` unquoted. **zsh does not word-split `$var`** (fifth
+   occurrence in this project): the whole string arrived as ONE argv, both renders exited rc=2, and
+   my comparison printed **"❌ DIFFER"** from its else-branch on two files that did not exist — a red
+   light with a label pointing at the wrong defect. Fixed with `ARGS=(...)` / `"${ARGS[@]}"` and an
+   argv-count echo.
+2. The repaired check ran **one** ATTACK throw. `attackC5TrimCut` and `attackDampCut` are live only
+   in the cut throw, so two of the seventeen were never evaluated and the check would have passed
+   with either wrong. Re-run across all three throws, plus a **mutation control** (`attackDampCut ×2`
+   must change the render) so a constant that never reaches the DSP cannot read as PASS.
+   ⇒ **bit-identical at attack = 0, 1, 2; mutation control fires.** So `s99_attack_cand.json` IS the
+   shipped grade and no re-render was needed — a measured claim, not an assumption.
+
+**ctest 16/17** — same single pre-existing `OSValidationTest` failure, no new ones. ⚠ Its numbers
+MOVED, a cost outside the matrix: at `amp 0.35`, **8× −17.1 → −23.1 dB (better), 4× −30.8 → −28.6
+(worse)**. Same session-92 cause (fold-down from the un-ADAA'd CD4049 VTC), still Phase 10 B's.
+
+**Two stale comments corrected in place** in `FitParams.h`: the shared-ladder block's "Defaults are
+the drawn values…" (now false in its first clause; its second clause was never about `FitParams` —
+`TrebleAttackTest` Test 10 compares the **stage's** own `kR7…kC6` defaults, so it still passes and is
+not vacuous), and `trebleC8`'s "the proposal's condition", now the shipped one.
+
+**▶ Next.** Item 4's head is now **(2): the notch is a TOPOLOGY question, not a fitting one** — the
+session-99 conflict table shows width rms saturating at 4.07–4.66 across a 100×/3× sweep, so another
+search on this topology will not reach both the notch shape and the absolute level. Also open and
+unchanged: item 3 (THD level, now 3.663 vs the 3.0 bar), item 5 (A3, one timeboxed attempt), item 6
+(Phase 10 B: the aperiodic 8× regime, then ADAA the CD4049 VTC).
+
+---
+
+## SESSION 93 (2026-08-01) — backlog item 4, the ATTACK re-fit. **The arbiter was measuring the two
+## sides with two different instruments.** Fixed and gated; item 4 re-scoped and it is HARDER.
+## Nothing in `src/` or `tests/`; ctest untouched.
+
+**The question.** Session 70's next-step (a): re-run the ATTACK fit against the CORRECTED spec (null
+spread **7.13 Hz, not 17.58**; boost width **19.2 Hz, not 27.1**). Nothing had been done in the 23
+sessions since.
+
+**(0) ✅ BASELINE FIRST — the corrected spec reproduces to the digit.** `read_notch_sweep.py` on the
+ten stepped-sine notch captures, drive-min / −30 dBFS: **f0 323.03 / 326.41 / 330.17 (spread 7.13) |
+depth 15.27 / 37.98 / 15.58 (boost/flat 2.44×) | width 75.4 / 19.2 / 75.6** — identical to session
+70's record. Its own GATE 1 (synthetic notches of known f0/depth/width) passes at 0.05 Hz / 1.3 %.
+
+**(1) ⛔⛔ THE BLOCKER NOBODY HAD NOTICED, AND IT IS THE WHOLE SIZE OF THE RESIDUAL.**
+`attack_render_gate.py` — the arbiter for every ATTACK candidate since session 63 — reads the RENDER
+with the **swept** instrument (`attack_notch_probe.locate_notch`, a 5.86 Hz CSD of the main test
+signal's `sweep_clean`). The corrected spec is **stepped-sine**. Session 70's own instrument-only
+delta is boost **−29.1 % width / +5.28 dB depth**; scoring one against the other books that straight
+onto the model, on the exact throw the re-fit is about. ⇒ **no re-fit could have been trusted until
+both sides used one instrument.**
+
+**(2) NEW TOOL: `analysis/attack_stepped_gate.py`** — renders the real chain through
+`notch_sweep_48k.wav` and reads it with the STEPPED locator, so pedal and model share an instrument.
+Five gates, all computed: **0 LOCATOR** (delegated to `read_notch_sweep.selftest`, one oracle not a
+second copy), **1 CONDITION** (`.args.json` stamp re-checked; render args from `captures.render_args`,
+never hand-written), **2 ALIGNMENT**, **3 LIVENESS**, **4 SWAP**.
+⚠ **GATE 2 FAILED FIRST AND THE GATE WAS WRONG, NOT THE DATA** — it asserted one lag spread over
+pedal AND render and failed at 71 samples. The render carries the oversampler FIR latency and the
+capture cannot. **Measured rather than argued**, by re-rendering one throw at three factors:
+**OS 1 → +10, OS 2 → +59, OS 8 → +74 samples** — it tracks the factor and OS 1 lands on the pedal's
+own +3…+9. (It also pins OfflineRender's default at **OS = 8**, the matrix's factor.) Gate rebuilt to
+check consistency *within* each side.
+
+**(3) ⭐⭐ THE PRE-REGISTERED PREDICTION HELD.** Registered in the tool's header before the run:
+smearing scales with how narrow a feature is, so the render — whose null is ~2.5× broader than the
+pedal's — should NOT show the pedal's −29 % narrowing. Measured, same audio, both instruments:
+
+| side | boost width swept → stepped |
+|---|---|
+| PEDAL | 27.1 → 19.2 Hz = **−29.1 %** (s70 record −29.2 %) |
+| render / s62 proposal | 46.5 → 51.7 Hz = **+11.1 %** (WIDENS) |
+
+⇒ the swept-vs-stepped pairing was a **real scoring error worth ~40 percentage points at boost**.
+
+**(4) ⭐⭐ AND IT CHANGES A CONCLUSION, NOT JUST A SCALE.** Width ratio (model / pedal), same audio:
+
+| instrument pairing | cut / boost / flat | worst throw |
+|---|---|---|
+| swept vs swept record | 1.51 / 1.72 / **1.98** | **flat** |
+| **stepped vs stepped** | 1.66 / **2.70** / 2.00 | **boost** |
+
+**Which throw is worst is exactly what selects a SHARED ladder element (session 63 item 5b) versus a
+per-throw one** — so the instrument swap moves the target of the fit. This independently corroborates
+session 70 item (5)(b)'s "boost-only, not uniform" re-scope, on machinery it does not share.
+⚠ Session 63's recorded 150.6 / 59.6 / 138.6 widths are **pre-session-65** (they predate the GRUNT
+render-condition fix) — do not diff against them; the post-fix swept read is 117.9 / 46.5 / 142.7.
+
+**(5) ⭐⭐ THE BIGGEST MISS IS NOW f0 SPREAD, WHICH WAS CONSIDERED CLOSED.** Session 63's headline was
+that the two-pole topology "met the notch requirement TO THE BIN". In matched units:
+
+| statistic | pedal | s62/63 proposal | |
+|---|---|---|---|
+| **f0 spread** | **7.13 Hz** | **17.72 Hz** | **2.49× too wide** |
+| depth cut / flat | 15.27 / 15.58 | 14.30 / 15.55 | −0.98 / −0.03 dB ✅ |
+| depth **boost** | **37.98** | 32.25 | **−5.73 dB** |
+| width cut / boost / flat | 75.4 / 19.2 / 75.6 | 124.8 / 51.7 / 151.3 | 1.66 / **2.70** / 2.00× |
+
+The proposal delivers spread **17.72** against the superseded spec's **17.58** — a 0.14 Hz match,
+which is *why* it read as solved. Against the corrected **7.13** it is the largest single error in the
+requirement. ⇒ **item 4 is not a width-only problem and never was; f0 spread has to be re-opened.**
+
+**(6) ⚠ THE SHIPPED DEFAULT HAS NO NULL AT ALL, AND ITS f0 IS A SENTINEL.** Drawn ladder: depth
+**3.1–3.3 dB** (pedal 15–38), half-depth contour never closes so width is `nan` **by construction**,
+and f0 rails at the 380 Hz `SEARCH_WIN` edge at all three throws — a **window bound, not a located
+null** (`sentinel-is-not-a-measurement`). This is session 57's finding surfacing as a missing
+statistic rather than a bad one; the tool flags it with `!` and refuses to call the swap gate decided
+from it (`UNDECIDABLE`), rather than silently counting `nan` as "does not narrow".
+
+**▶ NEXT, IN ORDER: (a)** ⭐⭐ the actual re-fit — point `attack_shape_screen.py`'s `screen_targets`
+at the **stepped** record instead of `REC["raw"]["notch"]`, **and re-derive its calibration**, which
+currently maps screen units onto the **swept** render (`render_cal`) and must now map onto the
+stepped one; the CAL ladder point needs 3 more renders through the notch stimulus. Then
+`--fit --best`, land on `attack_stepped_gate.py`, then the 129-capture matrix. **(b)** with (5) in
+hand, expect the fit to be arbitrating f0-spread against width — session 64 already recorded those
+two as in CONFLICT inside this topology at fixed f0, and the corrected spec **tightens both at once**,
+so a NEGATIVE reachability result is a live outcome and should be reported as one, not fitted around.
+**(c)** item 3 (THD level, re-scope against 4.279), **(d)** item 5 (A3, one timeboxed attempt),
+**(e)** the CLEAN bar re-derivation (user decision) → A4 re-grade → Phase 10.
+
+⚠ **UNCOMMITTED at session close:** everything sessions 55–92 already had, plus new
+`analysis/attack_stepped_gate.py`, `analysis/reports/s93_attack_stepped.json` (gitignored),
+`build/attack_stepped_gate/` (6 renders + stamps), and edits to `.claude/rules/measurement-discipline.md`,
+`docs/session-log.md`, `docs/phase9-validation.md`, `CLAUDE.md`. **Nothing in `src/` or `tests/`.**
+
+---
+
+## SESSION 92 (2026-07-31) — backlog item 6: the `OSValidationTest` aliasing number. **It is real
+## aliasing.** The instrument was rebuilt and gated first; nothing in `src/`; ctest still 16/17.
+
+**The question.** Session 91's `jfetSatNeg` 0.76054 → 1.9 moved a 46-session-old test number
+(8× alias/signal at amp 0.35, −23.6 → −17.3 dB). The handover said explicitly: not established as
+genuine aliasing, do not assume either way, settle it with a real instrument.
+
+**New tool: `analysis/alias_gate.py`.** One renderer (`OfflineRender` at `--input-ref 1
+--output-makeup 1`, which makes the CLI's gain staging the identity around `PedalDSP`, so it
+reproduces the test's own operating point), **three analyses of the same samples** — the old metric
+reimplemented verbatim, the repaired metric on the old 0.3 s window, and the repaired metric on a
+4 s window. Six known-answer gates (`--selftest`), each aimed at making a specific hypothesis fail
+rather than at making the new metric look good. KA-2 and KA-4 are the discriminators; KA-5 is the
+mutation test (a metric that cannot report a real −17 dB floor is useless however clean it reads).
+⚠ Two of the six failed on the first run for reasons in my own test signals, not in the metric —
+one assertion was written against a bin-exact f0 where the shipped test uses an off-grid one, and
+one synthetic tone was generated at the wrong frequency. Both are the same class as s91's KA-4.
+
+**Finding 1 — the −40.5 dB "floor" is window leakage, not a floor.** f0 = 2500 Hz against a
+2.9297 Hz bin is 853.33 bins. Off-grid harmonics leak past the ±3-bin "signal" mask; on a synthetic
+signal with **zero** alias content the old metric reads **−40.65 dB** off-grid and −99 dB bin-exact.
+That value appeared in twelve cells of the shipped table and had been read as a measurement floor by
+this project for 46 sessions. True floor at those points: **−86 dB**. 1/3 of a bin ⇒ 59 dB.
+
+**Finding 2 — the settling residue is real but is NOT the culprit.** 0.3 s against `MasterOut`'s two
+0.72 Hz high-passes leaves a decaying DC ramp in the window, and the harmonic mask charges it to
+alias (KA-4: +69 dB on a synthetic case). Measured on the real chain, the LF bucket sits **12–15 dB
+below** the alias bucket at every amp × factor cell. It never drove the headline.
+
+**Finding 3 — what remains is fold-down, established three ways.**
+- **Fold arithmetic, across three f0.** The dominant inharmonic bins match `|N·f0 − m·8·fs|` **to
+  the bin**: H152–156 at f0 = 2499 Hz, H190/193 at 2001 Hz, H117–120 at 3249 Hz. ⭐ Moving f0 is what
+  makes this evidence — at a single f0 "harmonic N folding" and "a beat note at δ" predict the same
+  bins by construction, because `|N·f0 − m·fs_os|` *is* a sideband offset. The offsets went
+  849.6 → 187.5 → 615.2 Hz, tracking f0.
+- **Convergence.** A 192 kHz-base render (1.536 MHz internal, 32× further from the audible band)
+  reads **−65.9 dB** where 48 kHz/8× reads −17.1 — an excess of **+48.8 dB**. ⚠ Caveat: at 192 kHz
+  the chain runs ~16 dB quieter for the same input, so the operating points are not matched; treat
+  the convergence row as corroboration of the sign and scale, not as a calibrated figure. Its
+  amp-0.5 rows read +6.3 dB (inharmonic above harmonic) and were **not** used.
+- **Localisation.** `railEnabled=0` moves it 1.5 dB, so the rail clamps are not the carrier; the
+  J201 already carries closed-form ADAA (`PedalChain.h:139`). What is left is the **un-ADAA'd
+  CD4049 VTC** — which `FitParams.h` has documented as carrying no ADAA since Phase 5.
+
+**Finding 4 — the cost of `jfetSatNeg = 1.9`, over 21 bin-exact fundamentals at amp 0.35.**
+8× median **+1.87 dB**, worst **+13.6 dB**; 2× median **+0.05 dB**. The absolute floor at 8× is
+−85…−115 dB for every fundamental below 1.5 kHz and −17…−26 dB above ~2.3 kHz; at 2× it is
+−15…−28 dB everywhere above 600 Hz **at both constants**, so the shipped realtime default is the
+larger exposure and the constant is irrelevant there. ⇒ 1.9 worsens a defect that long predates it.
+⚠ f0 = 1500 and 3000 Hz are degenerate at fs = 48 k (they divide the rate, so no fold can be
+inharmonic) and read −213 / −3067 dB — flagged, not averaged.
+
+**⭐⭐ Finding 5 — A SECOND, PREVIOUSLY UNKNOWN DEFECT, FOUND BY A CONTROL THAT WAS SUPPOSED TO BE
+BORING.** The degenerate tones (f0 dividing fs) should read −200 dB at every factor, and 1500 Hz
+does. **3000 Hz at 8× reads −23.4 dB**, which is impossible for fold-down. Dissected: the energy is
+BROADBAND (~−44 dB re H1 spread over thousands of bins), not the handful of discrete peaks the fold
+model produces. So the settled output was tested for the property the whole instrument assumes —
+`||y[n+M] − y[n]|| / ||y||`, which must be at the float32 floor for a time-invariant chain driven by
+a stimulus periodic in M:
+
+| | 2× | 8× |
+|---|---|---|
+| exactly periodic (resid ~1e-9) | **21 / 21** at both constants | 17 / 21 |
+| **APERIODIC** (resid > 1e-4) | **0 / 21** | **4 / 21**, worst **0.69** (69 % RMS non-repetition) |
+
+⇒ **at 8× the chain enters an aperiodic regime at four of twenty-one tones, all above 2.8 kHz, at
+BOTH constants** (4/21 either way — so this is not session 91's doing). At those points the spectrum
+**cannot be read as aliasing at all** and more oversampling does not help, because 2× is clean
+everywhere. ⚠ 8× is the OFFLINE-RENDER default and **the 129-capture matrix renders at OS = 8** —
+worth a look before the next matrix baseline, though the matrix's stimulus is a sweep at moderate
+level, not a hard 3 kHz tone at drive 0.85.
+⭐ The gate row itself (f0 = 2499 Hz) is periodic to **5.3e−9**, so finding 3's fold attribution
+holds unqualified exactly where the failing test sits. `alias_gate.py --periodicity`,
+`analysis/reports/s92_alias_periodicity.json`.
+
+**`tests/OSValidationTest.cpp` rebuilt** on the same geometry: bin-exact f0 (853 bins = 2499.02 Hz),
+rectangular window, 4 s settle, LF bucket printed separately, header carrying the derivation. ⭐ It
+reproduces `alias_gate.py`'s repaired column to **0.1 dB** across the whole table while sharing no
+code — two independent implementations agreeing. The gate still fails at amp 0.35 and that failure
+is now known to be a real defect, so ctest is 16/17 exactly as before, for a reason instead of a
+mystery. **No DSP constant was touched.**
+
+**✅ DECIDED WITH THE USER:** `jfetSatNeg = 1.9` **stays** (8×-only cost, above 2.3 kHz, free at the
+shipped 2× default, against a THD-level gain on the authoritative axis, and the defect predates it).
+**Phase 10 B order: (1) the aperiodic regime, (2) ADAA the CD4049 VTC.** Raising the OS defaults was
+considered and rejected — 2× is uniformly −15…−28 dB above 600 Hz and 8× is the factor carrying the
+aperiodicity, so more oversampling is not monotonically better here.
+
+**⭐⭐ Finding 6 — THE APERIODIC REGIME IS LOCALISED TO `Clipper::process`, AND IT HAS TWO CAUSES.**
+Bisected with `--fit` and a blend control (all at f0 = 3000 Hz, 8×, amp 0.35 unless stated):
+
+| condition | periodicity residual |
+|---|---|
+| **CONTROL** `--blend 0` (clipper out of circuit) | **0.00e+00** |
+| shipped | 9.3e−02 |
+| `clipA0` 24.871 (shipped) → **18 / 12 / 6 / 3** | 9.3e−02 → **0.00e+00 at every one** |
+| `clipK` 1.5 … 3.5 | 0.9–1.2e−01 — **knee hardness is irrelevant** |
+| `--drive` 0.85 → **0.6 / 0.4 / 0.2** | 9.3e−02 → **0.00e+00 at every one** (1.0 → 4.8e−02) |
+
+⇒ it needs **high closed-loop gain AND high drive**, and the shipped `clipA0` sits on the wrong side
+of a sharp threshold between 18 and 24.871. Then, by temporary edits to `src/dsp/Clipper.h`
+(**made, measured, and reverted — `git diff src/dsp/Clipper.h` is clean**):
+
+- **(a) The Newton solve is not converged.** `kNewtonIters = 6`. At **60**, two of the four aperiodic
+  tones (2800.8, 4400.4 Hz) become exactly periodic, and the alias figure at the gate tone f0 = 2499
+  moves **−17.05 → −17.40 dB** — so 6 iterations leaves a measurable residual at the 384 kHz internal
+  rate. The stage's own comment predicts "~2–4 iters", which is true at 48 kHz and not at 384 kHz.
+- **(b) The D1/D2 clamp fires, and it is applied OUTSIDE the solve.** `Clipper.h:270–273` hard-clips
+  the *solved* node voltage and then feeds that clipped value into the companion-cap state update —
+  a discontinuity inside a stateful feedback loop. At 60 iterations **with the clamp disabled, 20 of
+  21 tones are exactly periodic** and f0 = 3000 Hz collapses to **−3069 dB**, exactly the degenerate
+  value the bin arithmetic demands. Only 2800.8 Hz still misbehaves.
+  ⚠⚠ **This contradicts the stage header**, which says D1/D2 "essentially never fire (the test
+  asserts it)". Measured, at drive 0.85 they change the output. The assertion is presumably passing
+  because `ClipperTest` probes a gentler operating point.
+  ⛔ Removing the clamp is NOT the fix — D1/D2 are real parts. The modelling shortcut is that they
+  are a post-hoc clip rather than diodes inside the Newton system.
+
+⇒ **Phase 10 B item 1 has a concrete shape:** raise/adapt `kNewtonIters` with a convergence check,
+and fold D1/D2 into the solve. Both change every rendered sample, so they need a matrix re-baseline
+and must not be done mid-render (`measurement-discipline.md` s91).
+
+---
+
+## SESSION 91 (2026-07-31) — **TWO CONSTANTS SHIPPED, breaking a 46-session drought.** Backlog
+## items 1 and 2 closed; item 3 mostly closed as a side effect of item 2.
+
+**Shipped to `src/dsp/FitParams.h`** (both blocked on judgement, not measurement; both taken with
+the user in the loop):
+- **`c21R` 220k → 130k** (corner 7.2 → 12.2 Hz). Re-aimed from ND to the §2 HARDWARE anchor.
+- **`jfetSatNeg` 0.76054 → 1.9.** The low-drive even-order move located in session 80.
+
+Also **`src/dsp/JfetStage.h`**: corrected the documented monotonicity bound (comment only).
+
+**New tool: `analysis/c21_hw_anchor.py`** — derives the C21 corner from §2's own table over all
+three LF anchors, 6 known-answer gates, plus `--verify REPORT.json` (acceptance check run against
+the RENDER, not the prediction). ⚠ KA-4 caught a sign slip in my own closed form on the first run,
+which is the argument for writing the gate before the answer.
+
+**⭐ THE METHOD POINT (now a rule in `measurement-discipline.md`): the target is `HW − MODEL`, not
+§2's published `HW − ND`.** The old bullet's "hardware wants ~11–12 Hz ≈ 130–150k" applied the
+published delta raw, which assumes the model sits ON ND. It does not — measured over 168 CLEAN rows
+the model was already **0.40 dB below ND at 20 Hz** and 0.16 at 30 Hz, i.e. a third of the move was
+done. Raw delta → **121k, overshoots**. Remainder → **133.1k**, E24 **130k**. The flagged range
+happened to bracket the right answer while being derived the wrong way.
+
+**Results** (129 captures, 504 rows, membership identical throughout):
+
+| | s90 ship | +c21R 130k | +jfetSatNeg 1.9 |
+|---|---|---|---|
+| hardware worst err vs §2 | 0.70 | **0.17** | 0.17 |
+| OD band-RMS | 2.697 | 2.652 | 2.664 |
+| CLEAN band-RMS | 0.432 | 0.453 | 0.453 |
+| **THD level** | **6.202** | 6.158 | **4.279** |
+| THD tilt / curv | 4.281 / 3.257 | 4.236 / 3.229 | **2.847 / 2.832** |
+
+⭐⭐ **The THD result was NOT the objective and is the session's biggest number.** Item 3 ("the largest
+single number in the project, never had a dedicated session") fell 6.202 → 4.279 as a side effect of
+item 2 — mechanistically sensible, since the THD `level` term measures distortion *amount* being low
+and item 2 restored a missing even-order generator. **Re-scope item 3 against 4.279.**
+
+**⚠ Costs, recorded rather than smoothed:**
+1. **CLEAN pays for `c21R`** — p90 0.77 → 0.82, confined to 25–100 Hz. Deliberate and priced.
+2. **`jfetSatNeg` moved `OSValidationTest` for the first time in 46 sessions** — 8× alias floor
+   −23.6 → −17.3 dB. Attribution exact (reverting that one constant reproduces the old record to the
+   digit). **Not established as genuine aliasing** — the spike is at ONE amplitude with clean values
+   either side, and the metric counts >±3 bins from a harmonic as "alias" so more harmonics inflate
+   it — but per `instrument-defect-is-a-hypothesis` that is an argument, not a measurement. Now
+   backlog item 6.
+3. **The `JfetStage.h` bound was wrong**: `|a|*s < 2.598` is the even bump in isolation; scanning the
+   real `waveshape()` puts the fold-back at **a = 5.333 (|a|*s = 2.431)**. Session 73's rejected
+   `a ≈ 5.7` was therefore non-monotone, not merely worse-scoring.
+
+**⚠ The CLEAN gate restatement did the OPPOSITE of what was expected.** Carving the hardware-governed
+25–100 Hz bands out of the CLEAN pool was proposed as relieving a failing row; measured, it makes the
+row HARDER — those bands carried smaller errors and were diluting p90 downward, so p90 goes
+0.77 → 0.802 **on the s90 baseline**, which retroactively fails too. The ≤0.80 bar was passing on
+dilution, and was itself agreed against a transcribed 0.66 that measured 0.77. **The bar was
+deliberately NOT retuned** — that is a user decision and is now the blocking gate item.
+
+**⚠ Process failure worth not repeating:** I rebuilt `OfflineRender` mid-render after explicitly
+noting I shouldn't, splitting the run's cache across two binary signatures. Fixed by re-running
+(cheaper than killing: post-relink captures hit cache) and keeping the mixed-binary report as a
+control — **504/504 rows bit-identical**, so the comment-only rebuild was inert. Now a rule.
+
+---
+
+## SESSION 90 (2026-07-31) — Phase 9 item 0: the FR instrument. Repaired, validated, **and it
+## refuted its own premise.** Nothing shipped; nothing in `src/`.
+
+**Done.** `analyze.transfer_h1()` (H1-only Farina read, harmonics rejected by time-gating);
+`analyze.farina_deconv()` shared with `harmonic_thd_curve` so FR and THD from one capture cannot come
+from different deconvolutions; `analyze.band_read()` (point vs power-band sampling);
+`comprehensive_report.py` stores **all three** FR reads per row (`CACHE_VERSION` 2, `--fr-method`,
+default `h1band`) so the choice is post-processing, never a re-render; `matrix_grade.GRADE_HI`
+12901.6 → **16255**; new **`analysis/h1_fr_gate.py`** (KA-1…KA-5 known-answer gate) and
+**`analysis/release_gate.py`** (the release gate as a script). Re-baselined:
+`analysis/reports/s90_baseline129_h1.json`, 129 captures, ~35 min at `-j 8`.
+
+**The finding, which is negative and is the point.** Session 89's premise (a) — that the CSD read
+could not separate harmonics, making "ND aliases" and "our instrument is contaminated"
+indistinguishable — **does not survive**. Same 129 renders, all three reads, membership identical by
+construction: OD band-RMS **2.95 (CSD) → 2.99 (H1) → 2.70 (H1 band-avg)**; 8–16.3 kHz p90
+8.73 → 8.50 → 8.07; 12901.6 Hz max 36.18 → 35.32 → 33.23. Harmonic rejection is worth 0.1–0.9 dB and
+makes the headline *worse*; the gain is from band-averaging, a sampling choice. KA-2 says why: an
+exponential sweep separates orders **in time** (~1 s/octave) against a 170 ms Welch window, so the
+CSD passes a −10/−14 dB H2/H3 contamination test too. ⚠ The only mechanism that defeats both is an
+alias folding **onto** the fundamental at `f = FS/(N+1)` = 16.0 / 12.0 kHz — the top two graded
+bands — coincident in time *and* frequency, a limit of the stimulus (KA-5's 1× arms).
+
+**Two things moved that were not expected to.** (1) Widening to 16255 Hz made the tail **worse**:
+11 of the 12 worst OD band values are now that band, p90 16.6 dB, max 40.2. The old ceiling was
+justified by a comment about a "cab noise floor" — there is no cab in this pedal — and the band it
+excluded is the worst in the matrix. (2) The gate's hand-transcribed "now" column half-reproduced:
+every OD cell to the digit (median 0.85 / p90 5.87 / max 36.18 / band-RMS 2.743 at the old range),
+CLEAN's percentiles **not** (0.21/0.66/1.99 quoted vs 0.23/0.76/2.17 measured; three alternate pools
+tried, none reproduce, provenance unrecorded). Verdict unchanged, numbers replaced — hence
+`release_gate.py`.
+
+**Controls that held.** Membership 504 shared rows / 0 exclusive vs `s74_baseline129.json`; 54 rows
+better by >0.5 dB and **0 worse**, all of them `level-1700` (the bleed-free rows, i.e. the change
+landed exactly where it should); CLEAN band-RMS **0.432 on both instruments**; the whole THD block
+bit-identical (9.292 / level 6.202 / 4.281 / 3.257 / 5.147) because the THD path was untouched and
+its Nyquist guard already excluded 16255.
+
+**Next.** Session 89's step (b) is now the entire HF question — ND's artefact or our Sallen-Keys —
+and **no further work on the FR instrument is warranted**. Otherwise the ordered list in `CLAUDE.md`
+is unchanged: `c21R`, the `jfetSatNeg` weighting judgement (a decision for the user, not a
+measurement), the THD level term, the ATTACK re-fit, the timeboxed A3 attempt.
 
 ---
 

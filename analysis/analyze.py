@@ -67,6 +67,19 @@ def rms_db(x):
 
 
 def transfer(out, inp):
+    """Cross-spectral-density estimate of |H(f)| in dB: |Pxy| / Pxx, Welch-averaged.
+
+    ⚠⚠ THIS ONLY PARTIALLY REJECTS NONLINEAR CONTENT — use `transfer_h1()` for any FR read taken
+    at drive. The CSD suppresses whatever is incoherent with the input, but a harmonic of a swept
+    sine IS deterministically related to the input, and inside an 8192-point Welch segment the
+    sweep moves little, so H2 of the fundamental one octave down lands in the same analysis bin and
+    is NOT rejected. Session 89 found every one of the twelve worst OD rows in the 129-capture
+    matrix sitting in a single HF band, with "ND aliases" and "our FR instrument is contaminated"
+    indistinguishable on this estimator. `transfer_h1()` separates the linear response by Farina
+    time-gating instead, which rejects harmonics by construction.
+
+    Kept for: clean-path reads (no nonlinear content to reject), historical reproduction, and the
+    labelled CONTROL column in `h1_fr_gate.py`."""
     f, Pxy = sps.csd(inp, out, FS, nperseg=8192)
     f, Pxx = sps.welch(inp, FS, nperseg=8192)
     H = np.abs(Pxy) / (Pxx + 1e-20)
@@ -75,6 +88,36 @@ def transfer(out, inp):
 
 def gain_at(f, mag, target):
     return mag[int(np.argmin(np.abs(f - target)))]
+
+
+def band_read(f, mag_db, bands, mode="point", frac=3):
+    """Sample a frequency response at reporting bands. `mode`:
+
+      "point"  -- linear interpolation at the band centre (what every report on this project has
+                  always done).
+      "band"   -- POWER average across the band's own 1/3-octave width.
+
+    The distinction is invisible on a smooth curve and decisive on a sharp one, and which is right
+    depends on the CURVE'S RESOLUTION, not on taste.  A CSD read has ~5.9 Hz bins, so at the top of
+    the band a point sample already IS a local average and at 25 Hz the whole 1/3-octave band is
+    about one bin.  `transfer_h1` has 0.046 Hz bins, so a point sample there can land in the bottom
+    of a notch: measured on `attack-boost_base-od` at 50.4 Hz, the point read is -32.0 dB and the
+    band average -8.3 dB, against -9.1 dB from an independent narrowband estimator.  A 24 dB
+    "error" that is really a sampling choice is exactly what `.claude/rules/measurement-discipline.md`
+    §6 warns about, so a high-resolution curve must be band-averaged before it is graded."""
+    f = np.asarray(f)
+    mag = np.asarray(mag_db)
+    if mode == "point":
+        return [float(np.interp(b, f, mag)) for b in bands]
+    if mode != "band":
+        raise ValueError(f"band_read: unknown mode {mode!r}")
+    out = []
+    p = 10.0 ** (mag / 10.0)
+    for b in bands:
+        sel = (f >= b * 2 ** (-0.5 / frac)) & (f <= b * 2 ** (0.5 / frac))
+        out.append(float(10.0 * np.log10(np.mean(p[sel]) + 1e-30)) if sel.any()
+                   else float(np.interp(b, f, mag)))
+    return out
 
 
 def fractional_octave_freqs(f_lo=20.0, f_hi=20000.0, frac=3):
@@ -130,6 +173,64 @@ def thd(x, f0):
 ORDER_LIMIT_MARGIN = 0.95   # keep order N only while N*f <= SWEEP_F1*this (edge spike sits AT f1/N)
 
 
+def farina_deconv(capture_sweep, ref_sweep):
+    """Deconvolve a captured exponential sweep against its reference -> (ir, nfft, T_sweep, R).
+
+    `ir` is the full system impulse response: the LINEAR part sits at t = 0 and the N-th harmonic
+    response is time-ADVANCED by dt_N = T*ln(N)/R (so it appears at negative time, i.e. wrapped to
+    the end of the array). R = ln(f1/f0). Shared by harmonic_thd_curve() (orders >= 2) and
+    transfer_h1() (order 1) so the two read the SAME deconvolution — a divergence here would make
+    an FR number and a THD number from the same capture silently incomparable."""
+    n = min(len(capture_sweep), len(ref_sweep))
+    y = capture_sweep[:n].astype(np.float64)
+    x = ref_sweep[:n].astype(np.float64)
+    nfft = 1 << int(np.ceil(np.log2(2 * n)))
+    X = np.fft.rfft(x, nfft)
+    Y = np.fft.rfft(y, nfft)
+    eps = 1e-6 * np.mean(np.abs(X) ** 2)
+    ir = np.fft.irfft(Y * np.conj(X) / (np.abs(X) ** 2 + eps), nfft)
+    return ir, nfft, n / FS, np.log(G.SWEEP_F1 / G.SWEEP_F0)
+
+
+# H1 gate: a fraction of the H1->H2 spacing (dt_2 = T*ln2/R ~= 1.00 s for this 10 s / 20 Hz-20 kHz
+# sweep), matching harmonic_thd_curve()'s own "35% of the gap -> no overlap" rule. That is 8.8x
+# wider than the +-40 ms this project's THD path uses for H1, which matters: the OD chain's own
+# C21/C15 highpasses have tens of ms of impulse response, and a +-40 ms Hann would taper real
+# low-frequency response away as if it were the pedal's. The window is TUKEY, not Hann, so the
+# central 75% is flat (taper only at the edges) and a short IR passes through untouched.
+H1_GATE_FRACTION = 0.35
+H1_GATE_TAPER = 0.25
+
+
+def transfer_h1(out_sweep, ref_sweep, gate_fraction=H1_GATE_FRACTION, taper=H1_GATE_TAPER):
+    """LINEAR frequency response in dB, harmonics rejected by Farina time-gating — the FR read to
+    use at drive. Returns (freqs, mag_db) on the deconvolution's own ~0.046 Hz grid.
+
+    Why this exists (session 90). Every FR number in this project — including the Phase 9 release
+    gate — was taken with `transfer()`, a CSD estimate that does not separate a swept sine's
+    harmonics from its fundamental (see that function's warning). Here the separation is
+    structural: after deconvolution the N-th harmonic response sits a full dt_N = T*ln(N)/R ahead
+    of the linear response in TIME (1.00 s for H2 on this sweep), so a window around t = 0 that is
+    narrower than that spacing contains the linear response and nothing else. What survives is the
+    genuinely non-harmonic residue — aliasing, noise, and any intermodulation that happens to land
+    back at t ~ 0 — which is a far smaller and better-behaved contamination than "all of H2".
+
+    NOT changed here, deliberately: harmonic_thd_curve() keeps its own +-40 ms Hann H1 gate, because
+    its H1 is only the DENOMINATOR of Hn/H1 ratios and every historical harmonic number on this
+    project was read through it. The two H1s are different reads of the same deconvolution and must
+    not be quoted interchangeably.
+
+    Validated by known-answer self-test: `python3.11 analysis/h1_fr_gate.py --selftest`."""
+    ir, nfft, T_sweep, R = farina_deconv(out_sweep, ref_sweep)
+    dt2 = T_sweep * np.log(2.0) / R                      # H1 -> H2 spacing, seconds
+    half = max(int(gate_fraction * dt2 * FS), int(0.01 * FS))
+    idx = np.arange(-half, half) % nfft                  # centred on t = 0, wrapping negatives
+    w = sps.windows.tukey(2 * half, taper)
+    spec = np.fft.rfft(ir[idx] * w, nfft)
+    mag = np.abs(spec) / max(w[half], 1e-12)             # unit-delta-at-centre normalisation
+    return np.fft.rfftfreq(nfft, 1 / FS), 20 * np.log10(mag + 1e-12)
+
+
 def harmonic_thd_curve(capture_sweep, ref_sweep, max_order=7, order_limit=True):
     """Continuous THD(f) via Farina exponential-sweep harmonic separation. Deconvolve the captured
     driven sweep against the clean reference sweep; the N-th harmonic IR is time-advanced by
@@ -159,14 +260,7 @@ def harmonic_thd_curve(capture_sweep, ref_sweep, max_order=7, order_limit=True):
         is not a measurable quantity here — it is not a tooling gap.
       * `Hn` is returned masked too, so per-order magnitudes agree with the THD built from them.
     Pass order_limit=False only to reproduce a pre-2026-07-17 number."""
-    n = min(len(capture_sweep), len(ref_sweep))
-    y = capture_sweep[:n].astype(np.float64); x = ref_sweep[:n].astype(np.float64)
-    nfft = 1 << int(np.ceil(np.log2(2 * n)))
-    X = np.fft.rfft(x, nfft); Y = np.fft.rfft(y, nfft)
-    eps = 1e-6 * np.mean(np.abs(X) ** 2)
-    ir = np.fft.irfft(Y * np.conj(X) / (np.abs(X) ** 2 + eps), nfft)
-    T_sweep = n / FS
-    R = np.log(G.SWEEP_F1 / G.SWEEP_F0)
+    ir, nfft, T_sweep, R = farina_deconv(capture_sweep, ref_sweep)
 
     def gated_spectrum(order):
         dt = T_sweep * np.log(order) / R

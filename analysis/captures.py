@@ -82,8 +82,31 @@ _REF_GAIN_RE = re.compile(r"^ref-(od|clean)_gain-([np]\d+)$")
 # produce a smaller apparent output drop. Only re-derive this from ref-od if a gain-session capture
 # with base-od is ever added — until then this table only needs to cover base-clean captures.
 # Measured 2026-07-22: nominal -12 dB dial -> -12.071 dB actual (ref-clean.wav vs ref-clean_gain-n12.wav).
+#
+# ⛔⛔ SUPERSEDED SESSION 114 (2026-08-02): the value is **-12.000**, and -12.071 was the artefact of
+# deriving it from ONE pair whose full-send member is itself the contaminated file.
+#
+#   * The paragraph above says ref-clean is used "because its audible path is pure linear stages".
+#     That reasoning is right, and it is exactly what convicts the old number: on a LINEAR path
+#     full-minus-n12 is a pure gain and is FORBIDDEN to have frequency structure. The ref-clean pair
+#     reads 12.158 dB with a **0.334 dB span** over 29 bands. It is not flat, so it is not admissible.
+#   * Session 111's batch added four fresh linear twins (bass/treble/lomid/himid at 0700). All four
+#     read **12.000 dB with a span of <= 0.0003 dB** (s112). Session 113's GATE S2 then localised the
+#     contamination to `ref-clean.wav` itself rather than to "that pair", by the same flatness test.
+#   * Corroborated on two instruments sharing no machinery with the above: GATE N's THD **turnover**
+#     (nonlinear, immune to any record or output gain) returns 12.000/12.000/12.001 on the three
+#     full-send-twinned DRIVE pairs; and GATE S's model-side ladder **interlock** predicts a residual
+#     of exactly -(pad - 12.000) with no free parameter and measured -0.0705/-0.0640 against -0.0710.
+#
+# WHY IT MATTERS EVEN THOUGH THE MATRIX CANNOT SEE IT. This value pads the MODEL (`--input-trim`) so
+# it sees what the pedal saw. At 12.071 the model was rendered 0.071 dB QUIETER than the pedal was
+# driven on every gain-session capture. `comprehensive_report` gain-matches every row, so a pure gain
+# is invisible there by construction -- but GATE K/M/O/Q's ABSOLUTE ledgers are not gain-matched, and
+# neither is GATE S's interlock. Shipped on the user's "whatever increases accuracy" decision,
+# session 114. ⚠ Every gain-session capture re-renders (the value is in the per-capture cache key);
+# pre-s114 absolute figures on those rows are quoted against the old pad.
 _GAIN_SESSION_MEASURED_DB = {
-    -12: -12.071,
+    -12: -12.000,
 }
 
 # REF-OD baseline (nonlinear-component-modeling.md §4): every pot at noon except Blend

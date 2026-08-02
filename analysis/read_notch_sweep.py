@@ -277,7 +277,17 @@ def fitted_depth(f, mag, f0, db_min):
     return float(sol.x[0]), rms
 
 
-def locate(f, mag):
+def locate(f, mag, fit_depth=True):
+    """Locate the null. `fit_depth=False` skips the PARAMETRIC depth only.
+
+    ⚠ `fit_depth` changes NOTHING that any caller scores: `f_ref`, `depth` (the definitional
+    shoulder-referred lower bound) and `width` are computed the same way either way, and only the
+    optional `depth_base`/`base_resid` become nan. It exists because `fitted_depth` runs a bounded
+    least_squares (up to 4000 evaluations) and `attack_shape_screen` calls this INSIDE a
+    differential_evolution loop -- tens of thousands of times -- where it is pure cost. Adding a
+    flag here rather than a second copy of the locator in the screen keeps ONE oracle (session 62's
+    rule); a second implementation is exactly how the two sides of a comparison drift apart.
+    """
     m = (f >= SEARCH_WIN[0]) & (f <= SEARCH_WIN[1])
     fi = np.flatnonzero(m)
     i_local = int(np.argmin(mag[m]))
@@ -289,7 +299,8 @@ def locate(f, mag):
     mu = mag[(f >= UPPER_WIN[0]) & (f <= UPPER_WIN[1])]
     lo_sh = float(np.max(ms)) if len(ms) else float("nan")
     up_sh = float(np.max(mu)) if len(mu) else float("nan")
-    d_base, base_resid = fitted_depth(f, mag, f_ref, db_min)
+    d_base, base_resid = (fitted_depth(f, mag, f_ref, db_min) if fit_depth
+                          else (float("nan"), float("nan")))
     return dict(f_bin=f_bin, f_ref=f_ref, db_min=db_min, db_ref=db_ref,
                 lo_shoulder=lo_sh, up_shoulder=up_sh,
                 depth=lo_sh - db_min, depth_ref=lo_sh - db_ref,

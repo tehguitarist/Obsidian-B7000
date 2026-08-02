@@ -405,11 +405,18 @@ def report(title, rows, top):
     print("      outermost bands each side dropped (EDGE CONTROL) | rms(a) = matrix_grade's mean")
     aggs = {}
     n12 = lambda k: "gain-n12" in k[0]                                             # noqa: E731
+    # ⭐ SESSION 111: the headline OD row now GRADES the gain-n12 group (user decision — GATE N
+    # re-ran session 48's own THD-turnover instrument and 4 of 4 discriminating pairs recovered the
+    # harness's 12.071 dB pad). The two sub-reads stay printed as CONTROLS: `OD ex gain-n12` is what
+    # every pre-s111 quote was measured on, and the group's own row says what the retirement cost.
+    # Provenance and caveats: `matrix_grade.EXCLUDE_GAIN_N12`.
+    aggs["OD"] = aggregate(group(rows, lambda k, r: r["is_od"]), "OD",
+                           "<- GATED (gain-n12 included, s111)")
     aggs["OD ex gain-n12"] = aggregate(group(rows, lambda k, r: r["is_od"] and not n12(k)),
-                                       "OD ex gain-n12")
+                                       "OD ex gain-n12", "<- pre-s111 control")
     aggs["OD gain-n12"] = aggregate(group(rows, lambda k, r: r["is_od"] and n12(k)),
-                                    "OD gain-n12 [bad]",
-                                    "<- capture defect, session 48")
+                                    "OD gain-n12 [control]",
+                                    "<- healed s106 (GATE N); subset of OD")
     aggs["CLEAN"] = aggregate(group(rows, lambda k, r: not r["is_od"]), "CLEAN")
     aggs["ALL"] = aggregate(list(rows.values()), "ALL")
     print("\n  ⭐ READ THE DECOMPOSITION, NOT THE TOTAL: the four columns partition the rms exactly,")
@@ -541,7 +548,7 @@ def main():
             ax[0].set_title("LOCAL residual (smooth shape removed) -- narrow features only")
             ax[0].set_xlabel("Hz"); ax[0].set_ylabel("dB")
             ax[0].grid(True, which="both", alpha=0.3); ax[0].legend(fontsize=6)
-            names = ["OD ex gain-n12", "OD gain-n12", "CLEAN", "ALL"]
+            names = ["OD", "OD ex gain-n12", "OD gain-n12", "CLEAN", "ALL"]
             w, xs = 0.2, np.arange(len(names))
             for i, t in enumerate(TERMS):
                 ax[1].bar(xs + i * w, [out["fr"][n][t] if out["fr"].get(n) else 0 for n in names],

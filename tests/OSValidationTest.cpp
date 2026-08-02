@@ -19,24 +19,47 @@
 //      rails off) so we gate on the RELATIVE reduction + print the numbers,
 //      per build.md's "finite/relative probes, don't gate on absolute" rule.
 //
-//      ⚠ KNOWN ANOMALY, characterised 2026-07-22 — there is a NARROW BAND OF
-//      CLIPPER DRIVE where 8× is WORSE than 2×, i.e. oversampling locally goes
-//      backwards. It is NOT caused by the J201/TrebleAttack restructure of the
-//      same date: the pre-restructure build has exactly the same anomaly, merely
-//      at a different INPUT amplitude, because that build ran ~22 dB hotter into
-//      the clipper. Measured 8× alias/sig (dB) vs input amp:
-//          pre-restructure : 0.05 **-21.8** | 0.20 -35.1 | 0.35 -34.1 | 0.50 -37.3
-//          post-restructure: 0.05  -40.5    | 0.20 -40.5 | 0.35 -40.5 | 0.50 **-17.4**
-//      and 0.05 * 10^(22/20) ~= 0.63, so BOTH break at the same clipper drive.
-//      The OD region itself is provably clean at 384 kHz when driven directly
-//      (non-harmonic content 1e-4 relative, and it IMPROVES with rate), so the
-//      anomaly lives in the clipper/decimator interaction at that one operating
-//      point, not in any single stage. The gate therefore probes at amp = 0.2,
-//      which is inside the intended "hard into the clipper" regime for the
-//      CURRENT gain staging, and the full amp x order sweep is printed
+//      ⚠⚠ THE MEASUREMENT WAS REBUILT IN SESSION 92 (2026-07-31). Read this
+//      before comparing any number below with a pre-session-92 record: the
+//      figures moved because the INSTRUMENT changed, and two of the three
+//      things it used to report were artefacts of the instrument, not of the
+//      chain. Full derivation + known-answer gates: `analysis/alias_gate.py`
+//      (`--selftest` proves each claim below against a signal whose alias
+//      content is known by construction).
+//
+//        (a) f0 was 2500 Hz against a 2.9297 Hz bin — 853.33 bins, i.e. OFF
+//            GRID. Every harmonic whose order is not a multiple of 3 then sat a
+//            third of a bin off-centre and its Hann skirt escaped the ±3-bin
+//            "signal" mask, so the metric had a −40.5 dB LEAKAGE PEDESTAL. That
+//            is the exact value the old table printed as a "floor" at low
+//            drive; the true floor there is −86 dB. f0 is now bin-exact
+//            (kBin·fs/N), so the stimulus is periodic in exactly N samples, the
+//            window is RECTANGULAR, and leakage is zero by construction — no
+//            mask width is needed and none is used.
+//        (b) 0.3 s of settling is not settled. MasterOut is two ~0.72 Hz
+//            high-passes (τ = 0.22 s) and an asymmetric clipper steps them, so
+//            the window still held a decaying DC ramp — energy at bins 1..50,
+//            which `round(f/f0) == 0` classified as alias. The settle is now
+//            4 s (18 τ) and the sub-200 Hz bucket is reported separately
+//            instead of being summed into "alias".
+//        (c) what is left IS real aliasing, and it is now attributed exactly:
+//            the dominant inharmonic bins land on |n·f0 − m·(factor·fs)| for a
+//            handful of consecutive harmonic orders near the OS rate (H152–156
+//            at 8×), matching the arithmetic TO THE BIN at three different f0.
+//            A 192 kHz-base reference (1.536 MHz internal) reads −65.9 dB where
+//            48 kHz/8× reads −17.1, so it is fold-down, not circuit behaviour.
+//            Rails are not the carrier (railEnabled=0 moves it 1.5 dB) and the
+//            J201 already carries closed-form ADAA — the un-ADAA'd CD4049 VTC
+//            is what generates the far ladder (FitParams.h clipSat notes).
+//
+//      ⚠ The gate below therefore still FAILS at amp 0.35, and that failure is
+//      now known to be a REAL DEFECT rather than a measurement artefact. It is
+//      strongly f0-dependent: at 8× the alias floor is −85…−115 dB for
+//      fundamentals under 1.5 kHz (i.e. everywhere a bass guitar's fundamental
+//      lives) and collapses to −17…−26 dB above ~2.3 kHz. Do not "fix" it by
+//      moving the probe amplitude — the full amp × order sweep is printed
 //      unconditionally so the bad zone stays visible instead of hiding behind a
-//      green test. ** Root-causing that zone is an open item — see
-//      docs/phase7-calibration-handover.md. **
+//      green test. Owned by Phase 10 B (perf/HQ pass).
 //
 // This is the risky new code (delay bookkeeping + block-based OS around a
 // per-sample WDF chain); the per-stage oracles don't cover it.
@@ -68,7 +91,7 @@ static double goertzelMag(const std::vector<double>& x, double f, double fs)
 // Render a steady sine through a fresh PedalDSP at the given OS order; return the
 // output tail (transient discarded).
 static std::vector<double> renderSine(PedalChain::Params p, int order, double freq,
-                                      double amp, double fs, int nOut)
+                                      double amp, double fs, int nOut, double settleSec = 0.3)
 {
     PedalDSP dsp;
     const int block = 256;
@@ -77,7 +100,7 @@ static std::vector<double> renderSine(PedalChain::Params p, int order, double fr
     dsp.setFactorOrder(order);
     dsp.setParams(p);
 
-    const int settle = (int) (0.3 * fs);
+    const int settle = (int) (settleSec * fs);
     const int total = settle + nOut;
     std::vector<double> out;
     out.reserve((size_t) nOut);
@@ -167,68 +190,74 @@ int main()
         p.master = 1.0;
 
         // amp 0.35: hard into the clipper for the SESSION-17 fitted gain staging
-        // (kInputRef 3.377), and clear of the known bad zone. ** The probe amp MUST
-        // track the gain staging** — it was 0.2 through session 16, but the fitted
-        // kInputRef (0.87 -> 3.377) raised the clipper-onset input level, so at 0.2
-        // the chain now sits BELOW onset and every OS factor is at the measurement
-        // floor (nothing for oversampling to reduce -> a false gate failure). At the
-        // fitted point 0.35 drives 2x to catastrophic aliasing (-1.6 dB) while 4x/8x
-        // stay at the floor, so "8x beats 2x" is tested where it is meaningful.
-        // Bonus (see the header anomaly note): the fitted point ELIMINATES the old
-        // nominal "8x goes backwards at amp 0.5/0.7" reversal — 8x is now monotonically
-        // the cleanest at every amp. The sweep below still prints every amplitude so
-        // the residual (2x/4x narrow-band spikes) is never silently passed over.
-        const double f0 = 2500.0, gateAmp = 0.35;
-        const int N = 1 << 15;
+        // (kInputRef 3.377). ** The probe amp MUST track the gain staging** — it
+        // was 0.2 through session 16, but the fitted kInputRef (0.87 -> 3.377)
+        // raised the clipper-onset input level, so at 0.2 the chain sits BELOW
+        // onset and every factor is at the measurement floor.
+        // ⚠ kInputRef has since moved TWICE — 3.377 -> 1.2596 (s44) -> 0.90 (s109) — and this
+        // probe is deliberately UNAFFECTED by either: it feeds PedalDSP directly, in CHAIN-DOMAIN
+        // VOLTS, so K (a DAW-domain scalar, GainStaging.h) never enters. Verified at s109: the
+        // whole amp x factor table is unchanged across the 1.2596 -> 0.90 move. What HAS drifted is
+        // only what DAW level 0.35 V corresponds to (-19.7 dBFS at K = 3.377, -8.2 dBFS at
+        // K = 0.90), so read "hard into the clipper" as a statement about the CHAIN, which is what
+        // this test measures, not about a plugin input level.
+        //
+        // f0 is bin-exact: kBin cycles in exactly fftN samples (header note (a)),
+        // so the settled output is periodic in fftN, the rectangular window is
+        // leakage-free, and every harmonic — and every FOLD of a harmonic — lands
+        // dead on a bin. 2499.02 Hz, one bin off the 2500 the old test used.
+        const int fftOrder = 14;         // 16384
+        const int fftN = 1 << fftOrder;
+        const int kBin = 853;
+        const double f0 = kBin * fs / fftN;
+        const double gateAmp = 0.35;
+        const double lfHz = 200.0;       // below this = settling residue, reported separately
+        const double settleSec = 4.0;    // 18 tau of the 0.72 Hz output high-passes
 
+        // Returns { alias/signal dB, LF-bucket/signal dB }.
         auto aliasFloorDb = [&](int order, double amp) {
-            auto y = renderSine(p, order, f0, amp, fs, N);
-            // Hann-windowed magnitude spectrum via naive DFT at a coarse bin grid
-            // is too slow; use juce FFT.
-            const int fftOrder = 14; // 16384
-            const int fftN = 1 << fftOrder;
+            auto y = renderSine(p, order, f0, amp, fs, fftN, settleSec);
             juce::dsp::FFT fft(fftOrder);
             std::vector<float> fd((size_t) fftN * 2, 0.0f);
             for (int i = 0; i < fftN; ++i)
-            {
-                const double win = 0.5 - 0.5 * std::cos(2.0 * M_PI * i / (fftN - 1));
-                fd[(size_t) i] = (float) (y[(size_t) i] * win);
-            }
+                fd[(size_t) i] = (float) y[(size_t) i];   // rectangular — see above
             fft.performFrequencyOnlyForwardTransform(fd.data());
 
-            double sig = 0.0, alias = 0.0;
-            const double binHz = fs / fftN;
+            double sig = 0.0, alias = 0.0, lf = 0.0;
             for (int b = 1; b < fftN / 2; ++b)
             {
                 const double e = (double) fd[(size_t) b] * (double) fd[(size_t) b];
-                // "signal" = bins within ±3 of a true harmonic of f0.
-                const double f = b * binHz;
-                const double h = f / f0;
-                const double nearestH = std::round(h);
-                const bool isHarmonic = nearestH >= 1.0
-                    && std::abs(f - nearestH * f0) < 3.0 * binHz;
-                if (isHarmonic) sig += e; else alias += e;
+                if (b % kBin == 0)                       // exact harmonic bin
+                    sig += e;
+                else if (b * fs / fftN < lfHz)           // settling / DC residue
+                    lf += e;
+                else
+                    alias += e;
             }
-            return 10.0 * std::log10((alias + 1e-30) / (sig + 1e-30));
+            return std::pair<double, double>{ 10.0 * std::log10((alias + 1e-30) / (sig + 1e-30)),
+                                              10.0 * std::log10((lf + 1e-30) / (sig + 1e-30)) };
         };
 
         // Full sweep, printed unconditionally — see this file's header: there is a
         // drive band where 8x goes backwards, and it must stay visible.
-        std::printf("  [aliasing] alias/signal (dB) vs input amp — 8x SHOULD be lowest:\n");
+        std::printf("  [aliasing] f0 = %.2f Hz (bin-exact), rect window, %.0f s settle\n",
+                    f0, settleSec);
+        std::printf("  [aliasing] alias/signal (dB) vs input amp — 8x SHOULD be lowest"
+                    " (lf = settling bucket, excluded):\n");
         for (double a : { 0.05, 0.1, 0.2, 0.35, 0.5, 0.7 })
         {
-            const double s2 = aliasFloorDb(1, a), s4 = aliasFloorDb(2, a), s8 = aliasFloorDb(3, a);
-            // Only flag a REAL inversion: 8x failing to beat 2x while still well above
-            // the measurement floor. At the floor (~-40 dB) every factor is clean and
-            // there is simply nothing left for 8x to improve — not an anomaly.
-            const bool bad = (s8 > s2 - 3.0) && (s8 > -38.0);
-            std::printf("      amp %.2f :  2x %+6.1f   4x %+6.1f   8x %+6.1f%s\n",
-                        a, s2, s4, s8, bad ? "   <-- KNOWN ANOMALY ZONE" : "");
+            const auto r2 = aliasFloorDb(1, a), r4 = aliasFloorDb(2, a), r8 = aliasFloorDb(3, a);
+            // Flag a REAL inversion: 8x failing to beat 2x while still well clear of
+            // where there is nothing left to improve.
+            const bool bad = (r8.first > r2.first - 3.0) && (r8.first > -60.0);
+            std::printf("      amp %.2f :  2x %+6.1f   4x %+6.1f   8x %+6.1f   (lf %+6.1f)%s\n",
+                        a, r2.first, r4.first, r8.first, r8.second,
+                        bad ? "   <-- REAL FOLD-DOWN, see header (c)" : "");
         }
 
-        const double a2 = aliasFloorDb(1, gateAmp); // 2x
-        const double a4 = aliasFloorDb(2, gateAmp); // 4x
-        const double a8 = aliasFloorDb(3, gateAmp); // 8x
+        const double a2 = aliasFloorDb(1, gateAmp).first; // 2x
+        const double a4 = aliasFloorDb(2, gateAmp).first; // 4x
+        const double a8 = aliasFloorDb(3, gateAmp).first; // 8x
         std::printf("  [aliasing] alias/signal floor: 2x=%.1f dB  4x=%.1f dB  8x=%.1f dB\n",
                     a2, a4, a8);
         check(a8 < a2 - 3.0, "8x aliasing floor >=3 dB below 2x (oversampling works)");

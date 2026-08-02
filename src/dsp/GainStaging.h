@@ -75,7 +75,46 @@ namespace GainStaging
 // ⚠ K IS UPSTREAM OF EVERY NONLINEARITY, so this invalidates any OD number measured before it —
 // the 63-capture matrix was re-baselined in the same session. The clean/linear LEVEL is unaffected
 // (K cancels through the linear path, proven std = 0.000), so kOutputMakeup below is unchanged.
-static constexpr double kInputRefNominal = 1.2596;
+//
+// ** SESSION-109 UPDATE — kInputRef 1.2596 -> 0.90. SUPERSEDES the above VALUE, not its method. **
+// Sessions 17/43/44 are all about how to CHOOSE K, and session 44's answer (fence it with the
+// arithmetic clean-headroom bound, then let the harmonic objective place it inside) still stands as
+// method. What nobody had asked is what K DOES. Because it cancels exactly through the linear path,
+// K is the ONLY knob that moves every nonlinear operating point at once — the CD4049 ceiling, both
+// J201 ceilings, the TL07x rails and the D1/D2 clamp window — while provably changing nothing
+// linear. `analysis/od_absolute_gate.py` (GATE Q) measured that the model's OD path SATURATES TOO
+// EARLY, three ways that share no arithmetic:
+//   (a) over -30 -> -6 dBFS it compresses 4.17 / 3.25 / 1.00 dB MORE than the reference over
+//       500 Hz-8 kHz at DRIVE 0 / 0.5 / 1;
+//   (b) its 320 Hz cancellation null WASHES OUT with level (9.63 -> 4.36 dB) where the reference's
+//       DEEPENS (6.00 -> 8.06) — compression is what fills a cancellation null, and a fixed network
+//       cannot have a stimulus-dependent null depth;
+//   (c) THD on those same bleed-free endpoints runs +2.94 dB, i.e. it OVER-distorts, the same sign.
+// K is the exact lever for that, and a 21-point screen (`analysis/od_lever_screen.py`) confirms it
+// beats every individual ceiling: GATE Q's absolute score 4.663 -> 3.973 dB at K = 0.90, an INTERIOR
+// optimum (0.80 -> 4.031, 1.00 -> 4.094), against 4.045 for the best clipSat scaling and ~0.00 for
+// either J201 ceiling.
+// ⭐ IT IS NOT A DEPARTURE FROM PHYSICS — IT IS A MOVE TOWARD IT. K is degenerate with the ceilings,
+// so K 1.2596 -> 0.90 is EXACTLY equivalent to raising every ceiling in the OD path by 2.92 dB, and
+// every one lands inside its own bound: clipSat sum 1.036 -> 1.449 V against the self-consistent
+// R19-dropped 5.636 V rail (18 % -> 26 % of it, where session 44 flagged 18 % as a soft-low), and
+// the TL07x rails 2.7/2.9 -> 3.78/4.06 V against the +-4.325 V the 8.65 V supply allows. The implied
+// input voltage stays ordinary too: 0.45 V peak at the -6 dBFS 'hot bass' rung, against session 44's
+// 0.63 V, both normal passive-bass levels, and 0.90 is far inside the <= 1.509 V/FS clean-headroom
+// bound that is the only hard constraint here.
+// ⭐ THE 129-CAPTURE MATRIX ACCEPTS IT AND 8 OF THE 9 GATED OD/THD STATISTICS IMPROVE, WITH ONE
+// GATE ROW CLOSING (OD 100 Hz-8 kHz median 0.568 -> 0.480, SHIP *and* STRETCH — the first OD row the
+// project has ever closed): OD band-RMS ex gain-n12 2.409 -> 2.289, OD tilt 1.43 -> 0.98, THD level
+// term 3.663 -> 3.096, OD 8-16.3 kHz p90 8.058 -> 7.100, p99 14.661 -> 14.314. The only gated row
+// that moves the wrong way is OD 8-16.3 kHz median, by 0.012 dB, and it stays SHIP.
+// ⭐ AND CLEAN IS BIT-IDENTICAL (band-RMS 0.453, all four CLEAN gate rows unchanged) — which is not
+// luck but the known answer this whole change rests on, measured directly at 1.1e-08 dB over a 2x
+// change in K on a DIST-off render. kOutputMakeup is again UNCHANGED, for the same reason.
+// ⚠ COSTS, stated: THD *tilt* worsens 2.708 -> 3.415 (not a gated row), and 22 of 504 rows regress
+// by >0.5 dB against 38 that improve. ⚠ And K remains upstream of every nonlinearity, so EVERY OD
+// number measured before session 109 is superseded; `analysis/reports/s109_k090_cand.json` is the
+// new baseline.
+static constexpr double kInputRefNominal = 0.90;
 
 // Output make-up applied after the chain, before the output trim.
 // ** SESSION-17 CALIBRATED — 0.9 -> 3.684 (+11.33 dB). ** Set by level-matching a
