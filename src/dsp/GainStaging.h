@@ -141,5 +141,24 @@ static constexpr double kInputRefNominal = 0.90;
 // ⚠ This is a post-chain scalar (outputGain = makeup/kInputRef), so it moves NO nonlinear
 // operating point and invalidates no OD fit. It DOES shift the idle floor — recheck the VU
 // idle-noise gate (backlog C1) against it.
-static constexpr double kOutputMakeupNominal = 2.599;
+// ⭐⭐⭐ SESSION 115 (Phase 10 C): 2.599 -> 4.3297 (+4.43 dB). THE ANCHOR ABOVE WAS THE PROBLEM,
+// NOT THE ARITHMETIC. Both bullets above are still true; what neither session knew is that
+// `master-1700_gain-n12_base-clean.wav` — "the single capture this constant is level-matched
+// against" — is a DUPLICATE of the master-1545 capture, sitting at a knob position that is
+// neither detent, 4.447 dB below a true master-1700. So the plugin has been that much too QUIET.
+//   • It is NOT clipped, which is what session 112 concluded: the pinning is confined to one
+//     segment (`lvl_-3`), while `sweep_clean` — the segment this calibration reads — is clean,
+//     and the two files' offset is a PURE GAIN across a 33 dB span of level, which clipping
+//     cannot be. Proof + guards: analysis/master_anchor_gate.py (GATE T).
+//   • Session 106's "+0.007 dB, kOutputMakeup is CONFIRMED RIGHT" was CIRCULAR — it re-measured
+//     against the very capture the constant was fitted to, which is guaranteed to agree however
+//     wrong that capture is. That check is now kept as an explicit FRAME guard in
+//     master_taper_makeup.py, where reproducing it is the point rather than the conclusion.
+// Derived twice, by paths sharing no arithmetic: GATE T (capture-side ladder algebra) predicts
+// 4.337; the render-based re-derivation returns 4.3297. They agree to 0.015 dB.
+// ⚠ Still a post-chain scalar — no nonlinear operating point moves, no OD fit is invalidated,
+// and the gain-matched capture matrix is blind to it BY CONSTRUCTION. It is audible as output
+// level, and it shifts the idle floor: the VU idle-noise gate (backlog C1) is re-checked against
+// it in the session-115 block of CLAUDE.md.
+static constexpr double kOutputMakeupNominal = 4.3297;
 } // namespace GainStaging

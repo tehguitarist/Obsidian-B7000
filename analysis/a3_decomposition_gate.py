@@ -82,6 +82,7 @@ decision; a law error there is a volume-knob calibration error, not a tone error
 it with the LEVEL law (GATE K/L), which sits BEFORE the mix and therefore sets tone.
 """
 import argparse
+import re
 import json
 import sys
 
@@ -92,6 +93,7 @@ import matrix_grade as MG          # noqa: E402
 import level_law_gate as K         # noqa: E402
 import a3_balance_gate as M        # noqa: E402
 import captures as CAP             # noqa: E402  -- the harness pad, READ not retyped
+import master_anchor_gate as T     # noqa: E402  -- the ladder correction, IMPORTED not transcribed
 
 SWEEPS = M.SWEEPS
 
@@ -130,6 +132,23 @@ LEDGER_TOL_DB = 1e-3
 # defensible and the finding stays a two-sided balance.
 EXONERATION_MAX_RATIO = 0.15
 
+# The two duplicated MASTER detents (GATE T3) carry the SAME signal, so their pedal sides cancel
+# in (model - pedal) and the difference must equal the MODEL's OWN taper step -- computable from
+# the shipped PWL constants with no free parameter.
+#
+# ⚠ A "is it a pure gain?" span test does NOT work here and was tried first: O6 already asserts
+# that ANY two MASTER detents differ by a pure gain (that is the topology), so a span check cannot
+# tell a duplicated pair from an ordinary one.  Mutation-tested -- it passed against master-1200.
+# The taper-step check below is the discriminating one, because only a duplicate makes the pedal
+# term vanish.  Both bars are numerical: these are known answers, not tolerances on the pedal.
+DUP_PURE_GAIN_MAX_SPAN_DB = 0.01
+DUP_TAPER_STEP_MAX_DB = 0.05
+
+# The MASTER taper exponent session 115 RETIRED.  Deliberately transcribed -- it no longer exists
+# in FitParams.h, so it cannot be read from the header, and it is used for DIAGNOSIS ONLY (naming
+# a pre-s115 report as such) and never to gate anything.
+RETIRED_MASTER_TAPER_EXP = 1.998
+
 
 # --------------------------------------------------------------------------------------------
 # shared machinery
@@ -151,6 +170,31 @@ def err(absfr, f, sweep, sel):
 def is_silent(caps, f, sweep):
     fr = caps[f]["fr"][sweep]
     return (max(fr["plugin_db"]) < MG.SILENT_DB) or (max(fr["pedal_db"]) < MG.SILENT_DB)
+
+
+def shipped_master_taper():
+    """The two-segment PWL MASTER taper constants, READ from src/dsp/FitParams.h.
+
+    Read rather than transcribed: this gate's known answer is only a known answer if it uses the
+    constants the plugin actually ships (`verify-the-CONSTANT-not-the-prose`, s35).  Session 115
+    RETIRED `masterTaperExp`, so a stale power-law reader would silently find nothing -- hence the
+    hard failure rather than a default.
+    """
+    src = open(K.FITPARAMS, encoding="utf-8").read()
+    vals = {}
+    for name in ("masterTaperBreak", "masterTaperFrac"):
+        m = re.search(rf"\b{name}\s*=\s*([0-9.eE+-]+)\s*;", src)
+        if not m:
+            sys.exit(f"GATE O6b FAIL: {name} not found in {K.FITPARAMS}.  The shipped MASTER taper "
+                     f"has changed shape; re-derive this known answer rather than adjusting it")
+        vals[name] = float(m.group(1))
+    return vals["masterTaperBreak"], vals["masterTaperFrac"]
+
+
+def master_div(x, brk, frac):
+    """MasterOut::setMaster's divRatio -- deliberately a re-derivation, not a call into the stage,
+    so the check can still fail if the shipped curve moves."""
+    return (frac * x / brk) if x <= brk else (frac + (1.0 - frac) * (x - brk) / (1.0 - brk))
 
 
 def master_of(caps, f):
@@ -493,6 +537,87 @@ def gate_o6(absfr, caps, fb, nonhf, a3sel, prov, lad, out):
 
 
 # --------------------------------------------------------------------------------------------
+# O6b -- the ladder anchor (session 119).  SESSION 115 CORRECTED THE LADDER AND NOBODY RE-POINTED
+#        THIS GATE AT IT, so O6/O8 were reading a capture GATE T proved is 4.447 dB low.
+# --------------------------------------------------------------------------------------------
+def gate_o6b(absfr, caps, nonhf, u_file, out):
+    print("\n-- O6b: the master-unity ANCHOR -- is the capture the ledger rests on sound? --")
+
+    det = [d for d in T.DUP_DETENTS if f"master-{d}_" in u_file]
+    print(f"   the ledger's master-unity capture is {u_file}")
+
+    if not det:
+        # A future capture set may put a CLEAN file at unity.  Then the correction must be zero,
+        # and saying so explicitly is what stops it being applied where it does not belong.
+        print("   it is NOT one of GATE T's duplicated detents "
+              f"({', '.join(T.DUP_DETENTS)}) => correction 0.000 dB, ledger read as measured")
+        out["o6b"] = {"file": u_file, "corrected": False, "correction_db": 0.0}
+        print("   O6b OK   no correction applies")
+        return 0.0
+
+    corr = T.detent_corrections()[det[0]]
+    if not np.isfinite(corr) or corr <= 0.0:
+        sys.exit(f"GATE O6b FAIL: GATE T returned a correction of {corr} dB for detent {det[0]}; "
+                 f"a corrupted detent reads LOW, so the correction must be finite and positive")
+
+    # KNOWN ANSWER, inside THIS gate's own data and sharing no arithmetic with GATE T's WAV-level
+    # derivation.  T3 says the two top n12 files carry ONE signal.  If so their pedal sides cancel
+    # in (model - pedal), and what is left is the MODEL's own MASTER taper step -- which the
+    # shipped PWL constants predict with NO free parameter.  Only a duplicate makes the pedal term
+    # vanish, so this discriminates; a span test does not (see the constant's comment).
+    other = [f for f in caps
+             if any(f"master-{d}_" in f for d in T.DUP_DETENTS) and f != u_file]
+    if not other:
+        sys.exit(f"GATE O6b FAIL: the report has no second duplicated detent to check {u_file} "
+                 f"against, so the duplication cannot be confirmed in this gate's own domain")
+    d = err_curve(absfr, other[0], SWEEPS[0]) - err_curve(absfr, u_file, SWEEPS[0])
+    span = float(d[nonhf].max() - d[nonhf].min())
+    meas = float(d[nonhf].mean())
+    brk, frac = shipped_master_taper()
+    pred = 20.0 * np.log10(master_div(master_of(caps, other[0]), brk, frac)
+                           / master_div(master_of(caps, u_file), brk, frac))
+    print(f"   known answer: {other[0].split('_')[0]} vs {u_file.split('_')[0]} (model-pedal)")
+    print(f"      measured  {meas:+.4f} dB, span {span:.6f} dB")
+    print(f"      predicted {pred:+.4f} dB  = the shipped PWL taper step (brk {brk}, frac {frac}),")
+    print( "                  which is what remains IF AND ONLY IF the pedal sides cancel")
+    if span > DUP_PURE_GAIN_MAX_SPAN_DB:
+        sys.exit(f"GATE O6b FAIL: the two detents differ by {span:.4f} dB across frequency, not a "
+                 f"pure gain (bar {DUP_PURE_GAIN_MAX_SPAN_DB}) -- MASTER is attenuation-only, so "
+                 f"either this reconstruction or circuit.md's topology note is wrong")
+    if abs(meas - pred) > DUP_TAPER_STEP_MAX_DB:
+        # Before blaming the captures, check the likeliest cause: a report rendered BEFORE session
+        # 115 replaced the power law.  This makes the gate a real baseline-EPOCH guard -- the thing
+        # session 118 discovered the hard way, that "invisible to the matrix" is not "invisible".
+        old = 20.0 * np.log10(master_of(caps, other[0]) ** RETIRED_MASTER_TAPER_EXP
+                              / master_of(caps, u_file) ** RETIRED_MASTER_TAPER_EXP)
+        if abs(meas - old) <= DUP_TAPER_STEP_MAX_DB:
+            sys.exit(f"GATE O6b FAIL: measured {meas:+.4f} dB matches the RETIRED power-law taper "
+                     f"(exp {RETIRED_MASTER_TAPER_EXP}, predicts {old:+.4f}), not the shipped PWL "
+                     f"({pred:+.4f}).  ⇒ THIS REPORT PREDATES SESSION 115 and was rendered from a "
+                     f"different src/.  Re-render before reading any ABSOLUTE ledger off it: the "
+                     f"matrix's per-row gain match hides s115's constants, this gate does not")
+        sys.exit(f"GATE O6b FAIL: measured {meas:+.4f} dB vs the shipped taper's {pred:+.4f} dB "
+                 f"(bar {DUP_TAPER_STEP_MAX_DB}), and it does not match the retired power law "
+                 f"either ({old:+.4f}).  Either these two captures are not the duplicate GATE T3 "
+                 f"reports, or the shipped MASTER taper is not rendering as specified")
+    print(f"      agree to {abs(meas - pred):.4f} dB  => the pedal sides DO cancel: the")
+    print( "         duplication is confirmed here, independently of GATE T's WAV-level read.")
+    print( "      ⭐ Free second result: this validates the session-115 PWL taper on the render,")
+    print( "         through a path sharing nothing with s115's own acceptance check.")
+
+    print(f"\n   CORRECTION (imported from GATE T, not transcribed): +{corr:.3f} dB on the PEDAL")
+    print( "      provenance: the fresh gain-n18 capture of this detent, promoted through the")
+    print( "      directly measured 6.000 dB n12->n18 pad (GATE T2, derived WITHOUT the")
+    print( "      contaminated ref-clean.wav), against what the corrupted n12 file reads.")
+    print( "   ⚠ Sessions 107-118 read this gate WITHOUT it.  Pre-s119 quotes of O6/O8 are on the")
+    print( "      uncorrected anchor and are reproduced below as a labelled CONTROL.")
+    out["o6b"] = {"file": u_file, "corrected": True, "correction_db": corr,
+                  "dup_span_db": span, "dup_gain_db": float(d[nonhf].mean())}
+    print(f"   O6b OK   anchor corrected by +{corr:.3f} dB")
+    return corr
+
+
+# --------------------------------------------------------------------------------------------
 # O7 -- the route check (session 106's loose end)
 # --------------------------------------------------------------------------------------------
 def gate_o7(absfr, caps, fb, nonhf, a3sel, out):
@@ -546,8 +671,13 @@ def gate_o7(absfr, caps, fb, nonhf, a3sel, out):
 # --------------------------------------------------------------------------------------------
 # O8 -- the ledger, and the verdict
 # --------------------------------------------------------------------------------------------
-def gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, law, gap, u_file, out):
+def gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, law, gap, u_file, corr, out):
     print("\n-- O8: the ledger -- what is left of the clean path's absolute error? --")
+    if corr:
+        print(f"   anchor corrected by +{corr:.3f} dB on the pedal side (O6b).  The correction")
+        print( "   enters the MASTER law with +C and the residual with -C, so it CANCELS in the")
+        print( "   sum -- the reconstruction check below is therefore blind to it, and is a real")
+        print( "   guard that it has been threaded through BOTH places rather than one.")
     law_n, law_a = law
     gap_n, gap_a = gap
     res = {}
@@ -555,7 +685,12 @@ def gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, law, gap, u_file, out):
                                ("broadband non-HF", nonhf, law_n, gap_n)):
         measured = err(absfr, ROUTE_B, SWEEPS[0], sel)     # the clean side of every A3 pair
         pv = float(prov[sel].mean())
-        residual = err(absfr, u_file, SWEEPS[0], sel) - pv  # unity detent, onto the non-n12 basis
+        raw_resid = err(absfr, u_file, SWEEPS[0], sel) - pv  # unity detent, onto the non-n12 basis
+        # The corrupted detent reads LOW, so the true pedal level is higher and the model's error
+        # against it is smaller by exactly the correction.  The MASTER law is a difference in which
+        # this capture is the SUBTRAHEND, so it moves the other way.
+        residual = raw_resid - corr
+        lw = lw + corr
         terms = [("MASTER law (common-mode: cancels in A3's excess)", lw),
                  ("DIST-engage transparency gap, route B vs A (O7)", -gp),
                  ("clean SIGNAL-PATH residual (at master unity)", residual)]
@@ -578,7 +713,8 @@ def gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, law, gap, u_file, out):
         print(f"      => OD PATH DEFICIT (the full excess): "
               + " / ".join(f"{-d:.2f}" for d in deficit) + " dB across stimulus")
         res[label] = {"measured": measured, "master_law": lw, "route_gap": -gp,
-                      "residual": residual, "provenance": pv, "deficit": deficit}
+                      "residual": residual, "raw_residual": raw_resid, "correction": corr,
+                      "provenance": pv, "deficit": deficit}
 
     # The verdict, computed, and the bound taken CONSERVATIVELY: the residual itself is small, but
     # it was obtained by subtracting a provenance correction of comparable size and it sits on the
@@ -587,6 +723,17 @@ def gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, law, gap, u_file, out):
     bound = abs(a["residual"]) + abs(a["route_gap"]) + abs(a["provenance"])
     deficit = float(np.mean([abs(d) for d in a["deficit"]]))
     ratio = bound / deficit
+
+    if corr:
+        # CONTROL: the pre-s119 reading, on the uncorrupted-anchor-unaware ledger.  Printed so
+        # every session-107..118 quote of this gate stays reproducible on demand, and so the size
+        # of the repair is visible rather than asserted.
+        c_bound = abs(a["raw_residual"]) + abs(a["route_gap"]) + abs(a["provenance"])
+        print(f"\n   CONTROL (pre-s119, anchor UNcorrected -- what sessions 107-118 read):")
+        print(f"      clean signal-path residual {abs(a['raw_residual']):.3f} dB "
+              f"=> bound {c_bound:.3f}, ratio {c_bound / deficit:.3f}"
+              f"  [{'over' if c_bound / deficit > EXONERATION_MAX_RATIO else 'within'} bar]")
+
     print(f"\n   VERDICT (computed, 100-400 Hz, conservative bound):")
     print(f"      clean signal-path residual        {abs(a['residual']):.3f} dB")
     print(f"      + route gap, B vs A (O7)          {abs(a['route_gap']):.3f} dB")
@@ -615,6 +762,18 @@ def gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, law, gap, u_file, out):
     print( "        bound, so nothing about the conclusion changes -- only what may be quoted.")
     print( "      ⚠ A3's SIZE is untouched: MASTER is matched within every pair (O2), so it is")
     print( "        common-mode.  What changed is the ATTRIBUTION, not the number.")
+    if corr:
+        print( "      ⛔ DO NOT read the residual as independent evidence that the clean path is")
+        print( "         transparent.  kOutputMakeup is a SINGLE-POINT calibration anchored on this")
+        print( "         very detent, so the residual is near zero BY CONSTRUCTION on any baseline")
+        print( "         -- pre-s115 it was ~0 against the corrupted capture with the model 4.43 dB")
+        print( "         quiet, which is the circularity GATE T5 identified.  What it IS worth: a")
+        print( "         cross-check that s115's RENDER-based makeup re-derivation and GATE T's")
+        print( "         CAPTURE-side ladder algebra agree, and they do, to "
+              f"{abs(a['residual']):.3f} dB.")
+        print( "      ⭐ And a common-mode calibration error is invisible here yet HARMLESS to A3:")
+        print( "         kOutputMakeup is a post-chain scalar, so it moves both branches equally")
+        print( "         and cancels in the excess (s115 proved it a per-row pure gain).")
     out["o8"] = {"verdict": "exonerated", "ratio": ratio, "bound": bound, "deficit": deficit,
                  "detail": res}
 
@@ -646,8 +805,9 @@ def main():
     gate_o4(absfr, caps, nonhf, out)
     prov = gate_o5(absfr, caps, fb, nonhf, a3sel, out)
     law_n, law_a, u_file = gate_o6(absfr, caps, fb, nonhf, a3sel, prov, lad, out)
+    corr = gate_o6b(absfr, caps, nonhf, u_file, out)
     gap = gate_o7(absfr, caps, fb, nonhf, a3sel, out)
-    gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, (law_n, law_a), gap, u_file, out)
+    gate_o8(absfr, caps, pairs, fb, nonhf, a3sel, prov, (law_n, law_a), gap, u_file, corr, out)
 
     print("\n== GATE O: all sub-gates passed ==")
     if a.json:

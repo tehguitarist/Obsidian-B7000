@@ -177,19 +177,43 @@ def _stamp_path(out):
     return out + ".args.json"
 
 
+def _bin_sig():
+    """(size, mtime_ns) of the render binary -- what `comprehensive_report._cache_key` already
+    hashes, and what this gate's own stamp used to omit."""
+    st = os.stat(CR.DEFAULT_BIN)
+    return [st.st_size, st.st_mtime_ns]
+
+
 def render(out, args):
-    """Render ONE condition, reusing an existing file only if its recorded argv matches exactly."""
+    """Render ONE condition, reusing an existing file only if its recorded argv AND BINARY match.
+
+    ⚠⚠ THE BINARY HALF WAS MISSING UNTIL SESSION 117, AND IT WAS A REAL HOLE.  Stamping argv alone
+    means a SHIPPED DSP CONSTANT does not invalidate the cache: session 115 shipped `kOutputMakeup`
+    and the MASTER taper at 17:31 and this cache had been written at 10:37, so session 116's gate
+    sweep re-ran GATE R and silently re-read six-hour-old renders of a superseded build.
+    `rebaseline-all-derived-artefacts`, in the one place this gate was already careful about
+    staleness -- the argv stamp was added for exactly this class of bug and only covered half of it.
+    `comprehensive_report._cache_key` has always hashed the binary; this did not.
+
+    ⭐ The fix is safe to make retroactively BECAUSE IT WAS MEASURED FIRST, not because it is
+    obviously safe: GATE V's V1b re-rendered all 16 endpoints with the current binary and found the
+    null prominence unchanged to 1.8e-08 dB, which is the pure-scalar derivation (a prominence is a
+    CONTRAST between a notch bottom and its own shoulders, and both of s115's constants are proven
+    per-row scalars) confirmed rather than assumed.  So every number in `s110_null_locus.json`
+    stands; what changes is only that the next run re-renders instead of trusting luck."""
     os.makedirs(os.path.dirname(out), exist_ok=True)
     want = list(args)
     sp = _stamp_path(out)
     if os.path.exists(out) and os.path.exists(sp):
-        if json.load(open(sp))["argv"] == want:
+        st = json.load(open(sp))
+        if st["argv"] == want and st.get("bin") == _bin_sig():
             return out
-        sys.stderr.write(f"  ! {out} was rendered at a DIFFERENT condition -- re-rendering\n")
+        why = "a DIFFERENT condition" if st["argv"] != want else "a DIFFERENT BINARY"
+        sys.stderr.write(f"  ! {out} was rendered at {why} -- re-rendering\n")
     if not CR.render_plugin(CR.DEFAULT_BIN, want, out, OS_FACTOR):
         sys.exit(f"GATE R: render failed for {out}\n   args: {' '.join(want)}")
     with open(sp, "w") as fh:
-        json.dump({"argv": want}, fh, indent=1)
+        json.dump({"argv": want, "bin": _bin_sig()}, fh, indent=1)
     return out
 
 
@@ -643,9 +667,38 @@ def main():
     # "no swap" while the absolute levels had swapped -- which is also what the argmin hop was.
     print("\n   MODEL, median ABSOLUTE H1 level (dB) at each notch bottom:")
     print("   condition                    320 Hz null   bridged-T   deeper (lower) feature")
+    # ⚠⚠ POOLED OVER CONDITIONS, NOT FILES -- and R6b is the one statistic in this gate where that
+    # distinction BITES, for the same reason the absolute-level comparison above is necessary.
+    # Every other statistic here is a PROMINENCE, i.e. a contrast, which a pure gain cannot move,
+    # so a MASTER-only duplicate is harmless to it (R7's whole argument).  R6b compares ABSOLUTE
+    # LEVELS -- exactly the quantity a gain DOES move -- so the `master-1100` duplicate is NOT
+    # inert here, and taking a median over 6 files instead of 5 conditions lets that one file's
+    # different MASTER setting pull the median.
+    # Found in session 117: after s115 shipped kOutputMakeup + the MASTER taper, every r6b cell
+    # shifted by exactly -3.8999 dB (the two constants' net gain at master noon, predicted to 4
+    # decimal places) EXCEPT the two DRIVE-max `null` cells, which shifted -2.93 and -3.63 --
+    # because at master 0.4 the new piecewise taper gives a different net gain and the median
+    # straddled it.  The verdict survived, but the null-vs-bridged-T margin moved ~1.2 dB for a
+    # reason that has nothing to do with the physics.  `aggregate-moved-check-membership-first`.
+    # ⚠ And the de-duplication has to SELECT, not AVERAGE.  `by_condition` averages a MASTER-only
+    # duplicate pair, which is exactly right for a prominence (the two members are bit-identical
+    # there) and WRONG here: the two members differ BY the MASTER gain, so their mean is a level
+    # neither render has.  Restrict to the reference MASTER instead.
+    ref_master = max({(caps[r["file"]].get("settings", {}) or {}).get("master") for r in recs},
+                     key=lambda m: sum(1 for r in recs
+                                       if (caps[r["file"]].get("settings", {}) or {}).get("master") == m))
+    print(f"   (absolute levels, so restricted to the reference MASTER = {ref_master}; a "
+          f"MASTER-only duplicate is NOT inert for a level)")
     r6b = {}
     for dv in drives:
-        sel = [r for r in recs if r["drive"] == dv]
+        sel = [r for r in recs if r["drive"] == dv
+               and (caps[r["file"]].get("settings", {}) or {}).get("master") == ref_master]
+        seen = {}
+        for r in sel:
+            seen.setdefault(r["cond"], []).append(r["file"])
+        if any(len(v) > 1 for v in seen.values()):
+            fail.append(f"R6b: after restricting to MASTER {ref_master}, DRIVE {dv} still has a "
+                        f"condition with two files -- an absolute level cannot be pooled over them")
         for sw in (LO, HI):
             a_ = float(np.median([r["model"][sw]["h1_at_null"] for r in sel]))
             b_ = float(np.median([r["model"][sw]["bt_level"] for r in sel]))

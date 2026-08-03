@@ -328,7 +328,41 @@ struct FitParams
     // The residual 1.95 dB sits at m=0.50 and is the power law's own limit, not a fit error; it is
     // also within reach of knob-pointer error on a ±28 dB control (A2c). Fixing it properly means
     // replacing the power law with a real taper curve, as session 16 concluded for DRIVE.
-    double masterTaperExp = 1.998;
+    // ⭐⭐ SESSION 115 (Phase 10 C) — THE POWER LAW IS RETIRED. `masterTaperExp` NO LONGER EXISTS;
+    // a stale `--fit masterTaperExp=` now fails loudly in offline_render rather than being
+    // silently ignored, which is the failure mode this project keeps paying for.
+    //
+    // WHY THE FORM CHANGED, NOT THE VALUE. Session 41 fitted p over three points, all of them
+    // referred to `master-1700_gain-n12_base-clean.wav`. GATE T (analysis/master_anchor_gate.py)
+    // shows that file is a DUPLICATE of the 1545 capture at a knob position that is neither
+    // detent — 4.447 dB below a true master-1700 — so it corrupted the taper AND the makeup.
+    // (Session 112 read the same files as CLIPPED; that is refuted — the pinning is confined to
+    // one segment, and the two files' offset is a pure gain across a 33 dB span of level, which
+    // clipping cannot be.)
+    //
+    // On the corrected 9-detent ladder no power law fits at all: the per-point exponent runs
+    // 1.795 / 2.343 / 2.652 / 3.073 / 3.489 / 3.513 / 1.742. A real audio ("A") taper is
+    // MANUFACTURED as two linear resistive segments, and this pot measures like one.
+    //
+    //   fitted   : rms 1.28 dB, worst 1.96 dB   over the 7 interior detents
+    //   shipped p=1.998 : rms 4.71 dB, worst 6.47 dB
+    //   knob-repositioning noise floor, MEASURED from duplicate detents: 0.847 dB rms
+    // ⇒ the old form sat at 5.6x the noise floor (a real, resolvable misfit); the new one sits
+    //   at 1.5x it, i.e. as close as this ladder can resolve. Do NOT chase the residual — it is
+    //   the knob, not the model. Derivation + all guards: analysis/master_taper_makeup.py.
+    //
+    // ⚠ Free corroboration nothing in the objective knew: the fitted curve passes 9.6% of full
+    // resistance at HALF rotation, and a textbook audio taper is specified at 10-15%. circuit.md
+    // calls VR8 a "100k A".
+    //
+    // ⚠ divRatio(0) is EXACTLY 0 by construction. The reference does NOT mute at master=0 (it
+    // floors at -39.0 dB re full CW). That is deliberately not reproduced — MASTER is an [ENG]
+    // stage absent from our schematic, our drawn divider really does go to zero, and a volume
+    // control that cannot mute is a usability regression. Recorded as a departure, not an
+    // oversight (reference-sources.md §1 makes the captures authoritative for pot laws, so this
+    // is a knowing exception on one point).
+    double masterTaperBreak = 0.5927;   // rotation at which the wiper reaches masterTaperFrac
+    double masterTaperFrac = 0.1137;    // fraction of full resistance at that rotation
 
     // ---- C21 (100n) inter-stage coupling into the tone stack ----------------
     // The 100n cap is schematic-verified; the resistance it works against is the

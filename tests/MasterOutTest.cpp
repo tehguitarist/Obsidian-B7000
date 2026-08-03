@@ -23,11 +23,26 @@
 
 static constexpr double PI = 3.14159265358979323846;
 
+// Two-segment piecewise-linear MASTER taper -- the oracle's copy of MasterOut::setMaster.
+// Deliberately re-derived here rather than calling the stage, so the test can still fail if
+// the stage's curve changes underneath it.
+static double taperRatio(double m)
+{
+    const double b = MasterOut::kMasterTaperBreak;
+    const double f = MasterOut::kMasterTaperFrac;
+    if (m <= 0.0)
+        return 0.0;
+    if (m >= 1.0)
+        return 1.0;
+    return (m <= b) ? (f * m / b) : (f + (1.0 - f) * (m - b) / (1.0 - b));
+}
+
 // Analytic oracle: H(f) = divRatio · [sC36·Rp/(1+sC36·Rp)] · [sC37·R46/(1+sC37·R46)]
 static double oracleDb(double master, double freq)
 {
-    const double p = MasterOut::kMasterTaperExp;
-    const double ratio = (master <= 0.0) ? 0.0 : (master >= 1.0 ? 1.0 : std::pow(master, p));
+    // Session 115: the taper is a TWO-SEGMENT PIECEWISE LINEAR curve, not a power law.
+    // Mirrors MasterOut::setMaster exactly (endpoints exact: 0 at 0, 1 at 1).
+    const double ratio = taperRatio(master);
     const std::complex<double> s(0.0, 2.0 * PI * freq);
     const std::complex<double> hpIn = s * MasterOut::kC36 * MasterOut::kRp
                                        / (1.0 + s * MasterOut::kC36 * MasterOut::kRp);
@@ -109,7 +124,7 @@ int main()
         stage.setMaster(m);
 
         const double vin = 1.0e-3;
-        const double divRatio = std::pow(m, MasterOut::kMasterTaperExp);
+        const double divRatio = taperRatio(m);
         const double first = stage.process(vin);       // caps ≈ short at the edge
         double y = first;
         for (int n = 1; n < 400000; ++n)                // settle >> 0.22 s tau

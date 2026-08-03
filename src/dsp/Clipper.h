@@ -9,7 +9,12 @@
 // A single unbuffered-CD4049 inverter section wired as a shunt-feedback inverting
 // amp, self-biased to its own transition point, clipping softly against its own
 // (R19-dropped) CMOS rails. NOT a diode clipper — D1/D2 are rail clamps at node W
-// that (as verified by the test) never conduct in normal operation.
+// that never conduct in normal operation.
+// ⚠ That last clause was FALSE for the shipped build from session 44 to 117: the
+// clamp window was derived from the FITTED satLo and duly fired on up to 7.6 % of
+// samples. Fixed in session 118 by anchoring it on the physical trip point — see
+// kTripPointV below for the measurement, the cost, and why the per-stage test did
+// not catch it (it exercises the NOMINAL constants, not the shipped fit).
 //
 //   GRUNT bank : C11(4n7) always + C12(47n)/C13(220n) switched in parallel -->
 //                the "coupling cap" Cg feeding R16 (three bass-content levels).
@@ -36,9 +41,12 @@
 //     ideal-A0 upper bound.
 //
 // Per-sample this is an implicit equation (W depends on Y = VTC(W) and vice versa
-// through the feedback), so it is solved by Newton iteration on node W — cheap
-// (F is nearly linear except in saturation; warm-started from the previous sample,
-// ~2-4 iters). Both reactive elements (Cg, C14) are trapezoidal companion caps,
+// through the feedback), so it is solved by BRACKETED Newton with a bisection
+// fallback on node W — cheap (F is nearly linear except in saturation; warm-started
+// from the previous sample, mean 2.7-3.0 iterations measured across the whole OS x
+// drive plane). ⚠ It was a PLAIN Newton loop until session 120, and plain Newton is
+// not globally convergent on a sigmoid however monotone F is; see kNewtonIters for
+// the measured defect that cost. Both reactive elements (Cg, C14) are trapezoidal companion caps,
 // same convention as every other stage (JfetStage/DriveStage/MasterOut).
 //
 // ---- Node-W KCL (VD-referenced internally: 0 = the inverter trip point Vm) ----
@@ -110,25 +118,77 @@ public:
     // without checking its antiderivative stays closed-form (dsp.md trap class).
     static constexpr double kHardness = 2.0;
 
-    // D1/D2 clamp window on node W, VD_eff-referenced (0 = trip point Vm = satLo
-    // above GND). D1: W_abs <= +9.6 -> w <= 9.6 - Vm ; D2: W_abs >= -0.6 -> w >=
-    // -0.6 - Vm. Wide vs the ~+-0.3 V that the feedback-regulated node actually
-    // reaches, so these essentially never fire (the test asserts it).
-    // NOTE these TRACK satLo — the clamp window is referenced to the trip point,
-    // so refitting the saturation levels moves the window with it (the absolute
-    // +9.6 / -0.6 V rail references are what stay fixed).
-    static constexpr double kClampHi = 9.6 - kSatLo;  // +6.45 V
-    static constexpr double kClampLo = -0.6 - kSatLo; // -3.75 V
+    // ** SESSION-118: the inverter TRIP POINT, decoupled from the fitted VTC
+    // amplitude. This is a PHYSICAL constant and must NOT track a fit. **
+    // Node W is worked in a frame where 0 = the self-bias trip point Vm, so the
+    // absolute node voltage is W_abs = w + Vm and the 1N4148 rail clamps are
+    //   D1: W_abs <= +9.6  ->  w <=  9.6 - Vm
+    //   D2: W_abs >= -0.6  ->  w >= -0.6 - Vm
+    // Vm comes from circuit.md's self-consistent R19-dropped supply solve
+    // (session 42, analysis/clipper_rail_selfconsistent.py): the CD4049's own
+    // crowbar current through R19 settles at VDD = 5.636 V with the shunt-feedback
+    // self-bias point at Vm = 2.657 V. It is a property of the DEVICE and its
+    // supply dropper, not of how the VTC's knee was fitted.
+    //
+    // ⛔⛔ WHY THIS IS NOT `kSatLo` ANY MORE — SESSION-118 BUG FIX, and the old
+    // comment right here ("these essentially never fire (the test asserts it)")
+    // WAS FALSE FOR THE SHIPPED BUILD FOR 74 SESSIONS. The window used to be
+    // derived as `±rail - satLo`, on the reasoning that for a CMOS inverter
+    // swinging rail-to-rail the output swing toward GND *is* the trip point. That
+    // identification is sound for the NOMINAL values (kSatLo = 3.15 = 7.0/2) and
+    // it broke the moment satLo stopped being an output swing: session 44's A5
+    // re-fit made satLo a fitted KNEE SCALE and moved it 3.15 -> 0.4377 V (their
+    // sum, 1.036 V, is only 18 % of the 5.636 V rail — FitParams.h already flags
+    // that as a soft-low). The clamp window silently followed it from
+    // [-3.750, +6.450] to [-1.038, +9.162], i.e. the D2 floor moved 2.71 V IN
+    // TOWARD the region node W actually occupies.
+    // MEASURED (session 118, temporary in-chain instrumentation over 10 matrix
+    // conditions x OS 2 and 8, ~32 M clipper samples each): D1 never fires
+    // anywhere, and D2 fires on 0.39 % (ref-od, DRIVE noon) to 7.61 % of samples,
+    // rising monotonically with how hard the clipper is pushed —
+    //   DRIVE min 0.00 | DRIVE noon 0.39 | 1430 1.66 | DRIVE max 3.48 |
+    //   attack-boost 5.32 | grunt-flat 6.53 | grunt-boost 7.01   (OS 8)
+    // ⚠⚠ AND THE FIRST VERSION OF THIS NOTE OVERCLAIMED, BECAUSE THE ENVELOPE WAS
+    // MEASURED THROUGH THE LIMITER UNDER TEST. With the old clamp ACTIVE the node
+    // reads [-2.458, +5.417] V, which sits inside [-3.257, +6.943] and looks
+    // comfortably inert. It is not: the old clamp was itself holding the negative
+    // excursions down. Re-measured with the corrected window in place, the true
+    // envelope is [-3.927, +5.127] V, so D2 still fires — on 0.05-0.25 % of
+    // samples (OS 8) against the old 0.39-7.61 %, i.e. a 30-70x reduction, not
+    // elimination. **An excursion envelope measured with a limiter engaged
+    // understates the envelope that limiter would see if removed.**
+    // ⛔ The residual is NOT a reason to widen this number further. It is the
+    // known soft-low clipSat showing through: the fitted VTC saturates at
+    // |w| ~ satLo/a0 ~ 0.018 V, so past that the node runs away almost linearly
+    // and reaches excursions a physically-scaled ceiling (VDD 5.636 V) would never
+    // permit. Fixing THAT is a re-fit of the whole K/clipSat family, not a clamp
+    // edit — and it is already flagged in FitParams.h. What this change buys is
+    // that the window is anchored on physics instead of on a fit.
+    // COST OF THE OLD WINDOW, measured on an independent transcription of this
+    // solve (bit-identical to it, gated): at 384 kHz the clamp is the ENTIRE
+    // error — 6 Newton iterations with the clamp removed reproduce the converged
+    // solve to 7e-14 V, while the clamped version errs by up to 1.034 V, i.e. the
+    // whole satLo+satHi = 1.036 V output swing. The damage is not to y directly
+    // (vtc is already saturated out there, so y moves ~1e-4 V) but to wPrev and to
+    // the C14 companion-cap state, which is updated from the CLAMPED w: at 384 kHz
+    // that is a 4.8e-4 A error in a branch carrying ~1e-4 A.
+    // ⚠ Do NOT "fix" this by widening the number until it stops firing — the point
+    // is that the reference is physical and the fit must not reach it. If a future
+    // re-fit of the K/clipSat family restores a physical satLo, this constant and
+    // that one will agree again on their own.
+    static constexpr double kTripPointV = 2.657; // circuit.md / session-42 solve
+    static constexpr double kClampHi = 9.6 - kTripPointV;  // +6.943 V
+    static constexpr double kClampLo = -0.6 - kTripPointV; // -3.257 V
 
-    // Phase-7 capture fit (FitParams.h). Recomputes the derived clamp window.
+    // Phase-7 capture fit (FitParams.h). ** Does NOT touch the clamp window — see
+    // kTripPointV above: the window is anchored on the physical trip point and a
+    // VTC-amplitude fit is not allowed to move it (session-118 bug fix). **
     void setNonlinear(double A0, double sLo, double sHi, double k = kHardness) noexcept
     {
         a0 = A0;
         satLo = sLo;
         satHi = sHi;
         hardness = k;
-        clampHi = 9.6 - satLo;
-        clampLo = -0.6 - satLo;
     }
 
     // GRUNT position -> coupling cap. ** UI map VERIFIED against capture 2026-07-22
@@ -254,23 +314,63 @@ public:
         // Per-sample constant part of the input-branch current source.
         const double ic = ieqG / (r16 * dNode);
 
-        // ---- Newton solve for node W ----------------------------------------
+        // ---- Rigorous closed-form bracket for the root (session 120) ---------
+        // Rearranged, F(w) = (gIn+gFb)*(w0 - w) + gFb*vtc(w), so the root satisfies
+        //     w = w0 + (gFb/(gIn+gFb)) * vtc(w),  w0 = (gIn*x - ic - ieq14)/(gIn+gFb)
+        // and |vtc| <= max(satLo,satHi) confines it to w0 +/- rad. F is strictly
+        // decreasing, so F(lo) >= 0 >= F(hi) and the root is unique: this bracket
+        // cannot fail, costs no iteration, and needs no tuning.
+        const double sum = gIn + gFb;
+        const double w0 = (gIn * x - ic - ieq14) / sum;
+        const double rad = gFb * (satLo > satHi ? satLo : satHi) / sum + 1e-12;
+        double lo = w0 - rad, hi = w0 + rad;
+
+        // ---- Bracketed Newton with bisection fallback (Numerical Recipes
+        //      `rtsafe`) — session 120. See kNewtonIters for the measurement. ---
+        // ⚠ BOTH conditions are load-bearing and neither may be dropped:
+        //   (a) the RANGE test rejects a step that leaves [lo,hi] — a sigmoid VTC
+        //       is nearly flat in saturation, so plain Newton launched from out
+        //       there overshoots to the far side and can cycle;
+        //   (b) the SUFFICIENT-DECREASE test |2f| > |dwOld*fp| ("Newton is not at
+        //       least halving") is what breaks a 2-CYCLE in which Newton at a
+        //       proposes exactly b and at b proposes exactly a. A hand-rolled
+        //       guard with only (a) was measured cycling for 16 iterations with
+        //       the step still at half the bracket width.
         double w = wPrev; // warm start
+        if (w < lo) w = lo;
+        else if (w > hi) w = hi;
+        double dwOld = hi - lo, dw = dwOld;
+        double f = solveF(w, x, ic);
+        double fp = solveFp(w);
         for (int it = 0; it < kNewtonIters; ++it)
         {
-            const double f = gIn * (x - w) - ic + gFb * (vtc(w) - w) - ieq14;
-            const double fp = -gIn + gFb * (vtcDeriv(w) - 1.0);
-            const double dw = f / fp;
-            w -= dw;
+            if ((((w - hi) * fp - f) * ((w - lo) * fp - f) > 0.0)
+                || (std::abs(2.0 * f) > std::abs(dwOld * fp)))
+            {
+                dwOld = dw;
+                dw = 0.5 * (hi - lo);
+                w = lo + dw;
+            }
+            else
+            {
+                dwOld = dw;
+                dw = f / fp;
+                w -= dw;
+            }
             if (std::abs(dw) < 1e-12)
                 break;
+            f = solveF(w, x, ic);
+            fp = solveFp(w);
+            if (f > 0.0) lo = w; else hi = w; // F strictly decreasing
         }
 
         // ---- D1/D2 rail clamps at node W (normally inert) -------------------
-        if (w > clampHi)
-            w = clampHi;
-        else if (w < clampLo)
-            w = clampLo;
+        // Read the CONSTANTS directly: there is deliberately no mutable copy of
+        // the window any more, so no fit can reach it (session-118 bug fix).
+        if (w > kClampHi)
+            w = kClampHi;
+        else if (w < kClampLo)
+            w = kClampLo;
 
         wPrev = w;
         const double y = vtc(w);
@@ -285,7 +385,69 @@ public:
     }
 
 private:
-    static constexpr int kNewtonIters = 6;
+    // ** SESSION-120: 6 -> 12, and it is a CAP on the tail, not a per-sample cost. **
+    // The loop early-exits, and the MEAN iteration count is 2.69-2.98 across the whole
+    // OS ladder x drive plane — LOWER than the plain-Newton build's 2.90-3.07, because
+    // rtsafe's bisection fallback stops the wasted overshoot-and-return steps. So
+    // doubling the cap costs essentially nothing on the ~99 % of samples that converge
+    // in 2-4 iterations; it only buys the tail that used to be left unconverged.
+    //
+    // WHY 12 AND NOT 6 — measured IN-CHAIN, which is the only figure to quote.
+    // Temporary instrumentation in this function, driven by OSValidationTest (the real
+    // PedalDSP, 23,251,712 clipper samples spanning OS 2/4/8), added, measured and
+    // REVERTED:
+    //                              plain Newton      rtsafe, cap 12
+    //   max clipper input |x|         2.900 V          2.900 V
+    //   max solve residual            0.556 V          6.8e-16 V
+    //   unconverged samples        606314 (2.608 %)    0 (0.0000 %)
+    // rtsafe at cap 6 fixes most of it; only cap >= 8 reaches machine precision at
+    // every rate on the synthetic sweep, and 12 is 8 plus margin and is free.
+    //
+    // ⚠⚠ THE DEFECT IS **NOT** "1x ONLY", AND BOTH SYNTHETIC CHARACTERISATIONS OF IT
+    // UNDERSTATED IT — session 118's and this session's first pass alike. A smooth
+    // 110 Hz + 770 Hz probe stimulus says "absent at 4x/8x"; the real chain, feeding a
+    // 2499 Hz tone through the treble/ATTACK ladder and the GRUNT bank, is unconverged
+    // on 2.6 % of samples at only 2.9 V of clipper drive, at 4x AND 8x.
+    // ** A solver-convergence claim is a claim about the STIMULUS as much as about the
+    // sample rate: a slow, smooth test signal makes wPrev a good warm start and hides
+    // the overshoot entirely. Quote the in-chain number. **
+    //
+    // ⚠ The 162-capture matrix renders at OS 8 and is nonetheless nearly blind to this,
+    // because it grades gain-matched band statistics and this error is broadband and
+    // signal-correlated — which is exactly why the defect survived to session 120. The
+    // instrument that DOES see it is OSValidationTest; see the note below.
+    static constexpr int kNewtonIters = 12;
+
+    // ⭐⭐ CONSEQUENCE: `OSValidationTest` PASSES for the first time since session 44.
+    // ctest goes 16/17 -> 17/17. At amp 0.35 the alias/signal floor moves
+    //   2x -28.1 -> -32.4 | 4x -28.9 -> -50.5 | 8x -24.6 -> -61.2 dB   (36.6 dB at 8x)
+    // and the test's own "REAL FOLD-DOWN" markers at amp 0.20/0.35 disappear.
+    // Attributed by reverting ONLY this solver on an otherwise identical build.
+    //
+    // ⛔⛔ THIS SUBSTANTIALLY REFUTES SESSION 92's ATTRIBUTION of that failure to
+    // "genuine fold-down from the un-ADAA'd CD4049 VTC". Session 92's evidence was
+    // sound and could not have separated the two: a non-converged solve produces a
+    // SIGNAL-DEPENDENT error, so it folds at exactly the same |N*f0 - m*fs_os| loci
+    // that its bin-matching test used, and it also shrinks with rate, so its
+    // 192 kHz-base control is equally consistent with either cause.
+    // ⚠ NOT claimed: that the VTC needs no ADAA. ADAA remains open (Phase 10 B) and
+    // some genuine fold-down surely remains — what falls is that THIS test's failure
+    // was dominated by it. Re-measure before quoting session 92's alias figures.
+    // ⚠ Also retired: session 92's "at 8x the chain is aperiodic at 4 of 21 tones",
+    // which session 118 attributed to the clamp. With the clamp window fixed (s118)
+    // AND the solve converged (s120), re-run `analysis/alias_gate.py` before quoting
+    // any of that table — both of its named causes have now moved.
+
+    // The node-W residual and its derivative, factored out so the solve, its bracket
+    // and any gate can share ONE definition (see the KCL derivation in the header).
+    inline double solveF(double w, double x, double ic) const noexcept
+    {
+        return gIn * (x - w) - ic + gFb * (vtc(w) - w) - ieq14;
+    }
+    inline double solveFp(double w) const noexcept
+    {
+        return -gIn + gFb * (vtcDeriv(w) - 1.0);
+    }
 
     // Inverter VTC (VD_eff-referenced, 0 = trip point). Inverting asymmetric
     // sigmoid: slope -a0 at 0 (both sides -> C1-continuous), saturating to -satLo
@@ -304,8 +466,14 @@ private:
     // (satLo/satHi keep theirs), but knee hardness is now its own parameter:
     // tanh behaves like k ~= 2.5-3; the capture wants softer (k ~= 1.5-2).
     // f_k' = (1+u^k)^-((k+1)/k) is strictly positive, so the VTC stays strictly
-    // monotone decreasing and the Newton solve keeps its global-convergence
-    // property (F'(W) remains a sum of strictly negative terms).
+    // monotone decreasing and F'(W) remains a sum of strictly negative terms.
+    // ⛔ SESSION-120 CORRECTION: that gives the root UNIQUENESS, not "the Newton
+    // solve keeps its global-convergence property", which is what this comment
+    // used to claim and which is false. A strictly monotone F does not make plain
+    // Newton globally convergent — a sigmoid is nearly FLAT in saturation, so a
+    // step taken out there is huge and overshoots to the far side. That is exactly
+    // the measured 1x/2x defect. Uniqueness is what makes the closed-form bracket
+    // in process() valid; convergence is what rtsafe supplies.
     inline double vtc(double w) const noexcept
     {
         if (w >= 0.0)
@@ -347,7 +515,6 @@ private:
     double fs = 48000.0;
     // Phase-7 capture-fit amplitude params (FitParams.h), nominal-initialised.
     double a0 = kA0, satLo = kSatLo, satHi = kSatHi, hardness = kHardness;
-    double clampHi = kClampHi, clampLo = kClampLo; // derived from satLo
     // Feedback branch (R18 || C14).
     double gc14 = 0.0, gFb = 0.0, ieq14 = 0.0;
     // Input branch (Cg series R16), Norton-reduced.

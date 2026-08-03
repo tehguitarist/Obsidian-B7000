@@ -1,208 +1,368 @@
-#!/usr/bin/env python3.11
-"""Phase-7 SESSION 17 — fit masterTaperExp + calibrate kOutputMakeup (the LAST two constants).
+#!/usr/bin/env python3
+"""MASTER taper + kOutputMakeup — REWRITTEN SESSION 115 (Phase 10 C).
 
-CLEAN-PATH ISOLATION. The `master-*_base-clean` captures are DIST-DISENGAGED, so BLEND is forced to
-100% clean: the JFET + CD4049 clipper are BYPASSED entirely. And kInputRef CANCELS in the linear path
-(GainStaging.h §1). So masterTaperExp and kOutputMakeup depend on NEITHER the fitted clipper/JFET
-family NOR kInputRef — only on the EQ/MASTER linear stages. That is why they are the last, cleanest
-step, and why fitting them now (before the fitted family is written into FitParams.h) is valid.
+WHY IT WAS REWRITTEN
+--------------------
+The session-17/41 version was unrunnable and, where it did run, wrong:
 
-(1) masterTaperExp p — NO RENDER NEEDED. The MASTER pot is a pure post-EQ divider (MasterOut.h):
-    output(m) = Ntop(EQ) * divRatio(m),  divRatio(m) = m^p,  and divRatio(1)=1 (unity at full CW).
-    So the SHAPE ratio cancels the master-independent Ntop AND the makeup:
-        R_cap(m) / R_cap(1.0) = m^p   ->   p = ln(R_cap(m)/R_cap(1.0)) / ln(m)
-    Estimated at the two interior knobs (0.25, 0.75); master=0.0 is a null (0^p=0, uninformative).
-    ⚠ GAIN-n12: master-1430/1700 were captured -12 dB (interface headroom); apply the measured
-    +12.071 dB correction (captures.gain_correction_linear). Both 0.75 and 1.0 are gain-n12, so their
-    correction CANCELS in R(0.75)/R(1.0) — that estimate needs no correction and is the cleaner one.
+  * It anchored BOTH constants on `master-1700_gain-n12_base-clean.wav`, which GATE T
+    (`analysis/master_anchor_gate.py`) shows is a DUPLICATE of the 1545 capture at a knob position
+    that is neither detent — 4.447 dB below a true master-1700.  `kOutputMakeup` inherited that
+    error whole, and because every taper point is `lv[m] / lv[1.0]`, so did `masterTaperExp`.
+  * Two of its five captures (`master-0700_base-clean.wav`, `master-0930_base-clean.wav`) were
+    moved to `analysis/captures/_archive/` in session 112, so it exited rc=2.
+  * Its m=0.50 point was `ref-clean.wav`, the file GATE S2 identified as the contaminated member
+    of its own twin pair.
+  * It fitted a POWER LAW to three points.  On the corrected ladder no power law fits at all:
+    the per-point exponent spans 1.74..3.51.
 
-(2) kOutputMakeup — ONE render. At master=1.0 (divRatio=1, taper-independent) render the CLEAN chain
-    with makeup=1, match its level to the (gain-corrected) capture:
-        kOutputMakeup = R_cap(1.0) / R_mdl(1.0; makeup=1)
-    Then VERIFY at 0.25/0.75 that the model (with fitted p + makeup) matches the captures within ~1 dB
-    — a consistency check the fit did not target.
+WHAT THIS VERSION DOES
+----------------------
+(0) Builds the ladder from the SELF-CONSISTENT gain-n12 series (all one send, so the gain
+    corrections cancel exactly), promotes the top two detents from their `gain-n18` re-captures
+    through a DIRECTLY-measured pad, and uses the archived full-send captures as a genuine SECOND
+    TAKE at the four low detents.
+(1) MEASURES the knob-repositioning noise floor from those duplicate detents, and refuses to
+    resolve any taper form below it.
+(2) Fits candidate taper FORMS, not just an exponent, and prints them all.
+(3) Derives kOutputMakeup from ONE render, exploiting the fact that MASTER is a pure post-EQ gain
+    — with a second render as the known answer that proves it is one.
+(4) Acceptance-checks the shipped pair across the WHOLE travel.
 
-Level metric: RMS over the 'sweep_clean' segment (clean, well-defined, no clipping on this path; it is
-also the alignment anchor). Captures are integer-aligned to the reference before the segment read.
+⚠ DESIGN DECISION, session 115 — divRatio(0) is kept at EXACTLY 0.
+   The reference does not mute at master=0: it floors at -39.0 dB re full CW (divRatio 0.0112).
+   That is GATE L7's finding repeating on the second [ENG] divider.  It is NOT reproduced, on
+   three grounds: MASTER is an [ENG] stage that is not on our schematic at all; our drawn divider
+   (wiper onto VD) genuinely does go to zero, and a real 100k pot's end resistance would put the
+   floor near -70 dB, not -39; and a volume control that cannot mute is a usability regression.
+   The floor is therefore a deliberate, recorded departure from the captures, not an oversight.
 
 Run:  /opt/homebrew/bin/python3.11 analysis/master_taper_makeup.py
 Log:  analysis/fit_logs/step7_master_taper_makeup.log
 """
-import sys, os, subprocess, math
-sys.path.insert(0, os.path.dirname(__file__))
+import sys, os, subprocess, math, json, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
+from scipy.optimize import minimize
 import analyze as A
-from captures import parse_capture, render_args, gain_correction_linear, RENDER_BIN
+from captures import parse_capture, render_args, RENDER_BIN
+import gen_test_signal as G
 
 FS = 48000
 ORIG = "analysis/test_signal_48k.wav"
 LOG = "analysis/fit_logs/step7_master_taper_makeup.log"
-
-# master knob -> capture. 0.0 is a divider null (uninformative for p); kept for reporting.
-MASTERS = [
-    (0.00, "master-0700_base-clean.wav"),
-    (0.25, "master-0930_base-clean.wav"),
-    # ⚠ ADDED session 41. `ref-clean.wav` IS the master=0.50 member of this very series (_REF_OD
-    # with base=clean is every pot at noon, master included) — it was simply never listed here
-    # because it doesn't carry a `master-` filename token. It is the best-conditioned interior
-    # point on the knob and the ONE the shipped taper is worst at, so leaving it out let a
-    # 2.5 dB error sit in the middle of MASTER's travel while the fit reported itself consistent.
-    (0.50, "ref-clean.wav"),
-    (0.75, "master-1430_gain-n12_base-clean.wav"),
-    (1.00, "master-1700_gain-n12_base-clean.wav"),
-]
 CAPDIR = "analysis/captures"
-DRIVE_TAPER = 1.98        # session-17 measured (held); irrelevant on the clean path but kept consistent
+ARCHDIR = "analysis/captures/_archive"
+DRIVE_TAPER = 1.98
+
+# Detent token -> knob value (7 o'clock = 0.0 ... 5 o'clock = 1.0 over ten clock-hours).
+KNOB = {"0700": 0.000, "0815": 0.125, "0930": 0.250, "1045": 0.375, "1200": 0.500,
+        "1315": 0.625, "1430": 0.750, "1545": 0.875, "1700": 1.000}
+N18_DETENTS = ("1545", "1700")          # the two whose gain-n12 captures are the duplicate pair
+FULLSEND_PAD_DB = 12.000                 # captures.py _GAIN_SESSION_MEASURED_DB[-12], s114
+SEG = "sweep_clean"
+
+_T = G.segment_times()
+_fail = []
 
 
-def seg_rms(sig):
-    """RMS over the sweep_clean segment of an aligned signal."""
-    a, b = A.T["sweep_clean"]
-    s = sig[int(a * FS):int(b * FS)]
-    return float(np.sqrt(np.mean(s.astype(np.float64) ** 2)))
+def fail(msg):
+    _fail.append(msg)
 
 
-def cap_level(name):
-    """Gain-corrected sweep_clean RMS of a capture, aligned to the reference."""
-    parsed = parse_capture(name)
-    x = A.load(f"{CAPDIR}/{name}") * gain_correction_linear(parsed)
-    xa, _ = A.align(x, A.load(ORIG))
-    return seg_rms(xa)
+# --------------------------------------------------------------------------------------- levels
+def _load(p):
+    return A.load(p)
 
 
-def render_clean_level(master, taper_p, makeup):
-    """Render the CLEAN chain at a master setting; return sweep_clean RMS. dist-engage forced off.
+def seg_rms_db(path):
+    x = _load(path)
+    a, b = _T[SEG]
+    s = x[int(a * FS):int(b * FS)]
+    return 20 * math.log10(float(np.sqrt(np.mean(s.astype(np.float64) ** 2))) + 1e-300)
 
-    ⚠ FIXED 2026-07-27 (session 41): the render must sit in the SAME level frame as `cap_level`,
-    which multiplies the capture UP by gain_correction_linear() into the gainSessionDb=0 frame.
-    Session 21 taught `render_args()` to emit `--input-trim` for a capture's gain session — a
-    correct fix for the matrix, but it silently broke THIS script, which had been written when
-    render_args ignored gainSessionDb: the capture was being corrected UP by +12.071 dB while the
-    render was being trimmed DOWN by the same amount, a 12 dB double-count landing entirely in
-    kOutputMakeup. Clearing the tag on the render template puts both sides at full level again.
-    (Cross-checked: the corrected makeup reproduces a direct capture-vs-render level comparison
-    on the lvl_ ladder to 0.02 dB.)
+
+def seg_bands(path, nb=29):
+    x = _load(path)
+    a, b = _T[SEG]
+    s = x[int(a * FS):int(b * FS)].astype(np.float64)
+    f = np.fft.rfftfreq(len(s), 1 / FS)
+    X = np.abs(np.fft.rfft(s))
+    e = np.geomspace(25, 16300, nb + 1)
+    out = []
+    for i in range(nb):
+        m = (f >= e[i]) & (f < e[i + 1])
+        out.append(10 * math.log10(np.mean(X[m] ** 2)) if m.any() else np.nan)
+    return np.array(out)
+
+
+def flat_offset(pa, pb):
+    """Level difference and its frequency span.  A pure gain must have span ~0."""
+    d = seg_bands(pa) - seg_bands(pb)
+    d = d[np.isfinite(d)]
+    return float(d.mean()), float(d.max() - d.min())
+
+
+# --------------------------------------------------------------------------------------- taper
+def pwl2(m, xb, fb):
+    """Two-segment piecewise-linear pot -- how an audio taper is actually built.
+
+    Fraction fb of full resistance is reached at rotation xb; linear either side.
+    Exactly 0 at m=0 and exactly 1 at m=1, both of which the topology requires.
     """
-    parsed = parse_capture("master-1700_gain-n12_base-clean.wav")  # base-clean knob template
+    m = np.asarray(m, dtype=float)
+    return np.where(m <= xb, fb * m / max(xb, 1e-9),
+                    fb + (1.0 - fb) * (m - xb) / max(1.0 - xb, 1e-9))
+
+
+def powerlaw(m, p):
+    return np.asarray(m, dtype=float) ** p
+
+
+def _db(v):
+    return 20 * np.log10(np.maximum(v, 1e-12))
+
+
+def fit_form(mm, dd, model, x0, nparam):
+    r = minimize(lambda p: float(np.sqrt(np.mean((_db(model(mm, *p)) - dd) ** 2))),
+                 x0, method="Nelder-Mead",
+                 options={"xatol": 1e-12, "fatol": 1e-14, "maxiter": 40000})
+    e = _db(model(mm, *r.x)) - dd
+    return np.atleast_1d(r.x), float(np.sqrt(np.mean(e ** 2))), float(np.abs(e).max()), e
+
+
+# --------------------------------------------------------------------------------------- render
+def render_clean_level(master, xb, fb, makeup):
+    """sweep_clean RMS (dB) of the CLEAN chain at a master setting.
+
+    The capture side is read at FULL SEND level, so the render must be too: `gainSessionDb` is
+    cleared on the template (session 41's 12 dB double-count).
+    """
+    parsed = parse_capture("master-1700_gain-n12_base-clean.wav")   # base-clean knob template
     parsed["master"] = master
     parsed["gainSessionDb"] = 0
-    extra = ["--fit", f"masterTaperExp={taper_p:.6g}", "--fit", f"driveTaperExp={DRIVE_TAPER:.6g}"]
-    out = f"/tmp/mtm_{int(master*100):03d}.wav"
+    extra = ["--fit", f"masterTaperBreak={xb:.9g}",
+             "--fit", f"masterTaperFrac={fb:.9g}",
+             "--fit", f"driveTaperExp={DRIVE_TAPER:.6g}"]
+    out = f"/tmp/mtm_{int(round(master*1000)):04d}.wav"
     subprocess.run([RENDER_BIN, ORIG, out, "--os", "4", "--output-makeup", f"{makeup:.9g}"]
                    + render_args(parsed, extra), check=True, capture_output=True)
-    r, _ = A.align(A.load(out), A.load(ORIG))
-    return seg_rms(r)
+    r, _ = A.align(_load(out), _load(ORIG))
+    a, b = _T[SEG]
+    s = r[int(a * FS):int(b * FS)]
+    return 20 * math.log10(float(np.sqrt(np.mean(s.astype(np.float64) ** 2))) + 1e-300)
 
 
+# --------------------------------------------------------------------------------------- main
 def main():
-    os.makedirs("analysis/fit_logs", exist_ok=True)
-    log = open(LOG, "w")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", default="analysis/reports/s115_master_recal.json")
+    ap.add_argument("--no-render", action="store_true", help="taper only; skip makeup + acceptance")
+    args = ap.parse_args()
+
+    os.makedirs(os.path.dirname(LOG), exist_ok=True)
+    lines = []
 
     def emit(s=""):
         print(s)
-        log.write(s + "\n")
+        lines.append(s)
 
-    emit("=" * 90)
-    emit("MASTER taper (masterTaperExp) + output makeup (kOutputMakeup) — session 17")
-    emit("=" * 90)
-    emit("Clean-path isolation: DIST off => clipper/JFET bypassed; kInputRef cancels. Depends only on")
-    emit("the EQ/MASTER linear stages. Level = RMS over the sweep_clean segment (gain-n12 corrected).")
+    emit("=" * 92)
+    emit("MASTER taper + kOutputMakeup  --  REWRITTEN session 115 (Phase 10 C)")
+    emit("=" * 92)
+
+    # ---- (0) the pads ----------------------------------------------------------------------
+    emit("\n(0) PADS  [ the clean path is linear => every pad is a PURE GAIN, so span must be ~0 ]")
+    pad_n18, span_n18 = flat_offset(f"{CAPDIR}/ref-clean_gain-n12.wav",
+                                    f"{CAPDIR}/ref-clean_gain-n18.wav")
+    emit(f"  n12 -> n18 : {pad_n18:.4f} dB  span {span_n18:.4f} dB   "
+         f"(derived WITHOUT the contaminated ref-clean.wav -- GATE S2)")
+    if abs(pad_n18 - 6.0) > 0.01 or span_n18 > 0.01:
+        fail(f"n12->n18 pad {pad_n18:.4f} / span {span_n18:.4f} is not a clean 6.000 dB")
+    emit(f"  full -> n12: {FULLSEND_PAD_DB:.4f} dB  (captures.py, session 114)")
+
+    # ---- (1) the ladder --------------------------------------------------------------------
+    emit("\n(1) LADDER  [ gain-n12 primary; top two promoted from gain-n18; archived full-send = 2nd take ]")
+    takes, ladder = {}, {}
+    for det, k in KNOB.items():
+        t = []
+        if det in N18_DETENTS:
+            t.append(("n18", seg_rms_db(f"{CAPDIR}/master-{det}_gain-n18_base-clean.wav") + pad_n18))
+        else:
+            t.append(("n12", seg_rms_db(f"{CAPDIR}/master-{det}_gain-n12_base-clean.wav")))
+        arch = f"{ARCHDIR}/master-{det}_base-clean.wav"
+        if os.path.exists(arch):
+            t.append(("full", seg_rms_db(arch) - FULLSEND_PAD_DB))
+        takes[k] = t
+        ladder[k] = float(np.mean([v for _, v in t]))
+
+    top = ladder[1.0]
+    emit(f"  {'detent':8s} {'knob':>6s} {'dB re full CW':>14s} {'takes':>7s} {'spread':>8s}")
+    spreads = []
+    for det in sorted(KNOB, key=lambda d: KNOB[d]):
+        k = KNOB[det]
+        vs = [v for _, v in takes[k]]
+        sp = (max(vs) - min(vs)) if len(vs) > 1 else float("nan")
+        if len(vs) > 1:
+            spreads.append(sp)
+        emit(f"  {det:8s} {k:6.3f} {ladder[k]-top:+14.3f} "
+             f"{'+'.join(n for n, _ in takes[k]):>7s} "
+             f"{'' if math.isnan(sp) else format(sp, '.3f'):>8s}")
+
+    ks = sorted(ladder)
+    steps = [ladder[ks[i + 1]] - ladder[ks[i]] for i in range(len(ks) - 1)]
+    if min(steps) <= 0:
+        fail(f"ladder is not monotone (min step {min(steps):+.3f} dB)")
+    emit(f"  monotone: min step {min(steps):+.2f} dB, max {max(steps):+.2f} dB")
+
+    # ---- (2) the noise floor ---------------------------------------------------------------
+    emit("\n(2) KNOB-REPOSITIONING NOISE FLOOR  [ measured, not assumed ]")
+    emit("  Two independent takes of one detent differ only by where the knob was put.")
+    for det in sorted(KNOB, key=lambda d: KNOB[d]):
+        k = KNOB[det]
+        if len(takes[k]) < 2:
+            continue
+        a, b = takes[k]
+        _, sp = flat_offset(f"{ARCHDIR}/master-{det}_base-clean.wav",
+                            f"{CAPDIR}/master-{det}_gain-n12_base-clean.wav")
+        emit(f"    master-{det}: {a[0]} {a[1]:+9.3f} vs {b[0]} {b[1]:+9.3f}  "
+             f"=> {a[1]-b[1]:+7.3f} dB   band-span {sp:.4f} dB (pure gain => knob, not tone)")
+    floor = float(np.sqrt(np.mean(np.array(spreads) ** 2))) if spreads else float("nan")
+    emit(f"  => noise floor: rms {floor:.3f} dB, worst {max(spreads):.3f} dB, n={len(spreads)}")
+    if not spreads:
+        fail("no duplicate detent -- the noise floor is unmeasured, so no fit can be qualified")
+    emit("  ⇒ NO taper form is resolvable below this.  Forms within ~1.5x of it are indistinguishable.")
+
+    # ---- (3) taper form --------------------------------------------------------------------
+    emit("\n(3) TAPER FORM  [ interior points only; m=0 is a divider null, see the header note ]")
+    mm = np.array([k for k in ks if 0.0 < k < 1.0])
+    dd = np.array([ladder[k] - top for k in mm])
+
+    x_pwl, rms_pwl, worst_pwl, e_pwl = fit_form(mm, dd, pwl2, [0.6, 0.11], 2)
+    x_pow, rms_pow, worst_pow, e_pow = fit_form(mm, dd, powerlaw, [2.2], 1)
+    e_ship = _db(powerlaw(mm, 1.998)) - dd
+    rms_ship = float(np.sqrt(np.mean(e_ship ** 2)))
+
+    emit(f"  {'form':34s} {'params':>20s} {'rms dB':>8s} {'worst':>8s} {'vs floor':>9s}")
+    emit(f"  {'2-seg piecewise linear (SHIP)':34s} "
+         f"{f'xb={x_pwl[0]:.4f} fb={x_pwl[1]:.4f}':>20s} {rms_pwl:8.3f} {worst_pwl:8.3f} {rms_pwl/floor:8.1f}x")
+    emit(f"  {'power law m^p (re-fitted)':34s} {f'p={x_pow[0]:.4f}':>20s} "
+         f"{rms_pow:8.3f} {worst_pow:8.3f} {rms_pow/floor:8.1f}x")
+    emit(f"  {'power law p=1.998 (SHIPPED)':34s} {'p=1.9980':>20s} "
+         f"{rms_ship:8.3f} {float(np.abs(e_ship).max()):8.3f} {rms_ship/floor:8.1f}x")
     emit("")
+    emit("  per-point residual (dB):")
+    emit("     m        " + " ".join(f"{v:6.3f}" for v in mm))
+    emit("     2-seg    " + " ".join(f"{v:+6.2f}" for v in e_pwl))
+    emit("     p=1.998  " + " ".join(f"{v:+6.2f}" for v in e_ship))
 
-    # ---- capture levels ---------------------------------------------------------------
-    emit("-" * 90)
-    emit("CAPTURE LEVELS (sweep_clean RMS, gain-n12 corrected)")
-    emit("-" * 90)
-    lv = {}
-    for m, name in MASTERS:
-        if not os.path.exists(f"{CAPDIR}/{name}"):
-            emit(f"  ** MISSING {name}")
-            return 2
-        r = cap_level(name)
-        lv[m] = r
-        parsed = parse_capture(name)
-        gc = 20 * math.log10(gain_correction_linear(parsed))
-        emit(f"  master {m:.2f}  {name:40s}  RMS {20*math.log10(r+1e-12):+7.2f} dBFS "
-             f"(gain-corr {gc:+.1f} dB)")
-    emit("")
+    if rms_pwl > 1.5 * floor:
+        fail(f"the selected form sits at {rms_pwl/floor:.1f}x the noise floor -- not a clean fit")
+    if rms_ship < 3.0 * floor:
+        fail("the SHIPPED power law is not clearly worse than the floor -- the premise for changing it fails")
 
-    # ---- (1) taper exponent p ---------------------------------------------------------
-    emit("-" * 90)
-    emit("(1) masterTaperExp p   [ divRatio(m) = m^p ;  p = ln(R(m)/R(1.0)) / ln(m) ]")
-    emit("-" * 90)
-    ps = []
-    for m in (0.25, 0.50, 0.75):
-        ratio = lv[m] / lv[1.0]
-        p = math.log(ratio) / math.log(m)
-        ps.append(p)
-        clean = "  (both gain-n12 -> correction CANCELS, cleanest)" if m == 0.75 else ""
-        emit(f"  m={m:.2f}: R(m)/R(1.0) = {ratio:.4f} = {20*math.log10(ratio):+.2f} dB  ->  p = {p:.3f}{clean}")
-    p_mean = float(np.mean(ps))
-    emit(f"  => single-point estimates " + " / ".join(f"{p:.3f}" for p in ps) + f" (mean {p_mean:.3f})")
+    # free corroboration nothing in the fit arranged
+    half = float(pwl2(0.5, *x_pwl))
+    emit(f"\n  ⭐ FREE CHECK: the fitted taper passes {100*half:.1f}% of full resistance at half")
+    emit(f"     rotation.  A textbook audio ('A') taper is specified at 10-15%.  circuit.md calls")
+    emit(f"     VR8 a 100k A -- and nothing in the objective knew that.")
+    if not (0.05 <= half <= 0.20):
+        fail(f"fitted taper is {100*half:.1f}% at half rotation -- not an audio taper; re-examine")
 
-    # ⚠ Session 41: the two points DISAGREE (1.93 vs 1.73), so a single power law cannot satisfy
-    # both — the same finding as the DRIVE C-taper (session 16): a real pot taper is not a power
-    # law, and a one-parameter family fitted to ONE point looks exact and is wrong elsewhere.
-    # Report the least-squares p over both points and the residual EACH candidate leaves, so the
-    # choice is made on the whole knob travel rather than on whichever point was fitted.
-    # (m=0.00 is a divider null, 0^p = 0 at every p, and carries no information about p.)
-    logs = [(m, 20 * math.log10(lv[m] / lv[1.0])) for m in (0.25, 0.50, 0.75)]
-    num = sum((-20 * math.log10(m)) * (-d) for m, d in logs)
-    den = sum((20 * math.log10(m)) ** 2 for m, _ in logs)
-    p_ls = num / den
-    emit(f"  => LEAST-SQUARES over all interior points: p = {p_ls:.3f}")
-    emit("")
-    emit(f"  {'candidate p':>28} " + " ".join(f"{'err @' + format(m, '.2f'):>10}" for m, _ in logs)
-         + f" {'worst':>8}")
-    cands = [(p, f"m={m:.2f} point fit") for p, (m, _) in zip(ps, logs)]
-    cands += [(p_ls, "least squares (all)"), (2.25, "SHIPPED (= levelTaperExp)")]
-    best = None
-    for p, label in cands:
-        errs = [20 * p * math.log10(m) - d for m, d in logs]
-        worst = max(abs(e) for e in errs)
-        emit(f"  {label:>28} " + " ".join(f"{e:>+10.2f}" for e in errs) + f" {worst:>8.2f}")
-        if best is None or worst < best[0]:
-            best = (worst, p, label)
-    emit(f"  => on whole-travel error the best of these is {best[2]} (p = {best[1]:.3f}, "
-         f"worst {best[0]:.2f} dB)")
-    p_fit = p_ls
-    emit("")
+    emit(f"\n  m=0 reference floor: {ladder[0.0]-top:+.2f} dB (divRatio {10**((ladder[0.0]-top)/20):.4f}).")
+    emit(f"     DELIBERATELY NOT reproduced -- divRatio(0) stays exactly 0 so MASTER can mute.")
+    emit(f"     See the module header for the three grounds.")
 
-    # ---- (2) output makeup ------------------------------------------------------------
-    emit("-" * 90)
-    emit("(2) kOutputMakeup   [ render CLEAN at master=1.0, makeup=1, match the capture ]")
-    emit("-" * 90)
-    r_mdl_10 = render_clean_level(1.0, p_fit, 1.0)
-    makeup = lv[1.0] / r_mdl_10
-    emit(f"  R_cap(1.0)          = {20*math.log10(lv[1.0]+1e-12):+7.2f} dBFS")
-    emit(f"  R_mdl(1.0,makeup=1) = {20*math.log10(r_mdl_10+1e-12):+7.2f} dBFS")
-    emit(f"  => kOutputMakeup = R_cap/R_mdl = {makeup:.4f}  ({20*math.log10(makeup):+.2f} dB)")
-    emit(f"  (calibration §2: makeup MAY exceed 1.0 — do NOT pad for headroom.)")
-    emit("")
+    result = {"pad_n12_to_n18": pad_n18, "noise_floor_db": floor,
+              "ladder_re_full_cw": {str(k): ladder[k] - top for k in ks},
+              "taper_form": "pwl2", "masterTaperBreak": float(x_pwl[0]),
+              "masterTaperFrac": float(x_pwl[1]),
+              "taper_rms_db": rms_pwl, "taper_worst_db": worst_pwl,
+              "shipped_powerlaw_rms_db": rms_ship}
 
-    # ---- (3) consistency check at the interior knobs ----------------------------------
-    emit("-" * 90)
-    emit("(3) CONSISTENCY — model (fitted p + makeup) vs capture at each master (the fit did NOT")
-    emit("    target absolute level here, so agreement is real corroboration)")
-    emit("-" * 90)
-    emit(f"  {'master':>7} | {'capture':>9} {'model':>9} {'err dB':>7}")
-    worst = 0.0
-    for m in (0.25, 0.50, 0.75, 1.0):
-        r_mdl = render_clean_level(m, p_fit, makeup)
-        e = 20 * math.log10((r_mdl + 1e-12) / (lv[m] + 1e-12))
-        worst = max(worst, abs(e))
-        emit(f"  {m:>7.2f} | {20*math.log10(lv[m]+1e-12):>+8.2f} {20*math.log10(r_mdl+1e-12):>+8.2f} {e:>+7.2f}")
-    emit(f"  worst |err| = {worst:.2f} dB  ({'OK (<1 dB)' if worst < 1.0 else 'CHECK — taper/makeup mismatch'})")
-    emit("")
+    # ---- (4) makeup ------------------------------------------------------------------------
+    if not args.no_render:
+        emit("\n(4) kOutputMakeup  [ MASTER is a pure post-EQ gain => ONE render fixes the scale ]")
+        # ⚠⚠ FRAME. The render is produced with gainSessionDb cleared, i.e. in the FULL-SEND
+        # frame. The capture is a gain-n18 file, so it must be lifted by BOTH pads to match:
+        #     n18 -> n12 (pad_n18, 6.000)  ->  full send (FULLSEND_PAD_DB, 12.000)
+        # Dropping the second one is a silent 12 dB error that lands entirely in the makeup --
+        # which is EXACTLY the defect session 41 found and fixed in this same script (its
+        # `cap_level()` applied gain_correction_linear for this reason). It is guarded below.
+        r10 = render_clean_level(1.0, x_pwl[0], x_pwl[1], 1.0)
+        cap_top_abs = (seg_rms_db(f"{CAPDIR}/master-1700_gain-n18_base-clean.wav")
+                       + pad_n18 + FULLSEND_PAD_DB)
+        makeup = 10 ** ((cap_top_abs - r10) / 20)
 
-    emit("=" * 90)
-    emit("RESULT — write these into the shipped defaults")
-    emit("=" * 90)
-    emit(f"  MasterOut.h  kMasterTaperExp  : 1.43 -> {p_fit:.3f}")
-    emit(f"  GainStaging.h kOutputMakeupNominal : 0.90 -> {makeup:.3f}")
-    log.close()
-    print(f"\n[log] {LOG}")
-    return 0
+        # KNOWN ANSWER that pins the frame: the SHIPPED makeup was fitted to the corrupted
+        # capture, so rendering at 2.599 must reproduce THAT file's level (session 106 read the
+        # same agreement as +0.007 dB). If the frame is wrong by a pad, this fails by 12 dB.
+        bad_abs = seg_rms_db(f"{CAPDIR}/master-1700_gain-n12_base-clean.wav") + FULLSEND_PAD_DB
+        r_ship = r10 + 20 * math.log10(2.599)
+        emit(f"  [frame check] render @ shipped makeup 2.599 : {r_ship:+8.3f} dBFS")
+        emit(f"  [frame check] the CORRUPTED anchor capture  : {bad_abs:+8.3f} dBFS   "
+             f"=> {r_ship-bad_abs:+.3f} dB")
+        emit("     (must be ~0: the shipped makeup was fitted to that file. Reproduces s106's +0.007.)")
+        if abs(r_ship - bad_abs) > 0.10:
+            fail(f"frame check failed by {r_ship-bad_abs:+.3f} dB -- a pad is missing on one side")
+
+        emit(f"  capture, TRUE master-1700 : {cap_top_abs:+8.3f} dBFS")
+        emit(f"  render,  makeup=1         : {r10:+8.3f} dBFS")
+        emit(f"  => kOutputMakeup = {makeup:.4f}   (shipped 2.599 -> {20*math.log10(makeup/2.599):+.2f} dB)")
+        emit("  (calibration §2: the makeup MAY exceed 1.0 -- do NOT pad for headroom.)")
+
+        # KNOWN ANSWER: MASTER is a pure gain, so a render at another master must differ from the
+        # m=1 render by EXACTLY the taper ratio.  Nothing about the fit can make this true.
+        r05 = render_clean_level(0.5, x_pwl[0], x_pwl[1], 1.0)
+        pred = _db(pwl2(0.5, *x_pwl)) - _db(pwl2(1.0, *x_pwl))
+        emit(f"\n  ⭐ KNOWN ANSWER (MASTER is a pure gain): render(0.5) - render(1.0)")
+        emit(f"     measured {r05-r10:+8.4f} dB   predicted {float(pred):+8.4f} dB   "
+             f"error {abs(r05-r10-float(pred)):.4f} dB")
+        if abs(r05 - r10 - float(pred)) > 0.01:
+            fail("the render does not follow the taper as a pure gain -- MasterOut is not what we think")
+
+        # ---- (5) acceptance across the whole travel ----------------------------------------
+        emit("\n(5) ACCEPTANCE  [ predicted vs capture at EVERY detent, both taper forms ]")
+        emit(f"  {'knob':>6s} {'capture':>9s} {'NEW pwl2':>9s} {'err':>7s} {'OLD p=1.998':>12s} {'err':>7s}")
+        errs_new, errs_old = [], []
+        for k in ks:
+            if k == 0.0:
+                continue
+            cap = ladder[k] - top
+            pn = float(_db(pwl2(k, *x_pwl)) - _db(pwl2(1.0, *x_pwl)))
+            po = float(_db(powerlaw(k, 1.998)))
+            errs_new.append(pn - cap)
+            errs_old.append(po - cap)
+            emit(f"  {k:6.3f} {cap:+9.3f} {pn:+9.3f} {pn-cap:+7.2f} {po:+12.3f} {po-cap:+7.2f}")
+        wn, wo = max(abs(e) for e in errs_new), max(abs(e) for e in errs_old)
+        emit(f"  worst |err|:  NEW {wn:.2f} dB   OLD {wo:.2f} dB   "
+             f"({'IMPROVED' if wn < wo else 'NOT IMPROVED'})")
+        if wn >= wo:
+            fail("the new taper is not better than the shipped one on whole-travel error")
+        result.update({"kOutputMakeup": makeup, "worst_err_new_db": wn, "worst_err_old_db": wo})
+
+        emit("\n  => SHIP:")
+        emit(f"     FitParams.h  masterTaperBreak = {x_pwl[0]:.6g}")
+        emit(f"     FitParams.h  masterTaperFrac  = {x_pwl[1]:.6g}")
+        emit(f"     GainStaging.h kOutputMakeupNominal : 2.599 -> {makeup:.4f}")
+
+    emit("\n" + "=" * 92)
+    if _fail:
+        emit(f"FAILURES ({len(_fail)}):")
+        for f in _fail:
+            emit("  ** " + f)
+    else:
+        emit("OK -- all checks pass")
+    emit("=" * 92)
+
+    with open(LOG, "w") as fh:
+        fh.write("\n".join(lines) + "\n")
+    os.makedirs(os.path.dirname(args.json), exist_ok=True)
+    result["failures"] = _fail
+    with open(args.json, "w") as fh:
+        json.dump(result, fh, indent=2)
+    print(f"\nlog  {LOG}\njson {args.json}")
+    return 1 if _fail else 0
 
 
 if __name__ == "__main__":

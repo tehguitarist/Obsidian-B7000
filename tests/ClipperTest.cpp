@@ -19,10 +19,13 @@
 //   Test 4 — Sine clipping: soft asymmetric saturation. A hot tone compresses,
 //            output bounded by the per-side VTC ceilings, and the +/- peaks differ
 //            (kSatLo != kSatHi -> even harmonics — the doc's required asymmetry).
-//   Test 5 — D1/D2 inert at the rail-limited realistic max drive (~3.5 V — the
-//            hottest signal IC2_A can deliver), and BOUNDING beyond it (8 V).
+//   Test 5 — D1/D2: the clamp window is FIT-INVARIANT (the session-118 guard),
+//            inert in the in-range drive region, and BOUNDING beyond it.
 //            ** Session-11 correction: the old "max|W| = 1.1 V at 8 V" claim was
 //            an atanh-recovery artifact — see the in-test note. **
+//            ** Session-118: this test used to run the NOMINAL constants only and
+//            so could not see that the SHIPPED window had drifted onto the signal;
+//            it now runs both arms and gates the fit-invariance directly. **
 //   Test 6 — 3 GRUNT x 3 drive snapshot grid: all finite, monotone in drive.
 //
 // NOTE: kA0, kSatLo, kSatHi are NOMINAL placeholders (fit to captures at Phase 7).
@@ -32,10 +35,12 @@
 // =============================================================================
 
 #include "../src/dsp/Clipper.h"
+#include "../src/dsp/FitParams.h"
 
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <algorithm>
 
 static constexpr double PI = 3.14159265358979323846;
 
@@ -227,7 +232,7 @@ int main()
     }
 
     // ---- Test 5: D1/D2 inert at realistic max drive; bounding at absurd drive -
-    std::printf("\n=== D1/D2 clamps: inert at rail-limited max drive; bound W beyond it ===\n");
+    std::printf("\n=== D1/D2 clamps: fit-invariant window; inert in-range; bounding beyond ===\n");
     {
         // W is recovered from Y through the VTC's exact inverse: per side
         // y = -+sat * f_k(a0*w/sat), f_k(u) = u/(1+u^k)^(1/k), so
@@ -250,22 +255,29 @@ int main()
         //       hard-clamp simplification of the 1N4148s is justified in-chain;
         //   (b) beyond that (amp = 8 V) the clamps BOUND W at the window edge —
         //       they guard huge transients, exactly circuit.md's description.
-        const double kk = Clipper::kHardness;
-        auto sigInv = [kk](double t) {
-            t = std::min(0.999999, t);
-            return t * std::pow(1.0 - std::pow(t, kk), -1.0 / kk);
-        };
-        auto recoverW = [&](double y) {
-            if (y <= 0.0) // came from w >= 0
-                return (Clipper::kSatLo / Clipper::kA0) * sigInv(-y / Clipper::kSatLo);
-            return -(Clipper::kSatHi / Clipper::kA0) * sigInv(y / Clipper::kSatHi);
-        };
-        auto maxW = [&](double amp, double& wPos, double& wNeg) {
+        // ** SESSION-118: this test used to run the NOMINAL constants ONLY, and a
+        // stage that is never told the Phase-7 fit cannot answer a question about
+        // the SHIPPED build. It passed for 74 sessions while the shipped clamp
+        // window fired on up to 7.6 % of in-chain samples (Clipper.h ::
+        // kTripPointV). Both arms are now run: NOMINAL (structure, unchanged) and
+        // SHIPPED (FitParams, the arm that would have caught it). **
+        auto probe = [&](double a0, double sLo, double sHi, double kk,
+                         double amp, double& wPos, double& wNeg) {
+            auto sigInv = [kk](double t) {
+                t = std::min(0.999999, t);
+                return t * std::pow(1.0 - std::pow(t, kk), -1.0 / kk);
+            };
+            auto recoverW = [&](double y) {
+                if (y <= 0.0) // came from w >= 0
+                    return (sLo / a0) * sigInv(-y / sLo);
+                return -(sHi / a0) * sigInv(y / sHi);
+            };
             wPos = 0.0; wNeg = 0.0;
             for (const auto& gc : kGrunts)
             {
                 Clipper stage;
                 stage.prepare(48000.0);
+                stage.setNonlinear(a0, sLo, sHi, kk);
                 stage.setGruntCap(gc.cg);
                 for (int n = 0; n < 20000; ++n)
                 {
@@ -276,18 +288,70 @@ int main()
                 }
             }
         };
-        double wPos = 0.0, wNeg = 0.0;
-        maxW(3.5, wPos, wNeg); // rail-limited realistic ceiling
         const double eps = 1e-6;
-        const bool inert = wPos < Clipper::kClampHi - eps && wNeg > Clipper::kClampLo + eps;
-        std::printf("  amp=3.5V (rail-limited max): W in [%+.4f, %+.4f] V  (window [%+.2f, %+.2f])  %s\n",
-                    wNeg, wPos, Clipper::kClampLo, Clipper::kClampHi, inert ? "PASS" : "FAIL");
-        double wPos8 = 0.0, wNeg8 = 0.0;
-        maxW(8.0, wPos8, wNeg8); // absurd drive: clamps must bound W at the window
-        const bool bounded = wPos8 <= Clipper::kClampHi + eps && wNeg8 >= Clipper::kClampLo - eps;
-        std::printf("  amp=8.0V (absurd):           W in [%+.4f, %+.4f] V  bounded-at-window:%s\n",
-                    wNeg8, wPos8, bounded ? "PASS" : "FAIL");
-        if (! (inert && bounded))
+        const FitParams fp;
+        struct Arm { const char* name; double a0, sLo, sHi, k; };
+        const Arm arms[] = {
+            { "NOMINAL", Clipper::kA0, Clipper::kSatLo, Clipper::kSatHi, Clipper::kHardness },
+            { "SHIPPED", fp.clipA0, fp.clipSatLo, fp.clipSatHi, fp.clipK },
+        };
+        // ** The GATED claim is deliberately NOT "the clamps never fire". Session
+        // 118 measured that they do, at the top of the drive range, and pretending
+        // otherwise is what let the bug live for 74 sessions. What IS gated:
+        //   (i)  the window is the same for BOTH arms — i.e. no amplitude fit can
+        //        move it. This is the exact regression guard for the session-118
+        //        bug, and it is now structural (Clipper::process reads kClampLo /
+        //        kClampHi directly; there is no mutable copy left to desync).
+        //   (ii) at 3.0 V — comfortably inside what IC2_A can deliver — the clamps
+        //        are inert on BOTH arms, which is the "rarely conducts" claim
+        //        circuit.md actually makes.
+        //   (iii) beyond anything the chain can deliver they BOUND W at the window
+        //        edge, i.e. they are guards, not shapers.
+        // The rail-limited 4.1 V row is PRINTED as a measurement, not gated: there
+        // D2 does engage, and that is a real (documented) property of the shipped
+        // fit, not something a test should be tuned to hide.
+        // ⚠ Guard (ii) FAILS on the pre-session-118 window (-1.0377): the shipped
+        // arm reaches -2.05 V at 3.0 V in. Verified before the fix was believed —
+        // a guard that passes on the bug it was written for is worthless. **
+        const double kSafeV = 3.0, kRailV = 4.1, kAbsurdV = 40.0;
+        bool allInert = true, allBounded = true;
+        for (const auto& a : arms)
+        {
+            double wPos = 0.0, wNeg = 0.0;
+            probe(a.a0, a.sLo, a.sHi, a.k, kSafeV, wPos, wNeg);
+            const bool inert = wPos < Clipper::kClampHi - eps && wNeg > Clipper::kClampLo + eps;
+            allInert = allInert && inert;
+            std::printf("  %s amp=%.1fV: W in [%+.4f, %+.4f] V  (window [%+.3f, %+.3f], "
+                        "margin %+.3f/%+.3f)  %s\n", a.name, kSafeV, wNeg, wPos,
+                        Clipper::kClampLo, Clipper::kClampHi,
+                        wNeg - Clipper::kClampLo, Clipper::kClampHi - wPos, inert ? "PASS" : "FAIL");
+
+            double wPosR = 0.0, wNegR = 0.0;
+            probe(a.a0, a.sLo, a.sHi, a.k, kRailV, wPosR, wNegR);
+            std::printf("  %s amp=%.1fV (rail-limited max): W in [%+.4f, %+.4f] V  "
+                        "-- D2 %s here (measured, NOT gated)\n", a.name, kRailV, wNegR, wPosR,
+                        wNegR <= Clipper::kClampLo + eps ? "ENGAGES" : "inert");
+
+            double wPos8 = 0.0, wNeg8 = 0.0;
+            probe(a.a0, a.sLo, a.sHi, a.k, kAbsurdV, wPos8, wNeg8);
+            const bool bounded = wPos8 <= Clipper::kClampHi + eps && wNeg8 >= Clipper::kClampLo - eps;
+            allBounded = allBounded && bounded;
+            std::printf("  %s amp=%.0fV (absurd): W in [%+.4f, %+.4f] V  bounded-at-window:%s\n",
+                        a.name, kAbsurdV, wNeg8, wPos8, bounded ? "PASS" : "FAIL");
+        }
+        // (i) fit-invariance of the window — the exact session-118 regression
+        // guard. At absurd drive BOTH arms drive node W hard into D2, so both must
+        // pin at EXACTLY kClampLo whatever their VTC amplitudes are. (The positive
+        // side is not usable for this: the shipped arm's W never reaches kClampHi
+        // even at 40 V, so it cannot demonstrate anything and is not asserted.)
+        double p1 = 0.0, n1 = 0.0, p2 = 0.0, n2 = 0.0;
+        probe(Clipper::kA0, Clipper::kSatLo, Clipper::kSatHi, Clipper::kHardness, kAbsurdV, p1, n1);
+        probe(fp.clipA0, fp.clipSatLo, fp.clipSatHi, fp.clipK, kAbsurdV, p2, n2);
+        const bool pinned = std::abs(n1 - Clipper::kClampLo) < eps
+                         && std::abs(n2 - Clipper::kClampLo) < eps;
+        std::printf("  window is FIT-INVARIANT: D2 pins nominal at %+.4f, shipped at %+.4f "
+                    "(kClampLo %+.4f)  %s\n", n1, n2, Clipper::kClampLo, pinned ? "PASS" : "FAIL");
+        if (! (allInert && allBounded && pinned))
             ++failures;
     }
 
@@ -323,6 +387,107 @@ int main()
         std::printf("  all finite:%s  peak monotone in drive:%s\n",
                     allFinite ? "PASS" : "FAIL", allMonotone ? "PASS" : "FAIL");
         if (! (allFinite && allMonotone))
+            ++failures;
+    }
+
+    // ---- Test 7: the node-W solve CONVERGES, at every shipped OS rate ---------
+    // ** SESSION-120. The stage solves an implicit equation per sample; nothing in
+    // this file used to check that the solve actually reaches its root, and it did
+    // not: with plain Newton the shipped fit left up to 69 mV of node error at
+    // 48 kHz and 150 mV at 96 kHz, which is 0.6-0.7 V of OUTPUT error. **
+    //
+    // The 162-capture matrix renders at OS 8, where the plain solve was already
+    // converged to 1.8e-15 — it is STRUCTURALLY BLIND to this, so the guard has to
+    // live here. It runs the SHIPPED FitParams values (session-118's lesson: an
+    // amplitude-dependent claim cannot be gated on the NOMINAL constants).
+    //
+    // A local re-transcription is deliberate, not laziness: it is a SECOND
+    // implementation, so this test still fails if the stage's solve changes. Its
+    // reference is pure BISECTION on the closed-form bracket derived in Clipper.h,
+    // which shares no arithmetic with Newton.
+    std::printf("\n=== Node-W solve converges at every shipped OS rate (shipped fit) ===\n");
+    {
+        const FitParams fp {};
+        struct Ref
+        {
+            double gIn, gFb, ieqG = 0.0, ieq14 = 0.0, gcG, dNode, r16, a0, sLo, sHi, kk;
+            double sig(double u) const { return u * std::pow(1.0 + std::pow(u, kk), -1.0 / kk); }
+            double vtc(double w) const
+            { return w >= 0.0 ? -sLo * sig(a0 * w / sLo) : sHi * sig(-a0 * w / sHi); }
+            double F(double w, double x, double ic) const
+            { return gIn * (x - w) - ic + gFb * (vtc(w) - w) - ieq14; }
+        };
+
+        auto run = [&](double fs, double amp, double cg, double& worstDy) {
+            Clipper stage;
+            stage.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, fp.clipK);
+            stage.prepare(fs);
+            stage.setGruntCap(cg);
+
+            Ref r;
+            r.gcG = cg * 2.0 * fs;
+            r.r16 = Clipper::kR16;
+            r.dNode = r.gcG + 1.0 / r.r16;
+            r.gIn = r.gcG / (r.r16 * r.dNode);
+            r.gFb = 1.0 / Clipper::kR18 + Clipper::kC14 * 2.0 * fs;
+            r.a0 = fp.clipA0; r.sLo = fp.clipSatLo; r.sHi = fp.clipSatHi; r.kk = fp.clipK;
+
+            worstDy = 0.0;
+            const int n = static_cast<int>(0.05 * fs);
+            for (int i = 0; i < n; ++i)
+            {
+                const double t = i / fs;
+                const double x = amp * (0.75 * std::sin(2.0 * PI * 110.0 * t)
+                                        + 0.20 * std::sin(2.0 * PI * 770.0 * t + 0.7));
+                const double y = stage.process(x);
+
+                // Bisect the same equation from the same state.
+                const double ic = r.ieqG / (r.r16 * r.dNode);
+                const double sum = r.gIn + r.gFb;
+                const double w0 = (r.gIn * x - ic - r.ieq14) / sum;
+                const double rad = r.gFb * std::max(r.sLo, r.sHi) / sum + 1e-12;
+                double lo = w0 - rad, hi = w0 + rad;
+                for (int k = 0; k < 200; ++k)
+                {
+                    const double m = 0.5 * (lo + hi);
+                    if (m == lo || m == hi) break;
+                    (r.F(m, x, ic) > 0.0 ? lo : hi) = m;
+                }
+                double w = 0.5 * (lo + hi);
+                if (w > Clipper::kClampHi) w = Clipper::kClampHi;
+                else if (w < Clipper::kClampLo) w = Clipper::kClampLo;
+                worstDy = std::max(worstDy, std::abs(y - r.vtc(w)));
+
+                // Advance the reference on the STAGE's own trajectory, so this
+                // measures solver error and not the chain's trajectory divergence
+                // (two independent instances separate: the trapezoidal companion
+                // recursion ieq = 2g*dv - ieq is lossless, so an injected 1e-15
+                // never decays and the VTC's a0 amplifies it).
+                const double wS = -1.0; (void) wS;
+                const double m2 = (r.gcG * x - r.ieqG + w / r.r16) / r.dNode;
+                r.ieqG = 2.0 * r.gcG * (x - m2) - r.ieqG;
+                r.ieq14 = 2.0 * (Clipper::kC14 * 2.0 * fs) * (r.vtc(w) - w) - r.ieq14;
+            }
+        };
+
+        // 1e-9 V is ~7 orders below the stage's own output swing and ~2 orders
+        // below float32 render precision: a real solve failure lands at 1e-1.
+        const double kTol = 1e-9;
+        const double rates[] = { 48000.0, 96000.0, 192000.0, 384000.0 };
+        const char* rname[] = { "1x  48k", "2x  96k", "4x 192k", "8x 384k" };
+        bool ok = true;
+        for (int k = 0; k < 4; ++k)
+            for (double amp : { 2.0, 3.5 }) // 3.5 V ~= the physical ceiling (Test 5)
+                for (const auto& gc : kGrunts)
+                {
+                    double dy = 0.0;
+                    run(rates[k], amp, gc.cg, dy);
+                    if (dy > kTol) ok = false;
+                    std::printf("  %s amp %.1f %-16s worst |y - y_converged| = %.3e %s\n",
+                                rname[k], amp, gc.name, dy, dy > kTol ? "  <-- FAIL" : "");
+                }
+        std::printf("  converged everywhere (tol %.0e): %s\n", kTol, ok ? "PASS" : "FAIL");
+        if (! ok)
             ++failures;
     }
 

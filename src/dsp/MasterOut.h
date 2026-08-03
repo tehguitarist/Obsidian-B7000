@@ -67,9 +67,11 @@
 // confirmed by the step test. This closes the EQ→MASTER polarity chain: EQ block
 // is net non-inverting (4 inversions) and MASTER adds none.
 //
-// ⚠ Phase-7 carry-forward: the MASTER A-taper SHAPE (kMasterTaperExp = 1.43
-//   interim, divRatio = master^p) is a starting guess — fit p to the master-sweep
-//   captures (same power-law-taper method as LEVEL; dsp.md §tapers).
+// ✅ RESOLVED session 115 (Phase 10 C): the taper is no longer a power law. It is a
+//   TWO-SEGMENT PIECEWISE LINEAR curve fitted to the corrected 9-detent master ladder —
+//   see setMaster() and FitParams::masterTaperBreak. The old carry-forward asked for a
+//   power-law exponent fit; the answer is that no exponent exists (per-point p spans
+//   1.74…3.51), which is why the FORM changed rather than the value.
 // =============================================================================
 class MasterOut
 {
@@ -81,9 +83,13 @@ public:
     static constexpr double kR46 = 100.0e3;  // output pulldown to GND
     static constexpr double kR47 = 1.0e3;    // series output resistor (spec 1k out Z; unloaded → no drop)
 
-    // MASTER audio-taper exponent (power law: divRatio = master^p). Interim
-    // start per dsp.md §tapers; fit to captures at Phase 7.
-    static constexpr double kMasterTaperExp = 1.43;
+    // MASTER audio-taper shape — TWO-SEGMENT PIECEWISE LINEAR (session 115). `Break` is the
+    // rotation at which the wiper has reached `Frac` of full resistance; linear either side.
+    // (The retired power-law exponent `kMasterTaperExp = 1.43` lived here until session 115.)
+    // Defaults are the fitted session-115 values, so a default-constructed MasterOut matches
+    // the shipped FitParams. Both endpoints stay exact regardless of these numbers.
+    static constexpr double kMasterTaperBreak = 0.5927;
+    static constexpr double kMasterTaperFrac = 0.1137;
 
     MasterOut() = default;
 
@@ -99,17 +105,31 @@ public:
 
     void setMaster(double x) noexcept
     {
-        // x ∈ [0,1], A-taper via power law. divRatio = Rbot/Rp (wiper→GND tap):
+        // x ∈ [0,1]. divRatio = Rbot/Rp (wiper→GND tap):
         // x=1 (full CW) → 1.0 → unity; x=0 → 0.0 (wiper at VD, silent).
+        //
+        // ⭐ SESSION 115 — TWO-SEGMENT PIECEWISE LINEAR, replacing the power law.
+        // A real audio ("A") taper is MANUFACTURED as two linear resistive segments, and this
+        // pot measures like one: fraction `frac` of full resistance is reached at rotation
+        // `brk`, linear either side. The power law was not a close approximation to it — on the
+        // corrected ladder its per-point exponent spans 1.74…3.51, i.e. no single exponent
+        // exists. See FitParams::masterTaperBreak for the full provenance.
+        //
+        // Both endpoints are EXACT by construction, which the topology requires:
+        //   x=0 → 0 (the wiper is on VD)   x=1 → 1 (unity at full CW, circuit.md MASTER).
         knob = x;
-        divRatio = pedal::taper::powerLawTaper(x, 1.0, masterTaperExp);
+        const double b = (masterTaperBreak > 1.0e-9 && masterTaperBreak < 1.0) ? masterTaperBreak : 0.5;
+        const double f = (masterTaperFrac > 0.0 && masterTaperFrac < 1.0) ? masterTaperFrac : 0.1;
+        divRatio = (x <= b) ? (f * x / b)
+                            : (f + (1.0 - f) * (x - b) / (1.0 - b));
     }
 
-    // Phase-7 capture fit (FitParams.h): re-applies the CURRENT knob position
-    // through the new curve, so a taper refit doesn't leave a stale divRatio.
-    void setTaperExp(double p) noexcept
+    // Phase-7/10C capture fit (FitParams.h): re-applies the CURRENT knob position through the
+    // new curve, so a taper refit doesn't leave a stale divRatio.
+    void setTaper(double brk, double frac) noexcept
     {
-        masterTaperExp = p;
+        masterTaperBreak = brk;
+        masterTaperFrac = frac;
         setMaster(knob);
     }
 
@@ -141,7 +161,8 @@ private:
     double ieqC36 = 0.0, ieqC37 = 0.0; // capacitor history currents
     double divRatio = 1.0;             // MASTER wiper tap (default full CW = unity)
     // Phase-7 capture-fit taper shape + the knob position it was applied to.
-    double masterTaperExp = kMasterTaperExp;
+    double masterTaperBreak = kMasterTaperBreak;
+    double masterTaperFrac = kMasterTaperFrac;
     double knob = 1.0;
     RailClamp rail;
 

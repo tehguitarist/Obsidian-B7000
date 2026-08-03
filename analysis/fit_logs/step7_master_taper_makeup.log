@@ -1,56 +1,52 @@
-==========================================================================================
-MASTER taper (masterTaperExp) + output makeup (kOutputMakeup) — session 17
-==========================================================================================
-Clean-path isolation: DIST off => clipper/JFET bypassed; kInputRef cancels. Depends only on
-the EQ/MASTER linear stages. Level = RMS over the sweep_clean segment (gain-n12 corrected).
+============================================================================================
+MASTER taper + kOutputMakeup  --  REWRITTEN session 115 (Phase 10 C)
+============================================================================================
 
-------------------------------------------------------------------------------------------
-CAPTURE LEVELS (sweep_clean RMS, gain-n12 corrected)
-------------------------------------------------------------------------------------------
-  master 0.00  master-0700_base-clean.wav                RMS  -52.83 dBFS (gain-corr +0.0 dB)
-  master 0.25  master-0930_base-clean.wav                RMS  -41.43 dBFS (gain-corr +0.0 dB)
-  master 0.50  ref-clean.wav                             RMS  -32.18 dBFS (gain-corr +0.0 dB)
-  master 0.75  master-1430_gain-n12_base-clean.wav       RMS  -22.54 dBFS (gain-corr +12.1 dB)
-  master 1.00  master-1700_gain-n12_base-clean.wav       RMS  -18.20 dBFS (gain-corr +12.1 dB)
+(0) PADS  [ the clean path is linear => every pad is a PURE GAIN, so span must be ~0 ]
+  n12 -> n18 : 6.0000 dB  span 0.0001 dB   (derived WITHOUT the contaminated ref-clean.wav -- GATE S2)
+  full -> n12: 12.0000 dB  (captures.py, session 114)
 
-------------------------------------------------------------------------------------------
-(1) masterTaperExp p   [ divRatio(m) = m^p ;  p = ln(R(m)/R(1.0)) / ln(m) ]
-------------------------------------------------------------------------------------------
-  m=0.25: R(m)/R(1.0) = 0.0690 = -23.22 dB  ->  p = 1.929
-  m=0.50: R(m)/R(1.0) = 0.2000 = -13.98 dB  ->  p = 2.322
-  m=0.75: R(m)/R(1.0) = 0.6073 = -4.33 dB  ->  p = 1.734  (both gain-n12 -> correction CANCELS, cleanest)
-  => single-point estimates 1.929 / 2.322 / 1.734 (mean 1.995)
-  => LEAST-SQUARES over all interior points: p = 1.998
+(1) LADDER  [ gain-n12 primary; top two promoted from gain-n18; archived full-send = 2nd take ]
+  detent     knob  dB re full CW   takes   spread
+  0700      0.000        -39.000 n12+full    0.000
+  0815      0.125        -33.187 n12+full    1.545
+  0930      0.250        -27.906 n12+full    0.612
+  1045      0.375        -22.425 n12+full    0.330
+  1200      0.500        -18.500     n12         
+  1315      0.625        -14.241     n12         
+  1430      0.750         -8.779     n12         
+  1545      0.875         -2.020     n18         
+  1700      1.000         +0.000     n18         
+  monotone: min step +2.02 dB, max +6.76 dB
 
-                   candidate p  err @0.25  err @0.50  err @0.75    worst
-              m=0.25 point fit      +0.00      +2.37      -0.49     2.37
-              m=0.50 point fit      -4.73      -0.00      -1.47     4.73
-              m=0.75 point fit      +2.35      +3.54      +0.00     3.54
-           least squares (all)      -0.84      +1.95      -0.66     1.95
-     SHIPPED (= levelTaperExp)      -3.87      +0.43      -1.29     3.87
-  => on whole-travel error the best of these is least squares (all) (p = 1.998, worst 1.95 dB)
+(2) KNOB-REPOSITIONING NOISE FLOOR  [ measured, not assumed ]
+  Two independent takes of one detent differ only by where the knob was put.
+    master-0700: n12   -64.828 vs full   -64.828  =>  +0.000 dB   band-span 0.0002 dB (pure gain => knob, not tone)
+    master-0815: n12   -58.243 vs full   -59.788  =>  +1.545 dB   band-span 0.0001 dB (pure gain => knob, not tone)
+    master-0930: n12   -54.040 vs full   -53.428  =>  -0.612 dB   band-span 0.0001 dB (pure gain => knob, not tone)
+    master-1045: n12   -48.418 vs full   -48.088  =>  -0.330 dB   band-span 0.0002 dB (pure gain => knob, not tone)
+  => noise floor: rms 0.847 dB, worst 1.545 dB, n=4
+  ⇒ NO taper form is resolvable below this.  Forms within ~1.5x of it are indistinguishable.
 
-------------------------------------------------------------------------------------------
-(2) kOutputMakeup   [ render CLEAN at master=1.0, makeup=1, match the capture ]
-------------------------------------------------------------------------------------------
-  R_cap(1.0)          =  -18.20 dBFS
-  R_mdl(1.0,makeup=1) =  -26.50 dBFS
-  => kOutputMakeup = R_cap/R_mdl = 2.5987  (+8.30 dB)
-  (calibration §2: makeup MAY exceed 1.0 — do NOT pad for headroom.)
+(3) TAPER FORM  [ interior points only; m=0 is a divider null, see the header note ]
+  form                                             params   rms dB    worst  vs floor
+  2-seg piecewise linear (SHIP)       xb=0.5927 fb=0.1137    1.264    1.958      1.5x
+  power law m^p (re-fitted)                      p=2.1848    4.220    6.274      5.0x
+  power law p=1.998 (SHIPPED)                    p=1.9980    4.563    6.471      5.4x
 
-------------------------------------------------------------------------------------------
-(3) CONSISTENCY — model (fitted p + makeup) vs capture at each master (the fit did NOT
-    target absolute level here, so agreement is real corroboration)
-------------------------------------------------------------------------------------------
-   master |   capture     model  err dB
-     0.25 |   -41.43   -42.27   -0.84
-     0.50 |   -32.18   -30.23   +1.95
-     0.75 |   -22.54   -23.20   -0.66
-     1.00 |   -18.20   -18.20   -0.00
-  worst |err| = 1.95 dB  (CHECK — taper/makeup mismatch)
+  per-point residual (dB):
+     m         0.125  0.250  0.375  0.500  0.625  0.750  0.875
+     2-seg     +0.78  +1.52  -0.44  -1.86  -0.46  +1.96  -0.74
+     p=1.998   -2.90  +3.85  +5.40  +6.47  +6.08  +3.79  -0.30
 
-==========================================================================================
-RESULT — write these into the shipped defaults
-==========================================================================================
-  MasterOut.h  kMasterTaperExp  : 1.43 -> 1.998
-  GainStaging.h kOutputMakeupNominal : 0.90 -> 2.599
+  ⭐ FREE CHECK: the fitted taper passes 9.6% of full resistance at half
+     rotation.  A textbook audio ('A') taper is specified at 10-15%.  circuit.md calls
+     VR8 a 100k A -- and nothing in the objective knew that.
+
+  m=0 reference floor: -39.00 dB (divRatio 0.0112).
+     DELIBERATELY NOT reproduced -- divRatio(0) stays exactly 0 so MASTER can mute.
+     See the module header for the three grounds.
+
+============================================================================================
+OK -- all checks pass
+============================================================================================

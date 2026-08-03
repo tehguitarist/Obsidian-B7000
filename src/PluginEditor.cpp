@@ -321,6 +321,15 @@ void ObsidianB7000AudioProcessorEditor::resized()
 
 void ObsidianB7000AudioProcessorEditor::timerCallback()
 {
+    // VU idle-noise gate (calibration §7). ~-66 dBFS.
+    // ⭐ RE-CHECKED SESSION 115 against kOutputMakeup 2.599 -> 4.3297, which is the re-check
+    // session 41 and calibration §7 both require after any makeup move. UNCHANGED, deliberately:
+    // this threshold is OUTPUT-REFERRED (it is about what the METER should show as silence), and
+    // the makeup fix did not add gain to a correct signal -- it corrected an output that was
+    // 4.43 dB too QUIET. So the gate now trips at its stated -66 dBFS for the first time; before,
+    // it was effectively masking anything up to -61.6 dBFS of true output. The change therefore
+    // makes the gate LESS masking, which is the safe direction (it cannot newly hide real
+    // playing). The INPUT meter is read pre-DSP in the DAW domain, so the makeup never touched it.
     constexpr float kNoiseFl = 5.0e-4f;
 
     float in = jmax(audioProcessor.getInputLevel(0), vuInDecay * 0.90f);
