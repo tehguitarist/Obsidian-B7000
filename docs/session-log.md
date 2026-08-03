@@ -14999,3 +14999,164 @@ conditions §6 says are unknown; **quote the measured band, not the label**.
    a second session now.
 4. **Sessions 131/132/133 are UNCOMMITTED** — put the state to the user before the next session
    starts work in `analysis/`.
+
+---
+
+## SESSION 134 (2026-08-03) — GATE AF: the Sallen-Key candidate has no physical carrier, and the requirement is a slope not a corner
+
+**Head item on entry:** sessions 132's and 133's `▶ NEXT` #1, identically worded — *"Build the
+Sallen-Key candidate for the treble-peak walk."* GATE AB6 (s130) had sized it (SK τ × 1.1113, i.e.
+SK corners −10.01 %), GATE AC (s132) had reconciled it against GATE I and cleared it to be built,
+and GATE AE (s133) had added one further requirement (a candidate must also address a
+drive-generated null, which a pure filter re-tune cannot). So the next step was to write DSP.
+
+**User decision at the top of the session:** localise the mechanism first — ask what could
+physically make the post-clipper SK bandwidth drive-dependent, and compute whether anything
+reaches, before writing any DSP.
+
+⛔ **No render, no capture, no constant, no baseline move, no `src/` edit.** `s124_ship.json` is
+still the baseline; `analysis/reports/cache/` is untouched, so session 127's re-render bill is not
+added to and ctest is unaffected (nothing under `src/` was opened for writing).
+
+**Built:** `analysis/sk_mechanism_locus.py` (**GATE AF**) + `analysis/_mutate_gate_af.py`
+(**10/10**), `analysis/reports/s134_sk_mechanism.json`. The cascade and the locator are **imported**
+from `bt_pair_shape_gate` (GATE AB), not re-derived.
+
+### Why this step existed at all
+
+s130's session log names the carrier in a single line that nothing ever computed:
+
+> *"A falling effective op-amp GBW under large signal is the obvious single physical cause of the
+> SK half and does nothing for the bridged-T half."*
+
+That sentence then travelled into CLAUDE.md's item 6 and into two `NEXT` lists as the thing to
+build. It is the same shape as s125's own self-caught error — that session wrote *"the `C14 ∥ R18`
+corner, at 2.19 kHz, i.e. exactly where the treble peak is"* into CLAUDE.md, computed it in the same
+hour, and found the closed-loop corner was **6.29 kHz** and moved the **wrong way**. The difference
+is that s125 wrote its falsifier next to its hypothesis and s130 did not, so this one survived four
+sessions.
+
+### AF1 — three known answers
+
+* **AF1a** the finite-GBW Sallen-Key must reduce to the shipped **ideal** closed form as
+  `ft → ∞`: peak **2934.761544 vs 2934.761546 Hz, |Δ| = 1.80e−06 Hz**. Without it the AF2 sweep
+  would be measuring a transcription error rather than an op-amp.
+* **AF1b** the cascade reproduces GATE AB1 / s125: peak **2934.8 Hz**, notch **714.3 Hz**.
+* **AF1c** the vertex curvature is **−11.124 dB/oct²** (negative ⇒ a maximum), which AF6 then turns
+  into a free prediction.
+
+### AF2–AF5 — five physical candidates, none of which reaches
+
+| candidate | required vs available | reach |
+|---|---|---|
+| falling op-amp GBW | needs **16.09 kHz**; TL07x ships **3.0 MHz typ / 2.5 MHz min** | **0.0064** (155× short at the WORST part) |
+| slew-rate limiting | worst |dV/dt| **0.160 V/µs**; TL07x **13 typ / 8 min V/µs** | **0.020** (50× margin) |
+| output rail clamping | GATE W6's stored model span **0.21 %, verdict FIXED** vs **7.34 %** | **0.029** (34× short) |
+| op-amp input capacitance (~3 pF ‖ C2) | ceiling **−0.171 %** | **0.023** (43× short) |
+| film-cap voltage coefficient (ceiling 0.1 %/V × 2.9 V) | ceiling **−0.228 %** | **0.031** (32× short) |
+
+Three of these deserve their own sentence.
+
+⭐⭐ **The GBW refutation has a second half that is stronger than the size argument and immune to
+the datasheet number: gain-bandwidth is a SMALL-SIGNAL parameter.** An op-amp in its linear region
+does not lose gain-bandwidth as the signal grows; the large-signal limit is *slew*, which is a rate
+limit and not a bandwidth reduction. So there is **no amplitude at which this lever moves at all**
+and the 155× is beside the point. s130's "obvious single physical cause" names a mechanism that
+does not exist.
+
+⭐ **Free by-product of the same sweep:** at the real GBW the ideal-op-amp assumption is costing
+**0.025 %** at this feature. So it is not a hidden *static* model error either, and nothing is owed
+to modelling the SK op-amps' finite bandwidth.
+
+⭐⭐ **AF4's answer was already on disk and is stronger than any calculation this gate could make.**
+`FitParams.h` ships `railEnabled = true`, so the model **already carries a post-clipper amplitude
+nonlinearity on both Sallen-Key outputs** — and on five further op-amp outputs downstream. GATE W6
+measured what all seven do to this peak across the 24 dB ladder: **0.21 %, verdict FIXED.** ⇒ the
+question was never "add a post-clipper nonlinearity". We have seven and they do not move this
+feature — because a saturating clamp compresses the fundamental almost uniformly across frequency,
+and a uniform gain change cannot move a vertex (GATE AB2's own control).
+
+⚠ The two device parameters are **datasheet typicals, not measured in this repo and not fitted**,
+and both verdicts are quoted at the end of the published spread that is *worst* for the conclusion
+(minimum GBW, minimum slew rate), so "the part is at the bad end of its spread" is not an escape
+route. AF5's two are stated as **ceilings**, which is all they can be — and a ceiling is enough when
+the requirement is a 10 % move.
+
+### AF6 — ⭐⭐ THE DELIVERABLE: the requirement is a SLOPE, not a corner
+
+Every refutation above is about **corners**. AB4 already established that this peak is a **vertex**
+— the bridged-T's rise meeting three rolloffs — and a vertex sits where the total slope crosses
+zero, so **any drive-dependent TILT across its neighbourhood moves it with no corner moving
+anywhere**.
+
+The vertex law `Δx = −T / C` turns AF1c's curvature into a prediction with no fit in it:
+
+```
+  PREDICTED tilt  : -1.223 dB/oct      (= -curvature x the required -0.1100 oct)
+  MEASURED tilt   : -1.185 dB/oct      (relocating the vertex on the tilted curve)
+  agreement       : 3.2 %              PASS
+```
+
+⇒ **a drive-dependent slope change of −1.185 dB/oct in the neighbourhood of 2935 Hz moves the peak
+−7.34 %, exactly on target.**
+
+⚠⚠ **That is a LOCAL number and the gate says so every run.** The curvature argument is strictly
+local, so what is required is a slope change *at the vertex*. Extrapolating it to a broadband tilt
+is an **assumption**, flagged rather than hidden: if broadband it is **−7.49 dB end-to-end over
+100 Hz–8 kHz**, whose linear-tilt rms is **2.16 dB**, against GATE Q's measured `D(f)` of
+**3.01 dB rms** — the drive-dependent half of the OD-path deficit, whose own source says *"only a
+nonlinearity can carry it"*. ⇒ **the requirement is 72 % of a term this project has already
+measured: the SIZE is available.** ⚠ Whether the SHAPE matches is **unmeasured** — an rms says
+nothing about whether `D(f)` is a monotone tilt at 2.9 kHz.
+
+⭐ **And the cross-check that keeps this honest:** the same tilt moves the notch **714.3 → 720.2 Hz
+(+0.83 %)** against a **+7.14 %** target. So the tilt is a **peak-only** lever, exactly as the SK
+axis is. It independently reproduces AB3's orthogonality from a third construction and it does
+**not** collapse AB6's two sub-targets into one — **the bridged-T half stays unowned.**
+
+### ▶ Defect found in this session's OWN instrument — one, and its own mutation runner found it
+
+⭐⭐ **AF2 hard-exited on a physics OUTCOME.** Its first draft wrapped the `brentq` for the required
+GBW in a `sys.exit("the bracket is wrong or the sweep is not monotone")`. With the shipped target
+the root exists (at an absurd 16 kHz) so the exit never fired — but the AF6 computed-verdict arm
+flips the target's sign, and a *positive* target is unreachable by GBW at **any** value, because
+lowering an op-amp's bandwidth can only move this vertex DOWN. The gate refused, and the arm read as
+a failure.
+
+That is **s108's rule violated in its most flattering form**: *exit only on things that make the
+numbers below meaningless.* "No value of this parameter reaches the target in DIRECTION" is not a
+malfunction — it is **the strongest possible refutation of the candidate**, and the gate was
+throwing it away. Fixed: the sweep ENDPOINTS being unreadable still exits (a validity question);
+the absence of a root inside them is now a computed verdict that scores `reach = 0.0` and carries on.
+⚠ Note which way it failed — the buggy version discarded a *stronger* result than the one it
+printed, so nothing looked wrong. (GATE P's own P5, s108, is the prior occurrence.)
+
+### Mutation runner: 10/10
+
+`analysis/_mutate_gate_af.py`. Six refusal arms (AF1a, AF1b, AF4's two, the FitParams-desync
+vacuity arm, AF6's vertex-law known answer) and **four computed-verdict arms** — one per
+classification that could otherwise be narration (GBW, slew, rail clamping) plus AF6's direction.
+The ratio is the point: GATE AF's entire output is five classifications and one sizing, all of them
+`expect_rc == 0` findings, so an exit-code-only runner would have tested **one sixth** of it.
+Every verdict arm asserts on the printed `AF7-MEMBERSHIP` line and never on a **count** — five
+candidates classify identically today, so any count-based assertion would pass vacuously the moment
+a swap left the totals alone (s130's `_mutate_gate_ab.py` arm 6).
+
+### ▶ NEXT, in order
+
+1. ⭐⭐ **Item 6's treble half now has a sized target in the right units: a drive-dependent
+   −1.185 dB/oct slope change at ~2.9 kHz, at or UPSTREAM of the clipper.** The next measurement is
+   the cheap one that AF6 could not make: **read GATE Q's `D(f)` at 2.9 kHz and ask whether its
+   local slope has the required sign and size.** That is a stored-report read, no render — and it
+   converts "72 % of the rms is available" into "the shape does/does not match", which is the only
+   thing still separating this from a build.
+2. **The bridged-T half of AB6 (τ × 0.9337) remains unowned by any mechanism** — AF6 confirms the
+   tilt does not reach it (+0.83 % against +7.14 %), and s130 already noted nothing measured names
+   it. It needs its own AF-style screen before it is built either.
+3. ⛔ **Do NOT build a drive-dependent Sallen-Key.** AF7: 0 of 5 physical candidates reach, the
+   named one is structurally impossible, and the model already ships seven post-clipper
+   nonlinearities that move this feature 0.21 %. AB6's `SK τ × 1.1113` is a correct SIZING of the
+   peak's required move and is **not** a description of anything the circuit does.
+4. **GATE AD's item 3 (AD3, the 800 Hz–1 kHz clean-tilt inversion)** — unowned by any work item for
+   a third session now.
+5. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.

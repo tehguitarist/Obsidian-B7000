@@ -216,6 +216,17 @@ release) has not started.
   CLOSED/REFUTED table; both bear on open item 6, and a third measurement lands on item 9.
   ⚠ Seven defects were found in the session's OWN instrument, one of them a **thread race inside the
   mutation runner** — see `docs/session-log.md` SESSION 133 before reusing any of that machinery.
+- ⚠ **Session 134 likewise changed NO baseline, NO constant and NO `src/` file** — closed-form
+  arithmetic on the shipped post-clipper cascade plus two stored reports
+  (`analysis/sk_mechanism_locus.py`, **GATE AF**, + its **10/10** mutation runner). Its head item on
+  entry was sessions 132's and 133's identically-worded `NEXT` #1, *"build the Sallen-Key candidate"*;
+  the user's decision was to localise the mechanism before writing DSP, and **that decision is what
+  stopped a build with no physical carrier**. Three rows in the CLOSED/REFUTED table, all on item 6:
+  the SK-bandwidth frame is refuted as a MECHANISM (0 of 5 candidates reach) while AB6's arithmetic
+  stands as a SIZING, and the replacement target is a **drive-dependent −1.185 dB/oct slope near
+  2935 Hz**, at or upstream of the clipper. ⚠ One defect in its own instrument, found by its own
+  mutation runner: AF2 `sys.exit`ed on a physics OUTCOME (s108's rule, in its flattering direction —
+  it was discarding a *stronger* refutation than the one it printed).
 - **ctest 18/18** as of session 127 (`PerfBenchmark` added — the 18th; ~54 s, `RUN_SERIAL`, and that
   serial property is load-bearing, not tidiness: it times wall-clock per sample, so a co-scheduled
   ctest job contends for the cores it is measuring. ⛔ Do not copy `RUN_SERIAL` to any other test as
@@ -310,6 +321,9 @@ table in this file.
 | "item 6's SK sub-target (AB6: SK τ × 1.1113 across the drive ladder) and GATE I's 8–16.3 kHz gap are the same finding, or refute each other" (session 130's `NEXT` #3, gating its own #1) | ⭐⭐ **NEITHER — DIFFERENT MECHANISM CLASSES ON ONE SHARED KNOB, AND THE KNOB CANNOT CLOSE GATE I EVEN AT ITS LIMIT, s132** | 132 | The SK axis moves the treble-peak position **TOWARD** the pedal (−7.98 % vs a −7.34 % target) and the 8127.5→16255 Hz octave rate **AWAY** from it (−0.58 vs a required **+19.8…+21.5 dB/oct**, sign product −1) — **1 of 2 axes**, so a single SK mechanism cannot serve both; item 6's SK candidate is a *filtering* change, GATE I's gap needs a *generative* one (no lowpass chain can gain with frequency, which the pedal does). ⭐ **And the axis is bounded**: deleting both Sallen-Keys OUTRIGHT hands back only **+18.25 dB/oct**, still short of the hottest-rung requirement by **+1.57…+3.20 dB/oct** — 0 of 3 classes reachable at the hottest rung even at that limit (36 of 60 cells reachable across the whole ladder, all at the quiet end, per GATE I's own dose-response). ⇒ this **independently reproduces GATE I's own load-bearing property** (a fixed lowpass chain cannot gain with frequency) from a completely different construction. The bridged-T half of AB6 is nearly inert here (0.165× the SK half's collateral) — separable at this frequency exactly as AB3 found it separable at the features. ⚠ Collateral is a *mechanism size* on the closed-form linear cascade, not a priced render (the graded matrix sits downstream of a per-row null gain and the clipper). | `analysis/sk_gate_i_reconcile.py` (GATE AC) AC2–AC5 |
 | "we appear to have NO 4.5–6 kHz null at all" (s131 AD5b, put at the head of its own NEXT list as the cheapest high-value read) | ⭐⭐ **CONFIRMED AND STRENGTHENED BLEED-FREE — AND IT NEEDS ONE QUALIFIER, s133** | 133 | On a grid **18× finer** the model's window (4200–12000 Hz, 1/48 oct) contains **NO INTERIOR EXTREMUM AT ALL in 9 of 9** bleed-free driven cells — its curve is strictly monotone there, which is a statement with **no bar in it** (AD5b's 0.69 dB was an inflection). ND has one in 6 of 9 over the 1 dB bar, deepening monotonically with drive in 3/3 GRUNT (spans **4.96 / 17.01 / 3.37 dB**). ⚠ **BUT the unconditional wording must be qualified**: on the LEVEL ladder the model DOES carry the feature (3 detents, prom 2.23/1.91/1.32 dB, verdict **MIX**), dying as the clean tap does — exactly s126's bass-peak membership situation. ⇒ **what we lack is ND's DRIVE-GENERATED null, not every feature there**; ours is a balance, theirs is a balance PLUS something the OD path generates. Presence/absence, not a centre or a depth. ⛔ Nothing graded against hardware (§1: authority = neither). | `analysis/hf_null_presence_gate.py` (GATE AE) AE3/AE4/AE5 |
 | "the 4.5–6 kHz null" — the NAME | ⚠ **THE LABEL IS NOT THE WINDOW, s133** | 133 | Only **35 of 192** readings on either side fall inside 4.5–6 kHz; ND's centres run **6150 → 10708 Hz** across the LEVEL ladder. The name comes from `reference-sources.md` §3's PNG reads, whose exact conditions §6 says are unknown. ⇒ **quote the measured band, never the label** — and note GATE W has called this feature `treble_notch` with a 4200–12000 Hz window since s122. | `analysis/hf_null_presence_gate.py` (GATE AE) AE2 |
+| "a falling effective op-amp GBW under large signal is the obvious single physical cause of the SK half" (s130's named carrier for item 6's treble half, carried into two `NEXT` lists as the thing to build) | ⛔⛔ **REFUTED TWICE OVER, s134 — and the second half is immune to any datasheet number** | 134 | **(1) SIZE:** moving the peak −7.34 % needs a gain-bandwidth of **16.09 kHz**; TL07x ships **3.0 MHz typ / 2.5 MHz min**, so the requirement is **155× below the worst part TI sells**. At the real GBW the lever delivers **−0.025 %**. **(2) STRUCTURE, the stronger half:** gain-bandwidth is a **SMALL-SIGNAL** parameter — an op-amp in its linear region does not lose GBW as the signal grows; the large-signal limit is *slew*, a rate limit and not a bandwidth reduction. ⇒ there is **no amplitude at which this lever moves at all**, so the size arithmetic is moot. The sentence names a mechanism that does not exist. ⭐ Free by-product of the same sweep: the model's **ideal-op-amp assumption costs 0.025 %** at this feature, so nothing is owed to modelling finite SK bandwidth statically either. | `analysis/sk_mechanism_locus.py` (GATE AF) AF2 |
+| "item 6's treble half is a Sallen-Key BANDWIDTH move" — AB6's `SK τ × 1.1113` read as a build instruction | ⛔⛔ **THE ARITHMETIC STANDS; THE MECHANISM IS REFUTED — 0 of 5 physical candidates reach, s134** | 134 | Screened in closed form on the shipped cascade, each quoted at the spread end WORST for the conclusion: falling GBW **0.0064** of what is needed, slew limiting **0.020** (worst \|dV/dt\| anywhere is **0.160 V/µs** against an 8 V/µs minimum-spec part — 50× margin, never engaged), output rail clamping **0.029**, op-amp input capacitance **0.023**, film-cap voltage coefficient **0.031**. ⭐⭐ The rail-clamp row is the sharpest and its answer was already on disk: `railEnabled = true` ships, so the model **already carries seven post-clipper amplitude nonlinearities**, two of them on the Sallen-Key outputs — and GATE W6 measured what all seven do to this peak across the 24 dB ladder: **0.21 %, verdict FIXED, 34× short**. A saturating clamp compresses the fundamental almost uniformly across frequency, and a uniform gain change **cannot move a vertex** (AB2's own control). ⇒ **the question was never "add a post-clipper nonlinearity".** ⛔ Do NOT build a drive-dependent Sallen-Key. ⚠ AB6 is unharmed: `SK τ × 1.1113` is a correct **SIZING** of how far the peak must move, not a claim that anything moves the SK corners. | `analysis/sk_mechanism_locus.py` (GATE AF) AF3–AF5, AF7 |
+| item 6's treble half, stated in the right units | ⭐⭐ **IT IS A *SLOPE*, NOT A CORNER — SIZED, s134** | 134 | Every refutation above is about **corners**, and AB4 already established the peak is a **VERTEX** (the bridged-T's rise meeting three rolloffs). A vertex sits where the total slope crosses zero, so a drive-dependent **TILT** moves it with **no corner moving anywhere**. The vertex law `Δx = −T/C` turns AF1c's curvature (**−11.124 dB/oct²**) into a prediction with no fit in it: **predicted −1.223, measured −1.185 dB/oct, agreeing to 3.2 %**. ⇒ **a drive-dependent slope change of −1.185 dB/oct near 2935 Hz puts the peak exactly on target**, and it lives **at or UPSTREAM of the clipper**, not in the SK pair. ⚠⚠ **LOCAL number** — the curvature argument is strictly local; the broadband reading (**−7.49 dB over 100 Hz–8 kHz**, rms **2.16 dB**, i.e. **72 % of GATE Q's measured `D(f)` of 3.01 dB rms**) is an **assumption**, and an rms says nothing about whether `D(f)` is a monotone tilt at 2.9 kHz. ⭐ Cross-check: the same tilt moves the notch only **+0.83 %** against **+7.14 %**, so it is a **peak-only** lever — AB3's orthogonality reproduced from a third construction, and **the bridged-T half stays unowned**. | `analysis/sk_mechanism_locus.py` (GATE AF) AF6 |
 | `drive-1700_base-od @ sweep_drv_-6`, 50 Hz reading ~1400% THD | **RESOLVED — denominator artefact** | 122 | Model's 50 Hz fundamental collapses 41 dB below the pedal's (a cancellation-null read-point coincidence, same mechanism as the bass-notch/A3 row); numerator (harmonic energy) is ordinary on both sides. Not a distortion-generation defect; needs no separate work. | `analysis/feature_locus_gate.py` |
 
 ### THE RELEASE GATE
@@ -545,13 +559,27 @@ docstring and CLOSED/REFUTED row cites them.
    AWAY from it (1 of 2 axes) — a filtering change can't be a generative one — AND the axis is
    bounded: deleting both Sallen-Keys outright hands back only +18.25 dB/oct against a
    +19.8…+21.5 dB/oct requirement at the hottest rung, short by 1.6–3.2 dB/oct even at that limit.
-   See the CLOSED/REFUTED table (GATE AC). ⇒ **Work the Sallen-Key axis for the treble-peak walk
-   as planned** — it still carries 79% of that feature and reconciliation found no conflict, only
-   a bounded, quotable collateral cost in the (already-open, already-over-SHIP) HF region. Quote it
-   whenever the candidate is built: −0.58 dB/oct and −3.10 dB at 16255 Hz at the hottest rung
-   (2.7% of GATE I's own gap there). ⛔ Do NOT aim a single mechanism at the SK/bridged-T pair
-   (AB3: orthogonal in this cascade). ⛔ Do NOT expect this candidate to move GATE I's gap — it
-   is 36–46× too small on this axis and the two findings are different mechanism classes.
+   See the CLOSED/REFUTED table (GATE AC). GATE AC found no conflict, only a bounded, quotable
+   collateral cost in the (already-open, already-over-SHIP) HF region: −0.58 dB/oct and −3.10 dB at
+   16255 Hz at the hottest rung, 2.7% of GATE I's own gap there. ⛔ Do NOT aim a single mechanism at
+   the SK/bridged-T pair (AB3: orthogonal in this cascade). ⛔ Do NOT expect any candidate here to
+   move GATE I's gap — it is 36–46× too small on this axis and the two are different mechanism
+   classes.
+   ⛔⛔ **BUT SESSION 132's AND 133's "build the Sallen-Key candidate" IS WITHDRAWN, s134 — THE
+   SK-BANDWIDTH FRAME HAS NO PHYSICAL CARRIER** (`analysis/sk_mechanism_locus.py`, GATE AF; two
+   CLOSED/REFUTED rows above). **0 of 5** physical candidates reach a −10 % corner move: falling
+   op-amp GBW is **155× short AND structurally impossible** (GBW is small-signal, so there is no
+   amplitude at which it moves), slew limiting has a **50× margin** and never engages, and the model
+   **already ships seven post-clipper amplitude nonlinearities** — two on the SK outputs — which
+   GATE W6 measures moving this peak **0.21 %**. ⚠ AB6's arithmetic is untouched: `SK τ × 1.1113` is
+   a correct **SIZING** of the peak's required move, not a description of anything the circuit does.
+   ⭐⭐ **AND THE REPLACEMENT TARGET IS SIZED, IN THE RIGHT UNITS (AF6): a drive-dependent
+   −1.185 dB/oct SLOPE change near 2935 Hz**, which moves the vertex with no corner moving anywhere
+   (predicted −1.223 from the curvature alone, agreeing to 3.2 %). It lives **at or upstream of the
+   clipper**, it is **72 % of GATE Q's already-measured `D(f)`** — so the size is available — and it
+   moves the notch only **+0.83 %**, so it is peak-only and **the bridged-T half stays unowned**.
+   ⚠ The 72 % rests on treating the local slope as broadband; whether `D(f)`'s **shape** matches at
+   2.9 kHz is the next measurement and is a stored-report read, not a render.
    ⭐⭐⭐ **TWO MORE INSTANCES JOINED THIS ITEM IN s131, ON A NEW AXIS — *DEPTH*, NOT CENTRE
    FREQUENCY** (`analysis/hw_trend_gate.py`, GATE AD; bleed-free, driven ladder, both sides, one
    estimator). Everything above is about where a feature SITS; these are about how DEEP it is, which

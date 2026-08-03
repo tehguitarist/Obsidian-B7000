@@ -842,6 +842,36 @@
   ⚠ Sibling of `localise-before-fitting-a-constant`, pointed at the model rather than the defect:
   there you localise the ERROR before fitting; here you localise YOUR OWN FEATURE before theorising
   about the gap. (s125)
+- ⭐⭐⭐ **"THE OBVIOUS PHYSICAL CAUSE" IS THE PHRASE THAT NEVER GETS CHECKED, AND A CARRIER NAMED
+  IN A HANDOVER TRAVELS AS IF IT HAD BEEN — FOUR SESSIONS AND TWO `NEXT` LISTS, ON ONE UNCOMPUTED
+  SENTENCE.** A gate correctly SIZED a target (the treble peak needs the two Sallen-Key corners
+  10 % lower) and its session log added one line of attribution: *"a falling effective op-amp GBW
+  under large signal is the obvious single physical cause."* Nothing computed it. It became
+  CLAUDE.md's wording for the item, then both of the next two sessions' `NEXT` #1 — *"build the
+  Sallen-Key candidate"* — i.e. it was one session away from becoming DSP. Computed, it is
+  **refuted twice**: the required gain-bandwidth is **16.09 kHz** against a part that ships
+  **2.5 MHz minimum** (**155× short**), and — the half that matters — **gain-bandwidth is a
+  SMALL-SIGNAL parameter**, so there is no amplitude at which it moves at all and the size argument
+  is moot. ⭐ GENERAL: **refute on the AXIS the parameter lives on, not only on its size.** A size
+  refutation depends on a datasheet number and invites "but at the bad end of the spread…"; *"this
+  quantity is not a function of amplitude, so it cannot carry an amplitude-dependent effect"* needs
+  no number and cannot be argued down. Ask of any proposed carrier: *does this parameter even
+  DEPEND on the variable the effect depends on?* ⚠ The tell is available for free — the word
+  "obvious" beside an attribution that has no number next to it. Same family as
+  `an-attribution-is-not-a-measurement` (s125), and the exact failure s125 avoided in its own
+  session by writing the falsifier next to the hypothesis; here nobody did, and it cost four
+  sessions of the item being framed around a mechanism that does not exist. (s134, GATE AF)
+- ⭐⭐ **A SIZING IS NOT A MECHANISM — "parameter × 1.1113" ANSWERS *how far would X have to move*,
+  NOT *does anything move X*, AND THE TWO READ IDENTICALLY IN A TABLE.** GATE AB6's decomposition
+  is correct arithmetic and correctly labelled *"the required move"*; four sessions later it was
+  being read as a build instruction, because a row saying `SK time constants × 1.1113` looks exactly
+  like a row saying `set SK time constants to × 1.1113`. Screening the five physical candidates that
+  could actually turn that knob found **0 of 5 reach** — and the arithmetic survived intact, because
+  it never claimed anything about mechanism. ⭐ GENERAL: when a gate outputs a required parameter
+  move, write **what would have to be true of the circuit** for that move to happen in the same
+  table, even if the answer is "unknown" — an empty mechanism column is a visible hole, whereas a
+  bare multiplier reads as a plan. And before building the sized move, screen the mechanisms: it is
+  closed-form work measured in minutes against a DSP change measured in sessions. (s134)
 - ⭐⭐⭐ **A PROMINENCE MEASURED AT A WINDOW EDGE IS IDENTICALLY ZERO BY CONSTRUCTION, SO ANY CHECK
   BUILT ON IT IS CIRCULAR — AND IT LOOKS LIKE A DEVASTATING RESULT.** `locate`'s prominence is
   `min(left, right)` over a walk outward from the extremum; when the extremum sits ON a window
@@ -1594,6 +1624,29 @@
   vacuous mutation control); anything that is an outcome of the measurement gets a **computed
   verdict** and execution continues. Ask of every `sys.exit`: "if this fires, have I learned
   something about my instrument, or about the device?" Only the first belongs there. (s108)
+  - ⭐⭐ **SECOND OCCURRENCE, s134, AND THE DISCARDED RESULT WAS THE *STRONGEST* ONE THE GATE HAD.**
+    A reachability gate solved for the parameter value that hits a target and wrapped the root-find
+    in `sys.exit("the bracket is wrong or the sweep is not monotone")`. With the real target a root
+    existed, so it never fired — until a mutation arm flipped the target's sign, at which point
+    **no** value of the parameter reached it, because that lever can only move the feature one way.
+    "No setting of X reaches the target **in DIRECTION**" is not a malfunction: it is a **stronger
+    refutation of X than any size argument**, and the gate was throwing it away and refusing.
+    ⭐ GENERAL: for any solve-for-the-required-value gate, split the two failures — the sweep's
+    ENDPOINTS being unreadable is a validity failure and exits; the absence of a root **between**
+    them is a computed verdict scoring `reach = 0`. ⚠ Note the direction, which is why nothing
+    looked wrong: the bug suppressed a better result than the one it printed, so it failed in the
+    flattering direction *for the conclusion* while looking like caution. (s134, GATE AF)
+- ⭐ **BEFORE ADDING A MECHANISM CLASS, COUNT HOW MANY INSTANCES OF IT THE MODEL ALREADY HAS — AND
+  READ WHAT THEY DO.** The proposal was "give the post-clipper path a drive-dependent nonlinearity
+  so the treble peak moves". The shipped build already carries **seven** post-clipper amplitude
+  nonlinearities (a `RailClamp` on every op-amp output, `railEnabled = true`), two of them on the
+  very stages in question — and a prior gate had already measured the resulting peak as **FIXED to
+  0.21 %** across a 24 dB ladder. So the question was never *"add a nonlinearity"*; it was *"why does
+  the class we already have not move this feature"*, whose answer (a saturating clamp compresses the
+  fundamental almost uniformly across frequency, and a uniform gain change cannot move a vertex) is
+  what actually narrows the search. ⭐ The check is one `grep` for the class name in `src/` plus one
+  stored-report read, and it is stronger than any calculation, because it is the shipped build
+  measured rather than a model of it. (s134, GATE AF4)
 
 - ⭐⭐⭐ **"THERE IS NO FLOOR HERE" IS A LEGITIMATE ANSWER, AND TWO SUCCESSIVE FLOOR GUARDS THAT
   INVENTED ONE BOTH FAILED IN THE FLATTERING-THEN-DESTRUCTIVE DIRECTION.** GATE R needed to know
