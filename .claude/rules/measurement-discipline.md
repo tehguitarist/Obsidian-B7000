@@ -672,6 +672,24 @@
   `a-recovered-quantity-that-must-be-invariant-and-isnt-is-a-refutation` (s104 L6): there a broken
   invariance killed a model form, here an intact one certifies an instrument. Both are worth more
   than any absolute residual, because neither has a threshold to argue about. (s107, GATE O6)
+- ⭐⭐⭐ **WHEN THE QUANTITY IS A *CHANGE* IN A LINEAR FUNCTIONAL, EVERYTHING THAT DOES NOT VARY
+  CANCELS EXACTLY — SO ASK WHAT THE SCREEN CAN DROP BEFORE BUILDING IT, AND YOU MAY NOT NEED TO
+  RENDER AT ALL.** GATE AI had to screen a candidate mechanism at one frequency in the middle of a
+  long chain, and the obvious shape is "model the chain, perturb the candidate, render, difference".
+  It is unnecessary. The graded quantity is a drive-tilt **change** — a difference of slopes of
+  log-magnitudes — the tilt operator is **linear** on log-magnitude, and every block that does not
+  depend on the candidate's parameter contributes the *same* slope at both ends of the ladder.
+  ⇒ **the treble ladder, the gain stage, the bridged-T, both Sallen-Keys and the output stage all
+  cancel identically**, the screen collapses to a two-line closed form for the one block that
+  varies, and the whole gate runs with **no render**. ⭐ GENERAL: before building a perturbation
+  screen, write down whether your statistic is a DIFFERENCE and whether the operator producing it is
+  LINEAR in whatever the fixed parts contribute; if both, the fixed parts are not "small", they are
+  **exactly zero**, and modelling them is wasted work that also adds surface for bugs.
+  ⚠⚠ **And assert it, do not argue it** — the claim is one numeric line (add a deliberately wild
+  fixed block, poles and a zero inside the window, and require the change to move by < 1e-9), and
+  asserting it converts the gate's central simplification from an unexamined argument into a
+  measured fact. Same family as the entry above: a property the physics *forbids*, measured.
+  (s138, GATE AI1c)
 - ⭐⭐ **AN IMPLAUSIBLE COINCIDENCE IS A BUG REPORT — AND CHASING IT IS RIGHT EVEN WHEN IT TURNS OUT
   NOT TO BE A BUG.** Two different band selections (100–400 Hz and broadband non-HF) reported the
   MASTER law as **exactly 2.024 dB**, which should not happen for a quantity whose raw per-band
@@ -1707,6 +1725,20 @@
   read as a broken guard when the guard was fine. **Patch module-level constants at module level,
   and treat "this guard didn't fire" as a hypothesis about the mutation before it is one about the
   guard.** (s110)
+  - ⭐⭐ **THE THIRD VACUOUS SHAPE, s138: TO BREAK AN INVARIANCE, MUTATE THE PROPERTY IT RESTS ON —
+    A DIFFERENT *LINEAR* FUNCTIONAL IS NOT A NONLINEAR PERTURBATION.** The arm guarding
+    `tilt(a + b) = tilt(a) + tilt(b)` (the licence that lets a screen drop every fixed block)
+    replaced the estimator's returned coefficient with `c1 + 0.05·c0` — a plausible-looking
+    corruption that reads as "now it is contaminated by curvature". It is **still a linear
+    functional of the curve**, and additivity depends *only* on linearity, not on which coefficient
+    comes back, so the fixed block still cancelled to machine precision and the arm printed
+    `GUARD DEAD` against a guard that was working perfectly. ⭐ The fix is to ask what the invariance
+    actually needs and break *that*: squaring the curvature term (`c1 + 1e−3·c0²`) is genuinely
+    nonlinear and fires immediately. ⭐⭐ And pick the nonlinearity so the arm still **passes the
+    neighbouring guard**, which is what tests the two independently: a pure added tilt does not
+    change a curve's curvature, so the squared term cancels exactly from the injected-tilt check
+    while leaking into the fixed-block check. An arm that trips both guards has only proved they
+    are not the same guard's second copy. (s138, `_mutate_gate_ai.py` arm 3)
   ⭐⭐ **AND A VACUOUS MUTATION CAN BE WORTH KEEPING AS A MEASUREMENT.** GATE W needed a mutation
   meaning "the locator reports a biased centre", and two successive attempts were inert and both
   read as GUARD DEAD (`suspect the mutation before the guard`, twice in one session): **(i)** a

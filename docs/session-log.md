@@ -15607,3 +15607,144 @@ maximum toward an edge, and the arm then inverts AH5 exactly as intended.
    term per side, which would turn "not parabolic" into a number.
 4. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a sixth session.
 5. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+---
+
+## SESSION 138 (2026-08-04) — GATE AI: the pre/at-clipper mechanism the model ALREADY ships is refuted as item 6's carrier, on sign and on size
+
+**Changed NO baseline, NO constant and NO `src/` file.** Closed-form plus one stored surface; **no
+render at all**. New tool `analysis/at_clipper_tilt_gate.py` (GATE AI) + `analysis/_mutate_gate_ai.py`
+(**10/10 arms**). Report: `analysis/reports/s138_at_clipper_tilt.json`.
+
+Executes session 137's `NEXT` #1 on its **first candidate**. AF7 screened five carriers for item 6's
+treble half and refuted all five — but every one was **post-clipper**. The pre/at-clipper side had
+never been screened, and `measurement-discipline.md` §3 says where to start: *"BEFORE ADDING A
+MECHANISM CLASS, COUNT HOW MANY INSTANCES OF IT THE MODEL ALREADY HAS — AND READ WHAT THEY DO"* (AF4).
+
+There is exactly one, and it is the obvious one: **the CD4049's incremental gain `a0` falls as the
+VTC saturates.** It is drive-dependent by construction, it sits at the clipper, and it moves the
+response **two ways at once** — (i) the closed-loop pole `[1/((1+a0)R16) + 1/R18]/(2πC14)` rises as
+`a0` falls (**brighter**), and (ii) the input-node impedance `Zf/(1+a0)` rises, dragging the GRUNT
+coupling cap's high-pass corner **down** (**darker**). The net is not guessable, which is why it
+needed computing rather than asserting.
+
+⚠ **A prior was scoped rather than inherited.** Session 17's `clipa0_grunt_corner_probe.py` found
+*"the gain drop cancels the corner shift"*, and `FitParams.h` quotes that as **"A0 is ruled out"**.
+It is ruled out **for the LF GRUNT corner and H3−H2 at ~220 Hz** — a different frequency and a
+different quantity. It says nothing about the slope at 2935 Hz. The gate prints this premise every
+run so the scoping cannot be lost again.
+
+### ⭐⭐ The simplification that makes this exact and cheap — asserted, not argued
+
+The quantity is a drive-tilt **CHANGE**, i.e. a difference of slopes of log-magnitudes. The tilt
+operator is **linear on log-magnitude**, and every block that does not depend on `a0` contributes
+the same slope at both ends of the ladder, so **the entire fixed chain cancels EXACTLY** — treble/
+ATTACK ladder, IC2_A, bridged-T, both Sallen-Keys, output stage. Only the at-clipper block survives:
+
+    H_at(f, a0, Cg) = −a0·Zf / ( Zf + (1+a0)·(R16 + 1/(s·Cg)) ),    Zf = R18 ∥ 1/(s·C14)
+
+⇒ **the gate needs no render for the mechanism side at all.** That licence is AI1c, and it is
+**measured (1.3e−15 dB/oct)** against a deliberately wild fixed block — poles and a zero inside the
+window — rather than argued from the algebra.
+
+### AI1 — three known answers
+
+| | | |
+|---|---|---|
+| (a) `H_at(Cg → ∞)` must reduce to GATE AB's already-validated `clipper_closed_loop` | **2.1e−08 dB** | bar 1e−6 |
+| (b) injected-tilt recovery over T = 0 / −1.185 / +3 (T = 0 is its own control, s133) | **3.6e−15 dB/oct** | bar 1e−9 |
+| (c) **THE LICENCE** — a wild `a0`-independent block cancels from the tilt CHANGE | **1.3e−15 dB/oct** | bar 1e−9 |
+
+(a) is what ties this gate's own expression to the one s125/AB already validated against the render.
+
+### AI2 — the mechanism, per GRUNT position
+
+Shipped constants; the coupling caps are read from `FitParams.h`, where **`clipC11` is FITTED at
+3.69 nF**, not the schematic 4n7. Δtilt at 2935 Hz (±0.5 oct) as `a0` sags from the shipped 24.871:
+
+| a0 | cut | flat | boost |
+|---|---|---|---|
+| 20 | −0.068 | +0.203 | +0.224 |
+| 15 | −0.154 | +0.428 | +0.471 |
+| 10 | −0.264 | +0.658 | +0.723 |
+| 5 | −0.396 | +0.865 | +0.947 |
+| 2 | −0.476 | +0.954 | +1.041 |
+| **1 (LIMIT)** | **−0.498** | **+0.974** | **+1.061** |
+
+⚠ `a0 = 1` is **not an operating point** — it is the limit, quoted so the ceiling holds for *any*
+excursion (a shunt-feedback stage at `a0 = 1` has no gain left). ⭐⭐ **The mechanism's SIGN is not
+the same at every GRUNT position** — cut −, flat +, boost + — because (i) and (ii) trade places
+depending on the coupling cap.
+
+### AI3 — the defect, per GRUNT position (the discriminator)
+
+Per-capture PEDAL−MODEL drive-tilt on GATE Q's 16 pure-OD endpoints, AG5's own estimator:
+
+| GRUNT | n | mean | min | max | all one sign? |
+|---|---|---|---|---|---|
+| cut | 9 | **−2.407** | −3.760 | −1.420 | **yes** |
+| flat | 3 | **−1.913** | −2.901 | −1.195 | **yes** |
+| boost | 4 | **−1.098** | −1.631 | +0.243 | no (1 outlier, at the quietest drive) |
+
+**The defect is negative — the direction item 6 needs — in 15/16 captures, at every GRUNT position.**
+
+### ⭐⭐ AI4/AI5 — the verdict, refuted twice over
+
+| GRUNT | mechanism at a0 → 1 | defect | sign ok? | reach |
+|---|---|---|---|---|
+| cut | −0.498 | −2.407 | **yes** | **20.7 %** |
+| flat | +0.974 | −1.913 | **no** | 0 % |
+| boost | +1.061 | −1.098 | **no** | 0 % |
+
+⇒ **REFUTED — the mechanism has the right sign at only 1 of 3 GRUNT positions (and pushes the defect
+FURTHER at the other two), while the defect is the same sign at all three; and where the sign IS
+right it reaches only 21 % of what that position needs, at `a0 → 1`.**
+
+Two independent refutations, and the stronger is the **sign-consistency** one: it needs no threshold
+and no size argument. A mechanism that flips with a switch cannot carry a defect that does not flip
+with that switch. ⭐ Corroborating context from s137: AH6 measured the model's *total* drive-tilt
+change at this vertex as **+0.021 dB/oct** — essentially nil — which bounds the net of every
+drive-dependent mechanism the model currently has there, this one included.
+
+⚠ **SCOPE, printed by the gate itself.** This refutes ONE class — the at-clipper block, whose only
+drive-dependent term is `a0`. **UNSCREENED** on this side of the clipper: the **J201's Miller /
+junction capacitance**, **IC2_A's GBW and slew**, and the **GRUNT caps' own voltage coefficient**.
+Nothing here refutes those.
+
+### The mutation runner, and the arm that was wrong
+
+10 arms: 7 refusals (AI1a, AI1b, AI1c, membership-count, non-finite, GRUNT-split, VACUITY) and — per
+s128 — **3 computed-verdict arms**. A refutation that cannot become a non-refutation is narration, so
+the three drive AI5 to each of its *other* outcomes: `REACHES`, `REFUTED ON SIGN`, and `RIGHT SIGN
+EVERYWHERE, TOO SMALL`. The last is the sharpest: it gives all three positions the **same** coupling
+cap, so the sign flip must vanish — which tests that *"the switch changes the sign"* is computed from
+the caps rather than a sentence the gate always prints.
+
+⚠⚠ **AI1c's first arm was wrong and read as `GUARD DEAD`** (s110 — suspect the mutation before the
+guard). It returned `c1 + 0.05·c0` — **a different LINEAR functional of the curve** — and the
+cancellation AI1c tests depends only on **linearity**, not on which coefficient is returned, so an
+`a0`-independent block still cancelled exactly and the guard was right to stay silent. The property
+is `tilt(a+b) = tilt(a) + tilt(b)`; only a genuinely **nonlinear** functional can break it. The fix
+squares the curvature term (`c1 + 1e−3·c0²`), which also *passes* AI1b — a pure added tilt does not
+change `c0`, so it cancels there exactly — and that is what makes the two guards independently
+tested rather than one guard checked twice.
+
+### ▶ NEXT
+
+1. ⭐⭐ **Item 6's treble half — continue the pre/at-clipper screen with the three UNSCREENED
+   candidates**, in this order: the **J201's Miller / voltage-dependent junction capacitance** (the
+   only one that is amplitude-dependent *by construction* and upstream, so it is the strongest
+   prior); **IC2_A's slew** (AF3's argument re-run pre-clipper, where the swing is larger); and the
+   **GRUNT caps' voltage coefficient** (AF5's class, re-aimed). ⛔ Do not re-screen `a0`, and ⛔ do
+   not screen a constant tilt (AG4).
+   ⚠ Gate every candidate on all three of item 6's pre-registered gates, **and on GRUNT-sign
+   consistency** — which AI adds as a fourth, free, threshold-free screen that this session's
+   candidate failed.
+2. ⚠ **If all three fall, the pre/at-clipper frame itself is in question** and the honest next step
+   is to ask what is left rather than to widen a bound: the deficit is measured, sized and now
+   twice-localised, and every named carrier on both sides of the clipper would be refuted.
+3. **The bridged-T half of AB6 (τ × 0.9337) remains unowned.**
+4. ⚠ **`C_pedal`'s window/bar sensitivity (s137 NEXT #3)** — a cubic fit reporting the third-order
+   term per side would turn "not parabolic" into a number. Unchanged.
+5. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a seventh session.
+6. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
