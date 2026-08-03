@@ -640,6 +640,58 @@
   ⚠ Sibling of `localise-before-fitting-a-constant`, pointed at the model rather than the defect:
   there you localise the ERROR before fitting; here you localise YOUR OWN FEATURE before theorising
   about the gap. (s125)
+- ⭐⭐⭐ **A PROMINENCE MEASURED AT A WINDOW EDGE IS IDENTICALLY ZERO BY CONSTRUCTION, SO ANY CHECK
+  BUILT ON IT IS CIRCULAR — AND IT LOOKS LIKE A DEVASTATING RESULT.** `locate`'s prominence is
+  `min(left, right)` over a walk outward from the extremum; when the extremum sits ON a window
+  bound, one side has length zero, so **prom is 0.00 dB for any curve whatsoever**. A sub-gate
+  built to ask "did this feature DISSOLVE or merely MOVE?" re-located each feature in a widened
+  window and read that `prom`. It printed `prom 3.81 -> 0.00 dB` **four times** — two different
+  constants, at two different multiples, on two different features — and every "DISSOLVED" verdict
+  was just `edge=True` wearing a number. ⭐ The tell was the coincidence, not the physics
+  (`an-implausible-coincidence-is-a-bug-report`): four independent perturbations cannot agree to
+  the digit. ⭐⭐ The repair is to change the ESTIMATOR, not the window: ask for the most prominent
+  **interior** local extremum, where prominence is two-sided and can genuinely come back large —
+  a statistic that can fail in both directions. Measured, it does: **7.27 dB on the shipped render
+  and 0 interior extrema on the candidate.** ⚠ And gate the new estimator with its own known
+  answer *on the baseline* — the wide interior search must recover the narrow locator's centre
+  (it did, 329.5 → 329.5 and 416.0 → 416.0), because **a silent estimator and an absent feature
+  are indistinguishable** until you show the estimator finds the feature when it is there. Same
+  family as s119's O6b (a check an earlier guard already guarantees is not a check). (s126)
+- ⭐⭐⭐ **A LEVER MEASURED AT ONE STIMULUS RUNG IS A CLAIM ABOUT THAT RUNG —
+  `gate-domain-must-cover-candidate-reach` HAS A STIMULUS-AXIS FORM, AND IT IS EASIER TO MISS THAN
+  THE FREQUENCY-AXIS ONE BECAUSE THE CONDITION WAS CHOSEN CORRECTLY.** A reachability gate read its
+  feature at `sweep_clean` — the right choice, it is the condition the stored locus was measured at,
+  NAMED rather than selected (s122 W1) — and reported a constant that closes a +25.2 % gap exactly.
+  The collateral screen, which reads the loudest sweep its baseline supports, then read the **same
+  capture and the same candidate** and got **+2.1 %** where the reachability gate got **+25.6 %**.
+  The lever's own effect spans **2.1 %–25.6 %** across four rungs; it closes the gap at `clean` and
+  leaves **+21.6 %** at `drv_-12`. ⭐ GENERAL: after any single-condition reachability result, ask
+  what the OTHER rungs of the designed ladder say **before** quoting it — a capture matrix with a
+  stimulus ladder in it makes this nearly free, and the ladder exists precisely because the device
+  is nonlinear. ⚠ Print the DOSE-RESPONSE, not a verdict: here the *gap itself* collapsed 25.7 % →
+  6.4 % across the ladder, so the defect was far more a quiet-stimulus phenomenon than a broadband
+  one and every prior statement of its size was silently a `sweep_clean` statement. (s126)
+- ⭐⭐ **"UNRESOLVED" IN A STORED GATE CAN BE A MEMBERSHIP PROPERTY, NOT A PHYSICAL ONE — AND IT
+  READS AS "MEASURED, AND THERE IS NOTHING THERE".** GATE W6 reports the model's bass peak
+  `UNRESOLVED` on the stimulus axis, so nothing for three sessions asked whether it moves with
+  drive. W6 reads the **bleed-free endpoints**, and the bass peak is a **mix cancellation** — it
+  has no bleed-free reading at all, by the same physics W5/W7 classified it with. So the silence
+  was about *where W6 looks*, not about the feature. Measured on a capture that has a mix:
+  **163.9 → 151.1 Hz, −7.8 %**, i.e. DRIVE-DEPENDENT by W6's own 5 % bar. ⭐ GENERAL: before
+  treating a stored `UNRESOLVED`/`NO DATA` as a finding, check the gate's **membership** against
+  the feature's own nature — a gate is only silent about the conditions it sampled. Same family as
+  `verify-the-PREMISE-not-the-prior-session's-framing-of-it`, applied to a null result. (s126)
+- ⭐⭐ **WHEN A CHAIN MIXES TWO PATHS, NO SINGLE CAPTURE RESOLVES EVERY FEATURE — A COLLATERAL
+  SCREEN NEEDS A PER-FEATURE (CAPTURE, SWEEP), NOT ONE CONDITION.** A screen built to check "does
+  this fix break what we already have right?" ran at one capture and reported the two features it
+  existed to protect as NOT MEASURABLE. That is not a data defect: the bass features are **mix
+  cancellations** and live only where the clean tap is present, while the mid and bridged-T
+  features are the ones the reference gate resolves **bleed-free** — the two sets are disjoint by
+  construction, so no one capture carries both. ⭐ Resolve each feature's screening condition from
+  the BASELINE's own validity (first (capture, sweep) where the shipped render gives a valid
+  reading), print which one each column used, and report NOT MEASURABLE rather than damage where
+  there is none — s122's W1b, one level up: there an unguarded *arm* reading faked a failure, here
+  an unguarded *baseline* would have. (s126)
 - ⭐⭐⭐ **A COMPONENT'S BARE POLE IS NOT THE STAGE'S CORNER, AND FEEDBACK MOVES IT — IN A DIRECTION
   THAT IS EASY TO GET BACKWARDS. COMPUTE IT; THE HAND-DERIVATION IS 3× OUT AND WRONG-SIGNED.**
   Same session, same hour: I wrote into `CLAUDE.md` that a sag-driven fall in the clipper's

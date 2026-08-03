@@ -13797,3 +13797,117 @@ routing. (Added to `measurement-discipline.md` §7.)
   across the oversampled region"), cross-referenced from `architecture.md` (Bypass), `circuit.md`
   (BLEND note), and `docs/build-plan.md` (Phase 4/6 + risk #8). Build the delay line AND run the
   end-to-end DC-step test in Phase 6; don't ship Phase 4's BLEND stage without both.
+
+## SESSION 126
+
+⭐⭐ **EXECUTED SESSION 125'S `▶ NEXT` ITEM 0: LOCALISE THE MODEL'S OWN BASS PEAK.** New saved gate
+`analysis/bass_peak_locus.py` (GATE Y, 7 sub-gates + a KA, ~790 lines), report
+`analysis/reports/s126_bass_peak_locus.json`. **Nothing shipped — `src/` and `tests/` untouched.**
+The answer is a **reachability refutation**: the bass peak cannot be walked onto the pedal's by any
+single OD-path LF constant, and the two that *appear* to reach do so only by destroying the two
+features GATE W says we currently have right.
+
+⚠ **Why a render sweep and not session 125's closed-form cascade.** The treble peak yielded to
+closed form because every element that makes it is drawn on the schematic and post-clipper. The
+bass peak is not that kind of feature: it is a **mix cancellation on both sides** (W4/W7), so it
+belongs to no single network; the shipped OD path is not the drawn one (session 100 replaced R8/R11
+with a fitted 4-resistor tap ladder), so `eq_reference.py` is the wrong network to cascade; and W5's
+bleed-free endpoints read `n=0, NO DATA` — the feature *vanishes* without the clean tap, so there is
+no pure-OD transfer to read a centre off. ⇒ perturb the shipped renderer and measure
+`dlog(f0)/dlog(param)`.
+
+### What GATE Y measured
+
+| sub-gate | result |
+|---|---|
+| **Y1** known answer | reproduces W4's stored 7-detent model locus **to +0.00 % at every detent**, span 7.1 %. ⚠ Membership is re-derived, not transcribed: 9 detents → 7, because at LEVEL min the model **mutes** (GATE L7) and at LEVEL max the cancellation **vanishes** (clean coefficient exactly 0, GATE K2). The prepared clipK-epoch control never had to fire. |
+| **Y2** controls | NULL (`c21R` ×2, post-BLEND common-mode) moves the centre **−0.12 %**, inside the 0.48 % bar; POSITIVE (`levelTaperExp` ×1.6, the mix lever) moves it **+0.66 %**. Both required, or a zero in Y3 is unreadable. |
+| **Y3** sensitivity | **every** LF-shaping OD-path constant is a weak, NEGATIVE lever: `\|S\| ≤ 0.178` (trebleC7), then trebleR7 0.144, trebleC5 0.131, everything else ≤ 0.058. `clipR16` and `clipA0` do not resolve at all. |
+| **Y4** requirement | the loci are DISJOINT: **+18.2 % to touch, +25.2 % to match**. Against `\|S\| ≈ 0.15` that is a 4.8–5.6× move on a fitted constant. |
+| **Y5** reachability | rendered rather than extrapolated (s98). `trebleR7 ×0.21` → 205.9 Hz (**reaches** 205.25); `trebleC5 ×0.179` → 214.4 (overshoots); `trebleC7 ×0.28` → 196.8 (+20.1 %, does not reach). |
+| **Y6** stimulus axis | ⛔ **refutes Y5's headline.** See below. |
+| **Y7** collateral | ⛔ **both reaching candidates DISSOLVE the 320 Hz null and the mid peak.** See below. |
+
+### ⭐⭐⭐ Y6 — THE GAP ITSELF IS STIMULUS-DEPENDENT, AND NOBODY HAD EVER MEASURED IT
+
+Y1–Y5 all read `sweep_clean` — correctly, it is GATE W4's own condition, NAMED not selected. But
+the collateral screen reads the loudest sweep its baseline supports, and it read the **same capture
+and the same candidate** at `drv_-6` and got **+2.1 %** where Y5 got **+25.6 %**. That is
+`gate-domain-must-cover-candidate-reach` on the **stimulus** axis instead of the frequency axis, and
+it was caught by accident. Measured properly, both sides from the same capture:
+
+| sweep | pedal | model | gap | trebleR7 ×0.21 | trebleC5 ×0.179 |
+|---|---|---|---|---|---|
+| clean | 206.0 | 163.9 | **+25.7 %** | +0.0 % | −3.9 % |
+| drv_-18 | 203.1 | 163.8 | +24.0 % | **+17.0 %** | +6.1 % |
+| drv_-12 | 191.0 | 161.7 | +18.1 % | **+21.6 %** | +12.5 % |
+| drv_-6 | 160.8 | 151.1 | **+6.4 %** | +4.2 % | −1.7 % |
+
+Two findings. **(a) The gap collapses from 25.7 % to 6.4 % across the stimulus ladder** — it is a
+`sweep_clean` phenomenon far more than a broadband one, and every previous statement of it (session
+125's "18.2 % / 20–26 %" included) is a `sweep_clean` statement. **(b) `trebleR7` is
+CONDITION-SPECIFIC** — its own effect on the centre spans **2.1 % to 25.6 %** across the four rungs,
+so it closes the gap at `clean` and leaves **+21.6 %** at `drv_-12`. `trebleC5` is uniform but
+overshoots at both ends.
+
+⭐ **And GATE W6's `UNRESOLVED` for the model's bass peak is a MEMBERSHIP property, not a physical
+one** — W6 reads the bleed-free endpoints, where a mix cancellation has no reading at all. So
+nothing had ever asked whether *our* bass peak moves with drive. It does: **163.9 → 151.1 Hz
+(−7.8 %)**, comfortably over W6's own 5 % `STIM_MOVE_FRAC` bar. By W6's criterion the model's bass
+peak is **DRIVE-DEPENDENT**, as the pedal's already was (7.8 %).
+
+### ⛔⛔ Y7 — THE REACHING MOVES DESTROY GAP #2 AND THE MID PEAK
+
+⚠ **No single capture resolves all seven features**, and the first draft of Y7 tripped over it:
+screening at the mix detent alone reported `mid_notch`, `mid_peak` and `bt_notch` as NOT MEASURABLE
+— i.e. it could not screen the two features the gate exists to protect. That is not a data defect,
+it is the W5/W7 classification: the bass features are mix cancellations and live only where the
+clean tap is present, while the mid/bridged-T features are the ones GATE W resolves **bleed-free**.
+Fixed by screening at **two** captures — the mix detent and the ladder's own bleed-free endpoint
+(LEVEL = 1). All seven now measurable.
+
+| candidate | bass notch | bass peak | mid notch | mid peak | bt notch | treble peak | treble notch |
+|---|---|---|---|---|---|---|---|
+| shipped (Hz) | 62.9 | 151.1 | 329.5 | 416.0 | 716.9 | 2686.4 | 5279.4 |
+| trebleR7 ×0.21 | −2.8 % | +2.1 % | **DISSOLVED** | **DISSOLVED** | +0.1 % | +0.1 % | −1.4 % |
+| trebleC5 ×0.179 | +10.4 % | +8.2 % | **DISSOLVED** | **DISSOLVED** | −2.6 % | +3.4 % | +2.3 % |
+
+Both **PAY**. The 320 Hz null is GAP #2, whose *centre* GATE W measured right to 0.7 %, and the mid
+peak is the one feature whose drive dependence already tracks the pedal (~2.5 %) — session 125's
+localising clue for open item 6. A move that fixes the bass peak by flattening both is a
+compensating error, not a fix.
+
+### ⭐⭐⭐ THE TWO INSTRUMENT DEFECTS THIS SESSION FOUND IN ITS OWN GATE, BOTH VIA AN IMPLAUSIBLE COINCIDENCE
+
+**(1) `locate`'s prominence is IDENTICALLY ZERO on a window edge, by construction — so a check
+built on it is circular.** Y7b's first draft re-located each invalidated feature in a widened window
+and read `W.locate`'s `prom`. It printed `prom 3.81 → 0.00 dB` **four times** — two different
+constants, two different multiples, two different features, all agreeing to the digit. `locate`'s
+prominence is `min(left, right)` over a walk outward from the extremum, so an extremum sitting ON a
+bound has one side of length zero and prominence **0.00 for any curve whatsoever**. "DISSOLVED" was
+`edge=True` wearing a number (s119 O6b). Replaced with `_best_interior`: the most prominent
+**interior** local extremum in the widened window, where prominence is two-sided and can genuinely
+come back large. ⭐ Gated by its own known answer — on the SHIPPED render the wide interior search
+must recover the narrow `locate` centre, and it does exactly: **329.5 → 329.5** and **416.0 → 416.0**,
+1 interior extremum each, prom 7.27 dB. On the candidates: **0 interior extrema**. The estimator
+demonstrably returns a large number in one arm and zero in the other, which is what makes the
+verdict a measurement.
+
+**(2) The earlier `+6.8 % / −14.1 %` identical-delta pair was the same edge artefact one level up** —
+`mid_notch` (a min over 285–358) ran to 352.0 and `mid_peak` (a max over 358–620) ran to 357.1, both
+pinned to the **shared 358 Hz boundary from opposite sides**.
+
+⭐ Two coincidences that turned out **benign** and were still worth chasing: the shipped `prom 7.27`
+is identical for the mid notch and the mid peak because they are an **adjacent pair** — each one's
+binding side is the other, so both prominences *are* the notch-to-peak height; and `0 interior
+extrema` over 224–992 Hz is consistent with `bt_notch` surviving, because a monotone fall into a
+notch and back out has no interior local *maximum*.
+
+### Mutation test
+
+Control passes (rc=0); three mutations, each firing the **correct** guard by identity (s117):
+Y7b's known answer (data-level — bias the returned centre ×1.25) → `GATE Y7b`; Y2's null pointed at
+the mix lever → `GATE Y2 (null)`; Y1's membership predicate inverted → `GATE Y1`. ⚠ The Y1 mutation
+is a *predicate* inversion and duly produced a self-contradicting message (*"has 7 readings and this
+render has 7"*) — s122's lesson, and the reason the Y7b mutation was written at the data level
+instead.

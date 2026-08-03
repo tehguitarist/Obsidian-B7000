@@ -242,6 +242,8 @@ table in this file.
 | The six user-flagged peak/notch centre-frequency mismatches, **as CORNER (element-value) targets** | **CLOSED — none is a corner error.** ⚠ NOT "closed as a defect" — see the row below, added s125 | 122 | Two are the OD/clean mix (= A3, not a filter); three are not a fixed feature on at least one side; the 320 Hz null's centre is **right to 0.7%** — GAP #2 is a depth/width defect only, its centre was never wrong. ⛔ Do not point an optimiser at a capacitor for any of them. | `analysis/feature_locus_gate.py` (GATE W) |
 | "the bass notch/peak are A3 seen as a frequency, so they need no separate work" | ⚠ **HALF TRUE — the bass PEAK is NOT A3, s125** | 125 | **Notch: consistent with A3** (both sides MIX, both vanish bleed-free, LEVEL loci **overlap** — model 53.2–64.2, pedal 38.1–54.4 Hz — so some mix balance reconciles them). **Peak: ranges are DISJOINT** — model 154.6–**165.5**, pedal **195.7**–208.9 Hz, the pedal's *lowest* **18.2 % above** the model's *highest*. LEVEL is the mix lever A3 acts through and its FULL travel moves the feature 6.6 % against a ~20–26 % gap ⇒ the lever is 3× too small, **and points the wrong way** (more OD ⇒ model 165.5 → 154.6 Hz, *away* from the pedal). ⇒ correcting A3 makes the bass peak **worse**. Same shape as s38's C12 locus argument. | `analysis/reports/s122_feature_locus.json` W4 |
 | "…and therefore there is nothing to fix at those centres" | ⛔ **DOES NOT FOLLOW — REOPENED s125 as open-work item 6** | 125 | GATE W's verdict (c) *"not a fixed feature on at least one side"* is a **diagnosis, not an exoneration**: it says the pedal has a drive-dependent mechanism the model lacks. W6, measured: the model's treble peak is **FIXED to 0.2%** across the 24 dB ladder while the pedal's walks **2696 → 2498 Hz (7.9%)** ⇒ we are **281 Hz off at clean and 485 Hz (19.4%) off at `drv_-6`** — wrong at *every* drive setting. Same shape at the bridged-T (ours fixed 716 Hz, pedal 696 → 745 Hz). ⚠ The reassuring `1.022×` in s122's summary is `sweep_clean` on the LEVEL ladder only; the same feature reads `1.152×` on the pure-OD endpoints. | `analysis/feature_locus_gate.py` W6/W5/W5b |
+| "the bass peak can be walked onto the pedal's by an OD-path LF constant" (the natural next move after s125 opened it) | ⛔ **REFUTED — no SINGLE constant does it, s126** | 126 | Every LF-shaping OD-path constant is a weak NEGATIVE lever (`\|S\| ≤ 0.178`, next 0.144/0.131, rest ≤ 0.058), against a required **+18.2 % to touch / +25.2 % to match** ⇒ a 4.8–5.6× move on an already-fitted constant. Two **do** reach when rendered (`trebleR7 ×0.21` → 205.9 Hz, `trebleC5 ×0.179` → 214.4) — and both **DISSOLVE the 320 Hz null (GAP #2) and the mid peak entirely** (prom 7.27 → 0.00 dB, 0 interior extrema in a 1.6×-widened window), i.e. they flatten the one centre GATE W says is right to 0.7 % and the one feature whose drive dependence already tracks. ⇒ compensating error, not a fix. ⚠ NOT refuted: a mechanism that is not one of these constants. | `analysis/bass_peak_locus.py` (GATE Y) Y3/Y5/Y7 |
+| "the bass-peak gap is ~20–26 %" (s125, and every earlier statement of it) | ⚠ **THAT IS A `sweep_clean` NUMBER — the gap COLLAPSES with stimulus, s126** | 126 | Both sides from one capture: **+25.7 % (clean) → +24.0 → +18.1 → +6.4 % (`drv_-6`)**. So the defect is far more a quiet-stimulus phenomenon than a broadband one, and a lever must be quoted per rung: `trebleR7 ×0.21` closes it at `clean` and leaves **+21.6 %** at `drv_-12` (its own effect spans 2.1–25.6 % across the ladder). ⭐ Also the FIRST measurement of the model's own bass peak on this axis — **163.9 → 151.1 Hz, −7.8 %**, i.e. **DRIVE-DEPENDENT** by W6's own 5 % bar. GATE W6 reports it `UNRESOLVED` for a **membership** reason (W6 reads bleed-free endpoints; a mix cancellation has no reading there), never a physical one. | `analysis/bass_peak_locus.py` (GATE Y) Y6 |
 | "memoryless ADAA does not apply to the CD4049 VTC — it lives inside an implicit solve, so state-space ADAA would be needed" (asserted in `PedalChain.h`, `FitParams.h`, `dsp.md` from session 6) | **REFUTED** | 123 | Conflates the STAGE (has memory) with the NONLINEARITY (`vtc` is memoryless in node W). ADAA1 needs a memoryless map with a ~linear argument; nothing requires that argument to be the stage input. Built and measured: **12.6–19.8 dB** median alias-floor gain at OS 1×/2×. Ships OFF (exact only at `clipK == 2`). | `analysis/clip_adaa_gate.py` (GATE X) |
 | "ADAA only the NONLINEAR residue, keeping the linear part pointwise, to dodge ADAA1's 2-point-average cost in the feedback loop" | **REFUTED — do not re-invent** | 123 | Evaluates two halves of ONE map half a sample apart ⇒ injects a first difference of gain `a0/2`, reaching the **full loop gain at Nyquist**. H1 +13.4 dB hot, alias floor 14.4 dB worse than plain ADAA, whose own cost is 0.01 dB. | `Clipper.h::setADAA`, `ClipperTest` Test 8(e) |
 | "ADAA1 imposes its own ≈ −48 dB alias floor (win above it, loss below)" | **REFUTED — my own s123 hypothesis** | 123 | Read off the worst-3-tones table; the ADAA arm's full spread is 51–84 dB, as wide as the baseline's. What survives: `corr(baseline, benefit) = −0.540`, and every costing cell had a baseline already better than −43.9 dB. | `docs/session-log.md` SESSION 123 |
@@ -302,7 +304,22 @@ live hypothesis for it, not a settled artefact.
 ### Open work, in order
 
 Current ordering per session 124's own `▶ NEXT` (see `docs/session-log.md` for the superseded
-orderings and why each item moved):
+orderings and why each item moved).
+
+0. ✅ **DONE, SESSION 126 — the bass peak is LOCALISED, and the single-constant route is REFUTED.**
+   `analysis/bass_peak_locus.py` (GATE Y). Two CLOSED/REFUTED rows above carry the result; the
+   short version is that every OD-path LF constant is a weak negative lever, the two that reach a
+   +25.2 % move **dissolve GAP #2 and the mid peak**, and the gap being closed is itself a
+   `sweep_clean` phenomenon that collapses to +6.4 % at `drv_-6`.
+   ⭐⭐ **WHAT IT HANDS FORWARD, AND IT BELONGS TO ITEM 6, NOT HERE** (written as a numbered entry
+   rather than a paragraph, per `closing-an-item-drops-its-successor`): **our bass peak is
+   DRIVE-DEPENDENT too — 163.9 → 151.1 Hz, −7.8 %** — and so is the pedal's (7.8 %, W6). So the
+   bass peak is *not* another "ours is pinned, theirs walks" case like the treble peak; **both
+   walk, and they walk to different places.** That makes it a second instance of item 6's
+   frequency-dependent-nonlinearity target, at the opposite end of the band from the treble peak,
+   and it must be gated the same way: any candidate has to be checked at every stimulus rung, not
+   at `sweep_clean` alone.
+   ⛔ Do NOT re-open "point an optimiser at trebleR7/trebleC5/trebleC7" — priced and refuted.
 
 1. ✅ **DONE, SESSION 124 — the user enabled ADAA, gated by OS factor, with `clipK` re-anchored to
    2.0.** Three constants shipped (SHIPPED CONSTANTS table above); two open items closed on one
@@ -346,6 +363,19 @@ orderings and why each item moved):
    | mid peak | 458 → 429 Hz (9.0%) | 447 → 419 Hz (8.0%) | ~2.5% — ✅ this one TRACKS |
    ⭐ **The mid peak tracking is the localising clue**: we already have a drive-dependent mechanism
    at ~450 Hz and none at ~2.9 kHz, so this is not a global missing dynamic — it is specific.
+   ⭐⭐ **AND A FOURTH FEATURE JOINED THIS ITEM IN s126, AT THE OTHER END OF THE BAND — THE BASS
+   PEAK, WHERE *BOTH* SIDES WALK.** Measured on ONE capture, both sides, all four rungs (GATE Y's
+   Y6 — not W6, which reads this feature `UNRESOLVED` on the model for a membership reason):
+   | feature | model | pedal | our error |
+   |---|---|---|---|
+   | bass peak (`ref-od`, s126) | 163.9 → **151.1** Hz (7.8%) | 206.0 → **160.8** Hz (28.1%) | **+25.7 % @ clean → +6.4 % @ `drv_-6`** |
+   ⇒ unlike the treble peak this is **not** "ours is pinned and theirs walks" — ours walks too, just
+   **3.6× less far**, so the error is a difference of *rates*, not the presence-vs-absence of a
+   mechanism. Same target class (a frequency-dependent nonlinearity), second location, and it gives
+   the item a low-frequency anchor to gate candidates against.
+   ⚠ Quote the condition: on the **bleed-free** endpoints W6 reads the pedal's bass peak at a 7.8 %
+   span and non-monotone (195.7/199.0/186.7/201.3) — a different capture set at a different mix, so
+   the two are not interchangeable.
    ⭐⭐⭐ **WHAT MAKES OUR 2980 Hz PEAK — LOCALISED s125, CLOSED-FORM, NO FIT.** It is the
    **recovery bridged-T's rise out of its own 716 Hz notch, rolled off by the two Sallen-Keys.**
    Cascading the schematic values (bridged-T nodal solve × SK 10.7k × SK 3.3k × the clipper's
