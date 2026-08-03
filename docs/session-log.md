@@ -15748,3 +15748,215 @@ tested rather than one guard checked twice.
    term per side would turn "not parabolic" into a number. Unchanged.
 5. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a seventh session.
 6. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+## SESSION 139 (2026-08-04) — GATE AJ: the last three named pre-clipper carriers fall, so EVERY named carrier on both sides of the clipper is now refuted
+
+**Changed NO baseline, NO constant and NO `src/` file.** Closed-form plus two stored surfaces;
+**no render at all**. New tool `analysis/pre_clipper_tilt_gate.py` (GATE AJ) +
+`analysis/_mutate_gate_aj.py`. Report: `analysis/reports/s139_pre_clipper_tilt.json`.
+Also **fixed a defect in session 138's own gate** (below) and regenerated its report.
+
+Executes session 138's `NEXT` #1 to completion. AI's printed scope named exactly three unscreened
+candidates on the pre/at-clipper side; this session takes all three.
+
+### ⚠⚠ FIRST — A DEFECT IN GATE AI, FOUND BEFORE BUILDING ON IT
+
+`Clipper::gruntCap()` returns **Cut = c11, Flat = c11 + c12, Boost = c11 + c13** — C12/C13 are
+**ADD-caps** switched in parallel with the always-present C11 (circuit.md's GRUNT node graph;
+parallel capacitances add), and `FitParams.h` calls them "add-cap" in as many words. **GATE AI read
+`clipC12`/`clipC13` RAW as the flat/boost caps**, i.e. 47.00 / 220.00 nF where the shipped stage
+uses **50.69 / 223.69 nF**.
+
+⭐ The consequence was **measured, not assumed** — the gate was re-run at both cap sets and the two
+reports diffed:
+
+| | old cap | new cap | Δ AI2 limit | Δ AI4 reach |
+|---|---|---|---|---|
+| cut | 3.690 nF | 3.690 nF | **+0.00000** (bit-identical) | 20.69 % → 20.69 % |
+| flat | 47.00 nF | 50.69 nF (+7.85 %) | +0.00882 dB/oct | 0.00 % → 0.00 % |
+| boost | 220.0 nF | 223.69 nF (+1.68 %) | +0.00035 dB/oct | 0.00 % → 0.00 % |
+
+⇒ **AI's verdict, signs and reaches are all unchanged.** Two free known answers fell out and both
+held: `cut` is **bit-identical** (c11 alone was always right), and AI3's defect column is
+**bit-identical** (the caps do not enter it). Fixed by composing the caps in one place —
+`at_clipper_tilt_gate.grunt_caps()`, mirroring the stage — rather than at each call site, so the
+raw-fit-param reading cannot come back. `a shipped stage's closed form takes the STAGE's input`
+(s113), on a *composition* rather than a taper.
+
+### ⭐⭐ The licence, inherited and re-asserted (AJ1a)
+
+Same as AI1c: the graded quantity is a drive-tilt **CHANGE**, the tilt operator is linear on
+log-magnitude, so every block not depending on the candidate's parameter cancels **exactly**.
+⇒ all three candidates screened with **no render**. Asserted at **6.2e−15 dB/oct** against a
+deliberately wild fixed block, not argued.
+
+### AJ1 — four known answers, all at machine precision
+
+| | | |
+|---|---|---|
+| (a) THE LICENCE — a wild candidate-independent block cancels from the tilt CHANGE | **6.2e−15 dB/oct** | bar 1e−9 |
+| (b) injected-tilt recovery over T = 0 / −1.199 / +3 (T = 0 its own control, s133) | **8.9e−16 dB/oct** | bar 1e−9 |
+| (c) the gate-node block reduces to `JfetStage.h`'s own `kDiv * HP(s)` oracle at Cin → 0 | **4.4e−15 dB** | bar 1e−6 |
+| (d) the treble ladder's Zin, extracted at two probe impedances (1k, 47k) | **3.9e−14 rel** | bar 1e−9 |
+
+(c) is what ties AJ2's arithmetic to the *shipped* J201 input network; (d) is what makes the
+|A| < 1 finding a property of the ladder rather than of the extraction.
+
+### AJ2 — candidate 1: the J201's Miller / junction capacitance
+
+⭐⭐ **The structural half first: MILLER MULTIPLICATION NEEDS VOLTAGE GAIN, AND THIS STAGE HAS
+|A| = 0.565 AT THE VERTEX.** At the shipped `jfetGm = 0.10 mS` (session-4 anchor, session-17 held)
+into `Zout_jfet ∥ Zin_ladder = 5.654 kΩ`, the Miller factor `(1+|A|)` is **1.565** ⇒ the "Miller"
+candidate **reduces to the bare junction capacitance**. The stage is a transconductance into a low
+impedance, not a voltage amplifier.
+
+| | |
+|---|---|
+| Cin at the part's datasheet MAX (Ciss 4.0 pF, Crss 1.5 pF) | **4.85 pF** |
+| Cin REQUIRED for AH7's budget (−1.199 dB/oct) | **388.3 pF** — **80× the whole part** |
+| Cin REQUIRED for AG5's available (−2.038) | **660.9 pF** |
+| d(tilt) at a ceiling of 10 pF (**2.5× the datasheet max**) | **−0.00199 dB/oct = 0.17 % of budget** |
+
+…and the required capacitance would have to be delivered by the **drive-dependent part alone**.
+⭐ The Miller split's two dropped terms are **bounded rather than assumed**: drain-side pole
+**18.8 MHz** (6394× the vertex), feedforward zero **10.6 MHz** (3615×) — the input pole is the
+whole story.
+
+### ⭐⭐⭐ AJ2c — the screen that generalises past this candidate, and past this session
+
+Every "a capacitance grows with drive" mechanism is **one real pole whose corner moves**. For such
+a pole `dT(f) = −6.0206·u/(1+u)`, `u = (f/fp)²`, so
+
+    d ln|dT| / d ln f  =  2/(1+u)  <=  2 ,  EXACTLY, for every fp and every f.
+
+**The class cannot produce a deficit steepening faster than f².** Measured on AG4's only three
+uncontaminated centres (1612.7 / 2031.9 / 2560.0 Hz; deficit −0.389 / −0.775 / −1.444 dB/oct):
+
+| | |
+|---|---|
+| regression exponent | **2.841** |
+| adjacent-pair exponents | **2.989, 2.693** — gated on the **weaker**, which is the reading most favourable to the candidate |
+| the class's exact bound | **≤ 2.000** |
+
+⇒ **refuted on SHAPE, with no size argument and no threshold.** ⚠ **n = 3 centres** (AG4's own
+membership — the wider centres' windows reach ND's treble notch per GATE AE). This is a bound the
+class must satisfy and a measurement that exceeds it, **not a fit**.
+
+### AJ3 — candidate 2: IC2_A's GBW and slew
+
+**GBW — INHERITED, not re-derived.** AF2 established that gain-bandwidth is a **small-signal**
+parameter, so no amplitude moves it; that is a statement about the *part*, so it transfers from the
+Sallen-Keys to IC2_A unchanged. Size row for completeness: IC2_A's closed-loop gain at DRIVE max is
+**77.7**, so putting its own GBW pole on the vertex needs **ft = 228.2 kHz** against **2.5 MHz**
+min spec — **11× short**.
+
+**SLEW — new, and this is the one s138 asked for specifically.** Full-rail square wave demanded at
+IC2_A's output, shaped by its own closed loop (R15∥C10 → 10.26 kHz), normalised to the rail:
+
+⚠⚠ **A "worst rate over the sweep" figure is set by wherever the sweep STOPS** — the rate climbs
+monotonically with f0 (0.087 V/µs at 100 Hz → 9.0 at 20 kHz), so quoting it would make the verdict
+an artefact of the last table row. The gate therefore quotes the two **endpoint-independent**
+numbers instead:
+
+| | |
+|---|---|
+| rate at the 2935 Hz vertex | **0.683 V/µs → 12× margin** at the min-spec part |
+| fundamental at which slew first engages | **18.7 kHz** (6.4× the vertex) |
+
+⇒ **refuted at the vertex.** ⚠ **State the caveat honestly:** this margin is far tighter than AF3's
+post-clipper one — the pre-clipper swing genuinely *is* larger, exactly as s138 expected — and on
+the same bound the stage *would* slew above 18.7 kHz. Out of band and out of reach of a bass
+preamp, **but it is not a 50× margin and must not be quoted as one.**
+
+### AJ4 — candidate 3: the GRUNT caps' voltage coefficient
+
+A voltage coefficient makes C **fall** with signal. On AI's own at-clipper block, with the caps
+composed correctly:
+
+| dC/C | cut | flat | boost | |
+|---|---|---|---|---|
+| −0.1 % | +0.00112 | +0.00011 | +0.00002 | film ceiling |
+| −50 % | +0.71031 | +0.12173 | +0.02158 | X7R ceramic ceiling |
+| −90 % | +1.46865 | +1.16898 | +0.23601 | a limit past any dielectric |
+
+**Every entry is POSITIVE and the defect is NEGATIVE at all three positions** (−2.407 / −1.913 /
+−1.098) ⇒ **REFUTED ON SIGN, 0 of 3 positions, so no dielectric can carry it** — the verdict does
+not depend on whether the fitted parts are film or ceramic, which is what makes it robust to a part
+type nobody can verify.
+
+⚠⚠ **A defect in this session's own pattern statistic, found and fixed.** The GRUNT-consistency
+screen first normalised each side by its **signed** cut entry, which forces *both* to +1.000 there
+and **destroys the sign difference the screen exists to see** — it printed a reassuring 0.002
+agreement at `flat` between a mechanism and a defect of **opposite sign**. Normalising by |cut|
+instead gives mechanism +1.000/+0.796/+0.161 against defect −1.000/−0.794/−0.456, worst departure
+**2.000** (a sign flip alone costs ≥ 2 at cut). Same family as AB5: a classifier's predicate must
+compare against the target, and a normalisation that cancels the target's sign is that failure
+wearing arithmetic.
+
+### ⭐⭐⭐ AJ5 — the verdict, and what it means
+
+| candidate | verdict |
+|---|---|
+| J201 Miller / junction C | **REFUTED ON SHAPE AND SIZE** — f^2.84 against an exact f² bound; 0.17 % of budget at 2.5× the datasheet max |
+| IC2_A GBW / slew | **REFUTED** — GBW is small-signal (AF2, inherited; 11× short besides); slew 12× margin at the vertex |
+| GRUNT-cap voltage coeff | **REFUTED ON SIGN** — 0 of 3 positions, at a cap reduction past any dielectric |
+
+⇒ **ALL THREE REFUTED. With AF7's five post-clipper carriers and AI's at-clipper `a0`, EVERY named
+carrier on BOTH sides of the clipper is now refuted**, while the deficit stays measured, sized and
+twice-localised (AG5: P−M = −2.038 dB/oct, 1.72× the requirement, same sign 13/14). **Session 138's
+`NEXT` #2 fires: the pre/at-clipper FRAME is now the thing in question.**
+
+⚠ **SCOPE, printed by the gate itself:** what is refuted is a list of **named carriers**, not the
+existence of a mechanism. Nothing here touches the bridged-T half of AB6, and nothing here claims
+the deficit is unreal.
+
+### The mutation runner, and three arms that were my own fault
+
+**12/12 arms.** 8 refusals + **4 computed-verdict arms** — one per candidate plus the shape/size
+split inside candidate 1, since a refutation that cannot become a non-refutation is narration
+(s128). All four verdict arms pass, i.e. **each of the three candidates CAN be driven to
+`REACHES`** and the shape clause can be lost independently of the size clause.
+
+⚠ **Three arms initially read `PATCH DID NOT APPLY`, and all three were the TEST's fault, not the
+gate's** (s110 — suspect the mutation before the guard):
+* **two** aimed at the tilt estimator, which lives in the **imported** `at_clipper_tilt_gate`, not
+  in the gate under test — s128's documented "mutate the dependency" case. Re-pointed to inject a
+  module-level monkey-patch into the mutant itself, so the override lives and dies with the
+  subprocess and there is no shared-state restore to get wrong.
+* **one** anchored on a line my own mid-session vectorisation had moved.
+
+⚠⚠ **AND A REAL CONCURRENCY BUG IN THE RUNNER, in its cross-process form.** Two runs were briefly
+alive at once and **both wrote the same fixed-name mutant file** in `analysis/`, so each arm could
+score whatever the other run had just written. Fixed by making the mutant path **PID-unique**.
+This is s133's *"a concurrency-only bug inside a mutation test reads as a gate defect"* across
+processes rather than across threads — and the tell was the same: output that made no sense for
+the arm that produced it.
+
+⚠ **Performance note, because it changed a number.** AJ3's first draft built the square wave in a
+per-harmonic Python loop and the root-find called it ~200 times: **61 s per gate run**. Vectorised
+to one matmul with the derivative taken in **closed form** rather than by `np.gradient`, and the
+bisection cut to 60 halvings (already past double precision): **9.3 s**. The rates moved ~1–2 %
+(vertex 0.672 → 0.683 V/µs, crossing 18.9 → 18.7 kHz) because the analytic derivative is the more
+accurate of the two; no verdict moved.
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **Session 138's `NEXT` #2 has now fired, and it is the head item: the pre/at-clipper FRAME
+   is in question.** Every *named* carrier on both sides is refuted, so the honest next move is to
+   ask what is left rather than to widen a bound. Three concrete directions, cheapest first:
+   (a) **is the deficit's carrier LINEAR-but-drive-switched rather than a device nonlinearity** —
+   i.e. does something in the model's own OD path change its transfer with level in a way no single
+   block owns (A3's dynamic half, which `reference-sources.md` §1a records as *"static excluded,
+   dynamic UNTESTED"*); (b) **the J201's shaper itself** — the one pre-clipper nonlinearity nobody
+   has screened *as a tilt mechanism*, as opposed to as a harmonic one; (c) **question AG4's
+   premise** — the exponent screen says the deficit steepens faster than f², which no single moving
+   pole can do, so a candidate needs **two** poles or a distributed mechanism, and that is a
+   structural clue nobody has followed.
+2. ⚠ **AJ2c's exponent is n = 3.** Widening it needs centres whose windows clear both `bt_notch`
+   and ND's `treble_notch`, which AG1c says is true by only 50 Hz at the top — so more centres
+   need a finer surface, not a wider window. Worth sizing before anything is built on f^2.84.
+3. **The bridged-T half of AB6 (τ × 0.9337) remains unowned.** Unchanged for ten sessions.
+4. ⚠ **`C_pedal`'s window/bar sensitivity (s137 NEXT #3)** — a cubic fit reporting the third-order
+   term per side would turn "not parabolic" into a number. Unchanged.
+5. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for an eighth session.
+6. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.

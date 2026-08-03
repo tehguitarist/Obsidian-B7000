@@ -93,6 +93,27 @@ A0_LIMIT = 1.0
 
 GRUNT_CAP = {"cut": "clipC11", "flat": "clipC12", "boost": "clipC13"}
 
+
+def grunt_caps():
+    """The EFFECTIVE GRUNT coupling cap per position, composed exactly as the shipped stage does.
+
+    ⚠⚠ CORRECTED SESSION 139.  `Clipper::gruntCap()` returns  Cut = c11,  Flat = c11 + c12,
+    Boost = c11 + c13 — C12/C13 are ADD-caps switched in PARALLEL with the always-present C11
+    (circuit.md GRUNT node graph; parallel capacitances add), and `FitParams.h` names them
+    "add-cap" in as many words.  Session 138 read clipC12/clipC13 RAW as the flat/boost caps,
+    i.e. 47.00 / 220.00 nF where the stage uses 50.69 / 223.69 nF (7.3 % / 1.7 % low).
+
+    Both corners sit far below the 2935 Hz vertex either way, so AI2's signs and AI4's reach are
+    unmoved — but that is a MEASUREMENT (session 139 re-ran the gate at both cap sets and diffed
+    the stored report), not an argument.  Composing it here rather than at the two call sites is
+    what stops the raw-fit-param reading coming back: `a shipped stage's closed form takes the
+    STAGE's input` (measurement-discipline.md §1, s113).
+    """
+    c11 = AB._read_fitparam("clipC11")
+    return {"cut": c11,
+            "flat": c11 + AB._read_fitparam("clipC12"),
+            "boost": c11 + AB._read_fitparam("clipC13")}
+
 KA_REDUCE_TOL = 1e-6      # dB, AI1a -- exact algebra through two different expressions
 KA_TILT_TOL = 1e-9        # dB/oct, AI1b -- exact algebra
 KA_CANCEL_TOL = 1e-9      # dB/oct, AI1c -- the licence
@@ -185,10 +206,11 @@ def gate_ai2(f0, half, caps, out):
     print("AI2  THE MECHANISM — d(tilt) at the vertex as `a0` sags, per GRUNT position")
     print("-" * 96)
     print(f"  Shipped: R16 {AB.R16:.0f}  R18 {AB.R18:.0f}  C14 {AB.C14:.3g}  a0 {AB.CLIP_A0:.4f}")
-    print(f"  GRUNT coupling caps read from FitParams.h (clipC11 is FITTED, not the schematic "
-          f"4n7):")
+    print(f"  GRUNT coupling caps COMPOSED as Clipper::gruntCap() does (clipC11 is FITTED, not")
+    print(f"  the schematic 4n7; clipC12/clipC13 are ADD-caps in parallel — corrected s139):")
+    comp = {"cut": "clipC11", "flat": "clipC11+clipC12", "boost": "clipC11+clipC13"}
     for nm in ("cut", "flat", "boost"):
-        print(f"      {nm:<6s} {GRUNT_CAP[nm]:<9s} {caps[nm]:.4g} F")
+        print(f"      {nm:<6s} {comp[nm]:<16s} {caps[nm]:.4g} F")
     base = {nm: tilt_fine(mech_db(AB.CLIP_A0, caps[nm]), f0, half) for nm in caps}
     print(f"\n  tilt at {f0:.0f} Hz (+-{half} oct) at the shipped a0: "
           + "  ".join(f"{nm} {base[nm]:+.4f}" for nm in ("cut", "flat", "boost")))
@@ -337,7 +359,7 @@ def main():
     print(f"    that as \"A0 is ruled out\".  That is a different frequency and a different")
     print(f"    quantity; it is NOT inherited here, and this gate re-asks it at the vertex.")
 
-    caps = {nm: AB._read_fitparam(key) for nm, key in GRUNT_CAP.items()}
+    caps = grunt_caps()
     out = {"report": a.report, "ag_report": a.ag, "ah_report": a.ah, "vertex_hz": f0,
            "half_oct": half, "budget": budget, "available": avail,
            "a0_shipped": AB.CLIP_A0, "grunt_caps": caps}

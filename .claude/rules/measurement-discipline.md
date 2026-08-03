@@ -822,6 +822,23 @@
   **pass the perturbation as an ARGUMENT** so there is no shared state and no order to get wrong.
   ⚠ The tell was available and nearly missed — a column the mutation should not have touched moved.
   **When a mutation arm changes something outside its stated scope, suspect the arm.** (s133)
+  - ⭐⭐ **THE CROSS-PROCESS FORM, s139: A MUTATION RUNNER THAT WRITES ITS MUTANT TO A *FIXED*
+    FILENAME CANNOT SAFELY BE RUN TWICE.** The mutant must LIVE in the tool's own directory so
+    sibling imports resolve (s110) — which is exactly what makes a fixed name dangerous, because
+    two concurrent runs then share one path and each arm scores whatever the *other* run wrote
+    between its write and its subprocess launch. It happened here: a slow first run was still
+    alive when a second was started, and both were writing `analysis/_mutated_gate_aj.py`. ⭐ The
+    fix is one interpolation — **make the mutant path PID-unique** — and it costs nothing. ⚠ Note
+    how it presents: arms fail with results that make no sense *for the arm that produced them*,
+    which reads as a gate defect (s133's point) and is really two runners fighting. Before
+    debugging such a result, `pgrep` for a second copy of your own runner.
+  - ⚠ **AND CHECK WHERE THE THING YOUR ARM MUTATES ACTUALLY LIVES.** Two arms aimed at the tilt
+    estimator patched the gate's own source and reported `PATCH DID NOT APPLY` — the estimator is
+    in an **imported module**, so the pattern could never match. That is s128's documented
+    "mutate the dependency" case, and for a subprocess runner the cleanest form is not to patch
+    the dependency on disk (which needs a `finally` restore and can leak into other runs) but to
+    **inject a module-level monkey-patch into the mutant itself**, after its imports: the override
+    then lives and dies with the subprocess and there is no shared state at all. (s139)
 - ⭐⭐ **ASK WHETHER THE PARTIALITY YOUR GUARD IMAGINES IS STRUCTURALLY POSSIBLE — A GUARD THAT
   CANNOT FIRE IS WORSE THAN NO GUARD, AND s129's THREE-OUTCOME RULE CAN BE APPLIED TO THE WRONG
   AXIS.** GATE AE dutifully implemented "a GRUNT class that loses a stimulus rung is a MALFORMED
@@ -917,6 +934,44 @@
   table, even if the answer is "unknown" — an empty mechanism column is a visible hole, whereas a
   bare multiplier reads as a plan. And before building the sized move, screen the mechanisms: it is
   closed-form work measured in minutes against a DSP change measured in sessions. (s134)
+- ⭐⭐⭐ **A MECHANISM *CLASS* OFTEN CARRIES AN EXACT BOUND ON THE **SHAPE** OF THE EFFECT IT CAN
+  PRODUCE — FIND IT AND THE WHOLE CLASS FALLS WITH NO SIZE ARGUMENT, NO DATASHEET AND NO
+  THRESHOLD.** Six sessions of screening item 6's carriers had been fought on SIZE ("this reaches
+  0.17 % of the budget"), which is the arguable axis: it depends on a datasheet number and invites
+  *"but at the bad end of the spread…"*. The class here is *"some capacitance grows with drive"*,
+  and every member of it is **one real pole whose corner moves**, for which the tilt change is
+  `dT = -6.0206*u/(1+u)`, `u = (f/fp)^2`, so
+
+      d ln|dT| / d ln f  =  2/(1 + u)   <=  2 ,  EXACTLY, for every fp and every f.
+
+  The class therefore **cannot** produce a deficit steepening faster than the square of frequency.
+  Measured, the deficit steepens as **f^2.84** ⇒ every member is refuted at once, at any size, with
+  one line of calculus. ⭐ GENERAL: before screening candidates one at a time, ask **what SHAPE the
+  class can produce at all** — a monotone map, a single pole, a memoryless nonlinearity, a fixed
+  linear network each have hard structural signatures, and matching the shape is a necessary
+  condition that costs nothing to test. This is the *constructive* twin of `refute on the AXIS the
+  parameter lives on` (s134): there the parameter did not depend on amplitude, here the class
+  cannot make the shape. ⚠ Two disciplines the result still needs: gate on the **weakest** reading
+  (here the shallower of the two adjacent-pair exponents, 2.69, not the 2.84 regression — the
+  reading most favourable to the candidate is the honest bar), and print **n** beside it (3
+  centres, because the wider ones' windows reach a neighbouring migrating feature). ⭐ And read the
+  positive half: the bound does not merely refute, it **specifies** — what is needed is two poles
+  or a distributed mechanism, which is a sharper brief than "find a frequency-dependent
+  nonlinearity". (s139, GATE AJ2c)
+- ⭐⭐ **A "SHIPPED STAGE'S OWN INPUT" INCLUDES HOW ITS CONSTANTS ARE *COMPOSED*, NOT ONLY WHAT
+  DOMAIN THEY ARE IN.** s113's entry (below/above, `a shipped stage's closed form takes the
+  STAGE's input`) is about a taper sitting between the knob and the algebra. The same trap has a
+  composition form: `FitParams.h` stores `clipC12`/`clipC13` as **ADD-caps** and the stage returns
+  `Flat = c11 + c12`, `Boost = c11 + c13`, but a gate read the two fit params **raw** as the
+  effective caps — 47.00/220.0 nF where the stage uses 50.69/223.69 nF. Plausible, monotone,
+  ordered correctly, and wrong by 7.9 % / 1.7 %. ⭐ The habit that catches it is one grep: **read
+  the accessor the DSP actually calls** (`Clipper::gruntCap()`), not the constants it is built
+  from — a fit param is an ingredient, and only the stage knows the recipe. ⚠ And when you fix it,
+  **measure the consequence rather than asserting it is small**: re-run at both constant sets and
+  diff the stored reports. Here two free known answers fell out and both held (`cut` bit-identical
+  because it was always `c11` alone; the *defect* column bit-identical because the caps do not
+  enter it), and the verdict was unchanged — but that is a measurement, not the argument that was
+  available beforehand. Compose it in ONE place so the raw reading cannot return. (s139)
 - ⭐⭐⭐ **A PROMINENCE MEASURED AT A WINDOW EDGE IS IDENTICALLY ZERO BY CONSTRUCTION, SO ANY CHECK
   BUILT ON IT IS CIRCULAR — AND IT LOOKS LIKE A DEVASTATING RESULT.** `locate`'s prominence is
   `min(left, right)` over a walk outward from the extremum; when the extremum sits ON a window
@@ -1579,6 +1634,18 @@
   and is a measurement. ⭐ GENERAL: in any classifier, the target must appear **as a variable** in the
   predicate; if you can delete the target from the code and the classification still runs, it is
   narration. (s130, GATE AB5)
+  - ⭐⭐ **AND THE SUBTLER FORM, s139: A *NORMALISATION* CAN DELETE THE TARGET WHILE THE TARGET IS
+    STILL VISIBLY IN THE CODE.** A screen compared a candidate's per-position PATTERN against the
+    defect's, correctly reading both from data — and normalised each side by **its own signed
+    value at a reference position**. That forces BOTH to `+1.000` there, so the sign information
+    the screen exists to see is destroyed by the arithmetic rather than by the predicate. It duly
+    printed a reassuring **0.002** agreement between a mechanism and a defect of **opposite
+    sign**. Normalising by the **magnitude** `|ref|` instead keeps the sign and the departure
+    reads **2.000**. ⭐ GENERAL: after writing any ratio/normalisation into a comparison, ask
+    **which properties of the two operands survive it** — dividing by a signed reference discards
+    sign, dividing by a per-side scale discards size, and both look like sensible
+    scale-invariance. The tell was a number that was *too good*: two independent quantities
+    agreeing to 0.002 is `an implausible coincidence is a bug report`.
 - ⭐⭐ **A CARDINALITY IS A USELESS DISCRIMINATOR FOR A CLASSIFICATION MUTATION TEST WHENEVER THE TWO
   CLASSES CAN BE THE SAME SIZE — ASSERT MEMBERSHIP, AND PRINT IT MACHINE-CHECKABLY.** The arm written
   to catch exactly the defect above **passed vacuously**: it flipped the target so the classification
