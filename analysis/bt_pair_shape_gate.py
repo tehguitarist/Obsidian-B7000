@@ -104,8 +104,14 @@ R24 = 10.0e3                                        # bridged-T -> SK series res
 
 # GATE AA6's measured pedal signature (s129, from s122_feature_locus.json's W6 medians).
 PEDAL = dict(notch_lo=695.7, notch_hi=745.4, peak_lo=2498.5, peak_hi=2696.4)
-PEDAL_DNOTCH = PEDAL["notch_hi"] / PEDAL["notch_lo"] - 1.0     # +7.15 %
-PEDAL_DPEAK = PEDAL["peak_lo"] / PEDAL["peak_hi"] - 1.0        # -7.92 %
+PEDAL_DNOTCH = PEDAL["notch_hi"] / PEDAL["notch_lo"] - 1.0     # +7.14 %
+# ⚠ -7.34 %, NOT the -7.92 % this comment read until session 131. Both numbers are real and they
+# are different CONVENTIONS: -7.92 is AA6's max/min-1 SPAN, -7.34 is the rung-1 -> rung-4 CHANGE,
+# which is what a dose-response means and what this file deliberately adopted (s130 flagged the
+# mix in prose and left the comment stale). The constant below has always been the -7.34 one; only
+# the comment was wrong, so no number moved -- but a comment that misstates the constant beside it
+# is exactly how a convention gets re-mixed by the next reader.
+PEDAL_DPEAK = PEDAL["peak_lo"] / PEDAL["peak_hi"] - 1.0        # -7.34 %
 PEDAL_DRATIO = ((PEDAL["peak_lo"] / PEDAL["notch_hi"]) / (PEDAL["peak_hi"] / PEDAL["notch_lo"])) - 1.0
 
 # s125's closed-form answers, the known answer AB1 must reproduce.

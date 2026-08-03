@@ -14574,3 +14574,428 @@ whenever the classes can be the same size.**
    an SK-bandwidth candidate is built — they may be the same mechanism seen from two ends, or they
    may refute each other. This is a cheap read against a passing gate.
 4. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+---
+
+## SESSION 131 (2026-08-03) — GATE AD: the project's first HARDWARE-referenced gate, and we appear to have no 4.5–6 kHz null at all
+
+**Trigger.** The user re-attached the nine source images behind `reference-sources.md` §3/§4 (six
+ATTACK/GRUNT hardware-vs-ND FR overlays, three hardware-vs-ND spectrum overlays) and asked whether
+the hardware-vs-ND differences are actually being kept in mind, given the captures are ND.
+
+⭐ **First, an identification worth recording, because it is easy to get backwards:** in those
+charts the red/white "Plugin" trace is the **Neural DSP** plugin, NOT Obsidian-B7000. Confirmed
+against §3's own self-check — §3 says *"charts 2 and 5 are the same curve to the pixel"*, and the
+attached Attack #2 and Grunt #2 are indeed identical, which is what pins the position order as
+{Cut, Flat, Boost}. So these images measure the gap our captures INHERIT, not our own error.
+
+### 1. The audit the question actually asked for
+
+Three user observations, checked against the archive rather than from memory:
+
+* **~320 Hz notch deeper in hardware** — recorded (§3: +1.6 dB deeper at GRUNT cut → ~26 dB at
+  GRUNT boost; §1 gives hardware authority). **Open**, as GAP #2, and re-scoped by s99 into a
+  TOPOLOGY question: three re-fits reached the notch shape only by spending the OD path's absolute
+  low end (−42 dB, then −22 dB), and with an LF-visible term the search saturates.
+* **More bass in hardware** — recorded, and **band-specific**, which the user had independently
+  spotted (*"depending on settings"*). §3: +2.8…+4.8 dB over 150–250 Hz driven, **exactly 0 at
+  GRUNT cut and on the clean sweep**. Below ~65 Hz it INVERTS — §2 has hardware 0.75–1.4 dB
+  *quieter* than ND at 15–30 Hz, which is why `c21R` went 220k → 130k (s91).
+* **Harmonics below the fundamental** — **not recorded anywhere**, and adjudicated this session as
+  the recording's mains ladder. See the CLOSED/REFUTED row; the discriminator is that the ladder's
+  absolute level is constant across the three drive settings while the fundamental climbs 12 dB.
+
+**And the structural answer, which is the reason this session built something:** only **two**
+constants have ever shipped because of hardware (`c21R`, `jfetSatNeg`), and **`release_gate.py` is
+100 % ND-referenced** — its single mention of hardware is a comment explaining `c21R`'s deliberate
+departure. So §5 rule 2 (*"a candidate that moves away from the captures toward a documented
+hardware trend is a PASS, not a regression"*) had **no mechanical enforcement at all**, and a
+hardware-correct move would read as a regression unless a human remembered the rule. That is the
+s125 failure shape (a distinction that lives only in a summary), waiting to happen.
+
+### 2. GATE AD — `analysis/hw_trend_gate.py`
+
+⚠ **Letter collision, resolved:** AB was taken by s130's `bt_pair_shape_gate.py` (committed as
+`3c8c74f` while this session was working) and **AC by an untracked `analysis/sk_gate_i_reconcile.py`
+that is not this session's and has no session-log entry** — flagged to the user, not touched, not
+run. This gate is **AD**.
+
+Design constraints, all of them existing rules rather than new ones:
+
+* Grades **SIGN and ORDERING only** — §5 rule 3 forbids fitting to §3/§4. Every "% of the way"
+  column is PRINTED so the size stays quotable and GRADED NOWHERE.
+* Both bars it needs are **taken from independently measured quantities**, never chosen here: AD1's
+  route bar is GATE O's measured 0.30 dB route/session gap (s107).
+* Absolute, not gain-matched: `plugin_db − gain_db_applied` (s116 GATE U2).
+* AD2 refuses a report rendered with `--fit` overrides, or predating s118 (the absolute frame moved
+  −3.90 dB at s115), and treats a PARTIAL sweep set as a **refusal** rather than an exclusion
+  (s129's three-outcome rule).
+* Hard exits cover the gate's own validity only; every physics outcome is a computed verdict (s108).
+
+**Mutation runner `analysis/_mutate_gate_ad.py` — 8/8, and every mutation is DATA-level** (it
+patches a copy of the report JSON and runs the unmodified gate via `--report`), which sidesteps
+s110's patched-copy trap entirely and makes s114's "mutate the data, not the predicate" hold by
+construction. Three arms are s128-style `rc=0` verdict arms naming a string that must APPEAR and one
+that must DISAPPEAR — the second half is what actually catches narration.
+
+### 3. What it found
+
+**AD1 (known answer).** The clean tilt measured on two independent capture routes (DIST disengaged
+n=11, BLEND=0 n=4) differs by a ~2.2 dB **absolute route offset** and agrees on **SHAPE to
+0.148 dB**. That is what makes AD3's sub-dB verdicts readable at all.
+
+**AD3 — clean tilt (§2).** 5 of 7 graded bands lean hardware; both hinges reproduce. ⚠ The LF bands
+are a FRAME PIN (`c21R` fitted there, s91). The load-bearing finding is the **one inversion at
+800 Hz–1 kHz**, ~0.5–0.6 dB the wrong side of ND. No work item names it.
+
+⚠ **A defect in this gate's own first draft, caught by the user and worth recording:** the §2 anchor
+table is sparse (the chart's own anchors are), and printing only the anchors **jumped 200 → 800 Hz
+and hid the entire 250–800 Hz feature train**. Fixed by printing EVERY band and grading only the
+anchored ones. ⭐ The full curve then showed something the sparse one could not: on the CLEAN path
+the model−ND curve is a **smooth droop with no fine structure whatever** (−0.008 / −0.026 / −0.054 /
+−0.094 / −0.145 dB at 254 / 320 / 403 / 508 / 640 Hz), which independently corroborates GATE W's
+finding that the 250–800 Hz features are **mix cancellations, not network corners** — they simply do
+not exist on the clean path.
+
+**AD4 — OD low-mid (§3).** Splits into a level-dependent pedestal (= A3, 5–9 dB) and a
+**level-invariant GRUNT contrast that already leans hardware, 6 of 6**. See the CLOSED/REFUTED row.
+
+**AD5 — the 250–800 Hz feature train.** The 320 Hz null orders HW > ND > model in 7 of 9 conditions;
+2 invert (GRUNT cut at drv_−18/−12, model 2.13/1.07 dB deeper than ND). ⭐ The train's other two
+features carry no hardware statement and are reported, and one of them is a finding: the
+**bridged-T dip's prominence FALLS MONOTONICALLY with drive on ND in 3 of 3 GRUNT positions (spans
+1.30 / 2.20 / 1.49 dB) while the model's is pinned at 0.02 / 0.19 / 0.04 dB.** That is item 6's
+signature on a **new axis — depth rather than centre frequency** — and a notch whose depth collapses
+with drive is a **damping/loading** change, which is exactly the mechanism class s129's AA6 narrowed
+to. Independent corroboration of AA6's conclusion from a different statistic. ⚠ AA6's *reasoning*
+was separately corrected by s130's GATE AB; this touches its **conclusion**, not its argument.
+
+**AD5b — the 4.5–6 kHz null.** Added at the user's request (*"the notch between around 4.5 and 6 kHz
+which shifts depending on setting"*). §1's authority column for this feature reads **"Neither —
+unresolved"**, so nothing is graded against hardware. The measurement is nonetheless the session's
+largest: **ND's depth rises monotonically with drive in 3 of 3 GRUNT positions (spans 2.60 / 7.55 /
+3.41 dB) while the model's is FROZEN at a 0.01 dB span in all three.** Read correctly (s126), a
+prominence that is both tiny and invariant to every control means **we appear to have no null there
+at all**. See the CLOSED/REFUTED row for the full caveat set.
+
+⚠ **What the grid cannot do:** the report's bands are ~1/3 octave apart at 5–6.5 kHz, so the
+**SHIFT** the user sees in the charts is **not resolved** (both sides pick 6451 Hz in 9 of 9
+conditions) and every depth here is a LOWER BOUND. Confirming "no feature" and locating the shift
+both need GATE W's log-f locator, not this grid.
+
+### 4. What this session did NOT do
+
+* **No baseline, no constant, no `src/` file changed.** `s124_ship.json` stands; the release gate is
+  still 6 rows over SHIP; no re-baseline is owed and no cache was invalidated.
+* **§4's harmonic trend is NOT gated.** Hardware's evens sit ~27 dB above ND's while the odds match
+  to the dB — the largest hardware gap in the project — and it needs a harmonic instrument, not an
+  FR one. GATE AD prints this exclusion every run rather than leaving it implicit.
+* **Nothing was fitted to a hardware number**, and the gate is written so that it cannot become a
+  fit target without deleting its own docstring.
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **Confirm or refute "we have no 4.5–6 kHz null" with GATE W's locator.** This is the
+   cheapest high-value read on the board: AD5b says our prominence there is 0.69 dB and invariant to
+   drive and GRUNT, which is what a smooth curve looks like, and the pedal's reaches 8.47 dB. If
+   confirmed it is a **missing feature**, not a mis-tuned one, and that is a different kind of fix.
+   It belongs to open item 6.
+2. ⭐⭐ **The bridged-T dip's drive-dependent DEPTH** (AD5, above) — item 6 on a new axis, and it
+   corroborates AA6's damping/loading class. Worth folding into whatever candidate item 6 produces:
+   any candidate must now compress a notch's DEPTH with drive, not only move centres.
+3. ⚠ **The 800 Hz–1 kHz clean-tilt inversion** (AD3) — small (~0.5–0.6 dB), real, on the CLEAN path
+   (so it is a linear-element question, and cheap), and named by no work item. Decide whether it is
+   worth a lever or an accepted deviation; do not let it sit unowned a third session.
+4. ⚠ **`analysis/sk_gate_i_reconcile.py` (GATE AC) is untracked and unexplained** — put it to the
+   user before committing anything in `analysis/`.
+
+## SESSION 132 (2026-08-03) — GATE AC: item 6's SK sub-target reconciled against GATE I
+
+**Head item on entry:** session 130's `▶ NEXT` #3, which explicitly GATES its own #1 (building an
+SK-bandwidth candidate for the treble-peak walk): *"a drive-dependent fall in the model's effective
+HF bandwidth is the OPPOSITE sign to GATE I's measurement (the pedal GAINS with frequency under
+drive where our path rolls off) ... must be reconciled before an SK-bandwidth candidate is built."*
+
+⛔ **No render, no capture, no constant, no baseline move, no `src/` edit.** `s124_ship.json` is
+still the baseline. Every number below is closed-form arithmetic on the shipped post-clipper
+cascade (GATE AB's own construction, imported rather than re-derived) plus GATE I's own live
+measurement against the current baseline.
+
+⚠ **Naming note.** A second session ran in this repo concurrently and claimed "session 131" for
+`analysis/hw_trend_gate.py` (GATE AD) before this session's own numbering was assigned, leaving
+this session's tool (`analysis/sk_gate_i_reconcile.py`, already on disk, self-evidently unrelated
+to GATE AD) briefly untracked and flagged by name at that session's own close. Per the user: leave
+GATE AD and its mutation runner untouched — they are that session's work, not this one's. This
+session is filed as **132**.
+
+**Built:** `analysis/sk_gate_i_reconcile.py` (**GATE AC**) + `analysis/_mutate_gate_ac.py` (7/7),
+`analysis/reports/s131_ac.json`. Also fixed a stale comment in `bt_pair_shape_gate.py`:
+`PEDAL_DPEAK`'s inline comment read `-7.92 %`, which is AA6's `max/min-1` SPAN; the constant itself
+computes the rung-1->rung-4 CHANGE (`-7.34 %`, what the file's own AB6 dose-response uses) and
+always has — no number moved, only the comment was wrong, and left as-is it would have re-mixed
+the two conventions AB4 itself flagged. ctest unaffected (no `src/` file touched).
+
+### AC0-AC1 — provenance and known answers
+
+AB6's multipliers are read from `s130_bt_pair.json` (falling back to a live re-solve of GATE AB's
+own sensitivities if that file is absent — never transcribed). Two known answers gate everything
+below:
+
+- **AC1a**: `hf_artefact_gate.sk_mag_db` and `bt_pair_shape_gate.sallen_key` are two independently
+  written transcriptions of the same two schematic-verified Sallen-Keys; their octave rate agrees
+  to `0.00e+00` (exact, not merely close — both are closed-form on the same doubles).
+- **AC1b**: the cascade at `sk_scale=1` reproduces GATE AB's own AB1 known answer (the peak within
+  0.02% of s125's closed form), inherited rather than re-derived.
+
+### AC2 — separability, asserted numerically
+
+Transfers cascade multiplicatively, so in dB every unchanged stage cancels in a delta. The SK
+perturbation's effect on GATE I's octave, computed through the FULL cascade and through the SK
+pair ALONE, agree to `7e-15` dB/oct. So the number in AC3 does not depend on the treble ladder, C7,
+the GRUNT bank, the bridged-T, the EQ, or any pot position — it is a property of the two SK stages
+alone, and AC6 shows the bridged-T half of AB6 barely touches this region (0.165x the SK
+collateral, because the bridged-T is far above its own notch here and nearly flat across the
+octave — the same separability AB3 found at the features, read at a third frequency).
+
+### AC3-AC4 — the collateral and the direction
+
+At AB6's solved multiplier (SK tau x 1.1113), applied full-size at the hottest rung (it is
+drive-dependent by construction, inert at the clean rung):
+
+| | value |
+|---|---|
+| octave rate | -0.576 dB/oct |
+| level @ 8127.5 Hz | -2.521 dB |
+| level @ 16255.0 Hz | -3.097 dB |
+
+Against GATE I's own measured gap on `s124_ship.json` at `sweep_drv_-6` (widest class +21.45
+dB/oct): the SK move is **2.7%** of the gap it needs to close, and it points the WRONG way for it.
+
+**Direction, as a comparison against the target (not a property of the candidate — AB5's own
+defect, fixed in that gate and not repeated here):**
+
+| axis | candidate | target | sign product |
+|---|---|---|---|
+| treble peak position | -7.98% | -7.34% | +1 (TOWARD) |
+| 8-16.3 kHz octave rate | -0.58 | +21.45 | -1 (AWAY) |
+
+1 of 2 axes agree. A single SK mechanism cannot serve both targets on one knob.
+
+### AC5 — the reachability bound, and the first draft's own defect
+
+The sweep converges (SK pair's contribution -> 0.0000 dB/oct at `sk_scale -> 1e-4`), certifying
+the bound: **deleting both Sallen-Keys outright hands back +18.246 dB/oct** to the model's
+whole-path rate — the axis's absolute ceiling, computed rather than assumed.
+
+Read per (class, rung) rather than at one rung (s126: a lever measured at one stimulus rung is a
+claim about that rung), against the current report's live gap:
+
+```
+condition                           clean   drv_-18   drv_-12    drv_-6
+OD, bleed-free, DRIVE min          +15.09    +14.97    +18.76    +20.26
+OD, bleed-free, DRIVE noon          +7.68     +9.79    +17.76    +21.45
+OD, bleed-free, DRIVE max           +3.15    +12.51    +20.28    +19.82
+BOUND (SK deleted outright)        +18.25    +18.25    +18.25    +18.25
+```
+
+**0 of 3 classes reachable at the hottest rung, 36 of 60 cells reachable across the whole ladder**
+(all at the quiet end, where GATE I's own dose-response already says the gap is small). At the
+hottest rung the bound falls short by **+1.57 to +3.20 dB/oct even with both Sallen-Keys deleted**
+— not a comfortable margin, a tight one, which is what makes this a refutation of the AXIS and not
+merely of the one candidate multiplier.
+
+⭐ **This independently reproduces GATE I's own load-bearing property (no fixed lowpass chain can
+gain with frequency) from a completely different construction** — GATE I measured it from the
+render matrix; GATE AC derives the same ceiling from the schematic-verified SK values alone, with
+the model-side gap read live off the current baseline.
+
+### AC7 — the reconciliation
+
+Neither "same mechanism" nor "mutual refutation": item 6's SK sub-target is a **filtering** change
+(lower the corners, tilt the peak down with drive); GATE I's gap needs a **generative** one (the
+pedal gains where no filter can, GATE I's own G2/G2a). They share one knob with opposite signs on
+it, so the SK candidate carries a real, sized, bounded collateral cost in a region that is already
+2 of 8 rows over SHIP — 2.7% of the gap at the hottest rung, and mechanically incapable of ever
+closing it, even fully deleted.
+
+### Found while building: the mutation runner's own defect, same family as AB5's
+
+The first `AC5` draft printed a "bound" that was the SK pair's raw dB contribution at `sk_scale=1`
+(`-18.246`), directly under a parenthetical calling it "the SK pair's whole contribution ... handed
+back" — a message that could not be true (s122: a message that contradicts itself is a test defect
+even when the guard around it is sound). The bound is the CHANGE in that contribution
+(`sk_octave_rate(near-zero) - sk_octave_rate(1)` = `+18.246`), not its endpoint value; caught by
+reading the printed sweep table, which showed the "adds to path" column converging to `+18.246`
+while the mislabelled bound printed `+0.000`. Fixed before the mutation runner was built, so no
+false-pass was ever recorded.
+
+### Mutation runner: 7/7
+
+`analysis/_mutate_gate_ac.py`. Two guard-refusal arms (AC1a, AC1b), one separability-defect arm
+(AC2), one bound-non-convergence arm (AC5-guard), one vacuity arm (AC0), and two COMPUTED-VERDICT
+arms (AC4's direction must invert when the target's sign is flipped; AC5's reachability count must
+flip when the report's own top-octave gap is collapsed) — the latter two are the ones that would
+have caught AB5's exact defect had this gate repeated it. All four import-patching arms target the
+right pattern on the second attempt (the first used an anchored substring without the `^...$` line
+anchors the multi-line source needs); recorded as a test-authoring note, not a gate defect.
+
+### ▶ NEXT, in order
+
+1. **Build the Sallen-Key candidate for the treble-peak walk** (session 130's own item, now
+   unblocked). Quote the AC3 collateral (-0.58 dB/oct, -3.10 dB @16255 Hz at the hottest rung) when
+   it is built, and do not expect it to move GATE I's gap — AC5 shows it structurally cannot.
+2. **GATE AD's item 3 (AD3, the 800 Hz-1 kHz clean-tilt inversion)** and its item 2 (the bridged-T
+   dip's drive-dependent depth) are unowned by any work item — see that session's own NEXT list.
+3. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+## SESSION 133 (2026-08-03) — GATE AE: the 4.5–6 kHz null is CONFIRMED absent bleed-free, and the word "absent" needed a qualifier
+
+**Head item on entry:** session 131's `▶ NEXT` #1, its own "cheapest high-value read on the board" —
+*"Confirm or refute 'we have no 4.5–6 kHz null' with GATE W's locator."* AD5b had measured the
+model's prominence there at **0.69 dB and invariant to drive and GRUNT** on the ~1/3-octave grade
+grid, correctly inferred that a prominence both tiny AND invariant is the signature of NO FEATURE
+(s126), and said in as many words that confirming it needed GATE W's log-f locator rather than its
+own grid.
+
+⛔ **No capture, no constant, no baseline move, no `src/` edit.** `s124_ship.json` is still the
+baseline; **ctest 18/18** re-run and unaffected (nothing under `src/` was touched, so session 127's
+cache-invalidation bill is not added to). 24 captures were re-rendered into `build/s133_hf_null`
+because session 127's relink moved the binary stamp — the documented, expected price.
+
+**Built:** `analysis/hf_null_presence_gate.py` (**GATE AE**) + `analysis/_mutate_gate_ae.py`
+(**10/10**), `analysis/reports/s133_hf_null.json`.
+
+### Why it was not a foregone conclusion
+
+GATE W's own stored s122 run already said something nobody had read back: `w7` classifies
+`treble_notch` as **"(b) MIX / BALANCE … the feature VANISHES bleed-free"**, and `w6` reports the
+model's as `UNRESOLVED`. AD5b reads the **bleed-free** class. That is precisely s126's bass-peak
+trap — an `UNRESOLVED` that is a MEMBERSHIP property, not a physical one, because a mix
+cancellation has no bleed-free reading BY PHYSICS. So there were two live hypotheses with opposite
+consequences for open item 6, and only a reading on the LEVEL ladder could separate them.
+
+### AE1 — three known answers, because one is not enough for a NEGATIVE result
+
+A negative finding is the easiest kind to produce by accident: a broken estimator, an empty
+membership, a misplaced window and a genuinely featureless curve all print the same thing.
+
+* **AE1a** re-runs GATE W's own W1 **under the current binary** (imported and CALLED, not
+  re-derived): the locator reproduces GATE R's 329.73/712.01 Hz to **0.10 %/0.15 %** and follows
+  the R-C scaling law (ladder ×2 → mid notch ratio **2.0063**, bridged-T moves **0.63 %**).
+  Measured resolution **0.15 %**.
+* **AE1b** proves the estimator is **NOT SILENT** and **NOT CAPPED**. Three arms — the
+  nearest-neighbour control at every graded cell; ND's own prominences in the same window
+  (0.00–25.43 dB, median 3.31, printed without a bar); and a **SYNTHETIC** arm that injects a notch
+  of known depth into the MODEL's own curve.
+* **AE1c** reproduces AD5b's ORDERING (not its values — different grids, different prominence
+  definitions) in **8 of 8 orderable cells**, with 1 tie excluded rather than folded either way.
+
+### AE3 — the headline, and it needs no threshold
+
+Bleed-free (BLEND = LEVEL = 1), driven ladder × GRUNT, 1/48-octave, window 4200–12000 Hz:
+
+```
+ GRUNT          sweep   n     MODEL f0    prom  n_int      ND f0    prom  n_int
+ boost  sweep_drv_-18   4         none    0.00      0    10470.2    2.12      4
+ boost  sweep_drv_-12   4         none    0.00      0     9785.3    2.12      7
+ boost   sweep_drv_-6   4         none    0.00      0     7637.6    7.08      6
+   cut  sweep_drv_-18   9         none    0.00      0     9925.8    0.85      1
+   cut  sweep_drv_-12   9         none    0.00      0     8270.0    4.49      2
+   cut   sweep_drv_-6   9         none    0.00      0     6858.6   17.86      2
+  flat  sweep_drv_-18   3         none    0.00      0     9369.5    0.00      0
+  flat  sweep_drv_-12   3         none    0.00      0     9628.8    0.25      3
+  flat   sweep_drv_-6   3         none    0.00      0     7290.5    3.37      2
+
+ DEPTH vs DRIVE      ND span                model span
+  boost      4.96 dB   rising        0.00 dB  non-mono
+    cut     17.01 dB   rising        0.00 dB  non-mono
+   flat      3.37 dB   rising        0.00 dB  non-mono
+```
+
+⭐⭐ **The model's window contains NO interior extremum AT ALL in 9 of 9 cells** — its curve is
+strictly monotone across the whole window. That is a statement with **no bar in it**: AD5b's 0.69 dB
+was an inflection, and there is nothing there to grade. The prominence-bar sweep prints the same
+count at every setting, and here that is the finding rather than a knob that failed to turn (the
+quantity is identically 0.00), which the gate distinguishes by measurement rather than printing
+s106's N5 warning for both cases.
+
+### AE4 — the mix branch, which is why the verdict carries a qualifier
+
+On the LEVEL ladder at `sweep_clean`, the model **does** have the feature — and it dies as the clean
+tap does:
+
+```
+ MODEL   LEVEL   0.000    0.125    0.250    0.375    0.500    0.625 .. 1.000
+   f0 Hz        5053.9   6706.1   6783.5   6953.7   7315.6      nan .. nan
+   prom           0.00     2.23     1.91     1.32     0.56     0.00 .. 0.00
+   n_int            68        1        1        1        1        0 ..    0     (LEVEL 0 = MUTED)
+ PEDAL
+   f0 Hz        4586.6   6150.3   7129.5   7365.0   7645.3   8182.9 .. 10707.8
+   prom           0.11    24.37     9.82     8.87     6.81     4.28 ..    0.37
+```
+
+Both sides read **MIX**. ⇒ the model is *not* featureless in this region: it carries a mix
+cancellation, present at 3 detents and gone above LEVEL noon. What it lacks is ND's
+**drive-generated** null, which is the thing that survives bleed-free and deepens monotonically.
+
+⚠⚠ **And the two raw spans (model 9.1 % vs ND 133.5 %) MUST NOT BE COMPARED** — they are over
+different detent sets (we are muted at LEVEL min and lose the feature above noon; ND keeps it almost
+to the top), i.e. a membership difference wearing a physics number. Over the **4 detents where both
+sides resolve it**, ND's centre is **2.7× more LEVEL-sensitive than ours** (24.3 % vs 9.1 %). That
+is a second instance of the free evidence s125 handed to open work item 9 on the bass notch (~2× on
+the same ladder), on a different feature, at the other end of the band, and the same size.
+
+### AE2 — the label is not the window
+
+Only **35 of 192** readings on either side fall inside the "4.5–6 kHz" the chart review named this
+feature by. ND's centres run **6150 → 10708 Hz**. The name comes from §3's PNG reads, whose
+conditions §6 says are unknown; **quote the measured band, not the label**.
+
+### ▶ Defects found in this session's OWN instrument — seven, and every one changed a number or a claim
+
+1. **The NOT-SILENT control was wrong.** The first draft used `bt_notch`, which reads **0.13 dB** on
+   the model at some bleed-free driven conditions — and GATE W's own W1a comment already recorded
+   that it is "barely a feature at all" at some conditions. The bar was right and the control was
+   not. Replaced with `treble_peak` (GATE W6 resolves it on these very endpoints at all four rungs);
+   `bt_notch` is now a **named, pre-registered NON-control** with its numbers still printed.
+2. **The synthetic arm's centre bar was a flat number where the quantity has a scaling law.** A
+   1 dB notch on this steeply rolling-off curve is *expected* to read off-centre — a vertex is
+   pulled by slope/curvature, so the offset goes as 1/D. Measured **2.81 / 0.59 / 0.19 %** at
+   1/3/9 dB against **2.81 / 0.94 / 0.31 %** predicted. Gating the LAW instead of a tolerance is
+   stricter and tests the mechanism.
+3. **The LEVEL-min mute leaked into AE4's span.** The muted render is numerical noise; the estimator
+   found **68** interior extrema in it and its meaningless argmin dragged the model's LEVEL span to
+   **44.8 %** — straight past the MIX bar, from a row with no signal. The mute is now MEASURED
+   (−240 dB) rather than assumed. Span corrected to **9.1 %** (verdict unchanged).
+4. **A guard that could not fire.** The rung-level partial-ladder branch was unreachable: the four
+   sweeps are TIME WINDOWS of one file, not optional keys. Replaced with the partiality that IS real
+   here (a missing GRUNT class) and the rung branch relabelled a structural invariant, explicitly
+   *not* claimed as a guard.
+5. **A TIE scored as an INVERSION.** Where both sides read exactly 0.00 there is no ordering to
+   reproduce; counting that as a disagreement books "neither side has a feature" as an instrument
+   conflict. Ties are now reported and excluded from the agreement count (8/8, 1 tie).
+6. **`die()` exited 1, which an uncaught exception also does** — so a runner could not tell a guard
+   that fired from a crash. Now exits **2**.
+7. ⚠⚠ **A CONCURRENCY-ONLY BUG IN THE MUTATION RUNNER.** The AE9 arm flagged its injection through
+   a module-level `[False]` set around the model's read and cleared before the pedal's — correct
+   serially, and `parallel.pmap` uses a **ThreadPoolExecutor**, so the flag is shared mutable state
+   across workers. Signature was exactly a race: the injection reached some model reads and **leaked
+   into some PEDAL reads** (ND's prominence moved 2.12 → 5.77 dB in a cell nothing should have
+   touched). Fixed by passing the depth as an argument. `a-concurrency-only-bug-passes-every-serial-
+   verification-you-have` (s73), committed inside a mutation test — where a wrong result reads as a
+   *gate* defect rather than a test defect.
+
+### ▶ NEXT, in order
+
+1. **Build the Sallen-Key candidate for the treble-peak walk** (session 132's #1, still unblocked).
+   Any candidate must now also be checked for whether it can produce a **drive-generated null** in
+   this region — AE3 says we have none, so a mechanism that only re-tunes filters cannot address it.
+   Quote GATE AC's collateral (−0.58 dB/oct, −3.10 dB @16255 Hz at the hottest rung).
+2. **Open work item 9 now has two independent measurements** (bass notch ~2×, s125; this feature
+   2.7×, matched-detent) that both say the pedal's mix balance is more LEVEL-sensitive than ours.
+   Neither discriminates GATE L4's (a) from (b), which is still the open question — but the item is
+   no longer a question without an instrument.
+3. **GATE AD's item 3 (AD3, the 800 Hz–1 kHz clean-tilt inversion)** — unowned by any work item for
+   a second session now.
+4. **Sessions 131/132/133 are UNCOMMITTED** — put the state to the user before the next session
+   starts work in `analysis/`.

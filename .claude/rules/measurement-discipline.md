@@ -279,6 +279,34 @@
   proportional to `(w - wPrev)`; that is a derivative wearing a correction's clothing. ⚠ Corollary:
   "split the map" is not the fix for the same degeneracy anywhere else either (this project has it
   flagged on the J201 too) — gating the ADAA off, or accepting the rolloff, is. (s123)
+- ⭐⭐⭐ **A CONTROL MUST BE ESTABLISHED PRESENT *AT THE CONDITIONS THE GATE READS*, NOT MERELY
+  SOMEWHERE — AND WHEN IT FAILS, THE TEMPTING REPAIR IS TO LOOSEN THE BAR, WHICH DELETES THE ONLY
+  THING MAKING A NEGATIVE RESULT MEAN ANYTHING.** GATE AE's whole finding is a negative one ("the
+  model has no extremum in this window"), so it lives or dies on s126's rule that *a silent
+  estimator and an absent feature are indistinguishable until you show the estimator finds the
+  feature when it is there*. Its first draft used two controls, and one of them — the 716 Hz
+  bridged-T notch — reads **0.13 dB on the model** at some of the very conditions being graded, so
+  the run refused. That was not a discovery: **GATE W's own source comment already said** the
+  bridged-T "has a prominence of 0.46 dB and is barely a feature at all" at some conditions, and
+  s131's AD5 had measured its depth *moving* on the reference side. It was never established
+  present here, and including it was a defect in the TEST. ⭐ GENERAL: pick a control from what a
+  PRIOR gate has resolved **on this exact condition class** (here `treble_peak`, which GATE W6
+  reads on these endpoints at all four rungs and therefore passed W3's own guards), name any
+  rejected candidate **and its reason** so the exclusion is a pre-registered consequence of prior
+  knowledge rather than a reaction to the run's numbers, and keep printing the rejected one's
+  values. ⚠ The near-miss is the usual one: raising `MIN_PROM_DB` would have made everything green
+  and simultaneously destroyed the argument, because a control that is itself faint cannot certify
+  that a faint reading belongs to the device. (s133, GATE AE1b)
+- ⭐⭐ **AND A NEGATIVE RESULT WANTS A SYNTHETIC ARM, BECAUSE IT IS THE ONLY CHECK THAT CAN FAIL IN
+  BOTH DIRECTIONS.** A broken estimator, an empty membership, a misplaced window and a genuinely
+  featureless curve all print the same thing. The arm that separates them costs four lines: inject
+  a feature of KNOWN size into the measured curve and sweep the size, including **zero**. Zero is
+  the arm's own built-in mutation control (it must find nothing); the non-zero rungs prove the
+  estimator finds what is there and orders it. ⚠ Gate the arm on the quantity's own **law**, not on
+  a round number — a vertex on a sloping background is pulled by `slope/curvature`, so a shallow
+  injected notch is *expected* to read off-centre and a flat tolerance fails correct code at the
+  shallow end (measured 2.81 % at 1 dB, falling to 0.19 % at 9 dB, against a 1/D prediction of
+  2.81/0.94/0.31 %). Gating the FALL tests the mechanism and is the stricter test. (s133)
 - **A gate must be calibrated against the defect's SIGNATURE, not a proxy for it.** A flat-topping
   gate keyed on "16 consecutive samples above 0.985×peak" rejected a long-trusted reference capture
   peaking 7.6 dB below full scale — a sine spends ~5.5 % of its period up there. The real signature
@@ -734,6 +762,39 @@
     **membership** guard fired before the **empty** guard it was aimed at. That is defence in depth —
     the gate being better than the test's model of it — so **fix the expectation, not the guard**:
     empty only the target group's own predicate. Both are recorded at their arms.
+- ⭐⭐⭐ **A CONCURRENCY-ONLY BUG *INSIDE A MUTATION TEST* READS AS A GATE DEFECT, WHICH IS THE ONE
+  PLACE IT COSTS DOUBLE.** GATE AE's computed-verdict arm injects a synthetic notch into the MODEL's
+  curve and requires the headline to change. It flagged the injection with a module-level
+  `_INJECT_MODEL = [False]`, set around the model's read and cleared before the pedal's — correct in
+  a serial run, and **`parallel.pmap` uses a `ThreadPoolExecutor`**, so the flag is shared mutable
+  state across workers. The signature was exactly a race: the injection reached *some* model reads
+  and **leaked into some PEDAL reads**, moving ND's prominence 2.12 → 5.77 dB in a cell nothing was
+  supposed to touch. ⭐ Two lessons. **(a)** The project's own
+  `a-concurrency-only-bug-passes-every-serial-verification-you-have` (s73) applies to test
+  scaffolding, not just to production code — and scaffolding is where it is worst, because the
+  arm's wrong answer is reported as *the gate narrating* rather than as a broken test, sending the
+  next session to fix a gate that is fine. **(b)** The fix is structural, not careful ordering:
+  **pass the perturbation as an ARGUMENT** so there is no shared state and no order to get wrong.
+  ⚠ The tell was available and nearly missed — a column the mutation should not have touched moved.
+  **When a mutation arm changes something outside its stated scope, suspect the arm.** (s133)
+- ⭐⭐ **ASK WHETHER THE PARTIALITY YOUR GUARD IMAGINES IS STRUCTURALLY POSSIBLE — A GUARD THAT
+  CANNOT FIRE IS WORSE THAN NO GUARD, AND s129's THREE-OUTCOME RULE CAN BE APPLIED TO THE WRONG
+  AXIS.** GATE AE dutifully implemented "a GRUNT class that loses a stimulus rung is a MALFORMED
+  read, so REFUSE rather than exclude". Its mutation arm dropped a sweep from the report and the
+  gate passed — the arm was vacuous, because this gate reads renders and captures, where the four
+  sweeps are **time windows of one file** (`analyze.seg_of` indexes a fixed table) rather than
+  optional keys, so no rung can ever go missing. ⭐ The rule was right and pointed at an axis where
+  partiality is impossible; the axis where it IS possible was the GRUNT *class* (built from another
+  gate's selection, which can change). Fixed both: guard the real axis, and relabel the impossible
+  branch a **structural invariant** kept against a future refactor and explicitly NOT claimed as a
+  tested guard. ⚠ s110's "suspect the mutation before the guard" resolved here as *both were
+  wrong*, which is the outcome that takes longest to see. (s133)
+- ⭐ **"THE KNOB NEVER TURNED" AND "THE QUANTITY IS IDENTICALLY ZERO" ARE DIFFERENT, AND ONE OF THEM
+  IS THE RESULT.** s106's N5 says a robustness sweep whose bar never changes the surviving count is
+  a constant printed N times. True — *unless the quantity being graded is exactly 0.00*, in which
+  case no bar can ever bind and the constancy IS the finding. Printing N5's warning for both cases
+  tells a later reader that the strongest result in the gate is a broken knob. Distinguish it by
+  measurement (`all(x == 0.0)`), not by prose. (s133, GATE AE3)
 - **Mutation-test a guard.** A new `assert_anchors_match` read the wrong JSON key, returned `None` on
   every real report and fell through to its "cannot verify" branch — a warning that reads as
   diligence while checking nothing. (s88, same class as s80)
@@ -2195,6 +2256,19 @@
   of A and B actually SETS it, and print the split; a construction names the ingredients, not the
   lever. Same family as `X-is-the-dominant-cost-is-a-localisation-not-a-size` (s127), on the
   frequency axis rather than the CPU one. (s130)
+- ⭐⭐ **THE NAME A FEATURE WAS FLAGGED BY IS NOT THE BAND IT LIVES IN, AND THE NAME TRAVELS FOR
+  YEARS WHILE THE MEASUREMENT NEVER GETS TAKEN.** "The 4.5–6 kHz null" has been a row in
+  `reference-sources.md` §1/§3 and a line in two work items since the chart review. Measured on the
+  log-f locator, **35 of 192 readings on either side fall inside 4.5–6 kHz**, and the reference's
+  own centres run **6150 → 10708 Hz** across the LEVEL ladder. The name came from §3's PNG reads,
+  whose exact conditions §6 says are unknown — and GATE W had been calling the same feature
+  `treble_notch` with a **4200–12000 Hz** window since s122, without anyone noticing the two were
+  the same object under two incompatible descriptions. ⭐ GENERAL: when an item is opened, **measure
+  where its feature actually is before quoting the band in its name**, and if a window already
+  exists in a prior gate, use that one — a label is a memory of somebody's chart, a window is a
+  claim someone had to defend. Same family as
+  `a-backlog-line-can-outlive-its-own-dissolution-by-70-sessions`: the label travels and the
+  measurement does not. (s133, GATE AE2)
 - ⭐⭐ **AN EXTREMUM-FINDER OVER A NAMED WINDOW IS NOT A FEATURE DETECTOR — IT ALWAYS RETURNS
   SOMETHING.** `locate(window, "min")` returns the window's minimum whether or not a notch is there,
   so on a curve with no feature it returns an inflection, with a plausible frequency and a
