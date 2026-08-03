@@ -240,6 +240,7 @@ table in this file.
 | the THD "level term"'s direction | **The gated term is UNSIGNED (rms).** Signed mean is **positive** — the model **over**-distorts, not under. | 109 | Any candidate reasoned about as "we need more distortion" is backwards. | `FitParams.h`, `analysis/shape_gate.py` |
 | `s114_baseline.json` for absolute-ledger gates (K/M/O/P/Q) | **STALE** | 118/119 | Predates session 115's shipped `kOutputMakeup`/PWL-taper constants. GATE O refuses it by name. | `analysis/a3_decomposition_gate.py` |
 | The six user-flagged peak/notch centre-frequency mismatches, **as CORNER (element-value) targets** | **CLOSED — none is a corner error.** ⚠ NOT "closed as a defect" — see the row below, added s125 | 122 | Two are the OD/clean mix (= A3, not a filter); three are not a fixed feature on at least one side; the 320 Hz null's centre is **right to 0.7%** — GAP #2 is a depth/width defect only, its centre was never wrong. ⛔ Do not point an optimiser at a capacitor for any of them. | `analysis/feature_locus_gate.py` (GATE W) |
+| "the bass notch/peak are A3 seen as a frequency, so they need no separate work" | ⚠ **HALF TRUE — the bass PEAK is NOT A3, s125** | 125 | **Notch: consistent with A3** (both sides MIX, both vanish bleed-free, LEVEL loci **overlap** — model 53.2–64.2, pedal 38.1–54.4 Hz — so some mix balance reconciles them). **Peak: ranges are DISJOINT** — model 154.6–**165.5**, pedal **195.7**–208.9 Hz, the pedal's *lowest* **18.2 % above** the model's *highest*. LEVEL is the mix lever A3 acts through and its FULL travel moves the feature 6.6 % against a ~20–26 % gap ⇒ the lever is 3× too small, **and points the wrong way** (more OD ⇒ model 165.5 → 154.6 Hz, *away* from the pedal). ⇒ correcting A3 makes the bass peak **worse**. Same shape as s38's C12 locus argument. | `analysis/reports/s122_feature_locus.json` W4 |
 | "…and therefore there is nothing to fix at those centres" | ⛔ **DOES NOT FOLLOW — REOPENED s125 as open-work item 6** | 125 | GATE W's verdict (c) *"not a fixed feature on at least one side"* is a **diagnosis, not an exoneration**: it says the pedal has a drive-dependent mechanism the model lacks. W6, measured: the model's treble peak is **FIXED to 0.2%** across the 24 dB ladder while the pedal's walks **2696 → 2498 Hz (7.9%)** ⇒ we are **281 Hz off at clean and 485 Hz (19.4%) off at `drv_-6`** — wrong at *every* drive setting. Same shape at the bridged-T (ours fixed 716 Hz, pedal 696 → 745 Hz). ⚠ The reassuring `1.022×` in s122's summary is `sweep_clean` on the LEVEL ladder only; the same feature reads `1.152×` on the pure-OD endpoints. | `analysis/feature_locus_gate.py` W6/W5/W5b |
 | "memoryless ADAA does not apply to the CD4049 VTC — it lives inside an implicit solve, so state-space ADAA would be needed" (asserted in `PedalChain.h`, `FitParams.h`, `dsp.md` from session 6) | **REFUTED** | 123 | Conflates the STAGE (has memory) with the NONLINEARITY (`vtc` is memoryless in node W). ADAA1 needs a memoryless map with a ~linear argument; nothing requires that argument to be the stage input. Built and measured: **12.6–19.8 dB** median alias-floor gain at OS 1×/2×. Ships OFF (exact only at `clipK == 2`). | `analysis/clip_adaa_gate.py` (GATE X) |
 | "ADAA only the NONLINEAR residue, keeping the linear part pointwise, to dodge ADAA1's 2-point-average cost in the feedback loop" | **REFUTED — do not re-invent** | 123 | Evaluates two halves of ONE map half a sample apart ⇒ injects a first difference of gain `a0/2`, reaching the **full loop gain at Nyquist**. H1 +13.4 dB hot, alias floor 14.4 dB worse than plain ADAA, whose own cost is 0.01 dB. | `Clipper.h::setADAA`, `ClipperTest` Test 8(e) |
@@ -345,21 +346,32 @@ orderings and why each item moved):
    | mid peak | 458 → 429 Hz (9.0%) | 447 → 419 Hz (8.0%) | ~2.5% — ✅ this one TRACKS |
    ⭐ **The mid peak tracking is the localising clue**: we already have a drive-dependent mechanism
    at ~450 Hz and none at ~2.9 kHz, so this is not a global missing dynamic — it is specific.
-   ⭐⭐ **Leading candidate, and it is a documented DEFERRED item, not a new invention:
-   dynamic R19 supply sag.** `docs/nonlinear-component-modeling.md:70` — *"dynamic sag is an optional
-   refinement — add a simple supply-sag state (`VDD_eff = 8.6 − I_DD(Vout)·1k`, one-pole smoothed)
-   **only if captured feel demands it**"*. We shipped the **static** self-consistent solve
-   (`VDD = 5.636 V`, `Clipper.h:127`) and never returned. The captures now demand it. Mechanism is
-   schematic-grounded: sag moves the CD4049's trip point **and** its open-loop gain `a0`, and
-   `circuit.md` already records that node W's input impedance is `R18/(1+A0)` — so a drive-dependent
-   `a0` walks both the GRUNT corner and the `C14 ∥ R18` corner, which sits at
-   **1/(2π·330k·220p) = 2.19 kHz**, i.e. exactly where the treble peak is.
-   ⚠ **Hypothesis, not a result** — it predicts the right *sign*, *frequency* and *drive dependence*,
-   which is why it is worth a prototype; it has not been rendered. Known-answer test needs **no new
-   capture**: render the treble-peak drive sweep and require the model's centre to walk down.
-   ⭐ This is also the natural home for the 8–16.3 kHz question (THE RELEASE GATE's corrected note):
-   a nonlinearity whose gain rises with drive is the one thing that can produce a *rising, smooth,
-   drive-growing* HF plateau — the shape GATE I measured and G3 showed is **not** a fold.
+   ⭐⭐⭐ **WHAT MAKES OUR 2980 Hz PEAK — LOCALISED s125, CLOSED-FORM, NO FIT.** It is the
+   **recovery bridged-T's rise out of its own 716 Hz notch, rolled off by the two Sallen-Keys.**
+   Cascading the schematic values (bridged-T nodal solve × SK 10.7k × SK 3.3k × the clipper's
+   closed loop at the shipped `a0`) and vertex-interpolating in log-f gives **2934.8 Hz** against
+   GATE W's measured **2977–2983 Hz — 1.5 %, with nothing fitted.**
+   ⇒ **the treble peak is a pure POST-CLIPPER LINEAR feature, which is exactly why it is pinned to
+   0.2 %** — it is downstream of every nonlinearity, so it *cannot* move with drive, by construction.
+   ⛔⛔ **AND THAT REFUTES THIS ITEM'S OWN FIRST CANDIDATE, WITHIN THE SAME SESSION — dynamic R19
+   supply sag acting through `a0`. IT MOVES THE PEAK THE WRONG WAY.** The claim written here first
+   was that sag lowers `a0`, which walks the `C14 ∥ R18` corner *"at 1/(2π·330k·220p) = 2.19 kHz,
+   i.e. exactly where the treble peak is"*. **Two errors, both caught by computing instead of
+   reasoning:** (i) 2.19 kHz is the **bare** pole; the *closed-loop* corner is
+   `[1/((1+a0)R16) + 1/R18] / 2πC14` = **6.29 kHz**, not 2.19, so it was never the peak's cause;
+   (ii) that expression **rises** as `a0` falls, so sag moves the peak **UP** — measured
+   `a0` 24.871 → 15 → 8 gives **2934.8 → 3025.8 → 3099.0 Hz**, while the pedal walks **down**.
+   ⚠ Sag is not thereby dead as a mechanism for the *nonlinear* deficit; what is dead is the
+   corner-shifting route and the 2.19 kHz coincidence. Do not re-derive either.
+   ⭐⭐ **WHAT SURVIVES, AND IT UNIFIES THIS ITEM WITH A3.** GATE W reads centres off `transfer_h1`
+   — the **fundamental**, harmonics rejected. So for the *pedal's* peak to walk with drive, the
+   pedal's **fundamental transfer must itself be drive-dependent**, i.e. its compression is
+   **frequency-dependent** where ours is closer to uniform. That is not a new defect: it is
+   **GATE Q's `D(f)` (rms 3.01 dB, "only a nonlinearity can carry it") seen in the frequency
+   domain.** ⇒ **the treble-peak walk and A3's untested dynamic half are the SAME finding on two
+   instruments**, which is why they share this item. Any candidate must be a *frequency-dependent*
+   nonlinearity, and must be gated on the mid peak NOT moving (it already tracks at ~2.5 %) and on
+   CLEAN staying bit-identical (the clipper is OD-only).
 7. ⚠ **Capture question, while access lasts:** a clean same-session `gain-n18` MASTER ladder would
    let session 115's taper be resolved below its 0.85 dB knob-noise floor (7 of 9 detents already
    captured session 120 — see "Capture access status" below for the accuracy caveat). Read
@@ -378,6 +390,13 @@ orderings and why each item moved):
    axis; this is about whether the LEVEL control's *own* absolute law (GATE K's 9.3 dB defect) is a
    structural mismatch or a level-dependent downstream stage. Neither GATE L4(a) nor (b) has been
    discriminated as far as this archive shows.
+   ⭐⭐ **NEW EVIDENCE, s125, AND IT IS FREE — ALREADY IN `s122_feature_locus.json`.** Over the SAME
+   7-detent LEVEL ladder the **pedal's bass notch is ~2× more LEVEL-sensitive than ours**: span
+   **30.0 % (54.4 → 38.1 Hz) against our 17.2 % (64.2 → 53.2 Hz)**. Two mixers summing the same two
+   paths must respond to LEVEL the same way, so a 2× difference in that sensitivity is a **direct
+   measurement on L4(a) vs (b)** — and it is a *shape* question (how the cancellation locus moves),
+   which the gain-matched matrix is not blind to in the way it is blind to L4's absolute 9.3 dB.
+   ⇒ this item is now cheaper than it was: it has an instrument and a number, not just a question.
 
 ⚠ **A3 (item on this list since session 89) is compressed here but its exclusions must travel
 together — this sentence is load-bearing, do not lose it:** *no single element closes A3 (s50), no

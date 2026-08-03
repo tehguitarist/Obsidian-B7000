@@ -13365,14 +13365,109 @@ rebuilt, no baseline moved. `s120_newton.json` is still the baseline and the rel
 6 rows over SHIP. Every number quoted above is re-read from an existing gate against an existing
 report, not new.
 
+⭐⭐⭐ **SAME SESSION, THE PROTOTYPE WAS STARTED AND ITS OWN CANDIDATE DIED IN FIVE MINUTES OF
+ARITHMETIC — WHICH IS THE POINT OF DOING THE CHEAP TEST FIRST, AND THE REFUTED CLAIM WAS ONE I HAD
+WRITTEN INTO `CLAUDE.md` AN HOUR EARLIER.** ⛔ **No DSP change was made; none was needed.**
+
+⭐⭐ **FIRST, THE THING NOBODY HAD DONE: LOCALISE OUR OWN 2980 Hz PEAK.** Cascading the schematic
+values in closed form — the recovery bridged-T (nodal solve, `C16` bridging, `R22`/`R23` T with
+`C17` shunt, loaded by `R24`) × SK 10.7k × SK 3.3k × the clipper's closed loop at the shipped
+`clipA0 = 24.871` — and vertex-interpolating in log-f as GATE W does gives **2934.8 Hz** against
+GATE W's measured **2977–2983 Hz. 1.5 %, with nothing fitted.**
+⇒ **our treble peak is the bridged-T's rise out of its own 716 Hz notch, rolled off by the two
+Sallen-Keys — a pure POST-CLIPPER LINEAR feature.** That is *why* it is pinned to 0.2 %: it sits
+downstream of every nonlinearity and cannot move with drive by construction. ⭐ This also explains
+why the bridged-T notch and the treble peak behave identically in W6 — they are two features of
+**one** network, 716 Hz and 2935 Hz being its notch and its recovery.
+
+⛔⛔ **AND IT REFUTES MY OWN LEADING CANDIDATE ON SIGN.** The claim written into open-work item 6
+was that dynamic R19 sag lowers `a0`, which walks the `C14 ∥ R18` corner *"at
+1/(2π·330k·220p) = 2.19 kHz, i.e. exactly where the treble peak is"*. **Two errors, both caught by
+computing rather than reasoning:**
+1. **2.19 kHz is the BARE pole, not the closed-loop corner.** For the shunt-feedback stage the
+   denominator is `1/R16 + (1+a0)(1+sR18C14)/R18`, so the closed-loop pole is at
+   `[1/((1+a0)R16) + 1/R18] / 2πC14` = **6.29 kHz** at the shipped `a0`. The 2.19 kHz number was
+   never the peak's cause — it was the right formula for the wrong quantity.
+2. **The sign is backwards.** That expression **rises** as `a0` falls, because `1/((1+a0)R16)` grows.
+   Measured across the fit range: `a0` **24.871 → 15 → 8** gives peak **2934.8 → 3025.8 → 3099.0 Hz**
+   — the peak moves **UP** with sag, while the pedal's walks **DOWN** (2696 → 2498).
+
+⚠ **What is dead is the corner-shifting route and the 2.19 kHz coincidence — not sag itself** as a
+candidate for the nonlinear deficit. ⛔ Do not re-derive either; and note the coincidence was
+*flagged* as needing a test in the same breath it was written (`an implausible coincidence is a bug
+report`, in both directions), which is the only reason it cost minutes instead of a session.
+
+⭐⭐⭐ **WHAT SURVIVES IS BETTER THAN WHAT DIED: THE TREBLE-PEAK WALK AND A3's UNTESTED DYNAMIC HALF
+ARE THE SAME FINDING.** GATE W reads centres off `transfer_h1` — the **fundamental**, harmonics
+rejected. So a *linear* explanation of the pedal's walk is impossible on its side too: for the
+pedal's **fundamental** transfer to move with drive, its compression must be
+**frequency-dependent**, where ours is closer to uniform. That is exactly **GATE Q's `D(f)`
+(rms 3.01 dB, *"only a nonlinearity can carry it"*) seen on the frequency axis** rather than the
+level axis. ⇒ one target, two instruments, and the constraint on any candidate is now sharp:
+**it must be a frequency-dependent nonlinearity.** A flat compression change (a rail, a ceiling, a
+uniform sag) cannot produce it, which retires a whole family of candidates before any render.
+
+⚠ **AND IT CONSTRAINS THE 8–16.3 kHz QUESTION THE SAME WAY** — a drive-growing, smooth, *rising*
+HF plateau on the pedal's H1 is also a statement about frequency-dependent gain, so items 3 and 6
+may be one mechanism. Not claimed; noted as the cheapest thing to check next.
+
+⭐⭐⭐ **SAME SESSION, THIRD CHALLENGE: "the bass issue is an A3 one, right? not something to chase
+separately?" — AND CHECKING RATHER THAN AGREEING SPLIT IT IN TWO. THE BASS NOTCH IS A3; THE BASS
+PEAK PROVABLY IS NOT.** Read off the STORED `s122_feature_locus.json` W4 dose-response — no render,
+no new instrument.
+
+| feature | model LEVEL locus | pedal LEVEL locus | overlap? |
+|---|---|---|---|
+| bass **notch** | 53.2 – 64.2 Hz (span 17.2 %) | 38.1 – 54.4 Hz (span 30.0 %) | ✅ **overlap 1.17 Hz** |
+| bass **peak** | 154.6 – **165.5** Hz (span 6.6 %) | **195.7** – 208.9 Hz (span 6.3 %) | ⛔ **DISJOINT — pedal min is 18.2 % ABOVE model max** |
+
+⭐⭐ **The argument, and it needs no threshold.** LEVEL *is* the mix lever — the very axis A3 is an
+error in. So the LEVEL locus is the complete set of centres that **any** re-balancing of the OD/clean
+mix can produce. For the **notch** the two loci intersect, so an A3 correction can in principle
+reconcile them. For the **peak** they never intersect: sweeping LEVEL end-to-end moves the feature
+**6.6 %** against a **~20–26 %** gap ⇒ the lever is **3× too small**.
+⛔⛔ **And it points the WRONG WAY.** More LEVEL = more OD in the mix = the direction an A3
+correction pushes (A3 = our OD path is absolutely quiet by 4.4–5.5 dB). That walks the model's bass
+peak **165.5 → 154.6 Hz**, i.e. *away* from the pedal's 195–209. ⇒ **correcting A3 makes the bass
+peak worse**, so it cannot be A3 and it cannot be waiting on A3.
+⭐ Structurally identical to session 38's C12 argument (*"the locus runs right-and-down, the pedal
+sits right-and-up — off the curve in both coordinates"*), which the project already treats as
+decisive. **A dose-response locus that does not contain the target refutes the whole lever, not just
+its current setting.**
+
+⭐⭐ **AND A FREE THIRD FINDING THAT RE-PRICES OPEN ITEM 9.** Over that same ladder the **pedal's
+bass notch is ~2× more LEVEL-sensitive than ours** (30.0 % vs 17.2 %). Two mixers summing the same
+two paths must respond to LEVEL the same way — so that 2× is a **direct measurement on GATE L4's
+undiscriminated (a) *"the pedal's mix network differs structurally"* vs (b) *"something downstream
+of LEVEL is level-dependent"***, open and unanswered since session 104. ⭐ It is also a **shape**
+question (how the cancellation locus *moves*), so unlike L4's absolute 9.3 dB it is not in the
+gain-matched matrix's blind spot. Item 9 now has an instrument and a number rather than only a
+question.
+
+⚠ **THE PATTERN OF THIS SESSION, STATED PLAINLY: THREE STANDING "it's X, so nothing to do here"
+CLOSURES WERE CHECKED AND ALL THREE LEAKED** — the HF region ("ND's aliasing"), the treble peak
+("not the same kind of feature"), and now the bass peak ("it's A3"). ⭐ GENERAL: **a closure that
+routes a defect to an already-open item is the least-audited kind there is**, because it *looks*
+like bookkeeping rather than a claim — but "defect B is really defect A" asserts that A's lever
+reaches B, and that is a measurement. Check the lever's RANGE against the gap before accepting the
+routing. (Added to `measurement-discipline.md` §7.)
+
 ▶ **NEXT.**
-1. ⭐⭐ **Prototype dynamic R19 sag against the treble-peak drive sweep** (new open-work item 6). Cheap,
-   no capture needed, and it is a known-answer test rather than a fit: the model's centre must walk.
-   ⚠ Gate it on the mid peak NOT moving (it already tracks at ~2.5 %) and on CLEAN being bit-identical
-   (the clipper is OD-only) — a sag that reaches CLEAN has escaped its stage.
-2. ⭐ **If it walks, re-score A3's `D(f)` against it** — same mechanism, and GATE Q's 3.01 dB rms is
-   the pre-registered target. ⛔ Do not re-fit any *static* A3 correction on top; that is the thing
-   five sessions already excluded.
+0. ⭐⭐ **The bass peak is now its own item** — a ~20–26 % centre error that no mix balance can
+   reach, direction-refuted against A3. ⛔ Do not park it behind A3. ⚠ Unlike the treble peak it has
+   NOT been localised on our side; do that first (the s125 closed-form cascade is the template — it
+   cost minutes and retired a mechanism).
+1. ⭐⭐ **Find the frequency-dependent-compression mechanism** (open-work item 6, now sharply
+   constrained). ⛔ Do NOT prototype a uniform/flat sag: `transfer_h1` is a fundamental read, so a
+   frequency-flat gain change cannot move any centre, on either side. ⛔ Do NOT look post-clipper —
+   our peak is provably a linear feature there (2934.8 Hz closed-form) and A3 excluded post-clipper
+   linear elements of any order at s52. ⇒ the search space is **frequency-dependent nonlinearity at
+   or upstream of the clipper**: the GRUNT bank's interaction with a signal-dependent node-W
+   impedance (`R18/(1+A0)` — the one place `a0` legitimately moves a corner), the J201's own
+   frequency-dependent loading, or the treble/ATTACK ladder feeding a level-dependent clipper input.
+2. ⭐ **Whatever is found, score it against GATE Q's `D(f)` (3.01 dB rms), pre-registered** — same
+   mechanism, and it is the only *sized* nonlinear target the project owns. ⛔ Do not re-fit any
+   *static* A3 correction on top; five sessions already excluded that class.
 3. ⚠ **The 8–16.3 kHz grading question is a USER DECISION, and GATE I has been saying so.** With the
    aliasing attribution withdrawn, decide whether the region stays graded. ⚠ G4's table says an
    exclusion makes the **median WORSE** on both candidate and baseline (the HF bands were diluting it

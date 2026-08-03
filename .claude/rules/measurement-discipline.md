@@ -625,6 +625,36 @@
   would turn over. Session 73's rejected `a ≈ 5.7` was therefore **non-monotone**, not merely
   worse-scoring. **Scan the real function, not the sub-term's algebra**, and gate it three ways:
   the shipped point as a known answer, the candidate, and a value that MUST fold (mutation). (s91)
+- ⭐⭐⭐ **LOCALISE YOUR *OWN* SIDE'S FEATURE BEFORE PROPOSING A MECHANISM FOR THE MISMATCH — IT IS
+  USUALLY A CLOSED-FORM CALCULATION, IT TAKES MINUTES, AND IT CAN RETIRE A WHOLE FAMILY OF
+  CANDIDATES.** Session 125 opened a prototype for "our treble peak is pinned at 2980 Hz and the
+  pedal's walks 2696 → 2498 Hz with drive" and reached for a mechanism (dynamic supply sag) *before
+  asking what makes our peak at all*. Cascading the schematic values in closed form — bridged-T
+  nodal solve × SK 10.7k × SK 3.3k × the clipper's closed loop — gives **2934.8 Hz against a
+  measured 2977–2983, 1.5 %, nothing fitted.** ⇒ the peak is a **post-clipper LINEAR** feature, so
+  it is pinned *by construction* and **no nonlinearity anywhere can move it**; the search space is
+  the other side of the comparison. ⭐ The localisation also explained a second feature for free
+  (the 716 Hz bridged-T notch and the 2935 Hz peak are the notch and the recovery of **one**
+  network), and it sharpened the target from "add dynamics" to "frequency-dependent nonlinearity, at
+  or upstream of the clipper" — retiring every flat/uniform candidate before a single render.
+  ⚠ Sibling of `localise-before-fitting-a-constant`, pointed at the model rather than the defect:
+  there you localise the ERROR before fitting; here you localise YOUR OWN FEATURE before theorising
+  about the gap. (s125)
+- ⭐⭐⭐ **A COMPONENT'S BARE POLE IS NOT THE STAGE'S CORNER, AND FEEDBACK MOVES IT — IN A DIRECTION
+  THAT IS EASY TO GET BACKWARDS. COMPUTE IT; THE HAND-DERIVATION IS 3× OUT AND WRONG-SIGNED.**
+  Same session, same hour: I wrote into `CLAUDE.md` that a sag-driven fall in the clipper's
+  open-loop gain `a0` would walk *"the `C14 ∥ R18` corner, at 1/(2π·330k·220p) = **2.19 kHz**, i.e.
+  exactly where the treble peak is"*. Both halves are wrong. The **closed-loop** pole of the
+  shunt-feedback stage is `[1/((1+a0)R16) + 1/R18] / 2πC14` = **6.29 kHz** — the bare pole was the
+  right formula for the wrong quantity — and because `1/((1+a0)R16)` *grows* as `a0` falls, the
+  corner moves **UP**: `a0` 24.871 → 15 → 8 walks the peak **2934.8 → 3025.8 → 3099.0 Hz**, opposite
+  to the pedal. ⭐ GENERAL: **for any stage with feedback, the corner is a property of the loop, not
+  of the R and C that name it** — write the denominator out and read the pole off it, and check the
+  *sign* of `∂f/∂(gain)` numerically rather than by intuition, because "more gain extends bandwidth"
+  and "more gain moves the input-node impedance" pull opposite ways. ⚠ Note what made this cheap:
+  the coincidence was flagged as needing a test *in the same sentence it was written*
+  (`an-implausible-coincidence-is-a-bug-report`, applied to one's own claim), so it cost five
+  minutes of arithmetic instead of a prototype. **Write the falsifier next to the hypothesis.** (s125)
 
 ## 2. Aggregates, membership and range
 
@@ -2074,6 +2104,22 @@
   the complement of C is the untested workspace. ⚠ The tell is available for free: a property the
   exclusions all *assume* (here: time-invariance) that the defect itself is documented to *violate*.
   (s125)
+- ⭐⭐⭐ **A CLOSURE THAT ROUTES DEFECT B TO ALREADY-OPEN DEFECT A IS THE LEAST-AUDITED KIND THERE
+  IS, BECAUSE IT LOOKS LIKE BOOKKEEPING RATHER THAN A CLAIM — BUT "B is really A" ASSERTS THAT A'S
+  LEVER REACHES B, AND THAT IS A MEASUREMENT.** Session 125 checked three standing *"it's X, so
+  nothing to do here"* routings and **all three leaked**: the 8–16.3 kHz region ("ND's aliasing" —
+  the gate's own G3 refutes the mechanism), the treble peak ("not the same kind of feature" — we are
+  281–485 Hz out at every drive), and the bass peak ("it's A3"). ⭐ **The test is cheap and needs no
+  threshold: plot the lever's full DOSE-RESPONSE LOCUS and ask whether it CONTAINS the target.** For
+  the bass peak the lever is the mix balance (LEVEL), and its end-to-end travel moves the centre
+  **6.6 %** against a **~20–26 %** gap, with the two loci **disjoint** (pedal min 18.2 % above model
+  max) — *and* the A3-correcting direction walks the model **away** (165.5 → 154.6 Hz vs the pedal's
+  195–209). ⇒ not merely unreached but refuted, and correcting A3 makes it **worse**. ⚠ Contrast the
+  bass NOTCH on the same ladder, whose loci **do** overlap — so the routing was half right, which is
+  exactly why it survived: **a routing that is true of one feature gets applied to its neighbour.**
+  ⭐ Structurally identical to s38's C12 argument (*"the locus runs right-and-down, the pedal sits
+  right-and-up"*): **a dose-response locus that does not contain the target refutes the whole lever,
+  not just its present setting.** (s125)
 - **Exclude explicitly, with the evidence recorded, never silently.** (s40)
 - ⭐ **A GATE THAT LIVES IN A MARKDOWN TABLE IS A TRANSCRIPTION, AND TRANSCRIPTIONS ROT.** The Phase 9
   release gate's "now" column was hand-read into `CLAUDE.md`. Re-measured from the same file, same
