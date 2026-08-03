@@ -175,7 +175,11 @@ release) has not started.
   what it graded.
   ⛔ The absolute-ledger gates (K/M/O/P/Q) must be read against `s118_clampfix.json` or later — GATE O
   deliberately refuses any earlier report by name (session 119).
-- **ctest 17/17** as of session 124. ⚠ Two tests were REPAIRED in session 124 and neither was a code
+- **ctest 18/18** as of session 127 (`PerfBenchmark` added — the 18th; ~54 s, `RUN_SERIAL`, and that
+  serial property is load-bearing, not tidiness: it times wall-clock per sample, so a co-scheduled
+  ctest job contends for the cores it is measuring. ⛔ Do not copy `RUN_SERIAL` to any other test as
+  house style — `build.md` names this the ONE exception to "run tests in parallel, always".)
+  ⚠ Two tests were REPAIRED in session 124 and neither was a code
   defect — both asserted premises the ADAA change inverted (`ClipperTest` (d) bound a claim about `k`
   to whatever shipped; `OSValidationTest`'s delay-comp check asserts factor-independence of a path
   the OS gate deliberately makes factor-dependent). Both repairs kept their original bars. See
@@ -330,12 +334,33 @@ orderings and why each item moved).
    they lose (worst tone +9.9/+17.3 dB). See `docs/session-log.md` SESSION 124.
 2. **THD level term** — one of 6 rows over SHIP (3.523 vs ≤3.0, full-send). Model **over**-distorts
    (signed mean positive) — do not reason about candidates as "add more distortion".
-3. ⭐ **Perf: the `pow()` fast path is UNBLOCKED but NOT MEASURED.** `clipK = 2.0` restores
-   `sig()`/`sigDeriv()`'s `k == 2.0` fast path — which was the entire perf argument for the
-   re-anchor — but nobody has re-run `PerfBenchmark` against the clipper's recorded 356 ns/sample.
-   That is a **measurement, not a change**, and it must be quoted before this item is called closed.
-   ⚠ ADAA *adds* work at 1×/2× while the fast path removes it everywhere, so the net at the realtime
-   factors is genuinely unknown — measure it, do not reason about it.
+3. ✅ **DONE, SESSION 127 — MEASURED, AND SESSION 124 IS THE LARGEST PERF WIN IN THE PROJECT: THE
+   WHOLE CHAIN IS ~2× FASTER AT EVERY OS FACTOR.** `tests/PerfBenchmark.cpp` (new, registered with
+   `add_test`, `RUN_SERIAL`, finite-only per `build.md` — timing is REPORTED, never gated). ⚠ Note
+   `PerfBenchmark` **did not exist** until this session; session 120's 356 ns/sample came from a
+   scratch probe long since deleted, so "re-run PerfBenchmark" meant "build it".
+   **Full chain, ns per base sample, 48 kHz, BLEND=100 % OD, DRIVE=0.85 (run the test for live
+   numbers — do not transcribe):**
+   | factor | shipped | pre-s124 | pow fast path | ADAA on top | **s124 NET** | shipped × realtime |
+   |---|---|---|---|---|---|---|
+   | 1× | 225.0 | 437.8 | −58.0 % | +22.5 % | **−48.6 %** | 92.6× (1.08 % of a core) |
+   | 2× | 475.8 | 911.1 | −55.7 % | +18.0 % | **−47.8 %** | 43.8× (2.28 %) |
+   | 4× | 708.6 | 1653.9 | −57.2 % | **+0.08 %** | **−57.2 %** | 29.4× (3.40 %) |
+   | 8× | 1297.4 | 3151.8 | −58.8 % | **−0.03 %** | **−58.8 %** | 16.1× (6.23 %) |
+   ⇒ ADAA's cost is **+18…+22 % at the two gated-ON factors and ZERO to noise at 4×/8×** — the OS
+   gate is doing exactly what it says, and that ±0.05 % is a free known answer (checksum-identical
+   arms must also time identically). The fast path is **−56…−59 % of the WHOLE CHAIN**, so it dwarfs
+   ADAA's cost everywhere and the net is a ~2× speed-up at every factor. Stage-level (clipper alone,
+   384 kHz, comparable to s120's arm): **314.6 → 110.1 ns/sample, −65.0 %**.
+   ⭐⭐ **AND THE ARITHMETIC CLOSES FROM BOTH ENDS, so the −65 % is the `pow` calls and nothing
+   else:** a direct microbenchmark on this machine reads **11.97 ns per `std::pow`**, and the pow
+   count per sample is 4 (initial `solveF`+`solveFp`) + 4 × ~2.9 iterations + 2 (final `vtcSub` for
+   `y`) ≈ **17.6**, predicting **211 ns** against a measured **204.5 ns** — 3 %.
+   ⚠ **Absolute ns/sample is machine- and run-specific** (this run reads arm 1 at 314.6 where s120
+   recorded 356.59, −11.8 %, on a laptop three sessions later). **Only the within-run ratios are
+   quotable**; the test says so in its own output.
+   ⛔ Do NOT re-open "is the re-anchor worth it on perf grounds" — it is priced, and the price is
+   negative by a factor of two.
    ⚠ (Historical, now moot: had `clipK` stayed at 2.4653, ADAA would have needed a general-k
    primitive — a Chebyshev fit of `psi(u) = Phi(u) − u` on `t = u/(1+u)`. ⛔ And NOT quadrature: the
    in-chain step-vs-knee table in `Clipper.h::setADAA` rules it out — the argument steps further than
@@ -491,14 +516,19 @@ construction and sits in the OD path only, where A3 lives.
 (the doc-consolidation pass). Session 122's "sessions 115–122 are uncommitted" flag and its
 "flag to the user" note are **discharged**; nothing is owed there.
 
-✅ **Sessions 123–124 are COMMITTED** (one commit: session 123 built and measured ADAA, session 124
-shipped it on the user's decision — they are one change and were committed together). Run
+✅ **Sessions 123–127 are COMMITTED.** Run
 `git status --porcelain` for the live, authoritative state — do not transcribe it here
 (`rebuild-targets-dont-transcribe`; the old per-session "Uncommitted at session N" blocks were
 exactly this mistake, repeated 28 times, and are archived verbatim in `docs/session-log.md`).
 
 Regenerable/gitignored, not part of any commit decision: `analysis/reports/*.json`,
 `analysis/fit_logs/*.log`, `build/**`.
+
+⚠ **Session 127 relinked `OfflineRender` with a COMMENT-ONLY `FitParams.h` edit, so all 6501 entries
+/ 133 MB of `analysis/reports/cache/` are unreachable and the next matrix run re-renders from scratch
+(~25 min).** The DSP is bit-identical (verified: every changed line is a comment; ctest 18/18), so
+`s124_ship.json` is still the correct baseline and **no re-baseline is owed** — budget the time, don't
+go looking for a regression. `docs/session-log.md` SESSION 127 has the verification command.
 
 ## Project-specific carry-forwards
 

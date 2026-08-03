@@ -1741,6 +1741,25 @@
   good for both is propping up a different unfixed defect. (s46)
 - **Don't fit jointly across levels when the element is level-invariant** — it drags the fit toward
   absorbing a defect it cannot fix. Fit at one level, then CHECK at the others. (s35)
+- ⭐⭐⭐ **A FITTED CONSTANT CAN CARRY A COST THE OBJECTIVE HAS NO TERM FOR, AND A SPECIAL-CASED VALUE
+  IN THE SHIPPED STAGE IS EXACTLY WHERE THAT BITES — CHECK EVERY WINNER AGAINST THE FAST PATH BEFORE
+  BELIEVING A TIE.** `clipK = 2.4653` was a session-44 fit result, carried for 80 sessions. Session
+  124 measured it against `k = 2.0` on 162 captures and found the two **indistinguishable** on
+  accuracy; session 127 measured what the difference had been *costing* and it is **−56…−59 % of the
+  whole plugin's CPU at every OS factor** — a 2× speed-up — because `sig()`/`sigDeriv()` have a
+  closed-form branch at exactly `k == 2.0` and two `std::pow` otherwise. **Nothing in the fitter
+  could see that**, and nothing was wrong with the fit; the objective simply had no perf term, so a
+  value 20 % off a special case was free to win by an amount smaller than the measurement noise.
+  ⭐ GENERAL: when a stage special-cases a parameter value — a fast path, an exact closed form, an
+  elementary antiderivative — **name it in the fit's own comment as a preferred value, and break any
+  accuracy tie toward it.** The tie has to be *looked for*: a fitter reports the argmin, not the set
+  of points indistinguishable from it, so "is the winner distinguishable from the special value?" is
+  a separate question that nobody asks unless it is written down. ⚠ And the same constant gated a
+  *feature*: off `k = 2.0` the shipped ADAA is silently inert (`Clipper::adaaExact()`), so the fit
+  was also free to disable a shipped stage behaviour with no error and no log line — the expensive
+  failure mode, because nothing looks wrong. (s127; the sibling of
+  `if-every-term-is-relative-nothing-sees-absolute-level` — there the blind axis was a signal level,
+  here it is CPU and a feature's own precondition)
 
 ## 5. Artefacts, staleness and tooling
 
@@ -1841,6 +1860,20 @@
     ANY build, check for a running render (`pgrep -f comprehensive_report.py`) — not before builds
     you think are risky.** Remedy applied as prescribed: mixed-binary report kept as
     `s124_ship_mixedbin.json`, re-run to `s124_ship.json`, and the two diffed as a control. (s124)
+  - ⭐⭐ **THIRD ANGLE, s127: THE COST IS NOT ONLY "while a render is in flight" — A COMMENT-ONLY EDIT
+    TO ANY HEADER IN THE RENDER BINARY'S INCLUDE GRAPH INVALIDATES THE ENTIRE ANALYSIS CACHE,
+    SILENTLY, WITH NO RENDER RUNNING AT ALL.** `_cache_key` hashes the binary's `(size, mtime_ns)` —
+    correctly; that is the guard s117 added — and a relink moves `mtime_ns` whether or not a single
+    instruction changed. Session 127 documented the measured perf price of `clipK` **at the
+    constant** (the right place — a constraint must land where the value is CHOSEN), which relinked
+    `OfflineRender` and thereby made **6501 cache entries / 133 MB** unreachable. Nothing is
+    corrupted — every changed line was a comment, verified with a `git diff` filter, and ctest stayed
+    18/18 — but the next matrix run re-renders from scratch (~25 min). ⭐ GENERAL: **treat any edit
+    under `src/` as a cache-invalidating event even when it is pure prose, and BATCH a session's
+    `src/` documentation edits into one build alongside its last real change.** ⚠ Do NOT "fix" this
+    by restoring the old mtime or loosening the cache key — the key is right; a deferred re-render is
+    the honest price of a header comment, and it belongs in the handover rather than being discovered
+    by the next session as an unexplained 25-minute run. (s127)
 - **A COST CAN LIVE ENTIRELY OUTSIDE THE MATRIX.** `jfetSatNeg` 0.76 → 1.9 moved
   `OSValidationTest`'s 8× alias/signal floor −23.6 → −17.3 dB. The 129-capture matrix renders at
   OS=8 and grades FR/THD/harmonics **at bands** — it never measures inharmonic energy, so no amount
@@ -2196,3 +2229,26 @@
   caveat, build an instrument to resolve the caveat. Each closed an item honestly and nothing
   shipped. **If a session's next step is a refinement of a component of a defect that has no
   candidate fix, that is the signal to go and ship something instead.**
+- ⭐⭐⭐ **"X IS THE DOMINANT COST" IS A LOCALISATION, NOT A SIZE — AND AN UNSIZED FINDING IS FILED BY
+  ITS READER'S GUESS, WHICH FOR "a couple of `pow` calls" IS "a few percent".** Session 120 localised
+  the clipper's dominant per-sample cost correctly, wrote *"the real perf lever here"*, and quoted no
+  fraction. Session 124 then shipped the fix — and priced it as *"indistinguishable with a rounding
+  preference"*, with the perf argument in a parenthesis. Measured in session 127 it is **−56…−59 % of
+  the whole plugin at every OS factor, a ~2× speed-up: the largest perf change in the project's
+  history**, which had sat unquantified for seven sessions and was very nearly shipped as a
+  micro-optimisation. ⭐ GENERAL: **quote a localised cost as a fraction of the total in the same
+  sentence that names the mechanism** — one extra number, and without it the next reader assigns the
+  finding a magnitude from intuition and schedules it accordingly. ⚠ Note the direction: this error
+  ran *against* the project's interest (a big win looked small), which is why nothing flagged it —
+  the flattering-direction heuristic that catches most of the entries in this file does not fire when
+  a finding is *under*stated. (s127; the perf-axis form of
+  `unsigned-aggregates-have-no-sign` — there a summary lost a direction, here it lost a magnitude)
+- ⭐⭐ **AND WHEN A MEASUREMENT COMES BACK MUCH BIGGER THAN THE FINDING PREDICTED, CLOSE IT FROM BOTH
+  ENDS BEFORE QUOTING IT.** A −65 % step invites "cache effect / mis-set arm / the compiler did
+  something else", and the cheap discriminator is arithmetic from an independent direction: a direct
+  microbenchmark gave **11.97 ns per `std::pow`** on the same machine, and the pow count per sample
+  (4 initial + 4 × ~2.9 iterations + 2 for the emitted sample ≈ 17.6) predicts **211 ns** against a
+  measured **204.5 — 3 %**. That took one throwaway file and converts a surprising ratio into a
+  mechanism. ⭐ Same habit as s117's *"an exactly-repeated delta is a gain, so compute it"*: an
+  unexpectedly large effect and an unexpectedly exact one are both requests for a second derivation.
+  (s127)

@@ -110,7 +110,27 @@ struct FitParams
     // fast path — NOT the ledger. Anyone re-opening this should re-read that sentence
     // before quoting the 1.947 as evidence of accuracy.
     // The k != 2 forward path (Clipper.h vtc()/vtcDeriv()) is a plain pow(), exact
-    // for any k; only the k==2 sqrt fast-path is skipped (a little more CPU/sample). **
+    // for any k; only the k==2 sqrt fast-path is skipped.
+    // ⚠⚠ SESSION 127 CORRECTION — THE LINE ABOVE USED TO END "(a little more
+    // CPU/sample)", AND THAT UNDERSTATED IT BY TWO ORDERS OF MAGNITUDE OF IMPORTANCE.
+    // Measured (tests/PerfBenchmark.cpp, ctest #18): the k==2 fast path is worth
+    // **-56 to -59 % of the WHOLE PLUGIN's CPU at every OS factor** (chain, ns per base
+    // sample: 1x 437.8 -> 183.7, 8x 3151.8 -> 1297.7), i.e. off the anchor the plugin
+    // is ~2x slower. Clipper alone at 384 kHz: 314.6 -> 110.1 ns/sample, -65 %. The
+    // arithmetic closes independently at 3 %: 11.97 ns per pow() on that machine x ~17.6
+    // pow calls/sample (4 initial + 4 x ~2.9 Newton iterations + 2 for the emitted y).
+    // ⇒ ** THIS CONSTANT IS A PERF PARAMETER AS WELL AS A SHAPE ONE, AND NO FIT
+    // OBJECTIVE IN THIS PROJECT SCORES EITHER OF ITS TWO NON-SHAPE COSTS. ** Before
+    // shipping any re-fitted k (open-work item 5's K/clipSat re-fit against the physical
+    // rail is the live candidate), require BOTH:
+    //   (a) is the winner distinguishable from k = 2.0 on accuracy? A fitter reports the
+    //       argmin, never the set of points indistinguishable from it, so this is a
+    //       SEPARATE question and s124's answer was "no" (162 captures) after 80 sessions
+    //       of carrying 2.4653. Break an accuracy tie toward the anchor.
+    //   (b) is the 2x CPU and the SILENT DEATH OF ADAA (adaaExact() gates on
+    //       hardness == 2.0 — no error, no log line, the feature just stops) worth
+    //       whatever the non-anchor k buys? Say the price out loud in the handover.
+    // measurement-discipline.md §4 carries this as a general rule. **
     double clipK = 2.0;          // session-124 re-anchor (was 2.4653 session-44 A5, 2.8462 session-17)
     // clipC11 = the ALWAYS-PRESENT GRUNT coupling cap (schematic 4n7, Clipper.h
     // kC11). Made fittable in session 17 (user-authorised 2026-07-24: "ATTACK and

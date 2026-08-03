@@ -179,6 +179,26 @@ target_link_libraries(OSValidationTest
         juce::juce_recommended_config_flags)
 add_test(NAME OSValidationTest COMMAND OSValidationTest)
 
+# Phase-10 CPU probe (build.md "Performance & fidelity probes"). Registered as a
+# FINITE-ONLY test: its pass/fail assertions are finiteness + checksum identities, and
+# it never gates on a timing number (CI speed varies — build.md says so explicitly).
+#
+# ⚠ RUN_SERIAL is load-bearing, and it is build.md's ONE stated exception to
+# "run tests in parallel — always": this test measures wall-clock per sample, so a
+# co-scheduled ctest job contending for the same cores contaminates the very quantity
+# it reports. Do NOT copy this property to any other test as house style.
+juce_add_console_app(PerfBenchmark)
+target_sources(PerfBenchmark PRIVATE tests/PerfBenchmark.cpp)
+target_link_libraries(PerfBenchmark
+    PRIVATE
+        juce::juce_dsp
+        chowdsp::chowdsp_wdf
+        xsimd
+    PUBLIC
+        juce::juce_recommended_config_flags)
+add_test(NAME PerfBenchmark COMMAND PerfBenchmark)
+set_tests_properties(PerfBenchmark PROPERTIES RUN_SERIAL TRUE)
+
 # Headless editor snapshot tool (build.md "UI changes" testing pattern) — renders the real
 # editor off-screen at min/default/max UI scale to PNGs for visual review. NOT registered with
 # add_test() — it's a visual-inspection tool, not a pass/fail gate.

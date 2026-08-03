@@ -13911,3 +13911,161 @@ the mix lever → `GATE Y2 (null)`; Y1's membership predicate inverted → `GATE
 is a *predicate* inversion and duly produced a self-contradicting message (*"has 7 readings and this
 render has 7"*) — s122's lesson, and the reason the Y7b mutation was written at the data level
 instead.
+
+---
+
+## SESSION 127 (2026-08-03) — `PerfBenchmark` BUILT, and session 124 is the largest perf win in the project: the whole chain is ~2× faster at every OS factor
+
+Open-work item 3, which said in as many words *"that is a **measurement, not a change**, and it must
+be quoted before this item is called closed"* and *"the net at the realtime factors is genuinely
+unknown — measure it, do not reason about it"*. It is now measured.
+
+### ⚠ First correction: `PerfBenchmark` did not exist
+
+Item 3 said "nobody has re-run `PerfBenchmark`". There was nothing to re-run. `build.md` has
+specified the probe since the template and `README.md` carried a `TBD` table waiting for it, but the
+only per-sample figure the project has ever recorded — **356.59 ns/sample for the clipper stage at
+384 kHz** (session 120) — came from a scratch probe long since deleted. So the item's real content
+was "build it", which is `check-for-unread-data-first` in reverse: I checked for the tool before
+assuming its absence, and `grep` answered in one command (`tests/` had 17 files and none was it).
+
+### What was built — `tests/PerfBenchmark.cpp`, ctest #18, `RUN_SERIAL`
+
+**⛔ It is not a performance gate and must not become one.** Per `build.md` (*"register them with
+add_test() as **finite-only** probes … do NOT gate on absolute CPU %, CI speed varies"*), every
+pass/fail assertion is a finiteness check or a **checksum identity**. Timing is printed, never
+asserted. `RUN_SERIAL TRUE` is load-bearing rather than tidiness — the test measures wall-clock per
+sample, so a co-scheduled ctest job contends for the very cores it is measuring. ⛔ That property
+must not be copied to any other test as house style; `build.md` names this the ONE exception to
+"run tests in parallel — always".
+
+Two benches:
+
+- **Stage-level** (clipper alone, at 384 kHz to be comparable with s120's arm, and at 96 kHz where
+  the shipped policy has ADAA **on**), four arms × two amplitudes.
+- **Chain-level** (the real `PedalDSP`, BLEND = 100 % OD, DRIVE = 0.85 — the clipper's worst case,
+  which is what a perf table wants), three `FitParams` arms × four OS factors, reporting ns per
+  **base** sample, × realtime, CPU % of one core, and `getLatencySamples()`.
+
+Method: best-of-5 after one discarded warm-up, **stimulus precomputed outside the timed region**
+(three `std::sin` per sample would be ~17 % of the clipper's own cost and would make the absolute
+figure incomparable to s120's). Best-of-N rather than a mean because the contaminant is one-sided —
+preemption, throttling and a laptop with a history of clamshell-sleeping mid-run
+(`wallclock-is-not-runtime`) can only make a rep *slower*. Stage stimulus is an **inharmonic
+three-tone sum dominated by 2499 Hz**, not a slow sine, because s120 established that a warm-started
+solve's work is set by how far its argument moves *between samples* — two independent synthetic
+sweeps had already understated the same defect exactly that way.
+
+### THE RESULT — full chain, ns per base sample, 48 kHz
+
+| factor | shipped | fast path only | pre-s124 | pow fast path | ADAA on top | **s124 NET** | shipped × realtime | latency |
+|---|---|---|---|---|---|---|---|---|
+| 1× | 225.0 | 183.7 | 437.8 | −58.04 % | +22.48 % | **−48.61 %** | 92.6× (1.08 % of a core) | 0 |
+| 2× | 475.8 | 403.2 | 911.1 | −55.74 % | +18.00 % | **−47.78 %** | 43.8× (2.28 %) | 49 |
+| 4× | 708.6 | 708.0 | 1653.9 | −57.19 % | **+0.08 %** | **−57.16 %** | 29.4× (3.40 %) | 60 |
+| 8× | 1297.4 | 1297.7 | 3151.8 | −58.83 % | **−0.03 %** | **−58.84 %** | 16.1× (6.23 %) | 64 |
+
+Stage-level, clipper alone:
+
+| rate / amp | k=2.4653 ADAA Off | k=2.0 ADAA Off | k=2.0 ADAA Full | k=2.4653 ADAA Full [control] | pow | ADAA | NET |
+|---|---|---|---|---|---|---|---|
+| 384 kHz / 2.9 V | 314.57 | **110.06** | 149.44 | 314.70 | −65.01 % | +35.79 % | **−52.49 %** |
+| 384 kHz / 0.9 V | 349.09 | 120.86 | 153.24 | 349.15 | −65.38 % | +26.80 % | −56.10 % |
+| 96 kHz / 2.9 V | 358.10 | 120.76 | 153.88 | 357.90 | −66.28 % | +27.43 % | −57.03 % |
+| 96 kHz / 0.9 V | 383.52 | 132.45 | 163.34 | 383.84 | −65.47 % | +23.33 % | −57.41 % |
+
+⇒ **The `pow` fast path is worth −56…−59 % of the WHOLE PLUGIN at every factor**, ADAA costs
++18…+22 % back at the two factors it is gated on, and the net is a **~2× speed-up at every OS
+factor**. That makes session 124 the largest perf change in the project's history — and its own
+handover priced the re-anchor as *"indistinguishable with a rounding preference"*, with the perf
+argument in a parenthesis.
+
+### ⭐⭐ The arithmetic closes from both ends, so the −65 % is the `pow` calls and nothing else
+
+A −65 % step invites "is this a cache effect / a mis-set arm / a compiler doing something else?".
+Closed independently (`measurement-discipline.md`'s *"close it from both ends"*): a direct
+microbenchmark of `sig()`'s two branches on this machine reads **24.92 ns/call for the `k != 2` path
+vs 0.97 for the closed form ⇒ 11.97 ns per `std::pow`**. The pow count per sample is **4** (the
+initial `solveF` + `solveFp`) **+ 4 × ~2.9** (each Newton iteration ends with one of each; s120
+measured the mean iteration count at 2.69–2.98) **+ 2** (the final `vtcSub(w)` for `y`) ≈ **17.6**,
+predicting **211 ns**. Measured difference: **204.5 ns**. **Agreement 3 %.**
+
+### The known answers, and why each is not vacuous
+
+- **`k = 2.4653` + ADAA=Full is BIT-IDENTICAL to `k = 2.4653` + ADAA=Off** (checksums equal to every
+  printed digit; timings 314.57 vs 314.70, i.e. +0.04 %). `Clipper::adaaExact()` gates the
+  substitution on `hardness == 2.0`, so ADAA is *silently inert* off the anchor — this is the one
+  arm pairing that **proves** that gating rather than restating it, and it needs no threshold.
+- **Non-vacuity controls:** `k = 2.0` must change the checksum (it does) and ADAA=Full must change it
+  **at** the anchor (it does). Without these, a constant that never reaches the stage makes two arms
+  equal and the table reads "free" for exactly the defect the probe exists to catch — session 100's
+  mutation-control lesson, and session 118's `--os 3` probe that reported a clean `0.0000 %` across
+  nine renders that had processed nothing.
+- **The OS gate's scope, re-derived through a path sharing nothing with `OSValidationTest`:** shipped
+  vs an ADAA-off control is **checksum-different at 1×/2× and bit-identical at 4×/8×**. That is
+  simultaneously the policy assertion and the proof that the three chain arms reach `Clipper`.
+- ⭐ **And the gate's scope shows up in the TIMING for free, which nobody designed:** ADAA's cost at
+  4×/8× reads **+0.08 % and −0.03 %** — zero to noise, as two checksum-identical renders must be. A
+  non-zero number there would have meant the arms differed in something other than ADAA.
+
+### ⚠ What is explicitly NOT claimed
+
+- **Absolute ns/sample is machine- and run-specific.** Arm 1 at 384 kHz reads **314.57** here where
+  s120 recorded **356.59** (−11.8 %). A laptop three sessions later is not a controlled instrument;
+  the test prints s120's figure beside that arm labelled *"[context, NOT a bar]"* and says in its own
+  output that only within-run ratios are quotable. ⛔ Do not turn that −11.8 % into a finding.
+- **No accuracy claim.** This session shipped no DSP change; every arm other than "shipped" is a
+  deliberately non-shipped configuration existing only to be timed.
+- The stage arm-1 figure varies 314–384 ns across rate and amplitude (iteration count moves with
+  both). **Reported, not explained** — it is a ≤22 % spread on an arm used only as a ratio
+  denominator, and no mechanism is asserted for it.
+- The 2×→4× shipped step is only 1.49× rather than ~2×. That is **the ADAA gate, not a scaling
+  anomaly**: the fast-path-only column steps 403.2 → 708.0 = 1.76×, and the missing part is ADAA
+  being on at 2× and off at 4×. Worth writing down because it looks like a defect and is not.
+
+### Also updated
+
+- `README.md`'s Performance section — the `TBD` table this probe was specified for, now populated,
+  with the worst-case operating point stated and a "re-run it on your own machine" caveat.
+- `CLAUDE.md`: item 3 closed with the table; ctest count 17 → **18**, with the `RUN_SERIAL` caveat.
+- `.claude/rules/measurement-discipline.md`: two new entries (§7 and §4) — see below.
+
+### ▶ NEXT, in order
+
+1. **THD level term** (item 2) — one of 6 rows over SHIP (3.523 vs ≤3.0, full-send). Unchanged, and
+   still the only *gated* row with an open lever. ⛔ The model **over**-distorts (signed mean
+   positive), so candidates reasoned about as "add more distortion" are pointed backwards.
+2. ⭐⭐ **The drive-dependent mechanism above ~2 kHz** (item 6) — now the largest open model item,
+   with FOUR located features and a low-frequency anchor added by s126. Unchanged by this session.
+3. **Items 4/5** (the corrupted-MASTER-anchor consumers; the VTC-amplitude-vs-physical-rail re-fit)
+   — unchanged, and item 5 is now *cheaper to justify*: a K/`clipSat` re-fit against a physical
+   ceiling would move `clipK`, and this session prices what leaving `k = 2.0` would cost. ⭐⭐ **Any
+   such re-fit must now carry a perf term it never had:** off `k = 2.0` the plugin is 2× slower AND
+   ADAA silently dies (`adaaExact()`). Put both in the objective's comment before fitting.
+4. ⚠ **Phase 10's remaining probes are still unbuilt** — `FeatureProfile` and `OSFidelity`
+   (`build.md` "Performance & fidelity probes"). They are what decide the `hq` toggle, and item 3's
+   closure removes the argument for one: at 1.1–6.2 % of a core the omega solver is no longer
+   plausibly a CPU-vs-accuracy *lever* worth a user-facing button. ⚠ That is a hypothesis from the
+   headline number, not a measurement — `FeatureProfile` is what would settle it.
+
+### ⚠ One measured side effect of this session, flagged rather than discovered later
+
+Documenting the perf price **at `clipK` itself** (the right place — a constraint must land where the
+value is chosen) edited `src/dsp/FitParams.h`, which is in `offline_render.cpp`'s include graph, so
+`OfflineRender` **relinked**. `comprehensive_report._cache_key` hashes the binary's
+`(size, mtime_ns)`, so **all 6501 cache entries / 133 MB under `analysis/reports/cache/` are now
+unreachable** and the next matrix run re-renders from scratch (~25 min).
+
+**Nothing is corrupted, and the stored baselines stay valid.** Every changed line in `FitParams.h` is
+a comment — verified mechanically, not asserted:
+
+```bash
+git diff src/dsp/FitParams.h | grep -E "^[+-]" | grep -vE "^[+-]{3}" | grep -vE "^[+-]\s*//" | grep -vE "^[+-]\s*$"
+```
+
+returns nothing, ctest is 18/18, and the DSP is therefore bit-identical, so `s124_ship.json` remains
+the correct baseline and no re-baseline is owed. ⛔ Do NOT "repair" this by restoring the binary's
+mtime or by loosening the cache key — the key is right (it is s117's own guard), and the deferred
+re-render is simply the price of a header comment. Recorded in `measurement-discipline.md` §5 as a
+third angle on `never-rebuild-while-a-render-is-in-flight`, with the remedy being to **batch a
+session's `src/` prose edits into one build alongside its last real change**.

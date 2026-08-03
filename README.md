@@ -82,17 +82,25 @@ for the sibling [Monarch of Tone](https://github.com/tehguitarist/MoT) project:
 
 ## Performance
 
-*Placeholder — populated once the `PerfBenchmark` probe is added (see `docs/build-plan.md`'s
-performance-probe step, shared with the Monarch of Tone template). Expect the usual shape for a
-WDF/Newton-solve plugin: oversampling is the CPU-vs-fidelity dial, with the JFET and CD4049
-nonlinear solves the dominant per-sample cost.*
+Measured by `PerfBenchmark` (`ctest -R PerfBenchmark`), best-of-5 on the real `PedalDSP` chain at
+48 kHz with **BLEND at 100 % overdrive and DRIVE at 0.85** — i.e. the clipper's worst case, not a
+flattering average. Rebuild and re-run rather than trusting these figures on your own machine: they
+are specific to the box that produced them (Apple Silicon laptop, Release build).
 
-| Oversampling | CPU (≈ % of one core) | Added latency | Best for |
-|---|---|---|---|
-| **1×** | TBD | TBD | Tracking / low-latency live use |
-| **2×** | TBD | TBD | Everyday playing |
-| **4×** | TBD | TBD | Higher-fidelity highs |
-| **8×** | TBD | TBD | Maximum fidelity |
+| Oversampling | CPU (≈ % of one core) | × realtime | Added latency | Best for |
+|---|---|---|---|---|
+| **1×** | 1.1 % | 93× | 0 samples | Tracking / low-latency live use |
+| **2×** | 2.3 % | 44× | 49 samples | Everyday playing |
+| **4×** | 3.4 % | 29× | 60 samples | Higher-fidelity highs |
+| **8×** | 6.2 % | 16× | 64 samples | Maximum fidelity |
+
+Oversampling is the CPU-vs-fidelity dial, and the CD4049 clipper's per-sample Newton solve is the
+dominant cost — but far less dominant than it was. Session 124's re-anchor of the clipper's knee
+exponent to `k = 2` put `sig()`/`sigDeriv()` back on their closed-form path instead of two
+`std::pow` each, which alone is worth **−56 to −59 % of the whole chain** at every factor; 1st-order
+ADAA (on at 1×/2× only) costs **+18 to +22 %** back at those two factors and nothing at 4×/8×. Net,
+the plugin is roughly **twice as fast as it was before session 124** — see `CLAUDE.md`'s open-work
+item 3 for the full table and the both-ends arithmetic check.
 | **Render** *(auto, offline bounce)* | — | TBD | Engages automatically on DAW export |
 
 ## Building
