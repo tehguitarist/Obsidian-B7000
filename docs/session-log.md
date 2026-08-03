@@ -15960,3 +15960,168 @@ accurate of the two; no verdict moved.
    term per side would turn "not parabolic" into a number. Unchanged.
 5. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for an eighth session.
 6. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+## SESSION 140 (2026-08-04) — GATE AK: the J201's SHAPER is not item 6's tilt carrier either, on all three routes
+
+Session 139 closed with *"every named carrier on both sides of the clipper is now refuted"* and its
+own `▶ NEXT` #1(b) named the exception: **the J201's shaper, the one pre-clipper nonlinearity nobody
+had screened AS A TILT MECHANISM, as opposed to as a harmonic one.** AJ2 refuted the J201's gate
+**capacitance**; a capacitance and a transconductance are different carriers. This session screens
+the second. **`analysis/j201_shaper_tilt_gate.py` (GATE AK), 12/12 mutation arms,
+`analysis/reports/s140_j201_shaper_tilt.json`. No `src/` file, no constant and no baseline moved —
+the eleventh consecutive read-only gate session.**
+
+### The stage, and why there are THREE routes rather than one
+
+`JfetStage.h`'s class note is the whole starting point, and it is not the naive picture. The stage
+is a **CURRENT source**:
+
+    k(s) = 1 + gm*Zs(s),  Zs = R6 || C3     degeneration factor, 1+gm*R6 at DC -> 1 at HF
+    Gm(s)   = gm / k(s)                      transconductance RISES with frequency
+    Rout(s) = ro * k(s)                      drain output R FALLS with frequency
+    => open-circuit gain Gm*Rout = gm*ro     FLAT, independent of the degeneration
+
+so the shelf appears **only to the extent the stage is LOADED**, and the drain-node block is
+`T = Gm(f) * (Zout(f,gm) || Zin_ladder(f))` with `Zout = [ro*k(s)] || rq2`.
+
+That structure is what splits the candidate into three, and the split matters because **only one of
+the three is the obvious one**:
+
+1. **the shaper AS SHIPPED** — memoryless, sitting between the `1/k(s)` shelf and the `*(-gm)`
+   scaling;
+2. **gm SAG through `k(s)`** — the nonlinear-degeneration coupling the shipped Wiener-Hammerstein
+   model **omits**, and says so in as many words (*"the true degeneration is nonlinear feedback,
+   vgs = vg - i_d*Zs, an implicit solve"*). gm scales `rp = ro*gm*R6` in the drain impedance, which
+   **moves a pole** — a real tilt mechanism;
+3. **amplitude-dependent compression** — the shaper is memoryless but sits **downstream** of the
+   frequency-dependent shelf, so it sees a frequency-dependent drive and compresses by different
+   amounts across the window. Route 2 does not model this.
+
+**No render was needed**, on AI1c's licence re-asserted here on this gate's own blocks: the graded
+quantity is a tilt CHANGE, the tilt operator is linear on log-magnitude, so the treble ladder,
+IC2_A, the clipper, the bridged-T and both Sallen-Keys cancel **exactly** (asserted at 2.7e-15
+dB/oct against a deliberately wild fixed block).
+
+### AK2 — route 1: the shaper as shipped is inert, structurally
+
+A memoryless map's incremental gain at a given amplitude is a **scalar** multiplying the drain
+current, so log-magnitude gains a **constant** and the tilt is unchanged. Asserted rather than
+argued, over compressions from −0.1 dB to a 40 dB squash: **worst d(tilt) below 1e-14 dB/oct**.
+⇒ **the shipped shaper contributes NO tilt however hard it is driven** — AB2's own control
+(a uniform gain change cannot move a vertex), with no size argument and no threshold.
+
+### ⭐⭐ AK3 — route 2: gm sag, refuted on SHAPE by an argument stronger than AJ2c's bound
+
+| dgm/gm | d(tilt) | reach vs AH7 budget | sign ok |
+|---|---|---|---|
+| −0.1 % | −0.000033 | 0.003 % | True |
+| −10 % | −0.003260 | 0.272 % | True |
+| −50 % | −0.015626 | 1.303 % | True |
+| −90 % | −0.026899 | 2.244 % | True |
+| **gm → 0** (a LIMIT) | **−0.029544** | **2.464 %** | True |
+
+so **2.46 % of the budget at a limit at which a JFET has no transconductance left**, i.e. the
+ceiling holds for any sag whatever.
+
+⭐⭐ **But the SHAPE refutation is the strong half, and it is sharper than the f² pole-count bound
+s139 introduced.** Measured on the same estimator at AG4's three uncontaminated centres:
+
+| | 1612.7 Hz | 2031.9 Hz | 2560.0 Hz | adjacent-pair exponents |
+|---|---|---|---|---|
+| **deficit** \|PEDAL−MODEL\| | 0.3885 | 0.7752 | 1.4443 | **+2.989 / +2.693** |
+| **mechanism** \|d(tilt)\| at gm/2 | 4.92e−02 | 3.18e−02 | 2.04e−02 | **−1.884 / −1.926** |
+
+⇒ **the deficit RISES with frequency and the mechanism FALLS.** It is not merely under AJ2c's exact
+`≤ +2` bound — it is on the wrong side of **ZERO**: strongest where the deficit is weakest, and
+dying by the vertex. **Refuted with no threshold at all.**
+
+### AK4 — route 3, refuted on a CLASS bound that no shaper re-fit can move
+
+The third route needs no shaper model. If the shaper's gain is `G(A)` and the amplitude it sees
+varies by `d` dB across the window, the gain varies by `(dG_dB/dA_dB)·d`, and for **any** compressor
+`dG_dB/dA_dB ∈ [−1, 0]`. So the tilt this route can produce is bounded by **the shelf's own
+variation across the window**: `1/k(s)` runs **−0.0367 dB at 2075.2 Hz → −0.0093 dB at 4150.4 Hz`,
+a span of **0.0274 dB over 1.0 oct ⇒ ≤ 0.0274 dB/oct = 2.29 % of the budget, FOR ANY SHAPER SHAPE**.
+⇒ no re-fit of `s` / `a` / the ceiling can move it.
+
+### ⭐⭐⭐ The common root cause, and why all three land at ~2.3–2.5 %
+
+The degeneration shelf's corners are the **zero at `1/(2π R6 C3)` = 219.2 Hz** and the **pole at
+`(1+gm·R6)/(2π R6 C3)` = 291.6 Hz** — **both a decade below the 2935 Hz vertex.** Everything that
+acts through that shelf is spent before it reaches the feature, which is why two routes computed
+completely differently (a pole-move sizing and a class bound on compression) agree to within 0.2
+percentage points. **The J201 cannot reach the vertex because its only frequency-dependent element
+corners a decade too low** — a structural fact about the stage, not a number about a part.
+
+### ⭐⭐ AK5 — and the methodological result: this carrier PASSES the sign gate and is still refuted
+
+The J201 is **upstream** of the GRUNT switch and the tilt operator is linear on log-magnitude, so
+its tilt change is added identically whichever cap is switched in. Asserted rather than argued,
+through AI's own at-clipper block at each **shipped** cap (`AI.grunt_caps()`, which composes the
+ADD-caps as the stage does — s139's fix, imported rather than re-derived): **spread across GRUNT
+1.07e−14 dB/oct.**
+
+| GRUNT | cap (nF) | mech d(tilt) | defect | sign ok |
+|---|---|---|---|---|
+| cut | 3.690 | −0.015626 | −2.407 | True |
+| flat | 50.690 | −0.015626 | −1.913 | True |
+| boost | 223.690 | −0.015626 | −1.098 | True |
+
+⭐ **3 of 3 — unlike the clipper's `a0` (AI, 1 of 3) and the GRUNT caps' voltage coefficient (AJ4,
+0 of 3).** This carrier clears item 6's fourth pre-registered gate cleanly and dies on shape and
+size instead. ⇒ **sign-admissibility is NECESSARY, NOT SUFFICIENT — a screen built on sign alone
+would have passed it.** AB6 said this about size; s138 said it about `a0`; this is the first time a
+candidate has actually *survived* the sign gate and still fallen, which is what makes it worth
+recording rather than restating.
+
+### The known answer that failed, and it was the TEST both times
+
+⚠ **AK1d, first draft.** I asserted `Gm*Rout = gm*ro` flat **with `rq2` in circuit** and it failed at
+**3.93e−3 dB/oct against correct code**. The identity holds for the **bare device** only: the
+shipped `Zout` also shunts the active load, and `Gm·(ro·k ∥ rq2) = gm·ro·rq2/(ro·k + rq2)` keeps
+`k(s)` in the denominator. Repaired by removing `rq2` from the KA and printing what it contributes
+alone as a separate line — which is itself the measurement confirming *"the shelf appears only
+through loading"*.
+
+⚠ **AK1c, first draft.** I compared `jfet_source_z` against its two **asymptotes** `(ro+rp)∥rq2` and
+`ro∥rq2` at a 1e−9 bar, and it refused at **1.58e−8**. At 1 MHz the shelf term `rp/(1+sR6C3)` is
+still **14.5 Ω, not 0**, so the bar sat below the asymptote's own truncation error — `a tolerance a
+correct implementation cannot meet is a broken test` (s123). ⭐ The repair was to make the check
+**exact and therefore STRICTER** — pointwise against the closed form over all 6001 bins, worst rel
+**1e−16** — not to loosen the bar. *If the rebuilt test is harder than the one it replaces and still
+passes, it is a correction.*
+
+### The mutation runner
+
+**12/12 arms, first run.** 8 refusals + **4 computed-verdict arms**, one per route plus the sign
+reading. Two arms corrupt machinery in an **imported** module (the tilt estimator is GATE AI's, the
+ladder impedance is GATE AJ's) and use s139's monkey-patch-into-the-mutant form, so there is no
+shared state to restore. Mutant path is PID-unique (s139).
+
+⭐ The route-1 arm is the one worth keeping in mind: it applies the shaper's gain as a
+frequency-dependent **tilt** instead of a constant offset, and requires the gate to print
+`ROUTE 1 IS NOT INERT`. Without it, *"a memoryless shaper cannot move a vertex"* would be a sentence
+the gate always prints rather than a property it measures.
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **The frame question is now the head item with no named carrier left anywhere.** s139
+   offered three directions and (b) is now closed. What remains, and (c) is the one with a
+   structural clue behind it:
+   (a) **the deficit's carrier may be LINEAR-but-drive-switched rather than a device
+   nonlinearity** — A3's dynamic half, which `reference-sources.md` §1a records as *"static
+   excluded, dynamic UNTESTED"*;
+   (c) **follow AJ2c/AK3b's own exponent finding** — the deficit steepens as **f^2.84**, which no
+   single moving pole can do (exact bound f²), so what is needed is **two poles or a distributed
+   mechanism**. Nobody has asked which two-pole structures in this chain could move together, and
+   that is a much narrower brief than "find a frequency-dependent nonlinearity".
+   ⭐ AK adds a third constraint that narrows it further: **the carrier's own frequency dependence
+   must RISE with frequency near the vertex.** Every mechanism screened so far whose corners sit
+   below the vertex falls as ~f^−2 there. That is a positive specification, not just another veto.
+2. ⚠ **The exponent is still n = 3 centres** (AG4's membership; s139 `NEXT` #2, unchanged). Both
+   AJ2c and now AK3b rest on it, so it is carrying more weight each session. Widening it needs a
+   finer surface, not a wider window.
+3. **The bridged-T half of AB6 (τ × 0.9337) remains unowned.** Unchanged for eleven sessions.
+4. ⚠ **`C_pedal`'s window/bar sensitivity (s137 NEXT #3)** — unchanged.
+5. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a ninth session.
+6. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
