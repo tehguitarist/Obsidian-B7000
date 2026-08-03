@@ -14249,3 +14249,328 @@ to force a membership drift, but every graded row uses **all 26** bands, so the 
    independent handle on it.
 5. ⚠ **Phase 10's remaining probes are still unbuilt** — `FeatureProfile` and `OSFidelity`.
    Unchanged by this session.
+
+---
+
+## SESSION 129 (2026-08-03) — GATE AA: item 6's localising clue is withdrawn, and the candidate class is narrowed by a shape argument
+
+**Head item on entry:** open-work item 6 (the drive-dependent mechanism above ~2 kHz), promoted by
+session 128's `▶ NEXT` #1.
+
+⛔ **No render, no capture, no constant, no baseline move.** `s124_ship.json` is still the baseline
+and the release gate is still 6 rows over SHIP. Every number below was **already on disk** in
+`s122_feature_locus.json` and unread — `check-for-unread-data-first`, seventh occurrence, and the
+first time it has paid off against a *stored gate report* rather than a capture or a render.
+
+**Built:** `analysis/drive_locus_gate.py` (GATE AA) + `analysis/_mutate_gate_aa.py` (7 arms, 7/7).
+ctest **18/18**. `OfflineRender` was rebuilt to have it available and then not used.
+
+### What I set out to do, and the two cheap refutations that came first
+
+Item 6's framing rests on a localising clue: *"The mid peak tracking is the localising clue: we
+already have a drive-dependent mechanism at ~450 Hz and none at ~2.9 kHz, so this is not a global
+missing dynamic — it is specific."* The obvious next move is to find the mechanism that makes our
+mid peak walk, and s125's own lesson says to localise our own side before theorising.
+
+**Candidate, formed before looking:** the clipper's incremental gain falls as its VTC saturates, and
+node W's impedance is `R18/(1+a)`, so the GRUNT coupling corner `1/(2πC(R16 + R18/(1+a)))` falls with
+drive. That is a real, documented, frequency-dependent drive dependence (circuit.md's own GRUNT
+note), it acts at LF and not at 2.9 kHz, and s125 showed the same falling `a` moves the *treble*
+corner the wrong way. A tidy unifying story.
+
+⭐ **Two things killed it before any code, both from grepping rather than reasoning:**
+
+1. `FitParams.h:145` already records the route as dead — *"A0 is ruled out
+   (`analysis/clipa0_grunt_corner_probe.py`: the gain drop cancels the corner shift)"*. ⚠ Read the
+   probe before accepting it: that cancellation was measured on an **H3−H2 harmonic-level**
+   statistic, and a **centre-frequency** locator is immune to a broadband gain change, so the
+   degeneracy does not transfer (s109's `a-degeneracy-is-a-lever-on-the-axis-it-is-not-degenerate-
+   on`). The route survived this one.
+2. `bass_peak_locus.py` (GATE Y, s126) **already sweeps `clipA0` with exactly this rationale**, and
+   its stored `y3` gives the answer for that feature: slope −0.0637, `max_move_frac` 0.031. It is a
+   weak negative lever, as CLAUDE.md's Y-row says of the whole family.
+
+⇒ before building anything, look at what the stored locus report actually says about the feature the
+clue is *about*. That is where the session went, and the clue does not survive it.
+
+### AA3/AA4 — the clue is NOT SUPPORTED, on its own data
+
+GATE W6's per-sweep medians, the four rungs `clean → drv_-18 → drv_-12 → drv_-6`:
+
+| feature | side | rung 1 | 2 | 3 | 4 | span | dose-response |
+|---|---|---|---|---|---|---|---|
+| mid_notch | model | 329.3 | 329.0 | 327.6 | 327.4 | 0.59 % | FALLING 4/4 |
+| mid_notch | pedal | 327.2 | 326.4 | 325.6 | 322.2 | 1.56 % | FALLING 4/4 |
+| **mid_peak** | **model** | **458.0** | **467.4** | **448.1** | **428.9** | **8.98 %** | ⛔ **NON-MONOTONE** |
+| **mid_peak** | **pedal** | **446.7** | **440.2** | **413.8** | **418.8** | **7.95 %** | ⛔ **NON-MONOTONE** |
+| bt_notch | model | 715.8 | 716.4 | 716.6 | 716.9 | 0.15 % | FLAT (below resolution) |
+| bt_notch | pedal | 695.7 | 712.3 | 725.9 | 745.4 | 7.15 % | ⭐ RISING 4/4 |
+| treble_peak | model | 2977.3 | 2976.8 | 2980.1 | 2983.1 | 0.21 % | FLAT (below resolution) |
+| treble_peak | pedal | 2696.4 | 2583.1 | 2544.7 | 2498.5 | 7.92 % | ⭐ FALLING 4/4 |
+
+Three things the item-6 summary could not say, because it quoted endpoints of a four-rung table:
+
+- **`458 → 429` hides an interior that goes UP first** (467.4 at rung 2). The model's mid peak is the
+  **only non-monotone** model feature in the resolved set; every other one is flat to ≤0.6 %. A
+  dose-response that *reverses* is not the signature of a mechanism — it is what a vertex does when a
+  neighbouring feature changes shape underneath it. **The pedal's mid peak is non-monotone too**, and
+  in a different place (its minimum is rung 3, then it rises).
+- **GATE W5's `spread_model_frac` for mid_peak is 34.1 %**, against 3.0 / 2.4 / 0.8 % for the other
+  three resolved features — **11.4× the next widest**, i.e. by far the least stable reading in the
+  set. ⚠ That spread is a RANGE (`max/min − 1`), **not** an SD, so no σ and no standard error can be
+  derived from it and the gate does not try; it ranks stability and gates nothing (see the defect
+  below, which is exactly this trap committed and caught).
+- **The "~2.5 % — this one TRACKS" figure is the ENDPOINT error.** Per rung it is
+  **+2.51 / +6.18 / +8.29 / +2.41 %** — the feature excused as tracking is **8.3 % out mid-ladder,
+  3.3× the quoted figure.**
+
+⇒ **VERDICT (computed, AA3/AA4): item 6's localising clue is NOT SUPPORTED.** The model has no
+resolved drive-dependent feature anywhere. So the premise *"this is not a global missing dynamic — it
+is specific"* has no support, and item 6 should be worked as a **global** deficit in the model's
+fundamental transfer until something says otherwise.
+
+### AA6 — what survives is better, and it refutes a whole candidate class on SHAPE
+
+The two features that ARE clean 4/4 dose-responses on the pedal, with the model flat below the
+locator's own resolution, are `bt_notch` (**+7.15 %, RISING**) and `treble_peak` (**−7.92 %,
+FALLING**). ⭐⭐ **And s125 established in closed form that those two are the notch and the recovery
+peak of ONE network** — the recovery bridged-T's 716 Hz notch and its 2935 Hz rise, rolled off by the
+two Sallen-Keys.
+
+**They move in OPPOSITE directions.** A linear network whose element values all scale by `k` moves
+its notch **and** its recovery peak by exactly `1/k`, so their **ratio is invariant** under any
+effective element-value drift. Measured:
+
+| rung | notch Hz | peak Hz | peak/notch |
+|---|---|---|---|
+| clean | 695.7 | 2696.4 | 3.8761 |
+| drv_-18 | 712.3 | 2583.1 | 3.6263 |
+| drv_-12 | 725.9 | 2544.7 | 3.5055 |
+| drv_-6 | 745.4 | 2498.5 | 3.3519 |
+
+The ratio is **4/4 monotone falling, −13.52 %** — the pair does not slide, it **COMPRESSES**.
+
+⇒ **any candidate that acts as a drive-dependent element VALUE is refuted on shape, with no render
+and no threshold**: supply sag moving a corner, a nonlinear junction capacitance, an effective-R or
+effective-C drift anywhere in that network. All of them predict an invariant ratio. What compresses a
+bridged-T's notch-to-recovery span is a change in its **DAMPING / LOADING**, not in its element
+values. Same argument shape as s38's C12 locus and s125's sign refutation, applied to a *shape*
+rather than a position.
+
+⚠⚠ **THE PREMISE, STATED SO IT IS NOT INFERRED AND PRINTED BY THE GATE EVERY RUN:** "one network" is
+**proven in closed form for the MODEL** (s125) and **ASSUMED for the pedal**, on the grounds that it
+is the same circuit and its two features sit at the same places (696 vs 716 Hz, 2696 vs 2977 Hz). If
+the pedal's two features are made by *different* networks they are free to move independently and AA6
+weakens from a refutation to an observation. **This is the one thing that would overturn AA6** and it
+has not been tested.
+
+⚠ Also noted, unclaimed: `bt_notch`'s per-rung model-vs-pedal error **crosses zero**
+(+2.89 / +0.57 / −1.28 / −3.83 %) — consistent with item 6's existing "crosses over" note.
+
+### The gate's own two defects, both found by its mutation runner, both mine
+
+⭐⭐ **(1) I gated a span of MEDIANS against a RANGE of INDIVIDUALS, and it duly called the pedal's
+4/4-monotone treble walk "NOT ESTABLISHED".** AA3's first draft asked whether each feature's
+per-sweep span exceeded GATE W5's across-condition `spread_*_frac`. Those are not comparable: a
+median over 17–51 conditions is far better determined than the population's full range, and a
+`max/min − 1` admits **no** error bar at all — there is nothing to divide by `√n`. Every single row
+came back "NOT ESTABLISHED", including the two that are the strongest evidence in the session. ⭐ The
+repair is to use a floor that is actually a floor: **the locator's own resolution** (GATE W's
+1/48-octave grid = 1.45 % per cell, and s126's "same reading" bar of a third of a cell = 0.48 %),
+imported from GATE W rather than transcribed. Under it, `bt_notch`/model 0.15 % and
+`treble_peak`/model 0.21 % read **FLAT (below the locator's resolution)** — which is the honest
+statement, and is *stronger* than "fixed", since it says the model's treble peak does not merely
+barely move, it is unresolvably still. ⚠ Note the model's treble peak is itself **non-monotone**
+within that 0.21 %: it is flat plus noise, not a small walk.
+
+⭐⭐ **(2) A feature that LOSES a rung was being silently demoted to "unresolved" and excluded — the
+exact thing AA2's own docstring says it exists to catch.** The mutation runner aimed an arm at AA1
+(drop a rung) and AA2 caught it instead — s119's case where the gate is *better* than the test's
+model of it, and the rule is *fix the expectation, not the guard*. Here it was both: a side with
+**0** rungs is genuinely UNRESOLVED (a mix cancellation has no bleed-free reading at all — s126's W6
+lesson), but a side with **1–3** rungs is a **malformed report**, data that existed and went missing.
+Collapsing the second into the first is how a vanishing feature gets past the membership guard
+wearing the costume of an honest exclusion. AA2 gained a PARTIAL branch that refuses.
+
+⚠ **AA1 is exact by construction and says so.** Recomputing `max/min − 1` from the medians W6
+computed it from is the same arithmetic; it binds the **rung axis** (count/order), not the value —
+s119's *"a known answer an earlier sub-gate already guarantees is not a known answer"*. What makes
+AA1 non-vacuous is its **second arm**: W6's stored `verdict` string is produced by different code
+from the same medians, so re-deriving it at W6's own 5 % bar cross-checks the reading against a
+stored quantity this gate never touches (8/8 agree). The mutation runner has an arm for each.
+
+### Mutation test — 7/7
+
+Data-level mutations only (never a predicate — s114); patched copy **lives** in `analysis/` and
+**runs** from the repo root (s110); unmutated control first; guard **identity** checked, not just a
+non-zero exit (s117); and — s128's addition — **two arms carry `expect_rc = 0` and demand the
+OPPOSITE verdict**, so a conclusion that had quietly become hard-coded narration would fail:
+make the model's mid peak monotone ⇒ the clue must print **HOLDS**; make the pedal's notch and peak
+move the same way ⇒ AA6 must print **NOT REFUTED by this test**. Both flip.
+
+### ⚠ Unexplained working-tree change, flagged not resolved
+
+`CMakeLists.txt` shows `project(ObsidianB7000 VERSION 0.5.0)` → `0.5.1`. **This session did not edit
+it.** `git status --porcelain` was clean at session start; the only mutating command run before the
+change was visible was `cmake --build build --target OfflineRender`, and nothing in `CMakeLists.txt`
+rewrites itself (no `configure_file`, no `POST_BUILD`, no custom command) and there are no hooks in
+`.claude/settings*.json`. A VERSION bump is a *plausible deliberate act* — `build.md` says to bump it
+to force Logic to rescan the AU — so it was **neither reverted nor committed** here. Flag to the user
+before the next commit.
+
+### ▶ NEXT, in order
+
+1. ⭐⭐ **Item 6, reframed twice by this session, and both reframings change what to look for.**
+   (a) Work it as a **global** deficit — the "it is specific to ~2.9 kHz" premise is withdrawn.
+   (b) The candidate must **compress** the bridged-T's notch-to-recovery span by ~13.5 % over the
+   ladder, not slide it — so it is a **damping/loading** mechanism, and every effective-element-value
+   candidate is already refuted. ⛔ Do not re-open supply-sag-moves-a-corner or nonlinear junction
+   capacitance for this feature pair; AA6 prices them out.
+2. ⚠ **Test AA6's one premise before building on it**: is the *pedal's* 696 Hz notch / 2696 Hz peak
+   pair really one network? It is proven only for the model. If they are independent the refutation
+   weakens to an observation. This is cheap on the model side and may not be answerable on the
+   pedal's at all with capture access gone — say so rather than assuming.
+3. **The mid peak should be treated as UNRESOLVED, not as a tracking feature.** Its reading carries
+   an 11.4× outlier scatter and is non-monotone on both sides. ⛔ Do not gate any candidate on it,
+   in either direction, until the scatter is understood — and note a candidate that "fixes" it is
+   likely fitting noise.
+4. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+## SESSION 130 (2026-08-03) — GATE AB: AA6's reason does not survive, its verdict does, and item 6's target splits in two
+
+**Head item on entry:** open-work item 6, promoted by session 129's `▶ NEXT` #1, with AA6's
+shape argument as its gating criterion.
+
+⛔ **No render, no capture, no constant, no baseline move, no `src/` edit.** `s124_ship.json` is
+still the baseline and the release gate is still 6 rows over SHIP. Every number below is closed-form
+arithmetic on shipped constants — the s125 cascade, re-derived and extended.
+
+**Built:** `analysis/bt_pair_shape_gate.py` (GATE AB) + `analysis/_mutate_gate_ab.py` (7 arms, 7/7),
+`analysis/reports/s130_bt_pair.json`. ctest unchanged (nothing under `src/` was touched).
+
+### AB1 — the known answer is exact, which is what licenses everything below
+
+The cascade — bridged-T (nodal, loaded by R24) × SK 10.7k × SK 3.3k × the clipper's closed loop at
+the shipped `clipA0` — reproduces s125's closed form to **−0.00 %**:
+
+| | GATE AB | s125 / W6 |
+|---|---|---|
+| bt_notch | **714.28 Hz** (prom 14.96 dB) | 715.8–716.9 Hz |
+| treble_peak | **2934.76 Hz** (prom 16.22 dB) | 2934.8 Hz |
+
+⭐ And AB3 carries a *second*, free known answer nobody had asked for: the three time-constant
+classes **partition every τ in the cascade**, so each feature's sensitivity column must sum to
+**exactly −1**. Measured: notch **−1.0000** (residual 1.1e−07), peak **−0.9999** (6.2e−05). That sum
+is simultaneously the check and the **attribution**.
+
+### AB3 — the attribution, and it is the session's central fact
+
+`d(log f)/d(log τ)`, two-sided at ×1.10:
+
+| time-constant class | → notch | → peak |
+|---|---|---|
+| bridged-T (both caps) | **−1.0031** | −0.1016 |
+| downstream rolloff (both SKs) | +0.0020 | **−0.7885** |
+| clipper pole (C14) | +0.0011 | −0.1098 |
+| **SUM (must be −1)** | **−1.0000** | **−0.9999** |
+
+⇒ **the notch is ~100 % the bridged-T and the peak is ~79 % the SALLEN-KEYS.** The two features are
+very nearly **ORTHOGONAL** in this cascade. That is a materially different statement from the one the
+project has carried since s125 — *"two features of ONE network"* — which is true as a **construction**
+(the peak is the bridged-T's rise) and false as a statement about **position**.
+
+### AB4 — AA6's stated REASON is refuted, on our own baseline
+
+AA6 refuted every drive-dependent effective-element-value candidate with: *"scaling every element by
+`k` moves both features by `1/k`, so their ratio is invariant; measured, it falls 13.5 % ⇒ refuted."*
+
+The ratio is **not** invariant, because the peak is a vertex where the bridged-T's rise meets three
+rolloffs the drift does not touch. Sized to deliver the pedal's own **+7.14 %** notch move, a pure
+bridged-T element drift moves the ratio **−6.01 %** — i.e. **44.5 % of the pedal's measured
+−13.52 %**, where AA6 assumed 0.00 %.
+
+⛔ **A screen written as "the candidate must break the ratio invariance" would therefore pass the
+refuted class**, and AA6's own baseline breaks it by nearly half the effect it was refuting on.
+
+⭐ **AA6's VERDICT survives, on a stronger and simpler ground.** The same drift moves the peak
+**+0.70 % — UP**, where the pedal's goes DOWN. So element-value drift is refuted **on DIRECTION**,
+which needs no ratio, no invariant and no threshold. AB2's whole-cascade control shows exactly when
+AA6's premise *does* hold — when **everything** scales, notch and peak both move by 1/k to 1e−7 —
+and that configuration is not any candidate mechanism.
+
+⚠ **A quoting inconsistency inherited from AA6, recorded so it is not propagated:** its
+*"notch +7.15 % / peak −7.92 %"* mixes two conventions. Both are `max/min − 1` spans; the notch is
+monotone rising so its span *equals* its rung-1→rung-4 change, but the peak's rung-1→rung-4 change is
+**−7.34 %**, not −7.92. GATE AB uses the rung-1→rung-4 change on both axes, which is what a
+dose-response means. The ratio (−13.52 %) is unaffected.
+
+### AB5 — sign-admissibility, with SIZE, because a right sign at an unreachable magnitude is not a candidate
+
+Sized to deliver the peak's required −7.34 %:
+
+| class | knob × | drags notch | verdict |
+|---|---|---|---|
+| downstream rolloff (both SKs) | 1.101 | +0.02 % | reachable |
+| clipper pole (C14) | 2.002 | +0.07 % | reachable |
+| clipper a0 (sag route) | 3.030 | +0.07 % | reachable **but see below** |
+| output loading (Nout→GND) | 3.2e−06 | +1.66 % | UNREACHABLE |
+| source loading (buffer Zout) | 2.9e+33 | +0.22 % | UNREACHABLE |
+
+⇒ **the notch's +7.14 % rise has NO admissible carrier in this cascade** — the largest notch movement
+any peak-carrying class drags along is **0.07 % against a required +7.14 %**.
+
+⚠ `clipper a0` is admissible in sign and reachable in size **and is still refuted**, on physical
+direction: it needs `a0` to RISE with drive, and supply sag LOWERS it (s125: a0 24.871 → 15 → 8 walks
+the peak 2934.8 → 3025.8 → 3099.0 Hz, i.e. UP, away). **Sign-admissibility is necessary, not
+sufficient** — the gate prints this rather than leaving it to a reader.
+
+### AB6 — ⭐⭐ THE DELIVERABLE: item 6's target is TWO sized mechanisms, not one
+
+Because the two axes are carried by different sub-networks the 2×2 is well conditioned
+(**cond 1.30**) and the split is essentially unique:
+
+| | required move |
+|---|---|
+| bridged-T time constants | **× 0.9337 (−6.63 %)** |
+| Sallen-Key time constants | **× 1.1113 (+11.13 %, i.e. SK corners −10.01 %)** |
+
+Verified by evaluating the combination rather than trusting the linearisation (s98): notch
+**+7.15 %** against a target +7.14, peak **−7.21 %** against −7.34 — both inside 0.5 %.
+
+⇒ **s129's "look for a DAMPING / LOADING mechanism" is too narrow.** No single perturbation of this
+cascade produces the pedal's signature, because **nothing in it couples the two axes**. The honest
+target is a mechanism that shortens the recovery bridged-T's time constants by ~6.6 % **and**
+lowers the two Sallen-Key corners by ~10 % across the drive ladder — or two mechanisms, one per axis.
+A falling effective op-amp GBW under large signal is the obvious single physical cause of the SK
+half and does nothing for the bridged-T half; nothing measured here names the bridged-T half.
+
+### The gate's own defect, found by its mutation runner
+
+⭐⭐ **AB5 classified on "is this class opposite-signed?" as a PROPERTY, not as a COMPARISON against
+the target** — `computed-verdicts-not-narrated`, in the one sub-gate whose whole job is a verdict. It
+gave the right answer only because the target happens to be opposite-signed; flip the target and the
+verdict would have been exactly backwards. Fixed to compare the two sign PRODUCTS.
+
+⚠ **And the arm that caught it first passed VACUOUSLY**, for a reason worth keeping: it asserted on
+the printed **count**, and the admissible and refuted groups have **5 members each**, so swapping
+them leaves every count in the output identical. The gate now prints an `AB5-MEMBERSHIP` line and
+the arm asserts on membership. **A cardinality is a bad discriminator for a classification test
+whenever the classes can be the same size.**
+
+### ▶ NEXT, in order
+
+1. ⭐⭐ **Item 6 now has two sized sub-targets (AB6). Work the Sallen-Key axis first** — it is the
+   larger of the two (−10 % of corner vs −6.6 % of τ), it carries **79 %** of the treble peak, and it
+   has an obvious physical candidate (drive-dependent effective op-amp bandwidth) that the model
+   currently represents as ideal. ⛔ Do NOT aim a single mechanism at the pair; AB3 shows the axes
+   are orthogonal in this cascade.
+2. ⚠ **AA6's "one network" premise is now doubly load-bearing and still untested** (s129 `NEXT` #2),
+   and AB3 weakens it independently of the pedal: even on the MODEL, where "one network" is proven
+   as a construction, the two features' POSITIONS are ~orthogonal. Whatever is decided about the
+   pedal, stop using "they are one network" as a step in an argument.
+3. **Re-examine whether the 8–16.3 kHz gated rows are the same finding.** A drive-dependent fall in
+   the model's effective HF bandwidth is the *opposite* sign to GATE I's measurement (the pedal
+   GAINS with frequency under drive where our path rolls off). Those two must be reconciled before
+   an SK-bandwidth candidate is built — they may be the same mechanism seen from two ends, or they
+   may refute each other. This is a cheap read against a passing gate.
+4. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.

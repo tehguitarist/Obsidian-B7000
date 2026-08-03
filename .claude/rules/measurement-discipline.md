@@ -184,6 +184,55 @@
   one.** Before a region is declared out of scope, check the citing text against the cited tool's
   printed verdict — and treat "X ≠ ours to fix" as needing its own evidence, separate from "X is on
   their side". (s125)
+- ⭐⭐⭐ **AN ENDPOINT PAIR IS NOT A LADDER, AND A SPAN OVER A *NON-MONOTONE* EXCURSION IS NOT A
+  DOSE-RESPONSE — TWO SUMMARY HABITS THAT TOGETHER MANUFACTURED A MECHANISM AND SELECTED AN ITEM'S
+  WHOLE FRAMING.** A four-rung table was quoted as `458 → 429 Hz (9.0 %)` against the reference's
+  `447 → 419 (8.0 %)`, agreeing to `~2.5 %`, and from that the project concluded *"we already have a
+  drive-dependent mechanism at ~450 Hz and none at ~2.9 kHz, so the deficit is **specific**, not a
+  global missing dynamic"* — which is what an entire open item was then shaped around. Both halves
+  are artefacts of the summary. **(a)** The interior was never printed and the model's locus goes
+  **UP** first (458 → **467** → 448 → 429): it is the only NON-MONOTONE feature in the resolved set,
+  and the reference's is non-monotone too, in a different place. A dose-response that *reverses* is
+  not a mechanism's signature — it is what a vertex does when a neighbouring feature changes shape
+  underneath it. **(b)** `~2.5 %` is the *endpoint* error; per rung it runs
+  **+2.51 / +6.18 / +8.29 / +2.41 %**, so the feature excused as "tracking" is **3.3× worse
+  mid-ladder** than the figure that excused it. ⭐ GENERAL: **when a designed ladder exists, print
+  every rung and test MONOTONICITY before calling anything a dose-response, and quote the WORST rung
+  beside the endpoint one** — agreement at both ends is exactly what a crossing or a reversal looks
+  like from outside. ⚠ The tell was free and unread: the same stored report gave this feature an
+  across-condition range of **34.1 % against 3.0 / 2.4 / 0.8 %** for its neighbours — an 11.4×
+  stability outlier, which is a reason to distrust a reading before interpreting it. Same family as
+  `a-wash-out/delta/span-cannot-say-which-end-moved` (s117) and
+  `a-pooled-statistic-cannot-answer-about-its-own-axis` (s105); here the averaged-away thing is the
+  *interior of the axis itself*. (s129, GATE AA)
+- ⭐⭐⭐ **A FULL RANGE IS NOT AN ERROR BAR, AND COMPARING A SPAN OF *MEDIANS* AGAINST A RANGE OF
+  *INDIVIDUALS* WILL REJECT YOUR BEST EVIDENCE — USE THE INSTRUMENT'S OWN RESOLUTION AS THE FLOOR.**
+  Having correctly noticed that one feature's reading was an 11.4× scatter outlier, I gated every
+  feature's per-rung span against that same across-condition scatter (`spread = max/min − 1`). It
+  reported **every row** "NOT ESTABLISHED", including the two clean **4/4-monotone** walks that were
+  the session's strongest findings. Two errors in one line: a median over 17–51 conditions is far
+  better determined than the population's full range, and a `max/min − 1` **admits no error bar at
+  all** — there is nothing legitimate to divide by `√n`, so it cannot be converted into a
+  significance in either direction. ⭐ The floor that IS legitimate is the **measurement's own
+  resolution** — here the locator's 1/48-octave grid (1.45 %/cell) and the project's existing
+  "same reading" bar of a third of a cell, **imported from the tool that defines it rather than
+  transcribed**. Under it the two model features read **FLAT (below the locator's resolution)**,
+  which is both honest and *stronger* than "fixed": it says the model's feature is not merely nearly
+  still but unresolvably so. ⇒ **a dispersion statistic may RANK reliability; only a resolution or an
+  independently-measured floor may GATE it** (s113's rule — take the bar from a quantity measured
+  independently of the thing being classified — applied to a spread rather than to a ranking). (s129)
+- ⭐⭐ **THREE OUTCOMES, NOT TWO: "NEVER HAD DATA" AND "LOST DATA" MUST NOT SHARE A BRANCH, OR THE
+  MEMBERSHIP GUARD PASSES THE EXACT THING IT EXISTS TO CATCH.** A membership check classified each
+  feature as *fully resolved* or *unresolved-and-excluded*. A side with **0** readings is genuinely
+  unresolved — a mix cancellation has no bleed-free reading at all, by physics (s126). A side with
+  **1–3** of 4 is a **malformed report**: data that existed and went missing. Collapsing the second
+  into the first let a feature that *lost a rung* be excluded silently, with a tidy "named, not
+  dropped" line beside it — which is precisely the vanishing the guard's own docstring claimed to
+  prevent. ⭐ GENERAL: wherever a guard partitions into "complete" and "absent", ask what **partial**
+  means and give it its own branch, and make partial a **refusal** (it is a validity failure) rather
+  than an exclusion (which is a physics outcome). ⚠ Found by the gate's own mutation runner, aimed at
+  a *different* guard — s119's "the gate is better than the test's model of it", and this time the
+  right response was to fix **both**: re-point the arm AND add the branch. (s129)
 - ⭐⭐ **A CLASSIFICATION OF THE FORM "these two are not the same KIND of thing" IS A DIAGNOSIS, NOT
   AN EXONERATION — AND IT READS AS ONE.** GATE W classified three flagged mismatches as *(c) not a
   fixed-network feature on at least one side — its centre moves with drive*, correctly concluding
@@ -1383,6 +1432,28 @@
   dropped: the new test asserts 1×/2× DIFFER from an ADAA-off control while 4×/8× are BIT-IDENTICAL
   to it — parameter-free, and it catches a shipped policy that silently stops applying, which fails
   in the flattering direction (nothing errors; the feature just quietly disappears). (s124)
+- ⭐⭐⭐ **A CLASSIFIER'S VERDICT MUST BE A COMPARISON AGAINST THE TARGET, NOT A PROPERTY OF THE
+  CANDIDATE — AND `computed-verdicts-not-narrated` IS AT ITS MOST INVISIBLE INSIDE THE ONE SUB-GATE
+  WHOSE WHOLE JOB IS A VERDICT.** A sub-gate sorted candidate mechanisms into "can produce the
+  reference's signature" and "cannot", and implemented the test as *"does this candidate move the two
+  features in OPPOSITE directions?"* — hardcoding the reference's own signature into the predicate.
+  It gave the right answer, and would have given the exactly-inverted answer for any reference that
+  moved them the same way. The correct form compares the two sign PRODUCTS
+  (`sign(dA)*sign(dB)` of the candidate against that of the target), which is the same line of code
+  and is a measurement. ⭐ GENERAL: in any classifier, the target must appear **as a variable** in the
+  predicate; if you can delete the target from the code and the classification still runs, it is
+  narration. (s130, GATE AB5)
+- ⭐⭐ **A CARDINALITY IS A USELESS DISCRIMINATOR FOR A CLASSIFICATION MUTATION TEST WHENEVER THE TWO
+  CLASSES CAN BE THE SAME SIZE — ASSERT MEMBERSHIP, AND PRINT IT MACHINE-CHECKABLY.** The arm written
+  to catch exactly the defect above **passed vacuously**: it flipped the target so the classification
+  must invert, and asserted on the printed line `REFUTED ON SIGN (5)`. The two groups have **5 members
+  each**, so the swap left every count in the output byte-identical and the arm was green against a
+  gate that was genuinely broken — the defect was found only by reading the mutant's output by hand.
+  ⭐ Two fixes, both cheap: have the gate print a **`<GATE>-MEMBERSHIP admissible=[...] refuted=[...]`**
+  line (sorted, so it is stable), and assert on a NAME that must cross between the groups. ⚠ Note the
+  shape — this is `an-implausible-coincidence-is-a-bug-report` inverted: a coincidence in the *test's*
+  own numbers made a broken gate look tested, and nothing about the output looked odd. **When an
+  assertion is a count, ask what else could produce that count.** (s130, `_mutate_gate_ab.py` arm 6)
 - ⭐⭐ **A GUARD PROVING A MECHANISM IS *LIVE* SAYS NOTHING ABOUT WHETHER IT IS *WORTH HAVING* —
   MEASURE THE BENEFIT TOO, ASSERT THE SIGN, AND PRINT THE SIZE.** Session 124's gate check proves
   ADAA is on at 1×/2× and correctly scoped; a separate check measures what that buys on the full
@@ -2075,6 +2146,55 @@
   mismatch as an element target, find a control that moves the mix but no filter, and sweep it.**
   Same family as `dilution-fakes-a-resonance` (s60), one level up: there a flat effect read through
   a mixer looked peaked; here the mixer manufactures the feature outright. (s122, GATE W)
+- ⭐⭐⭐ **TWO FEATURES OF *ONE* NETWORK CARRY AN INVARIANT, AND THE INVARIANT REFUTES A WHOLE
+  CANDIDATE CLASS WITH NO RENDER AND NO THRESHOLD — LOOK FOR ONE BEFORE PROPOSING A MECHANISM.**
+  Scaling every element of a linear network by `k` moves **every** feature it makes by exactly
+  `1/k`, so the RATIO between any two of them is invariant under any effective element-value drift.
+  The reference's bridged-T notch and its recovery peak — established in closed form as **one**
+  network — move in **OPPOSITE** directions across the drive ladder (notch **+7.15 %**, peak
+  **−7.92 %**), and their ratio is **4/4 monotone falling, 3.876 → 3.352, −13.5 %**. The pair does
+  not slide, it **COMPRESSES**. ⇒ supply sag moving a corner, a nonlinear junction capacitance, any
+  drive-dependent R or C anywhere in that network: **all refuted at once**, because all of them
+  predict an invariant ratio. What compresses a bridged-T's notch-to-recovery span is a change in its
+  **damping / loading**. ⭐ GENERAL: a ratio between two features of one network is a **shape**
+  statistic — immune to level, to gain matching and to the per-row null fit — and it converts "find a
+  frequency-dependent nonlinearity" into a testable constraint on *which kind*. Same argument as
+  s38's C12 locus and s125's sign refutation (*a dose-response locus that cannot contain the target
+  refutes the lever, not just its present setting*), applied to a shape instead of a position.
+  ⚠⚠ **State the premise and keep printing it: "one network" was PROVEN for the model and ASSUMED for
+  the reference.** If the reference's two features are made by different networks they may move
+  independently and the refutation weakens to an observation — that single assumption is the whole
+  load-bearing structure, so it belongs in the tool's output, not only in a handover. (s129, GATE AA6)
+- ⭐⭐⭐ **AND THE VERY NEXT SESSION MEASURED THAT INVARIANT AND IT DOES NOT HOLD ON OUR OWN BASELINE
+  — BECAUSE ONE OF THE TWO "FEATURES OF ONE NETWORK" IS A **VERTEX AGAINST SOMETHING ELSE**.** The
+  entry above refutes a candidate class by arguing that scaling a linear network's elements by `k`
+  moves both its features by `1/k`, leaving their ratio fixed. True of a network's own poles and
+  zeros; **false of a peak formed where that network's RISE meets a ROLLOFF contributed by other
+  stages** — the vertex sits wherever the two slopes balance, so it moves only partly with the
+  network and partly with the rolloffs. Measured on the shipped cascade: sized to reproduce the
+  reference's own notch move, the drift shifts the ratio by **44.5 % of the very effect the argument
+  was refuting on**, where the argument assumed 0.0 %. ⇒ **a screen written as "the candidate must
+  break the invariance" would have passed the refuted class.** ⭐⭐ The repair is also the
+  generalisable instrument: **partition every time constant in the cascade into classes and measure
+  `d(log f)/d(log tau)` for each — the columns MUST sum to exactly −1, which is a free known answer
+  with no threshold to argue about, and the same numbers ARE the attribution.** Here they read notch
+  −1.003 bridged-T / ~0 everything else, and peak −0.789 Sallen-Keys / −0.110 clipper pole / only
+  −0.102 bridged-T ⇒ the pair is **~ORTHOGONAL**, so the two features share a *construction* and not
+  a *lever*, and no single perturbation can move both. ⭐ The verdict survived on a **stronger and
+  cheaper** ground that the invariance had obscured: the drift moves the two features the **SAME
+  direction** and the device moves them **OPPOSITE** ways — a sign test, needing no ratio, no
+  invariant and no threshold. ⇒ GENERAL: **before refuting a class with an invariance, evaluate that
+  invariance on your own baseline** — an invariant that your own model breaks is not an invariant,
+  and the direction test it was dressed up as is usually the real argument. (s130, GATE AB)
+- ⭐⭐ **"X IS THE DOMINANT COST/CARRIER" NEEDS ITS FRACTION IN THE SAME SENTENCE — AND WHEN A
+  SENSITIVITY PARTITION IS AVAILABLE IT IS FREE.** s125 recorded the treble peak as *"the bridged-T's
+  rise out of its own notch, rolled off by the two Sallen-Keys"* — a correct **construction**, read
+  forward for five sessions as a statement about **position**, and used to pair the peak with the
+  notch as one network's two features. The partition says the peak's position is **79 % the
+  Sallen-Keys and 10 % the bridged-T**. ⇒ when a feature is described as "A shaped by B", ask which
+  of A and B actually SETS it, and print the split; a construction names the ingredients, not the
+  lever. Same family as `X-is-the-dominant-cost-is-a-localisation-not-a-size` (s127), on the
+  frequency axis rather than the CPU one. (s130)
 - ⭐⭐ **AN EXTREMUM-FINDER OVER A NAMED WINDOW IS NOT A FEATURE DETECTOR — IT ALWAYS RETURNS
   SOMETHING.** `locate(window, "min")` returns the window's minimum whether or not a notch is there,
   so on a curve with no feature it returns an inflection, with a plausible frequency and a
