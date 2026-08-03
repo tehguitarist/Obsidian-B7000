@@ -86,9 +86,32 @@ struct FitParams
     // because the clipper carries NO ADAA (its VTC lives inside the implicit
     // RC-coupled Newton solve — memoryless-ADAA does not apply; oversampling
     // does the antialiasing), so the closed-form antiderivative is never used.
+    // ⛔⛔ SESSION 123: THE JUSTIFICATION IN THE THREE LINES ABOVE IS REFUTED —
+    // memoryless ADAA DOES apply to this stage (PedalChain.h's anti-aliasing block
+    // and Clipper.h::setADAA carry the argument and the measurement), so "the
+    // closed-form antiderivative is never used" is no longer a safe assumption and
+    // this non-anchor k had a COST: it is what made ADAA inert. Measured value of the
+    // ADAA it blocked: 12.6-19.8 dB of median alias-floor improvement over 19 tones
+    // at OS 1x/2x (GATE X, analysis/clip_adaa_gate.py).
+    // ✅ SESSION 124 RE-ANCHORS k TO 2.0, ON THE USER'S DECISION, AND THE PRICE WAS
+    // MEASURED FIRST, NOT ARGUED. `s123_k2.json` vs `s123_kship_control.json` (162
+    // captures, identical membership, n identical on all 14 gated rows, both at
+    // os_factor 8 with ADAA off so the arms isolate k alone): k=2 is better on 8 rows,
+    // worse on 3, and bit-unmoved on all four CLEAN rows — the last of which is a free
+    // SCOPE check, since the clipper is OD-only and a CLEAN move would have meant the
+    // constant reached further than intended. Both headline OD rows improve (band-RMS
+    // 1.959 -> 1.947, p99 10.348 -> 10.278); the only cost above 0.01 dB is THD
+    // full-send +0.038 dB on a row already over its bar by 0.52. SIX ROWS OVER SHIP
+    // EITHER WAY — no verdict changes.
+    // ⚠⚠ DO NOT RECORD THIS AS "k=2 FITS BETTER". The movements are far inside the
+    // spread this project treats as significant; the honest statement is
+    // *indistinguishable, with a rounding preference*. The reasons to prefer 2.0 are
+    // (a) it makes ADAA exact and therefore usable, and (b) it restores the k==2 sqrt
+    // fast path — NOT the ledger. Anyone re-opening this should re-read that sentence
+    // before quoting the 1.947 as evidence of accuracy.
     // The k != 2 forward path (Clipper.h vtc()/vtcDeriv()) is a plain pow(), exact
     // for any k; only the k==2 sqrt fast-path is skipped (a little more CPU/sample). **
-    double clipK = 2.4653;       // session-44 A5 re-fit (was 2.8462, session-17; anchor 2.0 — see closed-form note below)
+    double clipK = 2.0;          // session-124 re-anchor (was 2.4653 session-44 A5, 2.8462 session-17)
     // clipC11 = the ALWAYS-PRESENT GRUNT coupling cap (schematic 4n7, Clipper.h
     // kC11). Made fittable in session 17 (user-authorised 2026-07-24: "ATTACK and
     // GRUNT are somewhat estimated; I trust the captures more than the schematics").
@@ -784,6 +807,75 @@ struct FitParams
     bool railEnabled = true;
     double railNeg = 2.9;
     double railPos = 2.7;
+
+    // ---- clipAdaa: 1st-order ADAA on the CD4049 VTC (session 123; SHIPPED s124) ---
+    // 0 = Off      (the pre-session-124 default; bit-identical to the s122 build)
+    // 1 = Full     (average the whole VTC) ** SHIPPED **
+    // 2 = Residue  (average only its nonlinear part) ⛔ REFUTED — see below
+    // ⛔⛔ MODE 2's OWN DESCRIPTION IN THIS FILE USED TO READ "the one to prefer".
+    // THAT IS REFUTED (session 123) AND THE LINE OUTLIVED ITS OWN REFUTATION BY A
+    // SESSION — a `verify-the-PREMISE` occurrence inside the file that defines the
+    // constant. Clipper.h::setADAA carries the one-line algebra: averaging only the
+    // nonlinear part evaluates the two halves of ONE map half a sample apart, which
+    // injects a first difference of gain a0/2, and |0.5*a0*(1 - z^-1)| reaches the
+    // FULL loop gain at Nyquist at every sample rate. Measured: H1 +13.4 dB hot, alias
+    // floor 14.4 dB WORSE than Full — whose own 2-point-average cost, the thing
+    // Residue exists to avoid, is 0.01 dB of harmonic power and 0.2 dB of H2/H1.
+    // ⇒ mode 2 is kept SELECTABLE only so that refutation stays reproducible; it is
+    // not a better Full. Do not "upgrade" to it on the strength of its name.
+    // ⚠ SILENTLY INERT UNLESS clipK == 2.0. Clipper::adaaExact() gates on it because
+    // sigma_k's primitive is elementary only at k = 2 (and k = 1) — so a k != 2 build
+    // gets NO ADAA whatever this is set to, deliberately: a stale flag can never
+    // produce a WRONG antiderivative, only no antialiasing. That guard is now belt and
+    // braces rather than the operative one, because session 124 ships clipK = 2.0.
+    int clipAdaa = 1;
+
+    // ---- clipAdaaMaxOs: the OS-FACTOR GATE on the above (session 124) ------------
+    // ADAA applies only where the OD region's oversampling factor is <= this. The
+    // shipped 2 means ON at 1x/2x, OFF at 4x/8x. This is a MEASURED policy, not a
+    // taste. GATE X X6, Full vs its OWN k=2 baseline, 19 usable bin-exact tones per
+    // cell (2 degenerate tones excluded — a tone dividing fs puts every fold on a
+    // harmonic bin, so inharmonic content is impossible BY CONSTRUCTION and its
+    // spectacular reading means nothing), alias-floor change in dB, negative = better:
+    //        OS    median(amp .35 / .70)   WORST tone      improved
+    //        1x      -19.50 / -18.74       +1.96 / +2.53   95 % / 95 %
+    //        2x      -12.57 / -19.75       +3.33 / +3.23   84 % / 89 %
+    //        4x       -2.38 /  -8.71       +9.88 / +2.81   68 % / 89 %
+    //        8x       -4.62 /  -0.50       +0.73 / +17.33  89 % / 63 %
+    // ⇒ at 1x/2x the median is a large win and the WORST case is bounded at +3.3 dB;
+    // at 4x/8x the median collapses AND the worst tone costs +9.9 / +17.3 dB. ADAA1
+    // carries its own first-order residual, so once oversampling has already taken the
+    // floor low there is nothing left to win and the residual is all that is left to
+    // pay. The gate buys the top two rows and declines the bottom two.
+    // ⚠ Read the WORST column, not only the median — that is what makes this a policy
+    // rather than an average. And note it is NOT monotone in OS (8x beats 4x at amp
+    // .35, loses badly at .70): the honest statement is "1x/2x win, 4x/8x are a
+    // coin-toss with a bad tail", not "benefit decreases with rate".
+    // ⛔ Do NOT enable it flat across all factors on the strength of the 2x number —
+    // that is the specific error session 123 pre-registered against.
+    // ⚠ Corroborated by an instrument sharing nothing with the alias metric: node W's
+    // mean step/knee ratio falls 5.76 -> 2.84 -> 1.42 over 2x/4x/8x (Clipper.h
+    // setADAA's in-chain table). Crossing the whole knee in one sample is ADAA1's best
+    // case and oversampling's worst, so the two orderings agreeing is not a
+    // coincidence — it is the mechanism showing up twice.
+    // ⭐⭐ THE GATE LANDS ON THE PLUGIN'S OWN DEFAULTS, WHICH IS WHY IT IS WORTH HAVING
+    // AT ALL RATHER THAN BEING A CORNER CASE. PluginProcessor's `oversampling` choice
+    // defaults to index 1 = **2x** (the realtime path) and `render_oversampling` to
+    // index 3 = **8x** (offline bounce). So out of the box the realtime path GETS ADAA
+    // — exactly where the alias floor is worst and CPU is scarcest — and the offline
+    // render does not, because at 8x oversampling has already taken the floor to
+    // -63 dB and ADAA1's residual is all that is left to pay. ⇒ this is not "a feature
+    // that happens to be on at some settings"; it is on at the setting nearly every
+    // user runs. ⚠ If either default ever moves, re-read this: the policy's value is
+    // tied to them, and moving the realtime default to 4x would silently switch ADAA
+    // off for everyone.
+    // ⭐ SET IT TO 8 TO FORCE ADAA AT EVERY FACTOR — which is exactly what GATE X's
+    // 4x/8x arms need, and why this is a knob rather than a hardcoded `if`. 0 disables
+    // ADAA everywhere without disturbing clipAdaa's recorded mode.
+    // ⚠ The matrix renders at os_factor 8, where this gate turns ADAA OFF. So the
+    // shipped build's matrix grade is `s123_k2.json` (k=2, ADAA off) and NOT a new
+    // number — asserted as a known answer in session 124, not assumed.
+    int clipAdaaMaxOs = 2;
 
     // ---- MID stages: range limiter + the LO-MID "250" cap (Phase 9 GAP #4) -------
     // The captures say the real pedal's mid boost/cut range is ~+-12 dB at EVERY switch

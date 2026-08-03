@@ -284,6 +284,35 @@ static void applyFitAssignment(FitParams& fit, const std::string& assignment)
         return;
     }
 
+    if (key == "clipadaa")
+    {
+        // Session 123. Not in kFitFields because it is an enum index, not a
+        // double: 0=Off, 1=Full, 2=Residue (FitParams.h clipAdaa). REFUSE an
+        // out-of-range value rather than clamping — a silent clamp to Off would
+        // read as "ADAA bought nothing".
+        const int mode = parseInt("--fit clipAdaa", value);
+        if (mode < 0 || mode > 2)
+            fail("--fit clipAdaa must be 0 (off), 1 (full) or 2 (residue), got '" + value + "'");
+        fit.clipAdaa = mode;
+        return;
+    }
+
+    if (key == "clipadaamaxos")
+    {
+        // Session 124. Also an int, not a double: the OS-factor gate on clipAdaa
+        // (FitParams.h clipAdaaMaxOs). Ships 2 => ADAA on at 1x/2x, off at 4x/8x.
+        // ⭐ GATE X's 4x/8x arms MUST pass 8 here, or they measure the gate instead
+        // of the mechanism and silently report "ADAA bought nothing at 8x" — which
+        // is true of the shipped policy and false of the thing under test.
+        // Accept only the real factors (plus 0 = never), and REFUSE anything else
+        // rather than clamping, for the same reason clipAdaa refuses.
+        const int m = parseInt("--fit clipAdaaMaxOs", value);
+        if (m != 0 && m != 1 && m != 2 && m != 4 && m != 8)
+            fail("--fit clipAdaaMaxOs must be 0, 1, 2, 4 or 8, got '" + value + "'");
+        fit.clipAdaaMaxOs = m;
+        return;
+    }
+
     for (const auto& f : kFitFields)
     {
         if (key == lower(f.name))
@@ -293,7 +322,7 @@ static void applyFitAssignment(FitParams& fit, const std::string& assignment)
         }
     }
 
-    std::string known = "railEnabled";
+    std::string known = "railEnabled, clipAdaa, clipAdaaMaxOs";
     for (const auto& f : kFitFields)
         known += std::string(", ") + f.name;
     fail("--fit: unknown parameter '" + name + "' — known: " + known);
@@ -447,6 +476,8 @@ static void printFitReport(const Options& o, const PedalChain::Params& p, int la
     for (const auto& ff : kFitFields)
         std::printf("fit.%s=%.9g\n", ff.name, f.*(ff.member));
     std::printf("fit.railEnabled=%d\n", f.railEnabled ? 1 : 0);
+    std::printf("fit.clipAdaa=%d\n", f.clipAdaa);
+    std::printf("fit.clipAdaaMaxOs=%d\n", f.clipAdaaMaxOs);
 }
 
 // -----------------------------------------------------------------------------

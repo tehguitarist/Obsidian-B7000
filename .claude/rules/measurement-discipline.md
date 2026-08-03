@@ -58,6 +58,19 @@
     outlive their support. ⚠ And note the payoff for finally doing it: with both entries closed the
     table retires as a whole, which is itself a finding (the residual is not localised on any
     control axis) that neither individual closure stated. (s116, GATE U)
+  - ⭐⭐⭐ **NINTH, s124, AND IT IS THE SHORTEST RANGE YET — ONE SESSION, SAME FILE, AND THE STALE
+    LINE WAS THE ONE A CHOOSER WOULD READ.** `FitParams.h` enumerates the ADAA modes, and described
+    mode 2 (Residue) as *"the one to prefer"*. Session 123 then BUILT Residue, measured it, and
+    **refuted** it — writing the refutation into `Clipper.h::setADAA` (where the analysis lives) and
+    into CLAUDE.md's CLOSED/REFUTED table, but **not into the enum's own description**. So the file
+    that defines the constant still recommended the refuted mode, and a session picking a value from
+    that list — which is exactly what an enum comment is *for* — would have shipped it believing it
+    was the recommendation. ⭐ GENERAL: **a refutation has to land where the thing is CHOSEN, not
+    only where it is ANALYSED.** After refuting an option, grep its name and fix every site that
+    *offers* it: enum comments, defaults tables, CLI help, docstrings listing valid values. The
+    analysis site is the one you are already editing and therefore the one that never gets missed;
+    the chooser's site is the one that costs someone a session. ⚠ And keep the refuted option
+    *selectable* — the refutation must stay reproducible — but say so at the option. (s124)
   - ⭐⭐ **A RECORDED DERIVED NUMBER CAN BE RIGHT IN VALUE AND WRONG IN LABEL — REPRODUCE IT FROM
     THE RECORDED INPUTS, NOT BY FINDING A COMPUTATION THAT EMITS IT.** Session 112 recorded four
     clean fractions as its matched-pair design. All four are genuine entries in the relevant table,
@@ -151,6 +164,38 @@
   candidate and re-measure, which costs one rebuild). ⚠ And state what does NOT fall: ADAA is still
   open, some genuine fold-down surely remains, and only "this test's failure was dominated by it"
   is retired. (s120)
+- ⭐⭐⭐ **"IT IS NOT A MEMORYLESS FUNCTION" IS A CLAIM ABOUT THE *STAGE*; THE THEOREM IT IS USED TO
+  DISQUALIFY IS ABOUT THE *NONLINEARITY*. CHECK WHICH OBJECT THE PREMISE NAMES.** Three source files
+  asserted from session 6 to 122 that 1st-order ADAA "does not apply" to the CD4049 clipper because
+  its VTC "lives inside an implicit RC-coupled shunt-feedback loop solved per-sample by Newton on
+  node W (it is NOT a memoryless function of one input) — state-space ADAA would be needed". Every
+  clause is true, and the conclusion is false: ADAA1's derivation needs only (a) a memoryless map and
+  (b) an argument that is ~linear between samples, and `vtc` **is** a memoryless map — from node W.
+  That W is an internal signal rather than the stage input appears nowhere in the derivation.
+  Implemented, it gave **12.6–19.8 dB** of median alias-floor improvement at the realtime OS factors.
+  ⭐ GENERAL: when a recorded premise rules out a standard technique, name the technique's actual
+  hypotheses and check them one at a time against the right object — a stage, a signal, a map are
+  three different things, and a sentence that slides between them reads as a proof. Same family as
+  `a-strictly-monotone-residual-gives-root-uniqueness-not-global-convergence` (s120): the stated
+  premise was real and simply did not imply the stated conclusion. ⚠ And note the cost structure —
+  this premise was also the standing licence for a *fitted constant* to sit off its ADAA anchor
+  ("safe because the clipper carries no ADAA, so the closed-form antiderivative is never used"), so
+  refuting it re-opened a fit question 106 sessions later. A premise that licenses a shortcut should
+  be re-checked when the shortcut starts to cost something. (s123, GATE X)
+- ⭐⭐⭐ **WHEN YOU SPLIT A NONLINEARITY INTO PARTS FOR SEPARATE TREATMENT, EVERY PART MUST BE
+  EVALUATED OVER THE SAME INTERVAL — A HALF-SAMPLE MISALIGNMENT BETWEEN TWO TERMS OF ONE MAP IS A
+  DIFFERENTIATOR.** ADAA1 on a map whose linear part dominates degenerates to a 2-point average
+  (|H| = cos(pi f/fs)), which is a real cost when the map sits inside a feedback loop — so the
+  obvious refinement is to average only the NONLINEAR residue `g(w) = f(w) + a0*w` and keep the
+  linear term pointwise. The DIAGNOSIS is right; the remedy is wrong, and the algebra says so in one
+  line: `mean(g) - a0*w = Vbar - 0.5*a0*(w - wPrev)`, i.e. the "refinement" injects a **first
+  difference with gain a0/2**, and `|0.5*a0*(1 - z^-1)|` reaches the FULL loop gain a0 exactly at
+  Nyquist at every sample rate. Measured: H1 ran **+13.4 dB hot** and the alias floor came out
+  **14.4 dB worse** than the un-split version, whose own cost was 0.01 dB of harmonic power.
+  ⭐ The tell is available before any render — write the split out algebraically and look for a term
+  proportional to `(w - wPrev)`; that is a derivative wearing a correction's clothing. ⚠ Corollary:
+  "split the map" is not the fix for the same degeneracy anywhere else either (this project has it
+  flagged on the J201 too) — gating the ADAA off, or accepting the rolloff, is. (s123)
 - **A gate must be calibrated against the defect's SIGNATURE, not a proxy for it.** A flat-topping
   gate keyed on "16 consecutive samples above 0.985×peak" rejected a long-trusted reference capture
   peaking 7.6 dB below full scale — a sine spends ~5.5 % of its period up there. The real signature
@@ -587,6 +632,29 @@
   intermediate round-trip — and set the bar a decade above it. A bar tighter than the storage is not
   strict, it is broken, and it fails in the alarming direction rather than the flattering one, which
   is at least the safer way round. (s115)
+- ⭐⭐ **THE MIRROR OF THE ENTRY ABOVE: A TOLERANCE A CORRECT IMPLEMENTATION *CANNOT MEET* IS ALSO A
+  BROKEN TEST — DERIVE THE BAR FROM THE QUANTITY'S OWN SCALING LAW, NOT AS A ROUND NUMBER.** A new
+  sub-gate asked "does the ADAA mean converge to the pointwise value as the step vanishes?" and gated
+  it at a flat `< 1e-4`. It reported **FAIL at 1.244e-3** — which is `a0*dw/2` to three figures at the
+  largest `dw` in the sweep, i.e. the **mean value theorem**, not a defect: the quantity being bounded
+  is O(a0*dw) and the bar was a constant. ⭐ The fix is what makes the check load-bearing rather than
+  decorative: gate the **scaling law** (`err <= a0*|dw|`) and print the ratio — it now reads
+  **0.500 of bound at every step**, which IS the MVT value, so the test verifies first-order agreement
+  instead of asserting an arbitrary number. ⚠ Both failure directions are live and they feel completely
+  different: a bar below the storage precision (entry above) fails alarmingly on correct code, and a
+  bar above the achievable error passes silently on wrong code. Ask "what is this quantity's floor,
+  and what is its *law*?" before writing either. (s123)
+- ⭐⭐ **A UNIFYING HYPOTHESIS READ OFF THE WORST-N ROWS IS `self-selecting-scores` IN ITS MOST
+  SEDUCTIVE FORM, BECAUSE THE SUBSET WAS PRINTED FOR AN HONEST REASON.** Characterising where ADAA
+  *costs*, I printed the 3 worst tones per cell — and all of them landed near −48 dB whatever their
+  baseline, which looks exactly like "ADAA1 imposes its own ≈ −48 dB alias floor: a win above it, a
+  loss below". A tidy, mechanistic, publishable story. **Refuted by one command**: the ADAA arm's own
+  spread over all 19 tones is 51–84 dB, as wide as the baseline's, so there is no universal floor.
+  What survived is weaker and true — a correlation of −0.540 plus a hard boundary (every costing cell
+  had a baseline already better than −43.9 dB). ⭐ GENERAL: the worst-N table is the right instrument
+  for sizing a cost and the wrong one for inferring a mechanism, because it selects on the very
+  quantity the mechanism is supposed to explain. Before believing a pattern seen in a tail, compute
+  the statistic on the FULL population — here it was the spread, which the tail cannot show. (s123)
 - ⭐⭐⭐ **"IT'S CLIPPED" AND "IT'S THE SAME FILE TWICE" LOOK IDENTICAL AT THE PEAK AND ARE TOLD APART
   IN ONE LINE: CLIPPING IS NOT A PURE GAIN.** Session 112 saw two MASTER detents peaking at exactly
   0.98850 with 3160 samples pinned and diagnosed a ceiling. Session 115 measured per segment: the
@@ -848,6 +916,36 @@
   (must run the shipped fit), and run both arms for the second kind. Session 92 had already noticed
   the symptom — "`ClipperTest` must be probing a gentler point" — and it was not a gentler point, it
   was **a different stage**. (s118; the per-stage-test form of `verify-the-BASELINE-not-its-LABEL`)
+  - ⭐⭐⭐ **THE MIRROR IMAGE, s124: A TEST THAT BINDS A CLAIM ABOUT A *PARAMETER* TO WHATEVER
+    HAPPENS TO BE *SHIPPED* BREAKS THE DAY SHIPPING CHANGES — AND FAILS AGAINST CORRECT CODE WITH A
+    MESSAGE THAT CANNOT BE TRUE.** `ClipperTest` (d) gates the "ADAA is exact only at k == 2"
+    property, and it took its non-anchor arm from `fp.clipK` and its anchor arm from a literal
+    `2.0`, asserting *"inert at SHIPPED, live at k=2"*. Correct while the shipped `clipK` was
+    2.4653; the moment session 124 re-anchored it **to 2.0** the two arms became the same value and
+    the test demanded one render be simultaneously inert and live, printing
+    `clipK=2.0000 ... must be INERT`. ⭐ The defect is the BINDING, not the arm: the property is a
+    property of the exponent and does not know or care which value ships, so both arms must be named
+    constants. ⭐⭐ And do not simply delete the shipping question — **split it**: "is the shipped k
+    the ADAA anchor?" is a real, separate claim that SHOULD fail loudly if a future re-fit moves
+    `clipK` off the anchor and silently kills a shipped feature (no wrong answer, just a quiet
+    disappearance — the expensive kind). Two questions, two assertions. ⚠ Note this is the *same
+    test block* the s118 entry above repaired, failing a second time for the opposite reason: there
+    it answered about the nominal build while claiming the shipped one, here it over-coupled to the
+    shipped one. **"Which build is this assertion about?" needs answering explicitly in both
+    directions.** (s124)
+- ⭐⭐⭐ **WHEN A BEHAVIOUR DEPENDS ON TWO INDEPENDENTLY-SET PIECES OF STATE, RESOLVE IT FROM THE
+  STORED STATE — NEVER AT ONE OF THE WRITE SITES — AND GO AND READ EVERY CALLER'S ORDERING RATHER
+  THAN ASSUMING THEY AGREE.** Session 124's ADAA policy depends on the fit (WHICH mode) and the OS
+  factor (WHERE it applies). Those are set by two different setters, and the two production callers
+  set them in **opposite orders**: `OfflineRender` does prepare → `setFactorOrder` → `setFitParams`,
+  `PluginProcessor` does prepare → `setFitParams` → `setFactorOrder`. So an `if` inside either setter
+  alone is silently correct in one caller and wrong in the other — and the wrong one fails *quietly*,
+  as "the feature didn't seem to do anything in the plugin", with every test still green because the
+  test harness happens to use the other order. The fix is a single resolver reading both stored
+  values, called from both setters. ⭐ GENERAL: order-dependence between two setters is invisible at
+  each setter and only exists in the callers, so grep the call sites before writing the logic; and
+  prefer a formulation in which the order **cannot** matter over one that documents the required
+  order. (s124)
 - ⭐⭐⭐ **AN EXCURSION ENVELOPE MEASURED WITH THE LIMITER ENGAGED UNDERSTATES THE ENVELOPE THAT
   LIMITER WOULD SEE IF REMOVED — SO IT CANNOT SIZE ITS OWN WINDOW.** Having found the clamp firing,
   I measured node W's envelope in-chain to check the proposed replacement window would be inert. It
@@ -1058,6 +1156,37 @@
 
 ## 3. Gates, controls and verdicts
 
+- ⭐⭐⭐ **WHEN A NEW FEATURE DELIBERATELY BREAKS AN INVARIANT AN OLD GUARD ASSERTS, HOLD THE
+  *INTENDED EFFECT* CONSTANT INSIDE THE GUARD — DO NOT WIDEN ITS BAR.** `OSValidationTest`'s
+  delay-compensation check asserts the BLEND=50 % magnitude is OS-factor-independent below 200 Hz;
+  that is the only delay-comp proof in the suite, and a stale delay line combs exactly there.
+  Session 124 shipped an ADAA policy **gated by OS factor**, which makes the OD path factor-dependent
+  on purpose, and the 200 Hz spread duly went 0.078 → **0.112** against a <0.1 bar. Widening to 0.15
+  would have kept the light green and permanently blinded the only guard that can see a comb — the
+  classic concession. Instead the block now pins the ADAA gate OFF across all four arms, so it
+  measures only the delay path, and **the original 0.1 bar survives untouched** — which is the tell
+  (`if the rebuilt test is harder than the one it replaces and still passes, it is a correction`).
+  ⭐⭐ Two further habits paid here. **(a) Attribute before repairing:** *two* things changed (a
+  re-anchored constant and the new gate), so each was varied alone — k alone moved the spread
+  0.079 → 0.078, i.e. nothing, and the gate was the entire cause. **(b) The per-factor signature is
+  a free scope check:** 1× moved −0.033 dB, 2× −0.017, and 4×/8× were **bit-unmoved** — exactly the
+  two gated factors moved and exactly the two ungated ones did not, which proves the policy reached
+  only what it should. ⭐ And the displaced invariant deserves its own guard rather than being
+  dropped: the new test asserts 1×/2× DIFFER from an ADAA-off control while 4×/8× are BIT-IDENTICAL
+  to it — parameter-free, and it catches a shipped policy that silently stops applying, which fails
+  in the flattering direction (nothing errors; the feature just quietly disappears). (s124)
+- ⭐⭐ **A GUARD PROVING A MECHANISM IS *LIVE* SAYS NOTHING ABOUT WHETHER IT IS *WORTH HAVING* —
+  MEASURE THE BENEFIT TOO, ASSERT THE SIGN, AND PRINT THE SIZE.** Session 124's gate check proves
+  ADAA is on at 1×/2× and correctly scoped; a separate check measures what that buys on the full
+  chain (2× alias floor −32.7 → −47.8 dB at the gate amplitude). ⚠ The bar is the **sign** ("not
+  worse than not having it"), not a "must improve by ≥ N dB" — the latter is a number you guessed
+  (`a threshold you guessed is not a guard`), and here the benefit is legitimately
+  amplitude-dependent, so any fixed bar would be wrong at one end. ⭐ The size is printed so it stays
+  quotable, and the second instrument is the real prize: this reads the FULL `PedalDSP` chain while
+  GATE X reads its own harness at a different f0 with a different metric, and they agree to ~2.5 dB
+  (−15.1/−20.1 vs −12.6/−19.8 at amps 0.35/0.70). ⚠ And read your own table back before describing
+  it — the first draft of that comment said the benefit "rises monotonically" when amp 0.10 in fact
+  *costs* +0.6 dB. A trend is not a law. (s124)
 - ⭐⭐⭐ **A KNOWN ANSWER THAT AN EARLIER SUB-GATE ALREADY GUARANTEES IS NOT A KNOWN ANSWER — IT IS
   A RESTATEMENT, AND IT PASSES ON DATA IT WAS MEANT TO REJECT.** GATE O6b needed to confirm that two
   MASTER captures are the *same signal* (so their pedal sides cancel and a correction applies). The
@@ -1584,6 +1713,18 @@
   artefact every later session diffs against. Cheapest clean fix: let the run finish, then re-run
   the same command — captures rendered after the relink hit cache, so only the pre-relink ones
   re-render. Keep the mixed-binary report beside it and diff the two as a control. (s91)
+  - ⚠⚠ **SECOND OCCURRENCE, s124, COMMITTED BY A SESSION THAT HAD READ THIS ENTRY — AND THE
+    MECHANISM IS WORTH NAMING BECAUSE IT IS NOT "I FORGOT".** The rebuild was not part of the render
+    work at all: it was a `cmake --build` to confirm a **comment-only** edit to `FitParams.h` still
+    compiled, run while a background matrix render was at ~124/172. `FitParams.h` is included by
+    `offline_render.cpp`, so the binary relinked. ⭐ The trap is that the two activities feel
+    unrelated — "check my doc edit compiles" does not feel like "touch the render pipeline" — and a
+    background job is invisible while you work. The entry's own words cover it exactly (*"not even
+    for a comment-only edit"*), which is the point: the rule was known and still lost to the fact
+    that the rebuild was incidental to something else. ⭐ **Habit that actually prevents it: before
+    ANY build, check for a running render (`pgrep -f comprehensive_report.py`) — not before builds
+    you think are risky.** Remedy applied as prescribed: mixed-binary report kept as
+    `s124_ship_mixedbin.json`, re-run to `s124_ship.json`, and the two diffed as a control. (s124)
 - **A COST CAN LIVE ENTIRELY OUTSIDE THE MATRIX.** `jfetSatNeg` 0.76 → 1.9 moved
   `OSValidationTest`'s 8× alias/signal floor −23.6 → −17.3 dB. The 129-capture matrix renders at
   OS=8 and grades FR/THD/harmonics **at bands** — it never measures inharmonic energy, so no amount

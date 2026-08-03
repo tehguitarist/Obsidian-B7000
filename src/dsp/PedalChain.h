@@ -74,14 +74,28 @@
 //    4x default (-0.12 dB @10 kHz) but -2.0 dB @10 kHz / -12 dB @20 kHz at OS=1x.
 //    Account for this when fitting the Phase-8 low-OS top-octave shelf; consider
 //    gating ADAA off at order 0. (dsp-validator finding, 2026-07-22.)
-//  • **CD4049 clipper VTC** — the harder aliaser, but it lives INSIDE an implicit
-//    RC-coupled shunt-feedback loop solved per-sample by Newton on node W (it is
-//    NOT a memoryless function of one input), so the Esqueda 1st-order ADAA form
-//    (F(x)-F(xPrev))/(x-xPrev) does not apply — state-space ADAA would be needed
-//    and is out of Phase-6 scope. Its antialiasing is carried by OVERSAMPLING
-//    (this whole region), which OSValidationTest confirms drops the alias floor
-//    with factor. Revisit state-space ADAA only if low-OS listening reveals
-//    residual clipper aliasing (dsp.md leaves exactly this door open).
+//  • **CD4049 clipper VTC** — the harder aliaser. ⛔⛔ THIS ENTRY USED TO SAY that
+//    because the VTC "lives INSIDE an implicit RC-coupled shunt-feedback loop
+//    solved per-sample by Newton on node W (it is NOT a memoryless function of one
+//    input) ... the Esqueda 1st-order ADAA form does not apply — state-space ADAA
+//    would be needed and is out of Phase-6 scope". **THAT IS REFUTED (session
+//    123).** It conflates the STAGE with the NONLINEARITY: ADAA1 needs a memoryless
+//    map whose ARGUMENT is ~linear between samples, and `vtc` is a memoryless map
+//    from node W — W being an internal signal rather than the stage input is
+//    irrelevant to the derivation. `Clipper::setADAA` carries the argument, the
+//    self-consistency point (node-W KCL makes W a LINEAR combination of x and y, so
+//    substituting the mean INSIDE the solve antialiases W too, free) and the
+//    measurement. Implemented, gated (GATE X, `analysis/clip_adaa_gate.py`) and
+//    MEASURED: 12.6-19.8 dB median improvement over 19 tones at OS 1x/2x.
+//    ✅ SESSION 124 SHIPS IT ON, mode Full, **GATED BY OS FACTOR** (on at 1x/2x, off
+//    at 4x/8x — FitParams.h::clipAdaaMaxOs has the measured table and applyAdaaPolicy
+//    below does the resolving). Enabling it required re-anchoring the fitted
+//    clipK 2.4653 -> 2.0, since the antiderivative is elementary only at k = 2; that
+//    re-anchor was priced on the 162-capture matrix FIRST and is free (FitParams.h
+//    ::clipK). Oversampling still carries the antialiasing at 4x/8x, and carries it
+//    alongside ADAA at 1x/2x.
+//    ⛔ Do NOT "simplify" this to an unconditional on. The 4x/8x arms were measured
+//    and they lose: median benefit collapses and the worst tone costs +9.9/+17.3 dB.
 //  • **AccurateOmega is N/A here** — there are NO chowdsp DiodePairT/omega solves
 //    in the signal path (D1/D2 are hard clamps that never conduct; both shapers
 //    are std::tanh, already exact). The dsp.md omega4/AccurateOmega gotcha and
@@ -117,6 +131,7 @@ public:
     // host sample rate; unaffected by OS-factor changes.
     void prepareBase(double baseRate)
     {
+        baseSampleRate = baseRate; // the ADAA OS-factor gate's denominator
         inputBuffer.prepare(baseRate);
         levelBlend.prepare(baseRate);
         c21.prepare(baseRate);
@@ -148,6 +163,9 @@ public:
         skB.prepare(osRate);
         skA.configure(SallenKeyLPF::kIC4A);
         skA.prepare(osRate);
+
+        odSampleRate = osRate;
+        applyAdaaPolicy(); // the OS factor just changed => the ADAA gate may flip
 
         applyParams(cur);
     }
@@ -212,6 +230,16 @@ public:
         fit = f;
 
         clipper.setNonlinear(f.clipA0, f.clipSatLo, f.clipSatHi, f.clipK);
+        // Session 123/124: ADAA mode, gated by OS factor. setNonlinear FIRST —
+        // adaaExact() reads the hardness this call installs. The mode itself is
+        // resolved in applyAdaaPolicy(), which BOTH this and prepareOd() call,
+        // because the two are set independently and in OPPOSITE ORDERS by the two
+        // callers (OfflineRender: prepare -> setFactorOrder -> setFitParams;
+        // PluginProcessor: prepare -> setFitParams -> setFactorOrder). Resolving the
+        // policy in one place from the two STORED values is what makes the result
+        // independent of that order — an `if` in either setter alone would be
+        // silently correct in one caller and wrong in the other.
+        applyAdaaPolicy();
         clipper.setC11(f.clipC11);   // fittable GRUNT=Cut coupling cap (session 17)
         clipper.setC12(f.clipC12);   // fittable GRUNT=Flat  add-cap (session 19)
         clipper.setC13(f.clipC13);   // fittable GRUNT=Boost add-cap (session 19)
@@ -384,6 +412,42 @@ public:
     }
 
 private:
+    // ---- ADAA OS-factor gate (session 124) ----------------------------------
+    // Resolve FitParams::clipAdaa (WHICH mode) against clipAdaaMaxOs (WHERE it is
+    // worth having) and the OD region's current oversampling factor. Called from
+    // BOTH setFitParams() and prepareOd() because either can move independently,
+    // and the two production callers set them in opposite orders — see the comment
+    // at the setFitParams call site.
+    //
+    // Policy, measured (FitParams.h::clipAdaaMaxOs has the full GATE X table): ADAA1
+    // wins big at 1x/2x with a worst case bounded at +3.3 dB, and at 4x/8x its median
+    // collapses while its worst tone COSTS up to +17.3 dB. So the gate is `<=`, not a
+    // scale factor: the benefit is not monotone in rate and must not be interpolated.
+    //
+    // ⚠ Rounds the factor rather than truncating, and guards the base rate — osRate
+    // and baseSampleRate are doubles that have been through JUCE's rate plumbing, so
+    // 2.0000000001 must not read as 2 while 1.9999999999 reads as 1. A gate that
+    // flips on a floating-point crumb would be a nightmare to reproduce from a bug
+    // report ("it aliases on his machine and not mine").
+    void applyAdaaPolicy() noexcept
+    {
+        const auto requested = (fit.clipAdaa == 2)   ? Clipper::Adaa::Residue
+                               : (fit.clipAdaa == 1) ? Clipper::Adaa::Full
+                                                     : Clipper::Adaa::Off;
+
+        // Before prepare() there is no factor to gate on; keep the requested mode so
+        // a fit-only unit test (which never calls prepare) still sees what it asked
+        // for. prepareOd() re-resolves the moment a real rate arrives.
+        int factor = 1;
+        if (baseSampleRate > 0.0 && odSampleRate > 0.0)
+            factor = (int) std::lround(odSampleRate / baseSampleRate);
+
+        clipper.setADAA(factor <= fit.clipAdaaMaxOs ? requested : Clipper::Adaa::Off);
+    }
+
+    double baseSampleRate = 0.0; // host rate; set by prepareBase
+    double odSampleRate = 0.0;   // oversampled rate; set by prepareOd
+
     // ---- C15/R20/R21 clipper-output coupling: first-order highpass ----------
     // Phase 9 / A3 step 3b (session 36). NOT modelled before this session — the
     // clipper output fed straight into RecoveryBridgedT with nothing between them,

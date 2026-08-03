@@ -180,6 +180,113 @@ public:
     static constexpr double kClampHi = 9.6 - kTripPointV;  // +6.943 V
     static constexpr double kClampLo = -0.6 - kTripPointV; // -3.257 V
 
+    // ---- 1st-order ADAA on the VTC (session 123) ----------------------------
+    // ⛔ THIS REFUTES A PREMISE THAT STOOD IN THREE SOURCE FILES FROM SESSION 6 TO
+    // 122: "the CD4049 VTC lives inside an implicit RC-coupled shunt-feedback loop
+    // solved per-sample by Newton on node W (it is NOT a memoryless function of one
+    // input), so the Esqueda 1st-order ADAA form does not apply — state-space ADAA
+    // would be needed" (PedalChain.h's anti-aliasing block; FitParams.h clipK).
+    // The premise conflates the STAGE (which indeed has memory) with the
+    // NONLINEARITY. ADAA1's derivation needs only that (a) the map is memoryless
+    // and (b) its ARGUMENT is ~linear between samples. `vtc` is a memoryless map
+    // w -> y; w is a perfectly ordinary signal inside the discretisation. Nothing
+    // in the derivation requires w to be the stage's input.
+    // ⭐ And the topology makes it self-consistent rather than a hack: node-W KCL
+    // forces w to be a LINEAR combination of x and y, so every harmonic in w
+    // arrives via y. Substituting the averaged value INSIDE the solve therefore
+    // antialiases w too, at no extra cost; substituting it only at the output
+    // would leave the solve and the emitted sample disagreeing about the feedback
+    // current (and hence corrupt the C14 companion state, the session-118 defect
+    // one level down).
+    //
+    // MODES. **`Full` is the one to use.** `Residue` is kept only because it is
+    // the obvious-looking idea and it is WRONG for a measured reason worth keeping
+    // on the bench (below); a future reader will otherwise re-invent it.
+    //   Off      pointwise vtc(w). BIT-IDENTICAL to the pre-session-123 build (same
+    //            bracket, same arithmetic, same order) — the default.
+    //   Full     substitute the mean of vtc over [wPrev, w].  ← USE THIS
+    //   Residue  substitute the mean of only the NONLINEAR part
+    //            g(w) = vtc(w) + a0*w, keeping the linear -a0*w pointwise.
+    //
+    // ⛔⛔ WHY `Residue` IS WRONG — IT LOOKED LIKE THE CAREFUL CHOICE AND IT MOVES
+    // THE STAGE'S GAIN BY 13 dB. The reasoning that produced it is sound as far as
+    // it goes: averaging the LINEAR part of the VTC buys no antialiasing (a linear
+    // map makes no new frequencies) and does cost a 2-point average,
+    // |H| = cos(pi f / fs_os), plus a half-sample delay — inserted into a FEEDBACK
+    // path whose loop gain is a0 ~ 25. (That is the same degeneracy dsp-validator
+    // flagged on the J201 in 2026-07-22, where the remedy proposed was to gate ADAA
+    // off at OS 1x.) The error is in the remedy, not the diagnosis: evaluating the
+    // linear part at sample n while the nonlinear part is averaged over
+    // [n-1, n] evaluates the two halves of ONE map HALF A SAMPLE APART. Algebraically
+    //   mean(g) - a0*w = Vbar + a0*(w+wPrev)/2 - a0*w = Vbar - a0*(w - wPrev)/2,
+    // i.e. Residue = Full minus a FIRST DIFFERENCE carrying gain a0/2. That is a
+    // highpass, and |0.5*a0*(1 - z^-1)| reaches a0 EXACTLY at Nyquist at every OS
+    // rate — a perturbation as large as the entire loop gain, right where node W's
+    // fast transitions live.
+    // MEASURED (GATE X, analysis/clip_adaa_gate.py, s123_clip_adaa.json): the
+    // Residue arm's H1 runs +13.4 dB hot at amp 0.35 / OS 1x (82.28 vs 68.86 dB)
+    // and its alias floor is 14.4 dB WORSE than Full's at the same point. Full's
+    // cost over the same grid is 0.01 dB of harmonic power and 0.2 dB of H2/H1 —
+    // i.e. the 2-point average that Residue exists to avoid is not worth avoiding.
+    // ⭐ GENERAL: when a nonlinearity is split into parts for separate treatment,
+    // every part must be evaluated over the SAME interval. A half-sample
+    // misalignment between two terms of one map is a differentiator, not a detail.
+    // ⚠ The corollary for the J201's flagged 1x degeneracy: "split the map" is NOT
+    // the fix there either — gating, or accepting the cos rolloff, is.
+    //
+    // ⚠⚠ EXACT ONLY AT k == 2. `adaaExact()` gates on it and `vtcSub()` falls back
+    // to pointwise otherwise, so a k != 2 build silently gets NO ADAA rather than a
+    // wrong one. The shipped `clipK = 2.4653` is such a build: sigma_k's primitive
+    // is an incomplete beta function for general k, and FitParams.h's clipK note
+    // explicitly licensed the non-anchor value on the grounds that "the clipper
+    // carries NO ADAA ... so the closed-form antiderivative is never used". That
+    // licence is what this work withdraws — see the session-123 measurement.
+    // ⛔ Do NOT paper over it with quadrature. A 2-point Gauss-Legendre mean was
+    // considered and is WRONG here, for a reason that is MEASURED IN-CHAIN rather
+    // than estimated (temporary instrumentation in this function driven by
+    // OSValidationTest's real PedalDSP, 23.25 M clipper samples; added, measured and
+    // REVERTED — session 123). The VTC's full knee width is 2*satLo/a0 = 0.0352 V,
+    // and node W's step between consecutive samples is:
+    //        rate    n        mean|dw|   max|dw|   mean/knee   frac(|dw| > knee)
+    //        2x 96k  3.29 M   0.2026 V   1.895 V     5.76x          56.9 %
+    //        4x 192k 6.59 M   0.0999 V   1.263 V     2.84x          44.7 %
+    //        8x 384k 13.2 M   0.0498 V   0.804 V     1.42x          33.1 %
+    // ⇒ at the shipped realtime 2x, the argument steps FURTHER THAN THE WHOLE KNEE
+    // on 57 % of samples, so a fixed-node quadrature straddles the entire
+    // nonlinearity and averages two saturated values. Only a true antiderivative
+    // integrates it.
+    // ⭐ The same table is why ADAA is worth doing at all — crossing the whole map
+    // inside one sample is ADAA1's best case and oversampling's worst — and it is an
+    // INDEPENDENT corroboration of GATE X's measured ordering (benefit 12.6-19.8 dB
+    // median at 1x/2x, collapsing to 0.5-4.6 dB at 8x): mean/knee falls 5.76 -> 1.42
+    // over the same rates, on an instrument sharing nothing with the alias metric.
+    // ⚠ Do NOT read the 1x row of that instrumentation across to these: it is a
+    // different population (n = 189 k, and OSValidationTest drives 1x at a different
+    // stimulus mix), and it breaks the 1/fs scaling the other three hold to 1 %.
+    enum class Adaa
+    {
+        Off = 0,
+        Full = 1,
+        Residue = 2,
+    };
+
+    void setADAA(Adaa m) noexcept { adaaMode = m; }
+    Adaa adaa() const noexcept { return adaaMode; }
+
+    // ---- Test/oracle probes (session 123) -----------------------------------
+    // Thin forwarders to the VTC internals, so ClipperTest can gate the
+    // ANTIDERIVATIVE ITSELF (dV/dw == vtc, C1 at the trip point, exact-at-DC,
+    // monotonicity of the substituted map) rather than trying to infer all of that
+    // from process() output. Same posture as the public `gruntCap()` — the test
+    // shares the implementation's own definition instead of re-deriving it, which
+    // is what makes a mismatch a real finding. Stateless: none of these touch
+    // wPrev or the companion-cap states.
+    double probeVtc(double w) const noexcept { return vtc(w); }
+    double probeVtcDeriv(double w) const noexcept { return vtcDeriv(w); }
+    double probeVtcAD(double w) const noexcept { return vtcAD(w); }
+    double probeVtcAvg(double w, double wp) const noexcept { return vtcAvg(w, wp); }
+    bool probeAdaaExact() const noexcept { return adaaExact(); }
+
     // Phase-7 capture fit (FitParams.h). ** Does NOT touch the clamp window — see
     // kTripPointV above: the window is anchored on the physical trip point and a
     // VTC-amplitude fit is not allowed to move it (session-118 bug fix). **
@@ -321,9 +428,40 @@ public:
         // decreasing, so F(lo) >= 0 >= F(hi) and the root is unique: this bracket
         // cannot fail, costs no iteration, and needs no tuning.
         const double sum = gIn + gFb;
-        const double w0 = (gIn * x - ic - ieq14) / sum;
-        const double rad = gFb * (satLo > satHi ? satLo : satHi) / sum + 1e-12;
-        double lo = w0 - rad, hi = w0 + rad;
+        double lo, hi;
+        double w = wPrev; // warm start
+        double f;
+        if (adaaMode == Adaa::Off || ! adaaExact())
+        {
+            const double w0 = (gIn * x - ic - ieq14) / sum;
+            const double rad = gFb * (satLo > satHi ? satLo : satHi) / sum + 1e-12;
+            lo = w0 - rad;
+            hi = w0 + rad;
+            if (w < lo) w = lo;
+            else if (w > hi) w = hi;
+            f = solveF(w, x, ic);
+        }
+        else
+        {
+            // ---- ADAA bracket (session 123) ---------------------------------
+            // The |vtc| <= max(sat) confinement above does NOT survive the
+            // substitution: in Residue mode the substituted value carries a
+            // -a0*(w-wPrev)/2 term, so it is unbounded in w and the closed-form
+            // radius is invalid. Rather than widen it by a quantity that depends
+            // on the very step being solved for (circular), bracket off the
+            // SLOPE, which both substitutions bound from below:
+            //   dF/dw = -gIn + gFb*(dvtcSub/dw - 1),  dvtcSub/dw <= 0
+            //   => |dF/dw| >= gIn + gFb = sum   for Off, Full AND Residue
+            //      (Residue is steeper still: dvtcSub/dw <= -a0/2).
+            // F is strictly decreasing, so from any point the root is no further
+            // than |F|/sum away, on the side F's sign indicates. Rigorous, needs
+            // no tuning, and COSTS NOTHING — it is evaluated at the warm start,
+            // so the F it needs is the F rtsafe was going to compute anyway.
+            f = solveF(w, x, ic);
+            const double span = std::abs(f) / sum + 1e-12;
+            if (f >= 0.0) { lo = w; hi = w + span; }
+            else          { lo = w - span; hi = w; }
+        }
 
         // ---- Bracketed Newton with bisection fallback (Numerical Recipes
         //      `rtsafe`) — session 120. See kNewtonIters for the measurement. ---
@@ -336,11 +474,7 @@ public:
         //       proposes exactly b and at b proposes exactly a. A hand-rolled
         //       guard with only (a) was measured cycling for 16 iterations with
         //       the step still at half the bracket width.
-        double w = wPrev; // warm start
-        if (w < lo) w = lo;
-        else if (w > hi) w = hi;
         double dwOld = hi - lo, dw = dwOld;
-        double f = solveF(w, x, ic);
         double fp = solveFp(w);
         for (int it = 0; it < kNewtonIters; ++it)
         {
@@ -372,8 +506,12 @@ public:
         else if (w < kClampLo)
             w = kClampLo;
 
+        // ⚠ ORDER IS LOAD-BEARING: y must be read with the OLD wPrev, because in
+        // ADAA mode it is a function of BOTH samples. Emitting the substituted
+        // value (not vtc(w)) is what keeps the solve and the emitted sample
+        // agreeing about the feedback current — see the setADAA note.
+        const double y = vtcSub(w);
         wPrev = w;
-        const double y = vtc(w);
 
         // ---- Update companion cap states ------------------------------------
         // Intermediate node m between Cg and R16 (eliminated in the solve).
@@ -442,12 +580,89 @@ private:
     // and any gate can share ONE definition (see the KCL derivation in the header).
     inline double solveF(double w, double x, double ic) const noexcept
     {
-        return gIn * (x - w) - ic + gFb * (vtc(w) - w) - ieq14;
+        return gIn * (x - w) - ic + gFb * (vtcSub(w) - w) - ieq14;
     }
     inline double solveFp(double w) const noexcept
     {
-        return -gIn + gFb * (vtcDeriv(w) - 1.0);
+        return -gIn + gFb * (vtcSubDeriv(w) - 1.0);
     }
+
+    // ---- The substituted VTC and its derivative (session 123) ---------------
+    // `vtcSub` IS `vtc` when ADAA is off or inexact, so the Off path stays
+    // bit-identical: same expression, same order, one predictable branch.
+    // The mean of vtc over [wPrev, w] is the only quantity computed; Residue
+    // subtracts the single a0*dw/2 term derived in the setADAA note.
+    //
+    // MONOTONICITY — the property every consumer below depends on, and it
+    // SURVIVES both substitutions (so the bracket stays valid and the root stays
+    // unique; cf. the session-120 correction that monotonicity gives uniqueness,
+    // not convergence — rtsafe still supplies the latter):
+    //   Vbar' = (vtc(w) - Vbar)/dw. vtc is strictly decreasing, so for w > wPrev
+    //   its mean over the interval EXCEEDS vtc(w) (numerator < 0, denominator > 0)
+    //   and for w < wPrev the mean is BELOW vtc(w) (both signs flip). Either way
+    //   Vbar' < 0. Residue's is Vbar' - a0/2, steeper still.
+    // And |Vbar'| <= a0 (Residue: in [a0/2, 3a0/2]) — bounded, as the pointwise
+    // |vtcDeriv| <= a0 is, so Newton's step is no worse conditioned than before.
+    static constexpr double kAdaaEps = 1.0e-7; // see the cancellation note below
+    inline double vtcSub(double w) const noexcept
+    {
+        if (adaaMode == Adaa::Off || ! adaaExact())
+            return vtc(w);
+        const double bar = vtcAvg(w, wPrev);
+        return (adaaMode == Adaa::Residue) ? (bar - 0.5 * a0 * (w - wPrev)) : bar;
+    }
+
+    inline double vtcSubDeriv(double w) const noexcept
+    {
+        if (adaaMode == Adaa::Off || ! adaaExact())
+            return vtcDeriv(w);
+        const double dw = w - wPrev;
+        const double d = (std::abs(dw) < kAdaaEps)
+                             ? 0.5 * vtcDeriv(0.5 * (w + wPrev))
+                             : (vtc(w) - vtcAvg(w, wPrev)) / dw;
+        return (adaaMode == Adaa::Residue) ? (d - 0.5 * a0) : d;
+    }
+
+    // The mean of vtc over [wp, w] — STATELESS on purpose, so ClipperTest can gate
+    // the antiderivative and the fallback directly instead of inferring them from
+    // process() output (`probeVtcAvg` forwards to it).
+    inline double vtcAvg(double w, double wp) const noexcept
+    {
+        const double dw = w - wp;
+        // Midpoint fallback. The threshold is set by CANCELLATION, not by 0/0:
+        // |V| reaches ~satLo*|w| ~ 2.2 V at the node's measured excursion, so a
+        // 1e-16 relative error in the difference becomes ~2e-16/dw in the mean.
+        // At dw = 1e-7 that is ~2e-9 against a quantity of scale satLo ~ 0.44,
+        // i.e. ~5e-9 relative — while the midpoint rule's own O(dw^2 * vtc'')
+        // error at that step is far smaller. (JfetStage's 1e-9 is safe there
+        // because its antiderivative carries no large linear-in-w term; V does.)
+        if (std::abs(dw) < kAdaaEps)
+            return vtc(0.5 * (w + wp));
+        return (vtcAD(w) - vtcAD(wp)) / dw;
+    }
+
+    // V(w) = integral_0^w vtc(s) ds, with V(0) = 0 so ADAA1 is exact at DC.
+    // ELEMENTARY ONLY AT k == 2 (gated by adaaExact()): sigma_2(u) = u/sqrt(1+u^2)
+    // has the primitive sqrt(1+u^2), giving per side
+    //   w >= 0 : V = -(satLo^2/a0) * (sqrt(1+u^2) - 1),  u =  a0*w/satLo
+    //   w <  0 : V = -(satHi^2/a0) * (sqrt(1+u^2) - 1),  u = -a0*w/satHi
+    // Both branches are <= 0 and agree at w = 0 with matching first derivative
+    // (= vtc(0) = 0), so V is C1 across the trip point — checked in ClipperTest.
+    inline double vtcAD(double w) const noexcept
+    {
+        if (w >= 0.0)
+        {
+            const double u = a0 * w / satLo;
+            return -(satLo * satLo / a0) * (std::sqrt(1.0 + u * u) - 1.0);
+        }
+        const double u = -a0 * w / satHi;
+        return -(satHi * satHi / a0) * (std::sqrt(1.0 + u * u) - 1.0);
+    }
+
+    // Named predicate, same posture as JfetStage::adaaExact(): a k != 2 build gets
+    // NO ADAA rather than a wrong one, and there is one obvious place to wire in a
+    // general-k primitive if the k = 2 anchor is not restored.
+    inline bool adaaExact() const noexcept { return hardness == 2.0; }
 
     // Inverter VTC (VD_eff-referenced, 0 = trip point). Inverting asymmetric
     // sigmoid: slope -a0 at 0 (both sides -> C1-continuous), saturating to -satLo
@@ -523,8 +738,10 @@ private:
     double c13 = kC13;   // fittable GRUNT Boost add-cap (FitParams::clipC13); schematic 220n
     double r16 = kR16;   // fittable clipper input R (FitParams::clipR16); schematic 6k8
     double gcG = 0.0, dNode = 0.0, gIn = 0.0, ieqG = 0.0;
-    // Newton warm-start.
+    // Newton warm-start — ALSO the ADAA anchor (one state serves both; the ADAA
+    // pairing is exactly "this sample's solved w against the last one's").
     double wPrev = 0.0;
+    Adaa adaaMode = Adaa::Off; // default Off => bit-identical to pre-session-123
     // REF-OD baseline = grunt "mid" = the physical On-Off-On CENTRE = 4n7 alone =
     // the LEAST-bass position (circuit.md GRUNT note), which is Grunt::Cut here.
     Grunt grunt = Grunt::Cut;

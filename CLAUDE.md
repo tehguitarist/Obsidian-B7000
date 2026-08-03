@@ -155,20 +155,41 @@ release) has not started.
 
 #### STATUS
 
-- **Current baseline: `analysis/reports/s120_newton.json`** (162 captures). Quote every OD number
-  against this report. `s118_clampfix.json` is the diff-against control (identical membership).
+- **Current baseline: `analysis/reports/s124_ship.json`** (162 captures) — session 124 shipped three
+  DSP constants (`clipK`, `clipAdaa`, `clipAdaaMaxOs`), so the baseline moved with them. Quote every
+  OD number against this report. `s123_kship_control.json` is the diff-against control at the
+  PREVIOUS constants (identical membership), and `s123_k2.json` is the known answer this baseline
+  must reproduce (see below). `s120_newton.json` is the session-118→123 baseline, now superseded.
+  ✅ **The baseline move carries a KNOWN ANSWER, and it PASSED: `s124_ship.json` reproduces
+  `s123_k2.json` BIT-IDENTICALLY — 0 differing across 202,001 numeric leaves.** The matrix renders at
+  `--os 8`, where the OS gate turns ADAA **off**, so the only shipped constant reaching an 8× render
+  is `clipK = 2.0`; `s123_k2.json` was rendered with an explicit `--fit clipK=2.0` and `s124_ship.json`
+  with none, so this simultaneously certifies that the constant reaches the DSP as a default and that
+  no ADAA leaks into an 8× render. ⚠ This also means
+  **the matrix cannot see the ADAA change at all**, by construction — do not quote a matrix number as
+  evidence for or against ADAA. Its evidence is GATE X plus `OSValidationTest`'s in-chain benefit
+  block, both at 1×/2×.
+  ⚠ `comprehensive_report` now reports **172 attempted / 162 graded** — the 10-capture gap is the
+  `_gain-n18` set failing on the missing `_GAIN_SESSION_MEASURED_DB[-18]` entry (open work item 8),
+  NOT a membership change. A render log counts what it tried; only the report's capture list counts
+  what it graded.
   ⛔ The absolute-ledger gates (K/M/O/P/Q) must be read against `s118_clampfix.json` or later — GATE O
   deliberately refuses any earlier report by name (session 119).
-- **ctest 17/17** as of session 120 — the first clean suite since session 44 (the bracketed-Newton
-  `rtsafe` solve fixed the standing `OSValidationTest` failure; see SHIPPED CONSTANTS).
+- **ctest 17/17** as of session 124. ⚠ Two tests were REPAIRED in session 124 and neither was a code
+  defect — both asserted premises the ADAA change inverted (`ClipperTest` (d) bound a claim about `k`
+  to whatever shipped; `OSValidationTest`'s delay-comp check asserts factor-independence of a path
+  the OS gate deliberately makes factor-dependent). Both repairs kept their original bars. See
+  `docs/session-log.md` SESSION 124 before re-reading either as a regression.
 - **Release gate: 6 rows over SHIP.** Run the script for the live numbers — do not transcribe them:
   ```bash
-  /opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s120_newton.json
+  /opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s124_ship.json
   ```
-  The six, as of s120: OD 100 Hz–8 kHz p90, OD 25–100 Hz median/p90, OD 8–16.3 kHz p90, OD p99,
-  THD level (full-send). See §"THE RELEASE GATE" below for the bar definitions and fallback.
+  The six, unchanged through the session-124 re-anchor: OD 100 Hz–8 kHz p90, OD 25–100 Hz
+  median/p90, OD 8–16.3 kHz p90, OD p99, THD level (full-send). See §"THE RELEASE GATE" below for
+  the bar definitions and fallback.
 - Session 118's D1/D2 clamp-window fix and session 120's `rtsafe` solve are both **KEPT** (user
-  decisions, taken at the top of session 120).
+  decisions, taken at the top of session 120). Session 124's ADAA enable + `clipK` re-anchor is
+  likewise a **user decision**, taken after the matrix price was measured.
 - ⛔⛔ **CAPTURE ACCESS IS ENDING (session 111, 2026-08-02).** Read `reference-sources.md` §0's
   re-instated row and "Project-specific carry-forwards" → "Capture access status" before assuming
   any capture not already on disk is obtainable. If a session needs one, ask the user immediately.
@@ -194,6 +215,9 @@ lives in the named source file's own comment block — **not duplicated here**.
 | MASTER taper | power law (`masterTaperExp`) → 2-segment PWL (`masterTaperBreak`/`masterTaperFrac`) | 115 | no single exponent fits the corrected ladder (span 1.74–3.51) | `FitParams.h`, `MasterOut.h` |
 | D1/D2 clamp window | derived from fitted `satLo` (wrong meaning) → derived from `kTripPointV=2.657` (self-consistent rail) | 118 | fitted `satLo` is a knee scale, not the geometric trip point the window needs | `Clipper.h` |
 | Clipper Newton solve | plain 6-iter Newton → bracketed Newton + bisection fallback (`rtsafe`), cap 12 | 120 | plain solve unconverged on 2.6% of in-chain samples at 4×/8×; closed the 8× alias floor by 36.6 dB and the headline OD gate row | `Clipper.h` |
+| `clipK` | 2.4653 → 2.0 | 124 | the ADAA anchor (antiderivative elementary only at k=2) + restores the `pow()` fast path; matrix price measured FIRST and it is free — ⚠ "indistinguishable with a rounding preference", NOT "a better fit" | `FitParams.h` |
+| `clipAdaa` | 0 (Off) → 1 (Full) | 124 | ADAA on the CD4049 VTC, enabled on the user's decision; ⛔ mode 2 (Residue) is REFUTED, not an upgrade | `FitParams.h`, `Clipper.h::setADAA` |
+| `clipAdaaMaxOs` | *(new)* → 2 | 124 | OS-factor gate: ADAA on at 1×/2× (median −12.6…−19.8 dB, worst +3.3), off at 4×/8× (median collapses, worst +9.9/+17.3) | `FitParams.h`, `PedalChain::applyAdaaPolicy` |
 
 #### CLOSED / REFUTED — do not re-open without reading the pointer
 
@@ -215,7 +239,11 @@ table in this file.
 | session 92's attribution of `OSValidationTest`'s failure to the un-ADAA'd CD4049 VTC | **SUBSTANTIALLY REFUTED** | 120 | It was the Newton solver's non-convergence, not (mainly) the VTC. ADAA remains open; session 92's alias/aperiodicity table was unquotable until re-measured — ✅ done s121: aperiodic regime **CLOSED (0/21 tones)**, genuine fold-down survives, smaller. | `analysis/alias_gate.py` |
 | the THD "level term"'s direction | **The gated term is UNSIGNED (rms).** Signed mean is **positive** — the model **over**-distorts, not under. | 109 | Any candidate reasoned about as "we need more distortion" is backwards. | `FitParams.h`, `analysis/shape_gate.py` |
 | `s114_baseline.json` for absolute-ledger gates (K/M/O/P/Q) | **STALE** | 118/119 | Predates session 115's shipped `kOutputMakeup`/PWL-taper constants. GATE O refuses it by name. | `analysis/a3_decomposition_gate.py` |
-| The six user-flagged peak/notch centre-frequency mismatches (bass notch/peak, mid peak, treble peak/notch, clean HF rolloff) | **CLOSED — none is a corner error** | 122 | Two are the OD/clean mix (= A3, not a filter); three are not a fixed feature on at least one side (ND's own peaks move with drive, a fixed network cannot); the 320 Hz null's centre is **right to 0.7%** — GAP #2 is a depth/width defect only, its centre was never wrong. | `analysis/feature_locus_gate.py` (GATE W) |
+| The six user-flagged peak/notch centre-frequency mismatches, **as CORNER (element-value) targets** | **CLOSED — none is a corner error.** ⚠ NOT "closed as a defect" — see the row below, added s125 | 122 | Two are the OD/clean mix (= A3, not a filter); three are not a fixed feature on at least one side; the 320 Hz null's centre is **right to 0.7%** — GAP #2 is a depth/width defect only, its centre was never wrong. ⛔ Do not point an optimiser at a capacitor for any of them. | `analysis/feature_locus_gate.py` (GATE W) |
+| "…and therefore there is nothing to fix at those centres" | ⛔ **DOES NOT FOLLOW — REOPENED s125 as open-work item 6** | 125 | GATE W's verdict (c) *"not a fixed feature on at least one side"* is a **diagnosis, not an exoneration**: it says the pedal has a drive-dependent mechanism the model lacks. W6, measured: the model's treble peak is **FIXED to 0.2%** across the 24 dB ladder while the pedal's walks **2696 → 2498 Hz (7.9%)** ⇒ we are **281 Hz off at clean and 485 Hz (19.4%) off at `drv_-6`** — wrong at *every* drive setting. Same shape at the bridged-T (ours fixed 716 Hz, pedal 696 → 745 Hz). ⚠ The reassuring `1.022×` in s122's summary is `sweep_clean` on the LEVEL ladder only; the same feature reads `1.152×` on the pure-OD endpoints. | `analysis/feature_locus_gate.py` W6/W5/W5b |
+| "memoryless ADAA does not apply to the CD4049 VTC — it lives inside an implicit solve, so state-space ADAA would be needed" (asserted in `PedalChain.h`, `FitParams.h`, `dsp.md` from session 6) | **REFUTED** | 123 | Conflates the STAGE (has memory) with the NONLINEARITY (`vtc` is memoryless in node W). ADAA1 needs a memoryless map with a ~linear argument; nothing requires that argument to be the stage input. Built and measured: **12.6–19.8 dB** median alias-floor gain at OS 1×/2×. Ships OFF (exact only at `clipK == 2`). | `analysis/clip_adaa_gate.py` (GATE X) |
+| "ADAA only the NONLINEAR residue, keeping the linear part pointwise, to dodge ADAA1's 2-point-average cost in the feedback loop" | **REFUTED — do not re-invent** | 123 | Evaluates two halves of ONE map half a sample apart ⇒ injects a first difference of gain `a0/2`, reaching the **full loop gain at Nyquist**. H1 +13.4 dB hot, alias floor 14.4 dB worse than plain ADAA, whose own cost is 0.01 dB. | `Clipper.h::setADAA`, `ClipperTest` Test 8(e) |
+| "ADAA1 imposes its own ≈ −48 dB alias floor (win above it, loss below)" | **REFUTED — my own s123 hypothesis** | 123 | Read off the worst-3-tones table; the ADAA arm's full spread is 51–84 dB, as wide as the baseline's. What survives: `corr(baseline, benefit) = −0.540`, and every costing cell had a baseline already better than −43.9 dB. | `docs/session-log.md` SESSION 123 |
 | `drive-1700_base-od @ sweep_drv_-6`, 50 Hz reading ~1400% THD | **RESOLVED — denominator artefact** | 122 | Model's 50 Hz fundamental collapses 41 dB below the pedal's (a cancellation-null read-point coincidence, same mechanism as the bass-notch/A3 row); numerator (harmonic energy) is ordinary on both sides. Not a distortion-generation defect; needs no separate work. | `analysis/feature_locus_gate.py` |
 
 ### THE RELEASE GATE
@@ -247,27 +275,54 @@ failing its own baseline on dilution (session 95/96). Both CLEAN rows currently 
 
 ▶ **Pre-registered fallback, not yet triggered:** if every other OD row closes and the two
 8–16.3 kHz rows are the last blocker, split that region the way CLEAN was split (a real,
-drive-independent defect vs an ND-artefact-dominated tail) rather than loosening either bar. Trigger
+drive-independent defect vs a drive-generated tail) rather than loosening either bar. Trigger
 is "everything else closed", not "this row is annoying" — re-run GATE I and reproduce its numbers
-before acting. ⛔ **Do not aim model work at 8–16.3 kHz otherwise** — ~38% of the OD headline sits
-there and it is ND's own aliasing artefact (GATE I, `analysis/hf_artefact_gate.py`, passing since
-session 114), not our Sallen-Keys; p99 is 10.28 dB even with all four HF bands dropped, so the
-remaining OD error is genuinely broadband.
+before acting. ⚠ p99 is 10.28 dB even with all four HF bands dropped, so the remaining OD error is
+genuinely broadband and this region is not the p99 story.
+
+⚠⚠ **CORRECTED SESSION 125 — THE PREVIOUS VERSION OF THIS BLOCK SAID "it is ND's own ALIASING
+artefact… not ours to fix" AND CARRIED A ⛔ PROHIBITION ON WORKING THE REGION. GATE I DOES NOT SAY
+THAT, AND ITS G3 REFUTES THE ONE ALIASING MECHANISM IT TESTED.** What GATE I actually establishes is
+(G1) our clean-path linear HF is right, (G2) the pedal **gains** with frequency where our path rolls
+off, with the gap growing monotonically with drive ⇒ **drive-generated, on the pedal's side**, and
+(G3) it is **NOT** the `fs/(N+1)` fold mechanism — the excess passes through 16 kHz as a *smooth
+plateau* (13.5–19.5 kHz mean +15.07 dB, spread 0.73 dB over 6 kHz), and a fold deposits a peak, not
+a plateau. The gate's own printed verdict adds: *"NOT claimed: that the region is ENTIRELY artefact…
+Whether the gate should still grade these bands is a **USER DECISION**, not this tool's."* The
+gate's docstring also preserves the user's session-89 instruction verbatim: ⛔ *"DO NOT dismiss this
+as 'ND aliasing' — that is not established and it is not a reason to skip the band."* The
+prohibition inverted that instruction and converted a user decision into a standing rule.
+⇒ **"drive-generated" ≠ "aliasing" ≠ "not ours to fix".** There is **no hardware data anywhere above
+6 kHz under drive** (`reference-sources.md` §2 is clean-path only; §3's charts stop at the 5–6 kHz
+null), so nothing adjudicates whether a real B7K also produces this. Treat the region as **open and
+unattributed**, and see open-work item 6 — the model lacking a drive-dependent HF mechanism is a
+live hypothesis for it, not a settled artefact.
 
 ### Open work, in order
 
-Current ordering per session 122's own `▶ NEXT` (which supersedes every earlier list — see
-`docs/session-log.md` for the superseded orderings and why each item moved):
+Current ordering per session 124's own `▶ NEXT` (see `docs/session-log.md` for the superseded
+orderings and why each item moved):
 
-1. **ADAA the CD4049 VTC** — Phase 10 B's head item, re-scoped session 121 to the 2×/4× realtime
-   alias floor (−30…−32 dB at amp 0.35–0.70; the 8× render floor is already −61 dB post-`rtsafe`
-   and is not what a realtime user hears). The J201 already has closed-form ADAA (`PedalChain.h`);
-   this is 1st-order ADAA on `railClip`/the CD4049 VTC transfer per `dsp.md`'s ADAA section.
+1. ✅ **DONE, SESSION 124 — the user enabled ADAA, gated by OS factor, with `clipK` re-anchored to
+   2.0.** Three constants shipped (SHIPPED CONSTANTS table above); two open items closed on one
+   decision, since the re-anchor is both what makes ADAA exact and what restores the `pow()` fast
+   path. ⛔ Do NOT re-open the "is the re-anchor affordable" question — it was measured on 162
+   captures before shipping and is free (⚠ *indistinguishable with a rounding preference*, NOT "a
+   better fit"). ⛔ Do NOT "simplify" the OS gate to an unconditional on: 4×/8× were measured and
+   they lose (worst tone +9.9/+17.3 dB). See `docs/session-log.md` SESSION 124.
 2. **THD level term** — one of 6 rows over SHIP (3.523 vs ≤3.0, full-send). Model **over**-distorts
    (signed mean positive) — do not reason about candidates as "add more distortion".
-3. **Perf: the `pow()` path, not the solver.** Shipped `clipK = 2.4653` misses `sig()`/`sigDeriv()`'s
-   `k == 2.0` fast path — two `pow()` calls per Newton F-evaluation dominate the clipper's
-   356 ns/sample. A cheap `pow` approximation or an anchor back at k=2 is the lever.
+3. ⭐ **Perf: the `pow()` fast path is UNBLOCKED but NOT MEASURED.** `clipK = 2.0` restores
+   `sig()`/`sigDeriv()`'s `k == 2.0` fast path — which was the entire perf argument for the
+   re-anchor — but nobody has re-run `PerfBenchmark` against the clipper's recorded 356 ns/sample.
+   That is a **measurement, not a change**, and it must be quoted before this item is called closed.
+   ⚠ ADAA *adds* work at 1×/2× while the fast path removes it everywhere, so the net at the realtime
+   factors is genuinely unknown — measure it, do not reason about it.
+   ⚠ (Historical, now moot: had `clipK` stayed at 2.4653, ADAA would have needed a general-k
+   primitive — a Chebyshev fit of `psi(u) = Phi(u) − u` on `t = u/(1+u)`. ⛔ And NOT quadrature: the
+   in-chain step-vs-knee table in `Clipper.h::setADAA` rules it out — the argument steps further than
+   the whole knee on 57 % of samples at 2×, so fixed nodes land in saturation and miss the feature
+   entirely. Keep that refutation: it applies to any future "just integrate it numerically" idea.)
 4. **Re-point the other consumers of the corrupted MASTER anchor** — `clean_headroom_bound.py`,
    `clean_headroom_probe.py`, `clean_thd_check.py`, `captures.py`'s Tier-1 matrix list all still name
    `master-1700_gain-n12_base-clean.wav` (the capture GATE T proved 4.447 dB low). None currently
@@ -277,7 +332,34 @@ Current ordering per session 122's own `▶ NEXT` (which supersedes every earlie
    below the physical rail (everything around it — TL07x rails, D1/D2 references, R19 — is
    physical). That is why the corrected D1/D2 window still fires on 0.05–0.25% of samples. A
    K/`clipSat` re-fit against a physical ceiling is the real repair (same job as item 4).
-6. ⛔ **Do NOT open a centre-frequency item** (CLOSED session 122 — see CLOSED/REFUTED table).
+6. ⭐⭐ **THE MODEL LACKS A DRIVE-DEPENDENT MECHANISM ABOVE ~2 kHz — RESTORED s125, having been
+   DROPPED in the s122→s124 handover chain.** ⛔ This is **not** a centre-frequency item: GATE W
+   settled that none of the six flagged centres is a *corner* error, and that stands — do not point
+   an optimiser at a capacitor. What it is: the pedal's HF features **move with drive** and ours are
+   pinned, so we are wrong at every drive setting and the error grows with it.
+   **Measured (`feature_locus_gate.py` W6, 24 dB stimulus ladder):**
+   | feature | model | pedal | our error |
+   |---|---|---|---|
+   | treble peak | 2977 → 2983 Hz (**FIXED, 0.2%**) | 2696 → **2498** Hz (7.9%) | 281 Hz @ clean → **485 Hz (19.4%) @ `drv_-6`** |
+   | bridged-T | 715.8 → 716.9 Hz (**FIXED, 0.2%**) | 695.7 → **745.4** Hz (7.2%) | crosses over |
+   | mid peak | 458 → 429 Hz (9.0%) | 447 → 419 Hz (8.0%) | ~2.5% — ✅ this one TRACKS |
+   ⭐ **The mid peak tracking is the localising clue**: we already have a drive-dependent mechanism
+   at ~450 Hz and none at ~2.9 kHz, so this is not a global missing dynamic — it is specific.
+   ⭐⭐ **Leading candidate, and it is a documented DEFERRED item, not a new invention:
+   dynamic R19 supply sag.** `docs/nonlinear-component-modeling.md:70` — *"dynamic sag is an optional
+   refinement — add a simple supply-sag state (`VDD_eff = 8.6 − I_DD(Vout)·1k`, one-pole smoothed)
+   **only if captured feel demands it**"*. We shipped the **static** self-consistent solve
+   (`VDD = 5.636 V`, `Clipper.h:127`) and never returned. The captures now demand it. Mechanism is
+   schematic-grounded: sag moves the CD4049's trip point **and** its open-loop gain `a0`, and
+   `circuit.md` already records that node W's input impedance is `R18/(1+A0)` — so a drive-dependent
+   `a0` walks both the GRUNT corner and the `C14 ∥ R18` corner, which sits at
+   **1/(2π·330k·220p) = 2.19 kHz**, i.e. exactly where the treble peak is.
+   ⚠ **Hypothesis, not a result** — it predicts the right *sign*, *frequency* and *drive dependence*,
+   which is why it is worth a prototype; it has not been rendered. Known-answer test needs **no new
+   capture**: render the treble-peak drive sweep and require the model's centre to walk down.
+   ⭐ This is also the natural home for the 8–16.3 kHz question (THE RELEASE GATE's corrected note):
+   a nonlinearity whose gain rises with drive is the one thing that can produce a *rising, smooth,
+   drive-growing* HF plateau — the shape GATE I measured and G3 showed is **not** a fold.
 7. ⚠ **Capture question, while access lasts:** a clean same-session `gain-n18` MASTER ladder would
    let session 115's taper be resolved below its 0.85 dB knob-noise floor (7 of 9 detents already
    captured session 120 — see "Capture access status" below for the accuracy caveat). Read
@@ -305,6 +387,19 @@ produce it (s108 synthesis).* A3's SIZE and GATE O's attribution stand (see CLOS
 what is retired is only the idea of fitting a static correction to it. Full derivation:
 `docs/session-log.md` SESSION 105–108 blocks.
 
+⭐⭐⭐ **AND THE COROLLARY THAT WAS NEVER STATED, ADDED s125: EVERY ONE OF THOSE FIVE EXCLUSIONS IS A
+*STATIC / LINEAR* EXCLUSION. A DYNAMIC MECHANISM HAS NEVER BEEN TESTED, AND THE EVIDENCE POINTS AT
+ONE.** Read the list again — *element*, *linear element*, *cap*, *constant*, *fixed linear network*.
+Nothing there rules out a stimulus-dependent mechanism, and *"its shape MIGRATES with stimulus"* is
+the **signature** of one, not a reason to stop. The project has already measured this and then let
+the summary line bury it: **GATE Q split A3's deficit into `L(f)` (rms 2.72 dB, a linear element
+could carry it) and `D(f)` (rms 3.01 dB, of which its own source says *"only a nonlinearity can
+carry it"*).** So a nonlinear target of **3.01 dB rms** has been sized since session 109 and appears
+on no work list. `kInputRef` (s109) was the first move in that direction and is the only constant
+ever to close an OD gate row. ⇒ **A3's honest status is "static excluded, dynamic UNTESTED"** — and
+its most likely carrier is open-work item 6's dynamic-sag candidate, which is stimulus-dependent by
+construction and sits in the OD path only, where A3 lives.
+
 ### Standing rules that must not be lost
 
 - ⚠⚠ **`analysis/captures/` is a recording of the NEURAL DSP plugin, not hardware.**
@@ -321,29 +416,40 @@ what is retired is only the idea of fitting a static correction to it. Full deri
   question (pot taper, divider end-stop, path-to-path balance) must be asked with a matched-pair,
   no-gain-match instrument (session 103's GATE K is the template) — the matrix must not be quoted
   as the arbiter of a level/law question, only of a shape/frequency one.
-- ⭐⭐ **THE HF REGION (8–16.3 kHz) IS ND'S OWN ARTEFACT, AND THIS IS NOW QUOTABLE FROM A PASSING
-  GATE, NOT A NARRATIVE.** `analysis/hf_artefact_gate.py` (GATE I, rebuilt session 114) passes on
-  every report from s91 to s113 (and beyond): at the hottest stimulus every one of the 15 pedal
-  conditions **gains** with frequency across the octave and every one of the model's **rolls off** —
-  complete separation, gap +17.44 dB/oct, with a monotone dose-response (a drive-generated artefact
-  must grow with stimulus; a fixed filter difference cannot). ⛔ **STOP AIMING MODEL WORK AT
-  8–16.3 kHz** — ~38% of the OD headline sits there and is not ours to fix (see THE RELEASE GATE's
-  fallback note above for the one condition under which this changes).
+- ⭐⭐ **THE HF REGION (8–16.3 kHz) IS DRIVE-GENERATED AND ON THE PEDAL'S SIDE — WHICH IS QUOTABLE
+  FROM A PASSING GATE. IT IS *NOT* ESTABLISHED AS ALIASING, AND IT IS *NOT* ESTABLISHED AS "not ours
+  to fix".** `analysis/hf_artefact_gate.py` (GATE I, rebuilt session 114) passes on every report from
+  s91 onward: at the hottest stimulus every one of the 15 pedal conditions **gains** with frequency
+  across the octave and every one of the model's **rolls off** — complete separation, gap
+  +17.44 dB/oct, with a monotone dose-response (a drive-generated mechanism must grow with stimulus;
+  a fixed filter difference cannot). ⚠ **That is the whole of it.**
+  ⛔⛔ **CORRECTED SESSION 125 — this entry previously read "IS ND'S OWN ARTEFACT" and ended "STOP
+  AIMING MODEL WORK AT 8–16.3 kHz… not ours to fix". Both halves overstate the gate they cite.**
+  GATE I's **G3 REFUTES** the `fs/(N+1)` fold mechanism at H2 (the excess is a smooth plateau —
+  13.5–19.5 kHz mean +15.07 dB, spread 0.73 dB — where a fold deposits a localised peak), and the
+  gate prints *"NOT claimed: that the region is ENTIRELY artefact"* and *"whether the gate should
+  still grade these bands is a **USER DECISION**, not this tool's."* Its docstring carries the user's
+  own session-89 instruction: ⛔ *"DO NOT dismiss this as 'ND aliasing' — that is not established and
+  it is not a reason to skip the band."* The prohibition was the exact move that instruction forbade.
+  ⇒ **Do not write "aliasing" for this region again without a measurement that names a mechanism.**
+  A broadband HF plateau that grows with drive is equally the signature of *harmonic generation the
+  model under-delivers* — and no hardware data exists above 6 kHz under drive to adjudicate. Open
+  work item 6 carries the live hypothesis.
 
 ### Uncommitted work
 
-⚠ **As of session 122, sessions 115–122 are uncommitted.** Run `git status --porcelain` for the
-live, authoritative list — do not transcribe it here (`rebuild-targets-dont-transcribe`; the old
-per-session "Uncommitted at session N" blocks were exactly this mistake, repeated 28 times, and are
-now archived verbatim in `docs/session-log.md`). Sessions 89–114 **are committed** (`df81360`).
+✅ **Sessions 89–122 are ALL COMMITTED** — `df81360` (89–114), `9a0b255` (115–122) and `f927208`
+(the doc-consolidation pass). Session 122's "sessions 115–122 are uncommitted" flag and its
+"flag to the user" note are **discharged**; nothing is owed there.
+
+✅ **Sessions 123–124 are COMMITTED** (one commit: session 123 built and measured ADAA, session 124
+shipped it on the user's decision — they are one change and were committed together). Run
+`git status --porcelain` for the live, authoritative state — do not transcribe it here
+(`rebuild-targets-dont-transcribe`; the old per-session "Uncommitted at session N" blocks were
+exactly this mistake, repeated 28 times, and are archived verbatim in `docs/session-log.md`).
 
 Regenerable/gitignored, not part of any commit decision: `analysis/reports/*.json`,
 `analysis/fit_logs/*.log`, `build/**`.
-
-▶ **Flag to the user, do not act unilaterally:** several sessions of work including multiple
-shipped-constant changes (`kOutputMakeup`, the MASTER PWL taper, the D1/D2 clamp window, the
-`rtsafe` solver) are uncommitted. Committing them would make this section — and the SHIPPED
-CONSTANTS table above — trivially maintainable going forward. That is the user's call.
 
 ## Project-specific carry-forwards
 

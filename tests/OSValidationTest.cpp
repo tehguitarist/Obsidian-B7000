@@ -91,12 +91,13 @@ static double goertzelMag(const std::vector<double>& x, double f, double fs)
 // Render a steady sine through a fresh PedalDSP at the given OS order; return the
 // output tail (transient discarded).
 static std::vector<double> renderSine(PedalChain::Params p, int order, double freq,
-                                      double amp, double fs, int nOut, double settleSec = 0.3)
+                                      double amp, double fs, int nOut, double settleSec = 0.3,
+                                      FitParams fit = FitParams{})
 {
     PedalDSP dsp;
     const int block = 256;
     dsp.prepare(fs, block);
-    dsp.setFitParams(FitParams{});   // shipped session-17 calibration (matches PluginProcessor)
+    dsp.setFitParams(fit);           // defaults to the shipped calibration (matches PluginProcessor)
     dsp.setFactorOrder(order);
     dsp.setParams(p);
 
@@ -155,16 +156,36 @@ int main()
         //    OS rate, so higher OS = less top-octave warp = a slightly different
         //    OD magnitude (dsp.md "Top-octave accuracy" — a WANTED accuracy gain,
         //    not a delay error). Informational; bounded, not factor-independent.
+        // ⚠⚠ SESSION 124 — THIS BLOCK RUNS WITH ADAA HELD UNIFORM ACROSS THE FOUR
+        // ARMS, AND THAT IS A CORRECTION, NOT A CONCESSION. The shipped build gates
+        // ADAA by OS factor (on at 1x/2x, off at 4x/8x — FitParams.h::clipAdaaMaxOs),
+        // which makes the OD path DELIBERATELY factor-dependent. This check asserts
+        // the opposite, so on the shipped defaults it fails: measured, the 200 Hz
+        // spread goes 0.078 -> 0.112 against a 0.1 bar, with 1x moving -0.033 dB, 2x
+        // -0.017, and 4x/8x BIT-UNMOVED — i.e. exactly the two gated factors moved.
+        // ⭐ The tempting repair is to widen the bar to 0.15. That is wrong: this bar
+        // is the ONLY delay-compensation proof in the suite, a stale delay line combs
+        // here, and a widened bar would silently absorb it. Instead, hold the
+        // INTENDED effect constant so the check measures only what it is for — the
+        // original 0.1 bar then survives untouched, which is the tell that this is a
+        // correction (measurement-discipline.md: "if the rebuilt test is harder than
+        // the one it replaces and still passes, it is a correction; if it is easier,
+        // it is a concession"). The ADAA policy gets its OWN assertion, below.
+        FitParams delayFit;
+        delayFit.clipAdaaMaxOs = 0; // ADAA off at EVERY factor => the only thing
+                                    // differing between arms is the OS/delay path.
+
         struct FreqCheck { double f; bool strict; };
         const FreqCheck freqs[] = {{80.0, true}, {200.0, true}, {600.0, false}, {1500.0, false}};
-        std::printf("  [delay-comp] BLEND=50%% magnitude (dB) across OS factors:\n");
+        std::printf("  [delay-comp] BLEND=50%% magnitude (dB) across OS factors"
+                    " (ADAA held OFF at all factors — see note):\n");
         std::printf("     freq      1x        2x        4x        8x     spread  (band)\n");
         for (auto fc : freqs)
         {
             double mag[4];
             for (int order = 0; order < 4; ++order)
             {
-                auto y = renderSine(p, order, fc.f, 0.3, fs, 1 << 15);
+                auto y = renderSine(p, order, fc.f, 0.3, fs, 1 << 15, 0.3, delayFit);
                 mag[order] = 20.0 * std::log10(goertzelMag(y, fc.f, fs) + 1e-30);
             }
             double lo = mag[0], hi = mag[0];
@@ -178,6 +199,52 @@ int main()
                       "LF BLEND=50% magnitude factor-independent (<0.1 dB → delay comp OK)");
             else
                 check(spread < 1.0, "HF spread stays bounded (<1 dB warp-accuracy gain)");
+        }
+    }
+
+    // ---- 1b. The ADAA OS-factor gate is LIVE, and reaches ONLY 1x/2x ---------
+    // Session 124. The gate is a shipped POLICY (FitParams.h::clipAdaaMaxOs = 2), and
+    // a policy that silently stops applying is the expensive kind of regression: the
+    // build keeps working, nothing fails, and the realtime alias reduction the user
+    // decided to enable just quietly disappears. So assert both halves against a
+    // control with ADAA disabled everywhere:
+    //   • 1x and 2x MUST differ from the control  (the gate is doing something)
+    //   • 4x and 8x MUST be BIT-IDENTICAL to it   (it is doing it only where intended)
+    // ⭐ The second half is the more valuable one — it is a free SCOPE check, and it
+    // is what distinguishes "ADAA is on at 1x/2x" from "ADAA is on and also leaking
+    // somewhere I did not look". Both are parameter-free: no threshold to argue about.
+    {
+        PedalChain::Params p;
+        p.blend = 1.0;   // pure OD — the clean tap would dilute the very difference
+        p.level = 1.0;   //           being measured (bleed-free, GATE K2's rule)
+        p.drive = 0.6;
+        p.master = 1.0;
+
+        FitParams shipped;             // clipAdaa = 1, clipAdaaMaxOs = 2
+        FitParams noAdaa = shipped;
+        noAdaa.clipAdaaMaxOs = 0;      // same build, gate disabled
+
+        std::printf("  [adaa-gate] shipped vs ADAA-off control, per factor"
+                    " (clipAdaa=%d, clipAdaaMaxOs=%d):\n",
+                    shipped.clipAdaa, shipped.clipAdaaMaxOs);
+        for (int order = 0; order < 4; ++order)
+        {
+            const int factor = 1 << order;
+            auto a = renderSine(p, order, 2499.0, 0.35, fs, 1 << 14, 0.3, shipped);
+            auto b = renderSine(p, order, 2499.0, 0.35, fs, 1 << 14, 0.3, noAdaa);
+
+            double worst = 0.0;
+            for (size_t i = 0; i < a.size() && i < b.size(); ++i)
+                worst = std::max(worst, std::abs(a[i] - b[i]));
+
+            const bool wantLive = (factor <= shipped.clipAdaaMaxOs);
+            const bool live = (worst != 0.0);
+            std::printf("     %dx  worst |shipped - control| = %.3e  -> %-9s (want %s)\n",
+                        factor, worst, live ? "ADAA ON" : "identical",
+                        wantLive ? "ADAA ON" : "identical");
+            check(live == wantLive,
+                  wantLive ? "ADAA gate is LIVE at this factor (1x/2x)"
+                           : "ADAA gate is INERT at this factor (4x/8x) — bit-identical to control");
         }
     }
 
@@ -215,8 +282,8 @@ int main()
         const double settleSec = 4.0;    // 18 tau of the 0.72 Hz output high-passes
 
         // Returns { alias/signal dB, LF-bucket/signal dB }.
-        auto aliasFloorDb = [&](int order, double amp) {
-            auto y = renderSine(p, order, f0, amp, fs, fftN, settleSec);
+        auto aliasFloorDb = [&](int order, double amp, FitParams fit = FitParams{}) {
+            auto y = renderSine(p, order, f0, amp, fs, fftN, settleSec, fit);
             juce::dsp::FFT fft(fftOrder);
             std::vector<float> fd((size_t) fftN * 2, 0.0f);
             for (int i = 0; i < fftN; ++i)
@@ -269,6 +336,55 @@ int main()
         // +0.1 to +0.5 dB. The intent of this check is "4x is not MATERIALLY worse
         // than 2x", and 1.0 dB expresses that without flagging a strict improvement.
         check(a4 <= a2 + 1.0, "4x aliasing floor no worse than 2x (1 dB tol)");
+
+        // ---- what the shipped ADAA policy actually BUYS, in-chain (session 124) --
+        // Test 1b proves the gate is live and correctly scoped; it says nothing about
+        // whether the thing it enables is worth enabling. This does, on the FULL
+        // PedalDSP chain — an instrument sharing no machinery with GATE X
+        // (analysis/clip_adaa_gate.py), which is what makes the agreement below
+        // evidence rather than a restatement.
+        //
+        // ⚠ Assert the SIGN, print the SIZE. A "must improve by >= N dB" bar would be
+        // a number I guessed (measurement-discipline.md: a threshold you guessed is
+        // not a guard), and the benefit is legitimately amplitude-dependent — so the
+        // guard is "the shipped policy is not WORSE than not having it", which is
+        // parameter-free and still catches a regression that inverts the policy's
+        // value. The column is printed so the size stays visible and quotable.
+        //
+        // ⭐ The DOSE-RESPONSE is the real validity check, and it is free: ADAA1's
+        // benefit should GROW with drive, because a harder-driven node W steps further
+        // between samples and so crosses more of the knee per sample (Clipper.h
+        // setADAA's in-chain dw/knee table). A fixed filter difference could not do
+        // that. Measured at session 124, amp -> benefit:
+        //     0.05 -2.2 | 0.10 +0.6 | 0.20 -4.2 | 0.35 -15.1 | 0.50 -20.3 | 0.70 -20.1
+        // ⚠ Quote that as a TREND, not a monotone law — amp 0.10 costs +0.6 dB and
+        // 0.70 is fractionally behind 0.50, so it is neither monotone nor uniformly a
+        // win, and saying "rises monotonically" (as this comment first did, before the
+        // table was read back) would be an overclaim of exactly the kind this project
+        // keeps paying for. What IS supported: the benefit is small-to-negative at low
+        // drive and 15-20 dB at the drive levels that matter.
+        // ⭐ Corroboration worth more than the trend: GATE X's independent harness read
+        // -12.6 / -19.8 dB at amps 0.35 / 0.70 against this instrument's -15.1 / -20.1
+        // — two instruments sharing no machinery, agreeing to ~2.5 dB.
+        {
+            FitParams noAdaa;
+            noAdaa.clipAdaaMaxOs = 0;
+            std::printf("  [adaa-benefit] 2x alias/signal, shipped vs ADAA-off control"
+                        " (negative = ADAA better):\n");
+            for (double a : { 0.05, 0.1, 0.2, 0.35, 0.5, 0.7 })
+            {
+                const double on = aliasFloorDb(1, a).first;
+                const double off = aliasFloorDb(1, a, noAdaa).first;
+                std::printf("      amp %.2f :  off %+6.1f   on %+6.1f   benefit %+6.1f dB\n",
+                            a, off, on, on - off);
+            }
+            const double onGate = aliasFloorDb(1, gateAmp).first;
+            const double offGate = aliasFloorDb(1, gateAmp, noAdaa).first;
+            std::printf("  [adaa-benefit] at gate amp %.2f: %+.1f -> %+.1f dB (%+.1f)\n",
+                        gateAmp, offGate, onGate, onGate - offGate);
+            check(onGate <= offGate,
+                  "shipped ADAA policy does not worsen the 2x alias floor");
+        }
     }
 
     if (failures == 0) std::printf("OSValidationTest: PASS\n");

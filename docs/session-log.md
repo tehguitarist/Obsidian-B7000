@@ -12872,6 +12872,513 @@ unchanged.**
    not exist.
 
 
+---
+
+⭐⭐⭐ **SESSION 123 — PHASE 10 B's HEAD ITEM: ADAA ON THE CD4049 VTC IS BUILT, AND IT REQUIRED
+REFUTING A PREMISE THAT HAD STOOD IN THREE SOURCE FILES SINCE SESSION 6. MEASURED: 12.6–19.8 dB OF
+MEDIAN ALIAS-FLOOR IMPROVEMENT OVER 19 TONES AT THE REALTIME OS FACTORS (1×/2×), COLLAPSING TO
+0.5–4.6 dB AT 8×. IT SHIPS **OFF**, BECAUSE IT IS EXACT ONLY AT `clipK == 2` AND THE SHIPPED
+`clipK` IS 2.4653 — SO TURNING IT ON IS A FIT DECISION AND IS THE USER'S CALL.**
+
+⛔⛔ **THE PREMISE THAT HAD TO FALL FIRST.** `PedalChain.h`'s anti-aliasing block and
+`FitParams.h`'s `clipK` note both asserted that the CD4049 VTC "lives INSIDE an implicit RC-coupled
+shunt-feedback loop solved per-sample by Newton on node W (it is **NOT** a memoryless function of one
+input), so the Esqueda 1st-order ADAA form does not apply — state-space ADAA would be needed". That
+conflates the **STAGE** with the **NONLINEARITY**. ADAA1's derivation needs only (a) a memoryless map
+and (b) an argument that is ~linear between samples; `vtc` is a memoryless map from node W, and W is
+an ordinary signal inside the discretisation. Nothing in the derivation requires W to be the stage's
+input. ⭐ And the topology makes the substitution **self-consistent rather than a hack**: node-W KCL
+forces W to be a *linear* combination of x and y, so every harmonic in W arrives via y — substituting
+the averaged value INSIDE the solve antialiases W too, at no extra cost. Substituting it only at the
+output would leave the solve and the emitted sample disagreeing about the feedback current, which is
+the session-118 defect one level down (a corrupted C14 companion state).
+
+⭐ **WHAT SHIPPED (all default-OFF, `src/` behaviour bit-identical):** `Clipper::Adaa{Off,Full,Residue}`
++ `setADAA()`, the exact antiderivative `vtcAD()`, the stateless `vtcAvg()`, an ADAA-specific bracket,
+`FitParams::clipAdaa`, `--fit clipAdaa=N` on `OfflineRender`, `ClipperTest` Test 8 (5 sub-gates), and
+`analysis/clip_adaa_gate.py` (**GATE X**, 6 sub-gates). Reports: `s123_clip_adaa.json`,
+`s123_clip_adaa_f0.json`.
+
+⭐⭐ **ACCEPTANCE, IN THE RIGHT ORDER — BIT-IDENTITY *THEN* THE MUTATION CONTROLS.** `Off` mode is
+**bit-identical at all four OS factors** against a binary rebuilt from HEAD (`git stash`, rebuild,
+render, restore). On its own that check is worthless — it also passes for a flag that never reaches
+the stage — so both directions were then gated: at `clipK=2` the flag **changes** the render
+(worst 8.5e-01), and at the shipped `clipK` it is **exactly inert** (0.0e+00), which verifies
+`adaaExact()`'s documented k-gating rather than assuming it. `--fit clipAdaa=3` refuses (rc 2) instead
+of clamping to Off, which would have read as "ADAA bought nothing".
+
+⛔⛔ **MY OWN `Residue` MODE IS REFUTED BY THE GATE'S COST COLUMN, AND IT IS THE MOST TRANSFERABLE
+THING IN THE SESSION.** The idea: averaging the LINEAR part of the VTC buys no antialiasing (a linear
+map makes no new frequencies) and does cost a 2-point average, |H| = cos(pi f/fs_os), inside a
+feedback path with loop gain a0 ≈ 25 — so average only `g(w) = vtc(w) + a0*w` and keep the linear term
+pointwise. The diagnosis is right and **the remedy is wrong**: it evaluates the two halves of ONE map
+half a sample apart. Algebraically `Residue = Full − 0.5*a0*(w − wPrev)`, i.e. a **first difference
+carrying gain a0/2**, and `|0.5*a0*(1 − z⁻¹)|` reaches **a0 exactly at Nyquist at every OS rate** —
+a perturbation the size of the entire loop gain, precisely where node W's fast transitions live.
+Measured: the Residue arm's H1 runs **+13.4 dB hot** (82.28 vs 68.86 dB at amp 0.35 / 1×) and its
+alias floor is **14.4 dB worse than Full's**; `ClipperTest` (e) shows its max|y| falling
+15.72 → 9.15 → 5.35 → 3.10 V as fs doubles, exactly the 1/fs scaling of that term, on an independent
+instrument. `Full`'s cost over the same grid is **0.01 dB of harmonic power and 0.2 dB of H2/H1** —
+so the 2-point average Residue exists to avoid is not worth avoiding.
+⭐ **GENERAL: when a nonlinearity is split into parts for separate treatment, every part must be
+evaluated over the SAME interval. A half-sample misalignment between two terms of one map is a
+differentiator, not a detail.** ⚠ Corollary for the J201's flagged 1× ADAA degeneracy
+(`PedalChain.h`, dsp-validator 2026-07-22): "split the map" is **not** the fix there either — gating,
+or accepting the cos rolloff, is.
+
+⭐⭐⭐ **THE HEADLINE, AND IT IS AN f0 SWEEP, NOT A SINGLE TONE.** GATE X's X3 is n = 1 in frequency,
+and session 121 had already measured that the *sign* of an aliasing change is not uniform across
+tones even when its median is. Over `alias_gate.SWEEP_KS` (21 bin-exact tones, **19 usable — the 2
+degenerate ones at 1500/3000 Hz are detected from the reading, not a hardcoded list, and excluded
+with the count printed**), `Full` vs its own `k2_off` baseline:
+
+| | 1× | 2× | 4× | 8× |
+|---|---|---|---|---|
+| **amp 0.35** median | **−19.50** | **−12.57** | −2.38 | −4.62 |
+| improved | 18/19 | 16/19 | 13/19 | 17/19 |
+| worst (cost) | +1.96 | +3.33 | **+9.88** | +0.73 |
+| **amp 0.70** median | **−18.74** | **−19.75** | −8.71 | −0.50 |
+| improved | 18/19 | 17/19 | 17/19 | 12/19 |
+| worst (cost) | +2.53 | +3.23 | +2.81 | **+17.33** |
+
+⇒ **strong and consistent at 1×/2× (12.6–19.8 dB median, 84–95 % of tones improved, worst case
+≤ +3.3 dB); weak and two-sided at 4×/8×.** ⚠ Read the `worst` column: ADAA **costs** in 24 of 152
+cells, and every one of those cells has a baseline already better than **−43.9 dB**. Worst single
+cell: amp 0.70 / 8× / f0 3999 Hz, −65.92 → −48.59 dB.
+
+⛔ **AND A TIDY HYPOTHESIS OF MINE DIED HERE — RECORD IT SO IT IS NOT RE-INVENTED.** The worst-3
+tones per cell all land near −48 dB whatever their baseline, which looks exactly like "ADAA1 imposes
+its own ≈ −48 dB alias floor: a big win above it, a loss below". **Refuted by the full spread**: the
+`k2_full` column's own range is 51–84 dB, as wide as `k2_off`'s, so there is no universal floor. What
+survives is weaker and honest — `corr(baseline floor, benefit) = −0.540` (n = 152) plus the hard
+boundary above. The story was read off a **selected subset** (`self-selecting-scores`), and the
+selection was the worst-N table I had printed to characterise the cost.
+
+⭐⭐ **MECHANISM, MEASURED IN-CHAIN AND THEN SPLIT BY RATE.** Temporary instrumentation in
+`Clipper::process`, driven by `OSValidationTest`'s real `PedalDSP` (23.25 M clipper samples; added,
+measured, **reverted**). The VTC's full knee width is `2*satLo/a0` = **0.0352 V**; node W's
+per-sample step is:
+
+| rate | n | mean\|dw\| | max\|dw\| | mean/knee | frac(\|dw\|>knee) | meanIter |
+|---|---|---|---|---|---|---|
+| 2× 96k | 3.29 M | 0.2026 V | 1.895 V | **5.76×** | **56.9 %** | 3.125 |
+| 4× 192k | 6.59 M | 0.0999 V | 1.263 V | 2.84× | 44.7 % | 2.974 |
+| 8× 384k | 13.2 M | 0.0498 V | 0.804 V | 1.42× | 33.1 % | 2.860 |
+
+⇒ at the shipped realtime 2×, the argument steps **further than the whole knee on 57 % of samples**.
+That is ADAA1's best case and oversampling's worst, and `mean/knee` falling 5.76 → 1.42 over these
+rates is an **independent corroboration of GATE X's measured ordering**, on an instrument sharing
+nothing with the alias metric. ⭐ It also kills the obvious shortcut: a 2-point Gauss–Legendre mean
+(which would have sidestepped the whole `clipK` problem, since it needs no antiderivative) straddles
+the entire nonlinearity and averages two saturated values.
+⚠ **Do NOT read the 1× row across to these** — n = 189 k, `OSValidationTest` drives 1× at a different
+stimulus mix, and it breaks the 1/fs scaling the other three hold to 1 %.
+
+⭐ **ctest 17/17 throughout**, including new `ClipperTest` Test 8: `dV/dw == vtc` to 5.8e-10 over
+w ∈ [−4, +4], `V(0) = 0` exactly (ADAA1 exact at DC), the mean → pointwise first-order in dw,
+strict monotonicity of the substituted map (which is what keeps session 120's bracket valid), the
+k-gating both ways, and finiteness/boundedness at all four rates.
+
+⚠⚠ **TWO DEFECTS IN THIS SESSION'S OWN TEST, BOTH THE PROJECT'S OWN DOCUMENTED TRAPS:**
+**(i)** sub-gate (b) first used a flat `1e-4` bar and "FAILED" at **1.244e-3** — which is `a0*dw/2`
+to three figures at dw = 1e-4, i.e. the mean-value theorem, not a defect. *A tolerance a correct
+implementation cannot meet is a broken test*; it now gates the **scaling law** (`err <= a0*dw`) and
+reads 0.500 of bound, which is the MVT value and therefore a real check.
+**(ii)** sub-gate (d) printed `Clipper().probeAdaaExact()` and labelled it "shipped" — but
+`Clipper()` default-constructs at `kHardness = 2.0`, so it reported `1` for a stage that had never
+been told the fit. **That is the session-118 defect (a per-stage test answering about the NOMINAL
+build while claiming the shipped one) reproduced inside the test written to guard against it.**
+
+⚠ **AND THREE PROCESS SLIPS WORTH THE LINE:** the zsh array trap fired again (**6th occurrence** —
+`$COMMON` arrived as one argv, all four renders exited rc = 2, and the comparisons then printed
+confident verdicts off absent files); **two consecutive throwaway probes were vacuous** because I
+guessed at `s120_newton.json`'s key (`records` → 0 rows) and then at the harness's matrix membership
+(`CAPTURE_MATRIX` is one tier of 51, not the graded 172) — in both cases the output was absurd enough
+to catch, but the fix is to make the artefact state its own membership rather than infer it; and I
+instrumented `Clipper.h` **while a matrix render was in flight**, which is the documented
+never-relink-mid-run hazard — mitigated by building ONLY `OSValidationTest` and verifying
+`OfflineRender`'s mtime was unchanged before and after (11:01:57 both times).
+
+⚠ **MEMBERSHIP — A FALSE ALARM, RESOLVED, AND THE RESOLUTION IS WORTH THE LINE.** The render log
+reports **172** where the baseline says 162, which reads as exactly the trap
+`aggregate-moved-check-membership-first` warns about, so both k-arms were rendered on the current
+inventory rather than diffing against `s120_newton.json`. Measured after the fact: **172 is the
+ATTEMPTED inventory and 162 the GRADED one** — the 10-capture gap is the `_gain-n18` set failing on
+the missing `_GAIN_SESSION_MEASURED_DB[-18]` entry, which is open-work item 8 and was already known.
+`set(s123_k2) == set(s120_newton)` is **True** at 162. ⇒ the alarm was unfounded and the check was
+still right: a render's own log line counts what it tried, not what it graded, and only the report's
+capture list answers the membership question. ⭐ The arm-vs-arm control (`s123_kship_control.json`,
+`--fit clipK=2.4653` passed explicitly so neither arm takes a default path) is kept anyway, because
+it additionally controls for the binary having moved between s120 and now — run **sequentially**,
+since two concurrent `comprehensive_report` runs share the render cache directory.
+
+⭐⭐⭐ **AND THE PRICE OF THE `clipK` RE-ANCHOR IS MEASURED ON THE FULL MATRIX, NOT INFERRED: IT IS
+FREE TO WITHIN ±0.04 dB ON EVERY GATED ROW, WITH NO VERDICT CHANGE.** Two 162-capture renders on the
+current inventory, identical membership, `n` identical on all 14 gated rows:
+`s123_kship_control.json` (`--fit clipK=2.4653`) vs `s123_k2.json` (`--fit clipK=2.0`).
+
+⭐ **The control is also a KNOWN ANSWER, and it passes to every printed digit:** rendered from the
+session-123 binary with the shipped `clipK` passed explicitly, it reproduces `s120_newton.json`
+(session-120 binary, no override) exactly — OD band-RMS **1.959**, OD 100 Hz–8 kHz median **0.480**,
+THD full-send **3.523**, **6 rows over SHIP**. That confirms on the WHOLE MATRIX what the 4-render
+spot check only sampled: session 123's `Off` path is identical to session 120's, and `--fit
+clipK=2.4653` is the default.
+
+| gated row | k=2.4653 | k=2.0 | Δ | bar | verdict |
+|---|---|---|---|---|---|
+| CLEAN 100 Hz–8 kHz median / p90 | 0.221 / 0.732 | 0.221 / 0.732 | **+0.000** | 0.30 / 0.80 | SHIP → SHIP |
+| CLEAN 8–16.3 kHz median / p90 | 0.340 / 1.289 | 0.340 / 1.289 | **+0.000** | 0.40 / 1.40 | SHIP → SHIP |
+| OD 25–100 Hz median / p90 | 0.933 / 4.653 | 0.930 / 4.631 | −0.003 / −0.022 | 0.70 / 2.50 | over → over |
+| OD 100 Hz–8 kHz median / p90 | 0.480 / 3.630 | 0.475 / 3.583 | −0.005 / −0.047 | 0.50 / 2.00 | STRETCH / over (same) |
+| OD 8–16.3 kHz median / p90 | 0.636 / 6.372 | 0.642 / 6.374 | +0.006 / +0.002 | 0.70 / 2.50 | SHIP / over (same) |
+| OD ALL band-RMS | 1.959 | **1.947** | **−0.012** | 2.00 | SHIP → SHIP |
+| OD ALL p99 | 10.348 | **10.278** | **−0.070** | 4.00 | over → over |
+| THD level, full send | 3.523 | 3.561 | **+0.038** | 3.00 | over → over |
+| THD level, gain-n12 | 1.756 | 1.665 | −0.091 | 3.00 | STRETCH → STRETCH |
+
+⇒ **k = 2 is BETTER on 8 rows, worse on 3, and unmoved on all four CLEAN rows** (expected — the
+clipper is OD-only, so an unchanged CLEAN is a free scope check that the constant reached only what it
+should). The single cost above 0.01 dB is **THD full-send +0.038 dB on a row already over its bar by
+0.52**. Both headline OD rows *improve*. ⇒ **the fit objection to re-anchoring `clipK` does not
+survive contact with the matrix**; what remains is a decision, not a trade-off.
+⚠ Do NOT read this as "k = 2 is a better fit" — the movements are far inside the spread of anything
+this project treats as significant, and the honest statement is *indistinguishable, with a rounding
+preference*. The reason to prefer k = 2 is the ADAA and the `pow()` fast path, not the ledger.
+
+▶ **NEXT — item 1 is no longer "do ADAA"; it is "decide whether to enable it", and that needs the
+user.**
+1. ⚠⚠ **USER DECISION: enabling ADAA requires re-anchoring `clipK` 2.4653 → 2.0, a FITTED constant
+   (session-44 A5) — and the matrix says that re-anchor is free (table above).** So the decision is
+   no longer "is it worth the fit cost" but "do we want ADAA's realtime alias reduction, given it
+   ships off today". Benefit 12.6–19.8 dB median at 1×/2×; cost ±0.04 dB on the gated ledger, no
+   verdict change, CLEAN bit-unmoved.
+2. ⭐ **If ADAA is enabled, gate it BY OS FACTOR.** The measurement supports ON at 1×/2× (median
+   −12.6…−19.8 dB, worst +3.3) and OFF at 4×/8× (median −0.5…−8.7, worst +9.9/+17.3). The
+   architecture already re-prepares the OD region on every factor change (`PedalChain::prepareOd`),
+   so this is a one-line policy, not new machinery. ⛔ Do not enable it flat across all factors on
+   the strength of the 2× number.
+3. ⚠ **`clipK = 2` ALSO closes open-work item 3 (the `pow()` perf path)** — `sig()`/`sigDeriv()`'s
+   `k == 2.0` fast path is exactly what the shipped 2.4653 misses, and two `pow()` calls per Newton
+   F-evaluation dominate the clipper's 356 ns/sample. So items 1 and 3 are ONE decision, and the
+   perf win is a second, independent reason to price the re-anchor.
+4. ⚠ **If `clipK` stays at 2.4653, ADAA needs a general-k primitive to be usable at all** —
+   `sigma_k`'s is an incomplete beta function, so the route is a Chebyshev fit of
+   `psi(u) = Phi(u) − u` on `t = u/(1+u)` (bounded, smooth, `psi → A`). ⛔ NOT quadrature: the
+   in-chain `dw`/knee table above rules it out.
+5. Items 2 and 5–9 of the session-122 list are unchanged.
+
+## SESSION 124
+
+⭐⭐⭐ **THE USER TOOK SESSION 123's DECISION: ADAA IS ENABLED, GATED BY OS FACTOR, AND `clipK` IS
+RE-ANCHORED 2.4653 → 2.0.** Both halves of session 123's item 1 shipped together, because they are
+one change: the antiderivative is elementary only at k = 2, so ADAA cannot be enabled without the
+re-anchor, and the re-anchor is what restores the `pow()` fast path (session-122 item 3). Two open
+items close on one decision.
+
+**Shipped (`src/dsp/FitParams.h`):**
+
+| constant | was → now | why |
+|---|---|---|
+| `clipK` | 2.4653 → **2.0** | the ADAA anchor; price measured on the matrix FIRST (below) and it is free |
+| `clipAdaa` | 0 (Off) → **1 (Full)** | Residue was refuted in s123 — see the stale-comment note below |
+| `clipAdaaMaxOs` | *(new)* → **2** | the OS-factor gate: ADAA on at 1×/2×, off at 4×/8× |
+
+⚠ **THE `clipK` RE-ANCHOR IS "INDISTINGUISHABLE, WITH A ROUNDING PREFERENCE" — NOT "A BETTER FIT",
+AND THE DISTINCTION IS LOAD-BEARING.** `s123_k2.json` vs `s123_kship_control.json` (162 captures,
+identical membership, `n` identical on all 14 gated rows) has k=2 better on 8 rows, worse on 3, and
+**bit-unmoved on all four CLEAN rows**; both headline OD rows improve (band-RMS 1.959 → 1.947, p99
+10.348 → 10.278); the only cost above 0.01 dB is THD full-send +0.038 dB on a row already over by
+0.52. **Six rows over SHIP either way — no verdict changes.** The reasons to prefer 2.0 are ADAA and
+the `pow()` fast path; anyone quoting the 1.947 as evidence of accuracy has misread this.
+
+⭐⭐ **THE OS GATE IS A MEASURED POLICY, AND THE NUMBER THAT MAKES IT A POLICY IS THE *WORST* COLUMN,
+NOT THE MEDIAN.** GATE X X6, Full vs its own k=2 baseline, 19 usable bin-exact tones per cell:
+
+| OS | median (amp .35 / .70) | worst tone | improved |
+|---|---|---|---|
+| 1× | −19.50 / −18.74 | +1.96 / +2.53 | 95 % / 95 % |
+| 2× | −12.57 / −19.75 | +3.33 / +3.23 | 84 % / 89 % |
+| 4× | −2.38 / −8.71 | **+9.88** / +2.81 | 68 % / 89 % |
+| 8× | −4.62 / −0.50 | +0.73 / **+17.33** | 89 % / 63 % |
+
+⇒ at 1×/2× a large median win with the worst case bounded at +3.3 dB; at 4×/8× the median collapses
+**and** the tail turns expensive. ⚠ It is **not monotone in OS** (8× beats 4× at amp .35 and loses
+badly at .70), so the honest statement is *"1×/2× win, 4×/8× are a coin-toss with a bad tail"*, not
+*"benefit decreases with rate"* — the gate buys the top two rows and declines the bottom two.
+
+⭐⭐⭐ **THE POLICY MUST BE RESOLVED FROM TWO *STORED* VALUES, NOT SET IN EITHER SETTER — BECAUSE THE
+TWO PRODUCTION CALLERS SET THEM IN OPPOSITE ORDERS.** `OfflineRender` does prepare → `setFactorOrder`
+→ `setFitParams`; `PluginProcessor` does prepare → `setFitParams` → `setFactorOrder`. An `if` inside
+either setter alone is therefore silently correct in one caller and wrong in the other — and the
+wrong one fails *quietly*, as "ADAA didn't seem to do anything in the plugin" with every test green.
+`PedalChain::applyAdaaPolicy()` reads both stored values and is called from both. ⭐ GENERAL: when a
+behaviour depends on two independently-set pieces of state, resolve it from the state, never at one
+of the write sites; and go and *read both call sites' orders* rather than assuming they agree.
+
+⚠⚠ **A STALE COMMENT SURVIVED ITS OWN REFUTATION BY ONE SESSION, INSIDE THE FILE THAT DEFINES THE
+CONSTANT.** `FitParams.h`'s `clipAdaa` block described mode 2 (Residue) as *"the one to prefer"*.
+Session 123 built Residue, measured it, and **refuted** it (it injects a first difference of gain
+`a0/2`, reaching the full loop gain at Nyquist: H1 +13.4 dB hot, alias floor 14.4 dB worse than
+Full) — writing that into `Clipper.h::setADAA` and the CLAUDE.md CLOSED/REFUTED table, but not into
+the enum's own description. A session reading only that block would have shipped the refuted mode
+believing it was the recommended one. Corrected, with the refutation now stated at the enum.
+⭐ This is `verify-the-PREMISE-not-the-prior-session's-framing-of-it` at its shortest range yet: one
+session, same file. **When a mode is refuted, fix the line that ENUMERATES it, not only the line
+that analyses it.**
+
+### Two tests failed, and neither was a code defect — both were premises the change inverted
+
+⭐⭐⭐ **`ClipperTest` (d) BOUND A CLAIM ABOUT *k* TO WHATEVER HAPPENED TO BE *SHIPPED*.** It took its
+non-anchor arm from `fp.clipK` and its anchor arm from a literal `2.0`, asserting "inert at SHIPPED,
+live at k=2". Re-anchoring made the two arms the same value, so the test demanded one render be
+simultaneously inert and live, failed against correct code, and printed a message that **could not be
+true** (`clipK=2.0000 ... must be INERT`). Repaired by naming both exponents as constants — the
+property is a property of the exponent and does not care what ships. ⭐ And the shipping question was
+**not** deleted: it became its own assertion (*is the shipped `clipK` the ADAA anchor?*), which is a
+real claim that should fail loudly if a future re-fit moves `clipK` off 2.0 and silently kills ADAA.
+Two questions, two assertions. (Same family as the session-118 note already in that block.)
+
+⭐⭐⭐ **`OSValidationTest`'s DELAY-COMP CHECK ASSERTS FACTOR-INDEPENDENCE OF A PATH THE SHIPPED POLICY
+NOW DELIBERATELY MAKES FACTOR-DEPENDENT — AND THE FIX IS NOT TO WIDEN THE BAR.** The 200 Hz spread
+went 0.078 → **0.112** against a <0.1 bar. Attributed by varying each cause alone (the "two named
+causes" rule): k=2.4653+ADAA off → 0.079; k=2.0+ADAA off → **0.078** (the re-anchor contributes
+nothing); shipped → 0.112. So the OS gate is the whole cause, **by design**. The per-factor signature
+settles it: 1× moved −0.033 dB, 2× −0.017, and **4×/8× were bit-unmoved** — exactly the two gated
+factors moved and exactly the two ungated ones did not, which is a free scope check that the gate
+reached only what it should. ⭐ The tempting repair — widen to 0.15 — is the concession
+`measurement-discipline.md` warns about: this bar is the **only** delay-compensation proof in the
+suite, a stale delay line combs exactly here, and a widened bar would silently absorb it. Instead the
+block now holds the INTENDED effect constant (`clipAdaaMaxOs = 0` across all four arms) so it
+measures only what it is for, and **the original 0.1 bar survives untouched** — the tell that this is
+a correction and not a concession.
+
+⭐⭐ **TWO NEW GUARDS FELL OUT OF THAT, AND BOTH ARE PARAMETER-FREE.**
+- **Test 1b — the gate is LIVE and correctly SCOPED.** Against an ADAA-off control: 1×/2× must
+  differ, 4×/8× must be **bit-identical**. Measured `8.563e-02 / 2.057e-02 / 0.000e+00 / 0.000e+00`.
+  The second half is the more valuable one — it distinguishes "ADAA is on at 1×/2×" from "ADAA is on
+  and also leaking somewhere I did not look". A shipped *policy* that silently stops applying is the
+  expensive kind of regression: nothing fails, and the reduction the user chose just disappears.
+- **The benefit, in-chain.** Test 1b proves the gate works; it says nothing about whether the thing
+  it enables is worth enabling. Measured on the full `PedalDSP` chain at 2×, alias/signal:
+
+  | amp | 0.05 | 0.10 | 0.20 | 0.35 | 0.50 | 0.70 |
+  |---|---|---|---|---|---|---|
+  | benefit (dB) | −2.2 | **+0.6** | −4.2 | −15.1 | −20.3 | −20.1 |
+
+  ⚠ **Quote that as a TREND, not a monotone law.** My own first draft of the comment said "rises
+  monotonically"; amp 0.10 *costs* +0.6 dB and 0.70 is fractionally behind 0.50. Caught by reading
+  the table back against the sentence. What is supported: small-to-negative at low drive, 15–20 dB at
+  the drive levels that matter. ⭐ **The corroboration is worth more than the trend:** GATE X's
+  harness — which shares no machinery with this one (different f0, different metric construction, its
+  own render path) — read −12.6 / −19.8 dB at amps 0.35 / 0.70 against this instrument's
+  −15.1 / −20.1. Two independent instruments agreeing to ~2.5 dB.
+  ⚠ The guard asserts the **sign** and prints the **size**: a "must improve by ≥ N dB" bar would be a
+  number I guessed, and the benefit is legitimately amplitude-dependent.
+
+⭐⭐ **THE GATE LANDS ON THE PLUGIN'S OWN DEFAULTS — CHECKED, NOT ASSUMED, AND IT IS WHAT MAKES THE
+POLICY WORTH HAVING.** `PluginProcessor`'s `oversampling` choice defaults to index 1 = **2×** (the
+realtime path) and `render_oversampling` to index 3 = **8×** (offline bounce). So out of the box the
+realtime path gets ADAA — exactly where the alias floor is worst and CPU is scarcest — and the
+offline render does not, because at 8× oversampling has already taken the floor to −63 dB and ADAA1's
+residual is all that would be left to pay. ⇒ this is not "a feature that happens to be on at some
+settings"; it is on at the setting nearly every user runs, and off at the one where it would only
+cost. ⚠ **The policy's value is tied to those two defaults** — moving the realtime default to 4×
+would silently switch ADAA off for everyone, which is worth knowing before anyone changes it.
+⭐ The check was cheap and I nearly skipped it: had the realtime default been 4×, the whole enable
+would have been near-moot for real users while every measurement in this session stayed true.
+**A policy keyed on a setting is only as good as that setting's default — go and read the default.**
+
+⭐ **`clipAdaaMaxOs` IS A KNOB RATHER THAN A HARDCODED `if` FOR ONE REASON: GATE X's 4×/8× ARMS NEED
+TO FORCE ADAA ON.** With the gate hardcoded, those arms would measure *the gate* instead of *the
+mechanism* and report "ADAA bought nothing at 8×" — true of the shipped policy and false of the thing
+under test. Pass `--fit clipAdaaMaxOs=8`. `OfflineRender` refuses any value outside {0,1,2,4,8}
+rather than clamping, for the same reason `clipAdaa` refuses, and now prints it in the fit report so
+a render's provenance records the policy it ran under.
+
+### Acceptance: the baseline move carries a KNOWN ANSWER, and it was measured
+
+**`analysis/reports/s124_ship.json`** (162 captures, `--os 8`, shipped defaults, no `--fit`
+overrides) is the new baseline. ⭐ **It reproduces `s123_k2.json` BIT-IDENTICALLY — 0 differing
+values across 202,001 numeric leaves.** That is a real known answer and it certifies two separate
+things at once:
+- **the constant reaches the DSP as a DEFAULT exactly as it did as an override** — `s123_k2.json`
+  was rendered with an explicit `--fit clipK=2.0` against the old default, `s124_ship.json` with no
+  override against the new one (session 100's "render with the new defaults and with the explicit
+  `--fit` list, require bit-identity" check, which catches a value transcribed into the wrong field
+  or a flag that never reaches the stage);
+- **the OS gate is genuinely OFF at 8×** — `s123_k2.json` had ADAA off, so any leakage of ADAA into
+  an 8× render would have shown up here as a difference.
+⚠ **Corollary that must travel with the baseline: THE MATRIX CANNOT SEE THE ADAA CHANGE AT ALL**, by
+construction, because it renders at 8× where the gate disables it. Do not quote a matrix number as
+evidence for or against ADAA in either direction. ADAA's evidence is GATE X plus `OSValidationTest`'s
+in-chain benefit block, both at 1×/2×.
+
+**Release gate: 6 rows over SHIP, unchanged** (OD 100 Hz–8 kHz p90, OD 25–100 Hz median/p90, OD
+8–16.3 kHz p90, OD p99, THD level full-send). **ctest 17/17.**
+
+⚠ **The comparison instrument was itself gated before being believed** — it is a fresh script, so it
+was run against a known answer (`s123_kship_control.json` vs `s120_newton.json`, which CLAUDE.md
+records as agreeing "to every printed digit": measured **0 differing of 202,001**, i.e. bit-identical,
+a stronger statement than the record) and against a mutation control (`s123_k2.json` vs
+`s123_kship_control.json`: **66,852 differing**, worst 329.91). A diff tool that reports "identical"
+is worthless until it has been shown capable of reporting "different".
+
+⚠⚠ **PROCESS DEFECT, MINE, SECOND OCCURRENCE OF A DOCUMENTED RULE — `measurement-discipline.md`'s
+"NEVER REBUILD THE RENDER BINARY WHILE A MATRIX RENDER IS IN FLIGHT".** I ran `cmake --build` to
+check that a **comment-only** edit to `FitParams.h` compiled, while the first matrix render sat at
+~124/172. `FitParams.h` is included by `offline_render.cpp`, so the binary relinked mid-run and split
+the run's cache entries across two binary signatures. ⭐ The mechanism worth naming is that the two
+activities *feel unrelated* — "check my doc edit compiles" does not feel like "touch the render
+pipeline" — and a background job is invisible while you work; the rule's own words (*"not even for a
+comment-only edit"*) already covered it. Remedy applied exactly as the entry prescribes rather than
+reasoning that a comment cannot matter: the mixed-binary report was kept as
+**`s124_ship_mixedbin.json`**, the run repeated under a stable binary (`162/172 analysed, 0 from
+cache` — a genuinely fresh render), and the two diffed as a control: **bit-identical, 0 of 202,001**.
+So nothing was harmed, and that is now *measured* rather than assumed. ⭐ **Habit that actually
+prevents it: `pgrep -f comprehensive_report.py` before ANY build — not before builds you think are
+risky.**
+
+▶ **NEXT.**
+1. Items 2 and 4–9 of the session-122 list are unchanged (THD level term, MASTER-anchor consumers,
+   VTC-amplitude-vs-physical-rail, the `gain-n18` capture question, `_GAIN_SESSION_MEASURED_DB[-18]`,
+   and the ambiguous GATE L4(a)/(b) topology question).
+2. ⭐ **Session-122 item 3 (the `pow()` perf path) is now UNBLOCKED but NOT MEASURED.** `clipK = 2.0`
+   restores `sig()`/`sigDeriv()`'s `k == 2.0` fast path, which was the whole point — but nobody has
+   re-run `PerfBenchmark` to see what it bought against the clipper's recorded 356 ns/sample. That is
+   a measurement, not a change, and it should be quoted before the item is called closed.
+   ⚠ Note ADAA adds work at 1×/2× while the fast path removes it everywhere — so the net at the
+   realtime factors is genuinely unknown and must be measured, not reasoned about.
+
+---
+
+## SESSION 125
+
+⭐⭐⭐ **A USER CHALLENGE TO FOUR STANDING FRAMINGS, AND ALL FOUR FAILED ON RE-READING THE GATES THEY
+CITE. NO MEASUREMENT MOVED AND NO CONSTANT SHIPPED — THIS IS A DOCUMENTATION-CORRECTION SESSION, AND
+WHAT IT RECOVERED IS ONE DROPPED FINDING, TWO OVERCLAIMS AND ONE UNTESTED SOLUTION CLASS.**
+`src/`, `tests/` and `analysis/` untouched; `CLAUDE.md` edited (release-gate note, standing rules,
+CLOSED/REFUTED table, open-work item 6, the A3 exclusions block). Gates re-run for evidence only:
+`hf_artefact_gate.py` and `feature_locus_gate.py` against `s120_newton.json`, both rc=0, both
+reproducing their recorded numbers.
+
+⚠ **The session opened with me answering a "what's left from s122?" question straight out of the
+handover summaries, and getting three of four answers wrong.** The user pushed back on each. That is
+the `verify-the-PREMISE-not-the-prior-session's-framing-of-it` trap at its purest — the summaries
+were internally consistent, confidently worded, and did not match the tools they cited.
+
+⛔⛔ **OVERCLAIM 1 — "the 8–16.3 kHz region is ND's own ALIASING artefact, not ours to fix."
+CLAUDE.md carried this as a standing rule with a ⛔ STOP AIMING MODEL WORK prohibition. GATE I does
+not say it, and GATE I's own G3 REFUTES the aliasing mechanism.** What the gate prints:
+
+| sub-gate | result |
+|---|---|
+| G1 clean control | our linear HF is right |
+| G2 rate over the octave | pedal **gains**, model **rolls off**, gap +17.44 dB/oct, growing with drive ⇒ **drive-generated, pedal side** |
+| **G3 fold locus** | **REFUTED at H2** — the excess passes through 16 kHz as a *smooth plateau* (13.5–19.5 kHz mean **+15.07 dB, spread 0.73 dB over 6 kHz**); H2's local prominence is **−0.03 dB, 30th percentile of its own null**. A fold deposits a peak. |
+
+and its verdict block adds *"NOT claimed: that the region is ENTIRELY artefact"* and *"whether the
+gate should still grade these bands is a **USER DECISION**, not this tool's."*
+⭐⭐ **The sharpest part: the gate's docstring preserves the user's session-89 instruction verbatim —
+⛔ *"DO NOT dismiss this as 'ND aliasing' — that is not established and it is not a reason to skip
+the band."* The standing rule was the exact move that instruction forbade, written into the file
+that is read first every session.** ⇒ **"drive-generated" ≠ "aliasing" ≠ "not ours to fix"** — three
+distinct claims, and only the first is measured. ⚠ And there is **no hardware data above 6 kHz under
+drive** at all (`reference-sources.md` §2 is clean-path only, §3's charts stop at the 5–6 kHz null),
+so nothing adjudicates whether a real B7K does this too. ⭐ GENERAL: **an attribution is not a
+measurement.** G2 measured *where* the energy is and *that it grows with drive*; the word "aliasing"
+was supplied by a reader, survived into a rule, and then acquired a prohibition.
+
+⛔⛔ **OVERCLAIM 2 — "GATE W closed the centre-frequency question, and ND isn't a trustworthy target
+there." GATE W says neither. Its verdict (c) is a DIAGNOSIS, and I read it as an EXONERATION.**
+(c) reads *"not a fixed-network feature on at least one side — its centre moves with drive."* Where
+that side is the **pedal**, that is a statement that **the pedal has a mechanism the model lacks** —
+the most actionable class of finding there is. W6, re-run this session:
+
+| feature | model | pedal | our absolute error |
+|---|---|---|---|
+| treble peak | 2977 → 2983 Hz (**FIXED, 0.2 %**) | 2696 → **2498** Hz (**7.9 %**) | **281 Hz @ clean → 485 Hz (19.4 %) @ `drv_-6`** |
+| bridged-T | 715.8 → 716.9 Hz (**FIXED, 0.2 %**) | 695.7 → **745.4** Hz (**7.2 %**) | crosses over (small mean) |
+| mid peak | 458.0 → 428.9 Hz (9.0 %) | 446.7 → 418.8 Hz (8.0 %) | ~2.5 % — ✅ **TRACKS** |
+| mid notch (GAP #2) | 329.3 → 327.4 (FIXED) | 327.2 → 322.2 (FIXED) | ✅ 1.007× — genuinely right |
+
+⇒ **the model's treble peak is wrong at EVERY drive setting, by 281–485 Hz**, and the error grows
+with drive. The user's own chart-eye estimate ("off by around 100 Hz, that's NOT 1 % tolerance") was
+*conservative*. ⚠ **And session 122's summary quoted the flattering statistic**: `1.022×` is
+`sweep_clean` on the LEVEL ladder (W5b); the same feature on the pure-OD endpoints (W5) reads
+**`1.152×`**. Both are real; only one was carried forward. `self-selecting-scores`, one level up —
+the selection was between two legitimate instruments rather than within one.
+⭐⭐ **The mid peak TRACKING is the localising clue and is worth more than the mismatches**: we
+already have a drive-dependent mechanism at ~450 Hz and none at ~2.9 kHz, so this is **not** a global
+missing dynamic. It is specific, and it is above ~2 kHz.
+
+⛔⛔ **DROPPED ITEM — SESSION 122'S OWN SUCCESSOR FINDING NEVER REACHED THE BACKLOG.** Session 122's
+`▶ NEXT` item 2 reads, verbatim: *"the mid-peak / treble-peak / treble-notch drive dependence on the
+ND side is GATE I's HF-artefact finding extended down into the midrange — which is **new**, and is
+**the one thing here worth a look on its own terms**: ND's ~712 Hz and ~2.6 kHz features move **7–8 %
+with drive**, where a post-clipper passive network's cannot."* It exists **only** in this file. What
+reached `CLAUDE.md` was item 1 of the same list — `⛔ Do NOT open a centre-frequency item` — so the
+consolidation kept the **closure** and dropped the **finding it handed forward**.
+⭐ GENERAL, and this is the transferable half: **a session that closes an item and opens a successor
+in the same `▶ NEXT` block is the highest-risk shape for the handover**, because the closure is a
+tidy one-liner that compresses well and the successor is a paragraph that does not. When compressing,
+check every `NEXT` list for items whose *neighbour* was closed. (Sibling of
+`a-backlog-line-can-outlive-its-own-dissolution-by-70-sessions` — same mechanism, opposite sign:
+there a dead item survived, here a live one did not.)
+
+⭐⭐⭐ **A3 — THE EXCLUSION LIST IS ENTIRELY STATIC, AND NOBODY HAD SAID SO. THE USER ASKED "IF A
+STATIC SOLUTION DOESN'T WORK, WHY NOT A DYNAMIC ONE?" AND NOTHING IN 20 SESSIONS OF A3 WORK ANSWERS
+IT.** Read the load-bearing sentence again with that question in mind — *no single **element**
+(s50), no post-clipper **linear** element of any order (s52), no GRUNT-side **cap** (s38), not a
+fittable **constant** (s108), no **fixed linear** network (s108)*. Five exclusions, five static
+objects. ⭐ And *"its shape MIGRATES with stimulus"* — the clause used to justify stopping — is the
+**signature of a dynamic mechanism**, not a reason there isn't one.
+⭐⭐ **The project had already measured the dynamic half and let a summary bury it.** GATE Q (s109)
+split A3's deficit into `L(f)` (rms **2.72 dB**, a linear element could carry it) and `D(f)` (rms
+**3.01 dB**, of which its own source says *"only a nonlinearity can carry it"*). ⇒ **a nonlinear
+target sized at 3.01 dB rms has existed since session 109 and appears on no work list.** `kInputRef`
+(s109) — the one constant ever to close an OD gate row — was the first and only move in that
+direction. ⇒ A3's honest status is **"static excluded, dynamic UNTESTED"**.
+
+⭐⭐⭐ **AND A CANDIDATE MECHANISM THAT COVERS ALL THREE AT ONCE, WHICH IS A DOCUMENTED **DEFERRED**
+ITEM RATHER THAN A NEW INVENTION: DYNAMIC R19 SUPPLY SAG.**
+`docs/nonlinear-component-modeling.md:70` — *"dynamic sag is an optional refinement — try static
+first, add a simple supply-sag state (`VDD_eff = 8.6 − I_DD(Vout)·1k`, one-pole smoothed) **only if
+captured feel demands it**."* We shipped the **static** self-consistent solve (`VDD = 5.636 V`,
+`Clipper.h:127`) and never returned to it. ⚠ Grepped and confirmed: every `sag` mention in `src/` is
+in a comment describing the *static* R19-dropped rail; no sag state exists.
+**Why it fits, and it is schematic-grounded rather than curve-fitted:** sag moves the CD4049's trip
+point **and** its open-loop gain `a0` with signal, and `circuit.md` already records that node W's
+input impedance is `R18/(1+A0)` — so a drive-dependent `a0` walks both the GRUNT corner and the
+`C14 ∥ R18` corner, which sits at **1/(2π·330k·220p) = 2.19 kHz**, i.e. **exactly where the treble
+peak is**. It predicts the right *sign* (peak walks **down** as drive rises and the rail collapses),
+the right *frequency*, the right *drive dependence*, and it is stimulus-dependent by construction and
+lives in the **OD path only** — which is where A3 lives.
+⚠⚠ **HYPOTHESIS, NOT A RESULT — nothing was rendered.** ⛔ Do not let the next session quote the
+2.19 kHz coincidence as evidence; it is a reason to *run the test*, and an implausible coincidence is
+a bug report in both directions. ⭐ The known-answer test needs **no new capture** (which matters —
+capture access is gone): render the treble-peak drive sweep and require the model's centre to walk
+down toward the pedal's 2696 → 2498 Hz. It fails loudly if the mechanism is wrong, because our
+current centre is pinned to 0.2 %.
+
+⚠ **WHAT THIS SESSION DID NOT DO, STATED SO IT IS NOT INFERRED:** no render, no constant, no gate
+rebuilt, no baseline moved. `s120_newton.json` is still the baseline and the release gate is still
+6 rows over SHIP. Every number quoted above is re-read from an existing gate against an existing
+report, not new.
+
+▶ **NEXT.**
+1. ⭐⭐ **Prototype dynamic R19 sag against the treble-peak drive sweep** (new open-work item 6). Cheap,
+   no capture needed, and it is a known-answer test rather than a fit: the model's centre must walk.
+   ⚠ Gate it on the mid peak NOT moving (it already tracks at ~2.5 %) and on CLEAN being bit-identical
+   (the clipper is OD-only) — a sag that reaches CLEAN has escaped its stage.
+2. ⭐ **If it walks, re-score A3's `D(f)` against it** — same mechanism, and GATE Q's 3.01 dB rms is
+   the pre-registered target. ⛔ Do not re-fit any *static* A3 correction on top; that is the thing
+   five sessions already excluded.
+3. ⚠ **The 8–16.3 kHz grading question is a USER DECISION, and GATE I has been saying so.** With the
+   aliasing attribution withdrawn, decide whether the region stays graded. ⚠ G4's table says an
+   exclusion makes the **median WORSE** on both candidate and baseline (the HF bands were diluting it
+   downward) and leaves p99 at 10.1 dB — so it closes one row, not Phase 9.
+4. Items 2–5 and 7–9 of the session-124 list are unchanged.
+
 ## Project-specific carry-forwards (as it stood at session 122, pre-compression)
 
 ## Project-specific carry-forwards

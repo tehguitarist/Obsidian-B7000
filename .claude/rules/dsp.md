@@ -328,6 +328,56 @@ frequency) — the two never interact.
   worth it if listening reveals residual diode aliasing at low OS factors.
 - 1st-order ADAA: `y = (F1(x) - F1(xPrev)) / (x - xPrev)`, with a midpoint fallback when
   `|x - xPrev|` is tiny. Update the state every sample so toggling is glitch-free.
+- ⭐⭐ **ADAA1 APPLIES TO A NONLINEARITY BURIED INSIDE AN IMPLICIT SOLVE — "the stage has memory" is
+  not a disqualification.** The derivation needs only a memoryless map and an argument that is
+  ~linear between samples; it says nothing about the argument having to be the STAGE's input. So for
+  a waveshaper inside a per-sample Newton/WDF solve (this pedal's CD4049 VTC, solved on node W),
+  substitute the mean of the map over `[wPrev, w]` **inside** the residual `F` — not just at the
+  output. Two reasons it belongs inside: (a) where KCL makes the internal node a *linear* combination
+  of the input and the shaper's output, every harmonic at that node arrives via the output, so the
+  substitution antialiases the node too, free; (b) substituting only at the output leaves the solve
+  and the emitted sample disagreeing about the branch current, which corrupts the companion-cap
+  state. The mean stays monotone if the map is (`mean' = (f(w) - mean)/dw < 0` for a decreasing `f`),
+  so root uniqueness and a bracketed solve survive — but the closed-form `|f| <= sat` bracket may
+  not; bracket off the SLOPE instead (`|F'| >= sum of the linear conductances`, so the root is within
+  `|F|/that` of any point). Measured on this pedal: **12.6–19.8 dB** of median alias-floor
+  improvement at OS 1×/2×. (session 123; `src/dsp/Clipper.h::setADAA`, `analysis/clip_adaa_gate.py`)
+- ⚠ **Gate ADAA BY OS FACTOR, and measure both ends before enabling it flat.** ADAA1 is a
+  first-order approximation with its own residual, so its benefit shrinks as the OS factor rises and
+  can go NEGATIVE where oversampling has already taken the floor low. On this pedal the median
+  benefit runs −19.5/−12.6 dB at 1×/2× but only −2.4/−4.6 dB at 4×/8×, and the *worst* tone costs
+  +9.9 dB at 4× and +17.3 dB at 8×. The mechanism is measurable directly and predicts the ordering:
+  compare the per-sample step of the shaper's argument against the shaper's own knee width — where
+  the step exceeds the knee (57 % of samples at 2× here, 33 % at 8×) the argument crosses the whole
+  nonlinearity inside one sample, which is ADAA1's best case and oversampling's worst.
+  ⚠ **Read the WORST-tone column, not just the median** — that is what makes this a policy rather
+  than an average, and the benefit is **not monotone in rate** (8× beats 4× at one amplitude and
+  loses badly at another), so do not interpolate it or express the gate as a scale factor. A `<=`
+  threshold on the factor is the honest shape. Shipped here as `FitParams::clipAdaaMaxOs = 2`
+  (session 124).
+  ⭐ **Make the gate a KNOB, not a hardcoded `if`.** The gate's own validation needs to force ADAA on
+  at the factors the policy disables — otherwise those arms measure *the gate* instead of *the
+  mechanism* and report "ADAA bought nothing at 8×", which is true of the shipped policy and false of
+  the thing under test.
+  ⚠ **A factor-gated nonlinearity makes the processed path deliberately OS-factor-dependent**, which
+  will break any existing test asserting factor-independence (here the delay-compensation check). Fix
+  that by holding the gate constant inside such a test, never by widening its bar — see
+  `measurement-discipline.md` §3.
+  ⭐ **Resolve the policy from stored state, not in whichever setter happens to run last.** The mode
+  and the OS factor are set independently, and callers do it in different orders — see
+  `PedalChain::applyAdaaPolicy`.
+- ⛔ **Do NOT substitute quadrature for a missing antiderivative** when the argument steps across the
+  knee. A fixed-node rule (Gauss–Legendre etc.) then places every node in saturation and averages two
+  saturated values — it is not an approximation of the integral, it misses the feature entirely. If
+  the shaper's primitive is not elementary (e.g. `u/(1+u^k)^(1/k)` for general k, an incomplete beta
+  function), either re-anchor the shape parameter to a value that IS elementary or build a
+  Chebyshev/table primitive — and note that the antiderivative's cancellation sets the midpoint
+  fallback's threshold, which is looser than the usual `0/0` guard when the primitive carries a large
+  linear-in-argument term.
+- ⛔ **Splitting a map to dodge ADAA1's 2-point-average cost does not work** — see
+  `measurement-discipline.md`'s "every part must be evaluated over the same interval". Averaging the
+  nonlinear residue while keeping the linear term pointwise injects a first difference with gain
+  `a0/2`, which reaches the full loop gain at Nyquist. Gate ADAA off, or accept the rolloff.
 - Reference: Esqueda et al., "Antiderivative Antialiasing in Nonlinear Wave Digital Filters",
   DAFx 2020.
 

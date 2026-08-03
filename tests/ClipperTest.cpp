@@ -491,6 +491,221 @@ int main()
             ++failures;
     }
 
+    // ---- Test 8: ADAA on the VTC (session 123) --------------------------------
+    // Gates the ANTIDERIVATIVE and the substituted map directly, via the probe
+    // forwarders, rather than inferring them from process() output — a wrong V
+    // still produces plausible audio, so an output-only test cannot see it.
+    // These are STRUCTURE claims (calculus identities of the shipped shape), so
+    // they run at BOTH the nominal and the shipped amplitudes, and the k-gating
+    // claim is amplitude-dependent by definition so it runs the shipped clipK too
+    // (the session-118 sorting rule).
+    std::printf("\n=== ADAA on the VTC: antiderivative, exactness gate, monotonicity ===\n");
+    {
+        const FitParams fp;
+        bool ok = true;
+
+        // (a) V' == vtc, checked by central difference across the trip point and
+        //     deep into both saturations. This is THE load-bearing identity: if it
+        //     fails, ADAA1 is averaging the wrong function.
+        {
+            Clipper st;
+            st.prepare(48000.0);
+            st.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, 2.0);
+            double worst = 0.0, worstAt = 0.0;
+            const double h = 1e-6;
+            for (double w = -4.0; w <= 4.0; w += 0.0005)
+            {
+                const double num = (st.probeVtcAD(w + h) - st.probeVtcAD(w - h)) / (2.0 * h);
+                const double err = std::abs(num - st.probeVtc(w));
+                if (err > worst) { worst = err; worstAt = w; }
+            }
+            // 1e-7 is the central difference's own O(h^2 * V''') truncation scale
+            // here, not a tolerance chosen to pass.
+            const bool pass = worst < 1e-7;
+            std::printf("  (a) dV/dw == vtc over w in [-4,+4]: worst %.3e at w=%+.4f  %s\n",
+                        worst, worstAt, pass ? "PASS" : "FAIL");
+            std::printf("      V(0) = %.3e (must be 0 -> ADAA1 exact at DC)\n", st.probeVtcAD(0.0));
+            ok = ok && pass && std::abs(st.probeVtcAD(0.0)) < 1e-300;
+        }
+
+        // (b) the mean degenerates to the pointwise value as the step vanishes,
+        //     and the midpoint fallback joins on continuously (no step at kAdaaEps).
+        {
+            Clipper st;
+            st.prepare(48000.0);
+            st.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, 2.0);
+            // ** The bar must SCALE WITH dw, not be a fixed number. First draft used
+            // a flat 1e-4 and "failed" at 1.244e-3 — which is a0*dw/2 to three
+            // figures at dw = 1e-4, i.e. the mean-value theorem, not a defect.
+            // A tolerance that a correct implementation cannot meet is a broken
+            // test; the real claim is FIRST-ORDER agreement, so gate on that. **
+            double worstRel = 0.0, worstAbs = 0.0, worstDw = 0.0;
+            for (double w : { -2.0, -0.02, -1e-4, 0.0, 1e-4, 0.02, 2.0 })
+                for (double dw : { 1e-12, 1e-9, 1e-8, 1e-7, 1.000001e-7, 1e-6, 1e-4 })
+                {
+                    const double err = std::abs(st.probeVtcAvg(w + dw, w) - st.probeVtc(w));
+                    const double bound = fp.clipA0 * dw + 1e-12; // |vtc'| <= a0
+                    if (err / bound > worstRel)
+                    {
+                        worstRel = err / bound;
+                        worstAbs = err;
+                        worstDw = dw;
+                    }
+                }
+            const bool pass = worstRel <= 1.0;
+            std::printf("  (b) mean -> pointwise, first-order in dw (err <= a0*dw):"
+                        " worst %.3e at dw=%.0e = %.3f of bound  %s\n",
+                        worstAbs, worstDw, worstRel, pass ? "PASS" : "FAIL");
+            ok = ok && pass;
+        }
+
+        // (c) the substituted map stays STRICTLY DECREASING in w at fixed wPrev.
+        //     This is what keeps the root unique and the session-120 bracket valid;
+        //     if it fails, rtsafe's containment argument is void.
+        {
+            Clipper st;
+            st.prepare(48000.0);
+            st.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, 2.0);
+            bool mono = true;
+            double worstSlope = -1e300;
+            for (double wp : { -3.0, -0.5, -0.01, 0.0, 0.01, 0.5, 3.0 })
+            {
+                double prev = st.probeVtcAvg(-5.0, wp);
+                for (double w = -5.0 + 0.001; w <= 5.0; w += 0.001)
+                {
+                    const double cur = st.probeVtcAvg(w, wp);
+                    worstSlope = std::max(worstSlope, (cur - prev) / 0.001);
+                    if (cur > prev) mono = false;
+                    prev = cur;
+                }
+            }
+            std::printf("  (c) mean is strictly decreasing in w (worst slope %+.3e): %s\n",
+                        worstSlope, mono ? "PASS" : "FAIL");
+            ok = ok && mono;
+        }
+
+        // (d) the k != 2 GATE. A k != 2 build must get NO ADAA rather than a wrong
+        //     one, and a k == 2 build must actually get it (else the flag is dead and
+        //     every "ADAA bought nothing" reading is vacuous). BOTH directions, or
+        //     this proves nothing.
+        //
+        // ⚠⚠ SESSION 124 — THIS TEST HAD TO BE REPAIRED, AND THE REASON IS WORTH MORE
+        // THAN THE TEST. It was written when the shipped clipK was 2.4653, so it took
+        // its non-anchor arm from `fp.clipK` and its anchor arm from a literal 2.0,
+        // and asserted "inert at SHIPPED, live at k=2". The moment session 124
+        // re-anchored the shipped constant TO 2.0 the two arms became the same value
+        // and the test demanded that one render be simultaneously inert and live — it
+        // failed against entirely correct code, and its message ("clipK=2.0000 ...
+        // must be INERT") could not be true.
+        // ⭐ The defect is that it bound a claim about **k** to whatever happened to be
+        // SHIPPED. The property under test is a property of the exponent: it does not
+        // know or care which value ships. So both arms are now named constants, and
+        // the shipping question — "is the shipped k the ADAA anchor?" — is asserted
+        // SEPARATELY below, where it is a real, deliberate claim that SHOULD fail
+        // loudly if someone re-fits clipK off the anchor without re-reading
+        // FitParams.h::clipAdaa. Two questions, two assertions.
+        // (Same family as the session-118 note in this very block: a per-stage test
+        // must be explicit about which build it is answering about.)
+        {
+            // A deliberately NON-anchor exponent: the retired session-44 A5 value, so
+            // the inertness arm keeps testing the real historical case. Any k != 2
+            // would do; naming the retired one makes the intent legible.
+            constexpr double kNonAnchor = 2.4653;
+            constexpr double kAnchor = 2.0;
+            auto renderPeak = [&](double kk, Clipper::Adaa mode) {
+                Clipper st;
+                st.prepare(96000.0);
+                st.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, kk);
+                st.setADAA(mode);
+                st.setGrunt(Clipper::Grunt::Boost);
+                double acc = 0.0;
+                for (int n = 0; n < 8000; ++n)
+                    acc += std::abs(st.process(2.5 * std::sin(2.0 * PI * 2499.0 * n / 96000.0)));
+                return acc;
+            };
+            const double naOff = renderPeak(kNonAnchor, Clipper::Adaa::Off);
+            const double naFull = renderPeak(kNonAnchor, Clipper::Adaa::Full);
+            const double naRes = renderPeak(kNonAnchor, Clipper::Adaa::Residue);
+            const double k2Off = renderPeak(kAnchor, Clipper::Adaa::Off);
+            const double k2Full = renderPeak(kAnchor, Clipper::Adaa::Full);
+            const bool inertAtNonAnchor = (naFull == naOff) && (naRes == naOff);
+            const bool liveAtK2 = (k2Full != k2Off);
+            std::printf("  (d) clipK=%.4f (non-anchor): Full/Residue vs Off -> %s (must be INERT)\n",
+                        kNonAnchor, inertAtNonAnchor ? "identical" : "DIFFERENT");
+            std::printf("      clipK=%.4f (anchor):     Full vs Off         -> %s (must be LIVE)\n",
+                        kAnchor, liveAtK2 ? "different" : "IDENTICAL");
+            // ** `Clipper()` default-constructs at kHardness = 2.0, so printing
+            // `Clipper().probeAdaaExact()` and LABELLING it "shipped" reported 1 for
+            // a stage that had never been told the fit — the session-118 defect
+            // (a per-stage test answering about the nominal build while claiming the
+            // shipped one) reproduced inside the test written to guard against it.
+            // Construct each arm explicitly. **
+            Clipper naStage, k2Stage;
+            naStage.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, kNonAnchor);
+            k2Stage.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, kAnchor);
+            std::printf("      adaaExact(): k=%.4f %d, k=%.4f %d\n", kNonAnchor,
+                        (int) naStage.probeAdaaExact(), kAnchor, (int) k2Stage.probeAdaaExact());
+            ok = ok && ! naStage.probeAdaaExact() && k2Stage.probeAdaaExact();
+            ok = ok && inertAtNonAnchor && liveAtK2;
+
+            // ---- the SHIPPING claim, asserted separately (session 124) ----------
+            // The block above is about the exponent. THIS is about the build: session
+            // 124 ships ADAA ON, which is only meaningful if the shipped clipK is the
+            // anchor. If a future re-fit moves clipK off 2.0, ADAA goes silently inert
+            // — no wrong answer, but the shipped alias reduction quietly disappears,
+            // which is exactly the kind of loss that travels for 100 sessions. Fail
+            // loudly here instead, and name the file to re-read.
+            Clipper shippedStage;
+            shippedStage.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, fp.clipK);
+            const bool shippedIsAnchor = shippedStage.probeAdaaExact();
+            std::printf("      SHIPPED clipK=%.4f -> adaaExact %d, clipAdaa=%d, clipAdaaMaxOs=%d : %s\n",
+                        fp.clipK, (int) shippedIsAnchor, fp.clipAdaa, fp.clipAdaaMaxOs,
+                        (shippedIsAnchor || fp.clipAdaa == 0)
+                            ? "consistent"
+                            : "INCONSISTENT — clipAdaa is ON but clipK is off the anchor, so ADAA is DEAD "
+                              "(re-read FitParams.h::clipK / ::clipAdaa)");
+            ok = ok && (shippedIsAnchor || fp.clipAdaa == 0);
+        }
+
+        // (e) with ADAA live, the solve must still CONVERGE — the bracket changed
+        //     (slope-based, not the |vtc| <= sat radius), so Test 7's guarantee does
+        //     not transfer for free. Output must stay finite and bounded by the VTC
+        //     ceilings at every OS rate.
+        {
+            bool pass = true;
+            for (double fs : { 48000.0, 96000.0, 192000.0, 384000.0 })
+                for (auto mode : { Clipper::Adaa::Full, Clipper::Adaa::Residue })
+                {
+                    Clipper st;
+                    st.prepare(fs);
+                    st.setNonlinear(fp.clipA0, fp.clipSatLo, fp.clipSatHi, 2.0);
+                    st.setADAA(mode);
+                    st.setGrunt(Clipper::Grunt::Boost);
+                    double worst = 0.0;
+                    for (int n = 0; n < 20000; ++n)
+                    {
+                        const double y = st.process(3.5 * std::sin(2.0 * PI * 2499.0 * n / fs));
+                        if (! std::isfinite(y)) { pass = false; break; }
+                        worst = std::max(worst, std::abs(y));
+                    }
+                    // Residue's substituted value is NOT bounded by max(sat) (it
+                    // carries the a0*dw/2 first difference — Clipper.h setADAA), so
+                    // only Full is gated on the ceiling; Residue is gated on finite.
+                    if (mode == Clipper::Adaa::Full
+                        && worst > std::max(fp.clipSatLo, fp.clipSatHi) + 1e-9)
+                        pass = false;
+                    std::printf("      fs %6.0f  %-7s max|y| = %.5f\n", fs,
+                                mode == Clipper::Adaa::Full ? "Full" : "Residue", worst);
+                }
+            std::printf("  (e) ADAA solve finite everywhere, Full bounded by the ceilings: %s\n",
+                        pass ? "PASS" : "FAIL");
+            ok = ok && pass;
+        }
+
+        if (! ok)
+            ++failures;
+    }
+
     std::printf("\n%s\n", failures == 0 ? "All tests passed." : "Some tests FAILED.");
     return (failures > 0) ? 1 : 0;
 }
