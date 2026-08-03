@@ -355,6 +355,70 @@
   select the whole next workplan wrong. Print the signed term beside every unsigned one. Same
   family as `abs()-on-an-unobservable-sign-is-fine-differencing-it-is-not` (s33), one level up:
   there the sign was lost in the data, here it was lost in the summary. (s109)
+- ⭐⭐⭐ **A LINEAR-ALGEBRA LIBRARY DOES NOT OWE YOU A SIGN CONVENTION, AND THE ONE GATE WRITTEN TO
+  CHECK ATTRIBUTION RANKED MAGNITUDES — SO AN INVERTED DIRECTION SURVIVED 65 SESSIONS AND SELECTED A
+  WORKPLAN.** `shape_gate` decomposes every residual on an orthonormal `{1, u, u²}` basis from
+  `np.linalg.qr`, and QR's column signs are **arbitrary** (LAPACK's Householder convention returned
+  `Q[:,0] = −ones/√n` here). So `c[0] = Q[:,0]·d = −√n·mean(d)` and the stored `level_signed` was
+  **minus** the offset it was reporting: a residual that is a constant **+3 dB** came back as
+  **−3.0**. Session 109 correctly noticed the *gated* term was an unsigned rms, went looking for the
+  direction, found `level_signed` already computed and stored — and read its sign off a library
+  convention. That became a CLOSED/REFUTED row (*"the model over-distorts … any candidate reasoned
+  about as 'we need more distortion' is backwards"*), the framing of an open-work item, and a
+  sentence in two rules files. ⭐⭐ **WHY IT SURVIVED IS THE REUSABLE PART: the tool's own
+  ATTRIBUTION gate picks `max(TERMS, key=…)` over the UNSIGNED terms, so the gate that exists to
+  check attribution was structurally blind to the half of attribution a handover would read.** The
+  tell was free and nobody asked for it — **the three signed terms were INCONSISTENT with each
+  other** (`tilt_signed` happened to land right, `level_signed` and `curv_signed` did not), and an
+  inconsistency between three terms of one basis is the fingerprint of an unexamined convention
+  rather than a choice. ⭐ GENERAL: **any quantity whose sign comes out of a library
+  (eigenvectors, SVD/QR factors, FFT phase, a PCA loading, a fitted regression column) has an
+  arbitrary sign until you PIN it — canonicalise at the source, and assert a signed known answer
+  (`decompose(+3 dB) must return +3`), not merely a same-signed one, because the scale is what makes
+  it quotable.** ⚠ And check what the fix does and does not touch before announcing it: here every
+  unsigned quantity is invariant under a column-sign flip (`abs` on the coefficients, and
+  `loc = d − Q@c` is invariant because `c` flips with `Q`), so **no gated number, baseline or stored
+  report moved** — a selftest gate now asserts that 200 ways, which is what separates "a sign was
+  wrong" from "the grade was wrong". (s128; the deepest form of
+  `unsigned-aggregates-have-no-sign` — there a summary lost a direction it had, here the direction
+  was manufactured by a factorisation)
+- ⭐⭐⭐ **AND FIXING THE SIGN WAS NOT ENOUGH, BECAUSE THE QUESTION "WHICH WAY?" PRESUPPOSED AN ANSWER:
+  THE SURFACE CHANGES SIGN INSIDE THE POOL.** Having corrected the convention I had a tidy new
+  headline — *"the model UNDER-distorts by 2.31 dB"* — and it is just as wrong as the old one.
+  Measured **convention-free** (the two raw THD percentages side by side: no basis, no projection, no
+  gain match, nothing a library can invert) over the stimulus × DRIVE plane at zero bleed, the ratio
+  runs **+4.47 dB at DRIVE 0 × the quietest rung to −4.21 dB at DRIVE max × the hottest**, monotone
+  on **3/3** cells of each axis, with **54.8 %** of bands on the model's side of zero — a coin flip,
+  which is what a sign-changing surface looks like when it is summarised by one number. ⇒ the pooled
+  sign is a property of the **capture inventory**, and *both* prior directions were true of one
+  corner. ⭐ GENERAL: **before asking which way a defect points, check whether it points one way** —
+  print the statistic over the two axes the device is actually driven on, and if it crosses zero,
+  the deliverable is the surface and a mechanism that explains a *slope*, not an offset. A constant
+  cannot move a surface that changes sign, so any candidate reasoned about as "add/remove N dB of
+  distortion" is mis-specified whichever sign it carries. ⚠ Corroborate on an instrument sharing no
+  arithmetic before believing it: the stored per-order harmonics (per-order dB re fundamental at 3
+  fixed tones, versus a summed ratio over 26 bands of a sweep) reproduce the same ordering and the
+  same crossing (**+2.88 → −0.32 dB**). (s128, GATE Z; the sign-axis form of
+  `a-pooled-statistic-cannot-answer-about-its-own-axis`)
+- ⭐⭐ **A RATIO STATISTIC IS MOVED BY ITS DENOMINATOR, SO A "DISTORTION" ROW CAN BE MOSTLY A *MIX*
+  DEFECT — AND THE TEST IS WHETHER AN ALREADY-MEASURED QUANTITY PREDICTS IT, NOT WHETHER A CURVE
+  FITS.** THD is harmonics/fundamental and a clean blend path contributes fundamental with **no
+  harmonics**, so a difference in mix balance moves THD with no change in distortion anywhere. Split
+  by the model's own clean fraction, the gated THD row reads **2.201 = SHIP on the bleed-free rows**
+  and **3.763 = over with bleed** — i.e. the population that actually measures distortion generation
+  already meets the bar. ⭐ The discriminating move is to make the alternative **quantitative and
+  parameter-poor**: if the OD path is `DF` dB quiet against a clean path that is right, the dilution
+  is fully determined, `excess(cf) − excess(0) = −20log10((1+r)/(1+r·10^(DF/20)))` with
+  `r = cf/(1−cf)` — **one** free parameter, and one this project had already measured on a different
+  instrument. Fitted: **DF = −3.70 dB (interior, rms 0.56 dB over 4 classes)** against A3's
+  independently measured **−4.38**. ⇒ the bleed half needs **no second mechanism**; it closes when
+  A3 does. ⚠ State the limit: this is **SUFFICIENCY, not identification** — any mechanism scaling the
+  OD fundamental against its harmonics predicts the same curve — and it is a claim about the
+  **model's** clean fraction, since the reference's is not knowable from a capture. ⚠ And do not let
+  it become a proposal to re-member the gated row: bleed is continuous, the classes are unbalanced
+  across DRIVE, and `cf` is a model coefficient rather than a measured property of the reference.
+  (s128, GATE Z5/Z6; the constructive twin of s122's *"the 1400 % THD cell is a denominator
+  artefact"* — same mechanism, sized on the whole gate row instead of one cell)
 - ⭐⭐ **A THRESHOLD YOU GUESSED IS NOT A GUARD — MEASURE THE DISTRIBUTION AND PLACE THE BAR IN ITS
   GAP, THEN ASSERT THE GAP.** GATE Q's reference-dropout guard was first written at "12 dB, and
   that is deliberately generous". It printed a clean pass and **missed the defect by 0.41 dB**.
@@ -593,6 +657,34 @@
   to do with the locator. ⇒ **a known answer must NAME its condition**, taken from the source it is
   reproducing (GATE R builds its arms at `sweep_drv_-18`, and says so in its own code). Choosing the
   condition by agreement measures agreement, not the instrument. (s122)
+- ⭐⭐⭐ **A MUTATION RUNNER THAT SCORES `rc != 0` CANNOT TEST A *COMPUTED VERDICT* AT ALL — AND THE
+  s108 RULE GUARANTEES THAT YOUR MOST IMPORTANT STATEMENTS ARE COMPUTED VERDICTS, NOT EXITS.** The
+  two rules collide and nobody had noticed: s108 says *exit only on things that make the numbers
+  below meaningless; anything that is an OUTCOME of the measurement gets a computed verdict and
+  execution continues* — so a well-built gate's headline findings deliberately **never** change the
+  exit code, and every mutation runner in this project could therefore only test the plumbing, never
+  the conclusions. `computed-verdicts-not-narrated` has four prior occurrences precisely because
+  nothing mechanically checked it. ⭐ The fix is one extra field per arm: an expected **exit code**
+  *plus* a **string the output must contain**. An arm with `expect_rc = 0` breaks the data behind a
+  verdict and requires the gate to print the **opposite** verdict — so a conclusion that has quietly
+  become hard-coded narration fails the mutation test instead of surviving it. Four such arms here
+  (the sign-change verdict, the cross-instrument corroboration, the A3 agreement, and the
+  bound-resting report) and all four earned their place. ⚠ Two mechanics: **(a)** the failure mode is
+  a *third* outcome, `NARRATED` — passed but never printed the required line — which is distinct from
+  both `GUARD DEAD` and `WRONG GUARD`; **(b)** an arm may need to mutate an **imported module**
+  rather than the gate under test (here the sign fix lives in `shape_gate`, not in the gate), which
+  means patching the dependency in place and restoring it in a `finally` — say so at the arm rather
+  than pretending the mutation is local. (s128, `analysis/_mutate_gate_z.py`)
+  - ⚠ **AND BOTH OF THIS SESSION'S FIRST-DRAFT ARMS FAILED FOR REASONS THAT WERE THE TEST'S FAULT,
+    ONE OF EACH DOCUMENTED KIND.** *Vacuous* (s110): an arm raised the tool's own minimum-band
+    requirement by 6 to force a membership drift — and every graded row uses **all 26** bands in the
+    range, so the bar never bound, `n` never moved, and it read as `GUARD DEAD`. **A mutation on a
+    threshold that is nowhere near the data does nothing**; the honest version was at the DATA level
+    (re-admit the excluded dropout rows). *Caught by an earlier guard* (s119): an arm dropped a whole
+    capture class to empty one sub-population, which also shrank the headline group, so the
+    **membership** guard fired before the **empty** guard it was aimed at. That is defence in depth —
+    the gate being better than the test's model of it — so **fix the expectation, not the guard**:
+    empty only the target group's own predicate. Both are recorded at their arms.
 - **Mutation-test a guard.** A new `assert_anchors_match` read the wrong JSON key, returned `None` on
   every real report and fell through to its "cannot verify" branch — a warning that reads as
   diligence while checking nothing. (s88, same class as s80)

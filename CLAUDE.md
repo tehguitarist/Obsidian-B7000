@@ -191,6 +191,11 @@ release) has not started.
   The six, unchanged through the session-124 re-anchor: OD 100 Hz–8 kHz p90, OD 25–100 Hz
   median/p90, OD 8–16.3 kHz p90, OD p99, THD level (full-send). See §"THE RELEASE GATE" below for
   the bar definitions and fallback.
+  ⚠ **Session 128 fixed an inverted sign inside `shape_gate` and NO gated value moved** — the
+  `SIGNED mean` lines the gate prints beside the THD rows flip sign, every graded rms is
+  bit-identical (they take `abs`), and shape_gate selftest gate **2c** asserts exactly that
+  invariance. So `s124_ship.json` remains the baseline and **no re-baseline is owed**; what changed
+  is the *direction* the project quotes. See the CLOSED/REFUTED table and open item 2.
 - Session 118's D1/D2 clamp-window fix and session 120's `rtsafe` solve are both **KEPT** (user
   decisions, taken at the top of session 120). Session 124's ADAA enable + `clipK` re-anchor is
   likewise a **user decision**, taken after the matrix price was measured.
@@ -241,7 +246,8 @@ table in this file.
 | session 106's "`kOutputMakeup` is CONFIRMED RIGHT" | **REFUTED — circular** | 115 | Re-confirmed against the same capture it was fitted to. | `analysis/master_anchor_gate.py` |
 | "a null whose depth grows with level, at DRIVE MAX" (head item for 7 sessions) | **MIS-STATED, stood down** | 117 | Names the end of the ladder where the pedal is flat (9.9 dB quiet-end collapse vs 3.1 dB driven-end deepening — opposite of what was claimed). Recommendation on record: treat as a symptom of GATE Q's "OD path saturates too early", not its own target. | `analysis/null_drive_plane_gate.py` (GATE V) |
 | session 92's attribution of `OSValidationTest`'s failure to the un-ADAA'd CD4049 VTC | **SUBSTANTIALLY REFUTED** | 120 | It was the Newton solver's non-convergence, not (mainly) the VTC. ADAA remains open; session 92's alias/aperiodicity table was unquotable until re-measured — ✅ done s121: aperiodic regime **CLOSED (0/21 tones)**, genuine fold-down survives, smaller. | `analysis/alias_gate.py` |
-| the THD "level term"'s direction | **The gated term is UNSIGNED (rms).** Signed mean is **positive** — the model **over**-distorts, not under. | 109 | Any candidate reasoned about as "we need more distortion" is backwards. | `FitParams.h`, `analysis/shape_gate.py` |
+| the THD "level term"'s direction, as recorded by session 109: *"signed mean is **positive** — the model **over**-distorts"* | ⛔⛔ **REFUTED TWICE OVER, s128 — the sign was a LIBRARY ARTEFACT, and there is no single sign to correct it to** | 128 | **(1)** `shape_gate.basis` took `np.linalg.qr`'s column signs as given; LAPACK returns `Q[:,0] = −ones/√n`, so `level_signed` was **−mean(d)** — a constant **+3 dB** residual was reported as **−3.0**. Every direction the project printed from s109 to s127 was **backwards** (`tilt_signed` happened to land right, `curv_signed` was also wrong — an inconsistency between three terms of one basis is the fingerprint of an unexamined convention). Fixed at the source; ⭐ **every gated rms is bit-identical** (they take `abs`), asserted by shape_gate selftest gate **2c**, so no baseline, report or verdict moved. **(2)** ⛔ And the corrected pooled sign is *still* not a direction: measured **convention-free** (the two raw THD percentages, no basis/projection/gain-match) the ratio runs **+4.47 dB at DRIVE 0 × the quietest rung → −4.21 dB at DRIVE max × the hottest**, crossing zero **inside** the graded pool, 3/3 monotone on each axis. ⇒ the model **over**-distorts when the clipper is pushed gently and **under**-distorts when it is pushed hard: a **slope error with a crossing**, not a level error either way. Quote the corner or the cell, never the mean. | `analysis/thd_locus_gate.py` (GATE Z) Z1/Z3, `analysis/shape_gate.py::basis` |
+| "the gated THD row is a *distortion-generation* defect" | ⚠ **MOSTLY THE MIX, s128 — and the mix half needs NO new mechanism** | 128 | Split by the model's own clean fraction, the row reads **rms 2.201 = SHIP on the bleed-free rows** and **3.763 = over with bleed** (pooled 3.561). THD is harmonics/fundamental and the clean tap adds fundamental with no harmonics, so a mix difference moves it with **no change in distortion at all** — and the bleed dose-response is quantitatively what A3's already-measured OD-path deficit predicts: a one-parameter dilution law fits at **DF = −3.70 dB (interior, rms 0.56 dB over 4 classes)** against GATE O's independently measured **−4.38 dB**, i.e. **0.68 dB apart**. ⇒ same shape as s122's 1400 % THD cell (A3's cancellation read as a denominator). ⚠ **SUFFICIENCY, not identification** — any mechanism scaling the OD fundamental against its harmonics predicts the same curve. ⛔ **NOT a proposal to split the gate row** (Z6 prints and stops): bleed is continuous, the classes are unbalanced across DRIVE, and `cf` is the *model's* coefficient, not a measured property of the reference. | `analysis/thd_locus_gate.py` (GATE Z) Z5/Z6 |
 | `s114_baseline.json` for absolute-ledger gates (K/M/O/P/Q) | **STALE** | 118/119 | Predates session 115's shipped `kOutputMakeup`/PWL-taper constants. GATE O refuses it by name. | `analysis/a3_decomposition_gate.py` |
 | The six user-flagged peak/notch centre-frequency mismatches, **as CORNER (element-value) targets** | **CLOSED — none is a corner error.** ⚠ NOT "closed as a defect" — see the row below, added s125 | 122 | Two are the OD/clean mix (= A3, not a filter); three are not a fixed feature on at least one side; the 320 Hz null's centre is **right to 0.7%** — GAP #2 is a depth/width defect only, its centre was never wrong. ⛔ Do not point an optimiser at a capacitor for any of them. | `analysis/feature_locus_gate.py` (GATE W) |
 | "the bass notch/peak are A3 seen as a frequency, so they need no separate work" | ⚠ **HALF TRUE — the bass PEAK is NOT A3, s125** | 125 | **Notch: consistent with A3** (both sides MIX, both vanish bleed-free, LEVEL loci **overlap** — model 53.2–64.2, pedal 38.1–54.4 Hz — so some mix balance reconciles them). **Peak: ranges are DISJOINT** — model 154.6–**165.5**, pedal **195.7**–208.9 Hz, the pedal's *lowest* **18.2 % above** the model's *highest*. LEVEL is the mix lever A3 acts through and its FULL travel moves the feature 6.6 % against a ~20–26 % gap ⇒ the lever is 3× too small, **and points the wrong way** (more OD ⇒ model 165.5 → 154.6 Hz, *away* from the pedal). ⇒ correcting A3 makes the bass peak **worse**. Same shape as s38's C12 locus argument. | `analysis/reports/s122_feature_locus.json` W4 |
@@ -307,8 +313,11 @@ live hypothesis for it, not a settled artefact.
 
 ### Open work, in order
 
-Current ordering per session 124's own `▶ NEXT` (see `docs/session-log.md` for the superseded
-orderings and why each item moved).
+Current ordering per session 128's own `▶ NEXT` (see `docs/session-log.md` for the superseded
+orderings and why each item moved). ⚠ **The numbering below is historical and is NOT the priority
+order any more** — session 128 demoted item 2 (it turned out to be items 6 and 9 seen on another
+axis), so **item 6 is now the head item**. The numbers are kept because every rules file, gate
+docstring and CLOSED/REFUTED row cites them.
 
 0. ✅ **DONE, SESSION 126 — the bass peak is LOCALISED, and the single-constant route is REFUTED.**
    `analysis/bass_peak_locus.py` (GATE Y). Two CLOSED/REFUTED rows above carry the result; the
@@ -332,8 +341,31 @@ orderings and why each item moved).
    captures before shipping and is free (⚠ *indistinguishable with a rounding preference*, NOT "a
    better fit"). ⛔ Do NOT "simplify" the OS gate to an unconditional on: 4×/8× were measured and
    they lose (worst tone +9.9/+17.3 dB). See `docs/session-log.md` SESSION 124.
-2. **THD level term** — one of 6 rows over SHIP (3.523 vs ≤3.0, full-send). Model **over**-distorts
-   (signed mean positive) — do not reason about candidates as "add more distortion".
+2. ⭐⭐ **THD level term — LOCALISED, SESSION 128 (`analysis/thd_locus_gate.py`, GATE Z), AND BOTH
+   THINGS THIS ITEM SAID ARE NOW REFUTED.** Still one of 6 rows over SHIP (**3.561** vs ≤3.0,
+   full-send, on `s124_ship.json`). Two CLOSED/REFUTED rows above carry the detail; what a session
+   opening this item needs is:
+   - ⛔ **Do NOT reason from a pooled sign in EITHER direction.** s109's *"the model over-distorts"*
+     came from a QR-sign artefact and is fixed; and the corrected pool is still not a direction,
+     because the **convention-free surface changes sign inside the graded pool**:
+     | rung ↓ / DRIVE → | 0.0 | 0.5 | 1.0 |
+     |---|---|---|---|
+     | `drv_-18` | **+4.47** | +4.35 | −0.92 |
+     | `drv_-12` | +2.83 | +1.43 | −2.95 |
+     | `drv_-6`  | −1.36 | −2.64 | **−4.21** |
+     (raw THD %, model vs pedal, bleed-free full send; 3/3 monotone falling on each axis;
+     corroborated on the stored per-order harmonics, +2.88 → −0.32 dB, which shares no arithmetic
+     with it.) ⇒ **the target is a SLOPE with a crossing, not an amount.**
+   - ⭐ **The distortion-generation half already MEETS the bar** (bleed-free rms **2.201 = SHIP**);
+     the over-bar reading lives in the rows carrying clean bleed (**3.763**), and that half is
+     quantitatively A3's OD-path deficit seen through a ratio (DF −3.70 vs A3's −4.38 dB), so it
+     needs **no second mechanism** — it closes when A3 does.
+   - ⇒ **this item is now downstream of items 6/9, not independent of them.** The slope-with-a-
+     crossing IS GATE Q's `D(f)`/GATE S's compression-slope error on a third instrument, and the
+     bleed half is A3. ⚠ Whether that makes it worth *separate* work is a judgement for the next
+     session; what is no longer true is that it is "the only gated row with an open lever of its
+     own". ⛔ And do not aim a constant at the pooled 3.561 — no single offset can move a surface
+     that changes sign.
 3. ✅ **DONE, SESSION 127 — MEASURED, AND SESSION 124 IS THE LARGEST PERF WIN IN THE PROJECT: THE
    WHOLE CHAIN IS ~2× FASTER AT EVERY OS FACTOR.** `tests/PerfBenchmark.cpp` (new, registered with
    `add_test`, `RUN_SERIAL`, finite-only per `build.md` — timing is REPORTED, never gated). ⚠ Note
@@ -516,10 +548,12 @@ construction and sits in the OD path only, where A3 lives.
 (the doc-consolidation pass). Session 122's "sessions 115–122 are uncommitted" flag and its
 "flag to the user" note are **discharged**; nothing is owed there.
 
-✅ **Sessions 123–127 are COMMITTED.** Run
+✅ **Sessions 123–128 are COMMITTED.** Run
 `git status --porcelain` for the live, authoritative state — do not transcribe it here
 (`rebuild-targets-dont-transcribe`; the old per-session "Uncommitted at session N" blocks were
 exactly this mistake, repeated 28 times, and are archived verbatim in `docs/session-log.md`).
+Session 128 touched only `analysis/` and doc files (no `src/`), so it did not add to session 127's
+cache-invalidation bill.
 
 Regenerable/gitignored, not part of any commit decision: `analysis/reports/*.json`,
 `analysis/fit_logs/*.log`, `build/**`.

@@ -14069,3 +14069,183 @@ mtime or by loosening the cache key — the key is right (it is s117's own guard
 re-render is simply the price of a header comment. Recorded in `measurement-discipline.md` §5 as a
 third angle on `never-rebuild-while-a-render-is-in-flight`, with the remedy being to **batch a
 session's `src/` prose edits into one build alongside its last real change**.
+
+## SESSION 128 (2026-08-03) — open-work item 2 (the THD level term) LOCALISED, and the direction the project quoted for it was a `np.linalg.qr` sign convention
+
+Item 2 was session 127's `▶ NEXT` #1 and was described there as *"the only gated row with an open
+lever"*. It had never been localised — what the project carried was one pooled number plus a
+direction, and this session refutes both. **No render, no `src/` edit, no rebuild:** every number is
+a re-read of `s124_ship.json`, which is deliberate given session 127 invalidated the render cache.
+
+### ⛔⛔ FINDING 1 — `shape_gate`'s `level_signed` was **minus** the offset it reported, for 65 sessions
+
+`shape_gate.decompose` projects each residual onto an orthonormal `{1, u, u²}` basis built with
+`np.linalg.qr`. **QR's column signs are arbitrary**, and LAPACK's Householder convention returns
+`Q[:, 0] = −ones/√n` here, so
+
+    c[0] = Q[:, 0] · d = −√n · mean(d)      ⇒      level_signed = c[0]/√n = −mean(d)
+
+A residual that is a constant **+3 dB** was reported as **`level_signed = −3.0`**. Confirmed by a
+one-line known answer, not by inspection.
+
+Session 109 was right that the *gated* term is an unsigned rms and right to go looking for the
+direction; it found `level_signed` already computed and already stored, and read its sign off a
+library convention. That reading became CLAUDE.md's CLOSED/REFUTED row (*"the model **over**-distorts
+… any candidate reasoned about as 'we need more distortion' is backwards"*), open-work item 2's own
+framing, a bullet in `reference-sources.md` §1a, and `release_gate.thd_split`'s docstring.
+
+**Fixed at the source** (`basis` now pins each column's sign to the basis vector it represents), so
+all three signed terms become meaningful together. Before the fix they were **mutually
+inconsistent** — `tilt_signed` happened to land right, `level_signed` and `curv_signed` did not —
+and that inconsistency was the free tell nobody had asked for.
+
+⭐ **WHY IT SURVIVED, and this is the reusable half.** `shape_gate`'s own gate 2 (ATTRIBUTION) exists
+precisely to check that a known shape lands in the right term, and it scores
+`max(TERMS, key=lambda t: r[t])` — the **unsigned** terms. The gate written to check attribution was
+structurally blind to the half of attribution a handover would eventually read.
+
+⚠ **WHAT DID NOT MOVE, measured rather than argued.** Every unsigned quantity is invariant under a
+column-sign flip (`level`/`tilt`/`curv` take `abs`; `loc = d − Q@c` is invariant because `c` flips
+with `Q`). New selftest gate **2c** asserts that over 200 random residuals under a full sign flip and
+returns **0.000e+00**. `release_gate` re-run on `s124_ship.json`: all 14 rows and both THD rms values
+**byte-identical**, only the printed `SIGNED mean` lines flip. ⇒ `s124_ship.json` is still the
+baseline and **no re-baseline is owed**.
+
+Also added: selftest gate **2b**, six signed known answers, with `level_signed` asserted **equal to
+`mean(d)`** rather than merely same-signed — the scale is what makes it quotable as "the plugin reads
+N dB high" instead of just a sign.
+
+### ⛔⛔ FINDING 2 — and correcting the sign is not enough: **the surface changes sign inside the pool**
+
+With the convention fixed I had a tidy replacement headline — *"the model UNDER-distorts by
+2.31 dB"* — and it is as wrong as the old one, for a different reason. Measured **convention-free**
+(the two raw THD percentages side by side: no basis, no projection, no gain match, nothing a library
+can invert), over the stimulus × DRIVE plane at **zero bleed**, full send:
+
+| rung ↓ / DRIVE → | 0.0 | 0.5 | 1.0 |
+|---|---|---|---|
+| `drv_-18` | **+4.47** | +4.35 | −0.92 |
+| `drv_-12` | +2.83 | +1.43 | −2.95 |
+| `drv_-6`  | −1.36 | −2.64 | **−4.21** |
+
+(dB, `20log10(median model THD% / median pedal THD%)`; 5–6 rows per cell, 46 rows total.)
+
+- **Monotone falling with stimulus at 3/3 DRIVE settings, and with DRIVE at 3/3 rungs.**
+- Span **+4.47 … −4.21 dB**, crossing zero **inside** the graded population.
+- **54.8 % of the 1196 band readings** have the model higher — a coin flip, which is exactly what a
+  sign-changing surface looks like when it is summarised by one number.
+
+⇒ **the model over-distorts when the clipper is pushed gently and under-distorts when it is pushed
+hard.** Both of the project's prior directions were true of one corner. The target is a **SLOPE with
+a crossing**, and no constant offset can move it, whichever sign that offset carries.
+
+⭐ **Corroborated on an instrument sharing no arithmetic**: the report's stored per-order harmonics
+(H2–H7 in dB re the fundamental, at the 100/200/400 Hz anchors — per-order rather than summed, three
+fixed tones rather than 26 bands of a sweep) over the same rows read a rung-mean of
+**+2.88 → +1.51 → −0.32 dB**, same ordering, same crossing.
+
+⚠ This does **not** touch session 109's mechanism sentence — *"the model's OD path saturates too
+early"*. It sharpens it: distorting too much when pushed gently and too little when pushed hard is
+exactly what an early, soft ceiling does. What dies is only the single-signed summary.
+
+### ⭐⭐ FINDING 3 — most of the OVER-BAR reading is the MIX, and that half needs no new mechanism
+
+THD is harmonics/fundamental, and the clean blend tap contributes fundamental with **no harmonics**,
+so a mix-balance difference moves THD with **no change in distortion anywhere**. Split by the model's
+own clean fraction `cf` (from the shipped `LevelBlend` algebra at the **tapered** level — session
+113's trap):
+
+| population | n | rms (the GATED statistic) | signed mean | vs 3.0 bar |
+|---|---|---|---|---|
+| full-send OD (the gated row) | 289 | **3.561** | −2.306 | over |
+| bleed-free only | 46 | **2.201** | −0.566 | **SHIP** |
+| with bleed only | 243 | **3.763** | −2.635 | over |
+| `gain-n12` [control] | 33 | 1.665 | −0.365 | SHIP |
+
+⇒ **the population that actually measures distortion generation already meets the bar.**
+
+And the bleed axis is quantitatively what A3 predicts. If the OD path is `DF` dB quiet against a
+clean path that is right (GATE O's A3 attribution exactly), the dilution is fully determined:
+
+    excess(cf) − excess(0) = −20 log10( (1 + r) / (1 + r·10^(DF/20)) ),   r = cf/(1−cf)
+
+**One** free parameter, and one already measured on a different instrument. Fitted over the four
+bleed classes: **DF = −3.70 dB, INTERIOR, rms 0.56 dB** against GATE O's independently measured
+**−4.38 dB** — **0.68 dB apart**, with A3's clean-side bound at 0.48 dB. ⇒ the bleed half is **A3 read
+through a ratio**, the same shape as session 122's finding that the 1400 % THD cell was A3's
+cancellation null read as a denominator — sized here on the whole gate row rather than one cell.
+
+⚠ **SUFFICIENCY, not identification**: any mechanism that scales the OD path's fundamental against
+its harmonics by the same factor predicts the same curve. What it can do is retire the need for a
+*second* mechanism, which is what a work list needs.
+
+⛔ **NOT a proposal to split or re-member the gated row.** Z6 prints and stops. A split here would be
+strictly worse-founded than session 114's: bleed is **continuous**, the cf classes are **unbalanced
+across DRIVE** (Z2 prints the cross-tab), and `cf` is the **model's** own coefficient rather than a
+measured property of the reference. Session 114's own note is explicit that a split must keep the
+original bar on both halves and must be justified by a **verdict** disagreement, and it was a user
+decision.
+
+### What was built
+
+- **`analysis/thd_locus_gate.py` (GATE Z)** — no render. Z1 known answer (reproduces
+  `release_gate.thd_split`'s three rms values to 1e-9 **and** requires `shape_gate`'s stored
+  `level_signed` to equal an independently computed `mean(20log10(model/pedal))`, which pins the sign
+  fix *where it is consumed*, not only in a selftest); Z2 membership + per-axis composition; Z3 the
+  convention-free surface; Z4 the harmonic corroboration; Z5 the bleed axis and the one-parameter
+  dilution law; Z6 the per-sub-population reading, reported not proposed.
+- **`analysis/_mutate_gate_z.py`** — 10 arms, all firing their own guard, control passes.
+- **`analysis/shape_gate.py`** — the `basis` sign fix plus selftest gates **2b** (signed known
+  answers) and **2c** (sign-flip invariance of every unsigned quantity).
+- **`analysis/release_gate.py`** — the printed note now says which way a negative sign points and
+  ⛔ refuses to let the pooled sign be read as the direction; `thd_split`'s docstring corrected.
+- `analysis/reports/s128_thd_locus.json` — every printed number.
+
+⭐ **A mutation-runner extension worth copying.** Session 108's rule (*exit only on things that make
+the numbers below meaningless; anything that is an OUTCOME gets a computed verdict and execution
+continues*) means a well-built gate's **headline findings never change the exit code** — so every
+mutation runner in this project could test the plumbing and never the conclusions, which is why
+`computed-verdicts-not-narrated` has four prior occurrences with nothing mechanically checking it.
+Arms here carry an expected **exit code** *plus* a **string the output must contain**; four arms use
+`expect_rc = 0`, break the data behind a verdict, and require the gate to print the **opposite**
+verdict. The new failure mode is `NARRATED` — passed but never printed the required line.
+
+⚠ **Both first-draft arms failed for reasons that were the test's fault, one of each documented
+kind**, and both are recorded at the arm: one *vacuous* (raised the tool's own minimum-band bar by 6
+to force a membership drift, but every graded row uses **all 26** bands, so the bar never bound —
+`suspect the mutation before the guard`, s110), and one *caught by an earlier guard than it aimed at*
+(emptied a sub-population by dropping a capture class, which also shrank the headline group, so the
+**membership** guard fired before the **empty** guard — s119's *fix the expectation, not the guard*).
+
+### Verification
+
+- `shape_gate --selftest`: gates 1, 2, **2b**, **2c**, 3 all pass.
+- `release_gate s124_ship.json`: **6 rows over SHIP, unchanged**, every gated value byte-identical.
+- `_mutate_gate_z.py`: control passes, **10/10** arms fire their own guard.
+- **ctest 18/18** (88.8 s). No `src/` file was touched, so no relink and no further cache damage —
+  session 127's ~25-minute re-render cost is unchanged, not compounded.
+
+### ▶ NEXT, in order
+
+1. ⭐⭐ **The drive-dependent mechanism above ~2 kHz** (item 6) — now clearly the largest open model
+   item, and this session **added a fourth instrument pointing at the same class of target**. Item
+   2's surface is a *frequency-independent* statement of the same thing item 6 measures in the
+   frequency domain (GATE Q's `D(f)`, *"only a nonlinearity can carry it"*), so a candidate for item
+   6 should now be gated on **both**: it must move the treble/bass feature loci **and** flatten the
+   THD slope-with-a-crossing. ⇒ two independent acceptance tests for one candidate, which is
+   strictly better than item 6 had before.
+2. **Item 2 is no longer independent** — see CLAUDE.md's rewritten entry. Its distortion half is
+   item 6's target on another axis and its bleed half is A3. ⛔ Do not open it as a standalone
+   fitting job, and do not aim a constant at the pooled 3.561.
+3. **Items 4/5** (the corrupted-MASTER-anchor consumers; the VTC-amplitude-vs-physical-rail re-fit)
+   — unchanged, and item 5 gains support from this session: a ceiling fitted **5.4× below the
+   physical rail** is exactly the shape that would distort too early and then run out of range,
+   which is the surface Z3 measured. ⚠ That is a *consistency*, not evidence — the re-fit still has
+   to be measured, and it must carry session 127's perf term (off `clipK = 2.0` the plugin is 2×
+   slower and ADAA silently dies).
+4. ⚠ **Item 9 (the LEVEL-law topology question) is now cheaper again.** Z5 needed the model's clean
+   fraction and could only use the **model's** coefficient, because the reference's is not knowable
+   from a capture — which is precisely GATE L4's open (a)-vs-(b). Z5's fitted `DF` is a new,
+   independent handle on it.
+5. ⚠ **Phase 10's remaining probes are still unbuilt** — `FeatureProfile` and `OSFidelity`.
+   Unchanged by this session.

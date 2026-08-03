@@ -106,6 +106,20 @@ the derivation. Full per-session detail: `docs/session-log.md`.
   `CLAUDE.md` SHIPPED CONSTANTS). ⚠ Two corrections fell out: the THD "level term" is an **UNSIGNED**
   rms (signed mean **+1.263 dB** — the model over-distorts, not under); one `(capture, sweep)` cell
   is a reference dropout worth +0.055 dB of the shipped OD headline.
+  - ⛔⛔ **s128 — THE FIRST OF THOSE TWO CORRECTIONS IS ITSELF REFUTED, AND SO IS ITS REPLACEMENT.**
+    That `+1.263` (and s109's `+2.94` on the bleed-free endpoints, and every signed THD figure this
+    file or `CLAUDE.md` has printed since) came from `shape_gate`'s `level_signed`, which was
+    **−mean(d)**: `np.linalg.qr`'s arbitrary column signs, never examined, so a constant **+3 dB**
+    residual reported as **−3.0**. Fixed at the source in `shape_gate.basis`; **no gated number
+    moved** (they take `abs`). ⛔ And the corrected sign is *still* not quotable as a direction —
+    measured convention-free from the raw percentages the THD ratio runs **+4.47 dB at DRIVE 0 × the
+    quietest rung to −4.21 dB at DRIVE max × the hottest**, crossing zero inside the pool. ⇒ **what
+    survives from s109 is that the term is unsigned and that the mechanism is a compression-law
+    error; what does NOT survive is any statement of the form "the model distorts more/less".** The
+    over-distorting corner is real and so is the under-distorting one. `analysis/thd_locus_gate.py`
+    (GATE Z). ⚠ s109's mechanism sentence — *"the model's OD path saturates too early"* — is
+    **unaffected and in fact sharpened**: distorting too much when pushed gently and too little when
+    pushed hard is exactly what an early, soft ceiling does.
 - **s112** — GATE O5's "ND's clean path is not level-invariant" is **REFUTED**. Four fresh clean
   twins read 12.000 dB flat to 0.0003 dB across 29 bands; the 0.334 dB tilt was one contaminated
   pair (`ref-clean.wav`), corroborated on a second instrument sharing no machinery (GATE N's THD

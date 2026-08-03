@@ -99,11 +99,36 @@ TERMS = ["level", "tilt", "curv", "local"]
 # =============================================================================================
 def basis(freqs):
     """Orthonormal {1, u, u^2} on u = normalised log10(f). Orthonormal so the terms partition the
-    mean square exactly rather than approximately -- which is what makes the sum a CHECK."""
+    mean square exactly rather than approximately -- which is what makes the sum a CHECK.
+
+    ⛔⛔ SESSION 128 BUG FIX -- THE SIGN OF `level_signed` WAS INVERTED FOR 65 SESSIONS, AND IT IS
+    THE ONE SIGNED TERM ANY TOOL CONSUMES. `np.linalg.qr` is free to return any column signs
+    (LAPACK's Householder convention hands back Q[:, 0] = **-1/sqrt(n) * ones** here), and the
+    coefficients inherit them: c[0] = Q[:, 0] . d = -sqrt(n) * mean(d), so `level_signed` came out
+    as **-mean(d)**. A residual that is a constant +3 dB was reported as `level_signed = -3.0`.
+    Column 2 happened to land positive and column 3 negative, so `tilt_signed` was RIGHT and
+    `curv_signed` was WRONG -- an inconsistency between three terms of one basis is the fingerprint
+    of an unexamined library convention rather than a deliberate choice.
+    ⚠ WHAT THIS DID NOT TOUCH: every UNSIGNED quantity is invariant under a column-sign flip
+    (`level`/`tilt`/`curv` take abs, and `loc = d - Q @ c` is invariant because c flips with Q), so
+    no gated number, no baseline and no stored report moves -- selftest gate 4 asserts exactly that.
+    What moved is the DIRECTION the project quoted for the THD level term, which selected the
+    workplan for open-work item 2. See CLAUDE.md's CLOSED/REFUTED table.
+    ⭐ WHY IT SURVIVED: selftest gate 2 (ATTRIBUTION) picks `max(TERMS, key=...)` over the UNSIGNED
+    terms, so it could not see a sign at all -- the gate written to check attribution was blind to
+    the half of attribution that a handover would eventually read. Gate 2 now asserts the signs too.
+
+    Fix: canonicalise each column's sign so it points along the basis vector it represents. This is
+    the source of the convention rather than a patch at each consumer, so all three signed terms
+    become meaningful together."""
     lg = np.log10(np.asarray(freqs, dtype=float))
     u = 2.0 * (lg - lg.min()) / (lg.max() - lg.min()) - 1.0
     V = np.stack([np.ones_like(u), u, u * u], axis=1)
-    Q, _ = np.linalg.qr(V)                             # columns orthonormal
+    Q, _ = np.linalg.qr(V)                             # columns orthonormal, signs ARBITRARY
+    # Pin the sign of each column to its own basis vector, so c[j] > 0 means "d leans along V[:, j]".
+    for j in range(Q.shape[1]):
+        if float(Q[:, j] @ V[:, j]) < 0.0:
+            Q[:, j] = -Q[:, j]
     return Q
 
 
@@ -118,7 +143,11 @@ def decompose(d, Q):
            "curv": abs(float(c[2])) / np.sqrt(n),
            "local": float(np.sqrt(np.mean(loc ** 2))),
            "rms": float(np.sqrt(np.mean(d ** 2))),
-           # signed versions, because the DIRECTION of a tilt is the diagnostic half
+           # Signed versions, because the DIRECTION is the diagnostic half. With `basis`'s
+           # canonicalised column signs (session 128 -- read that note before touching this),
+           # `level_signed` == mean(d) exactly, so for d = plugin - pedal a POSITIVE level_signed
+           # means the PLUGIN reads higher; `tilt_signed` > 0 is rising with frequency; and
+           # `curv_signed` > 0 is a scoop (up at both band edges).
            "level_signed": float(c[0]) / np.sqrt(n),
            "tilt_signed": float(c[1]) / np.sqrt(n),
            "curv_signed": float(c[2]) / np.sqrt(n)}
@@ -260,6 +289,50 @@ def selftest():
     print("        it slightly, so LOCAL is a LOWER BOUND on a narrow feature (and the 1/3-oct grid")
     print("        is a second, larger lower bound -- session 46 measured -3.4 banded vs -24 at")
     print("        full resolution). LOCAL says WHERE to look, not how deep.")
+    # ---------------------------------------------------------------------------------------------
+    # ⛔ SESSION 128. Gate 2 above ranks the UNSIGNED terms, so for 65 sessions it passed while
+    # `level_signed` returned MINUS the offset it was reporting (see `basis`). A signed known answer
+    # is one line and it fails loudly; without it, the only reader of the sign is a handover.
+    # ---------------------------------------------------------------------------------------------
+    print("\n  2b DIRECTION -- the SIGNED terms must point the way the injected shape does.")
+    print("     (gate 2 ranks magnitudes and is blind to this; the inverted level_signed it missed")
+    print("      was quoted as the direction of the THD defect from session 109 to 127.)")
+    #                                                        want_sign, and an EXACT value where the
+    #                                                        term has one (level_signed == mean(d))
+    signed_cases = [
+        ("constant +3 dB     ", np.full(len(fa), 3.0), "level_signed", +1, +3.0),
+        ("constant -3 dB     ", np.full(len(fa), -3.0), "level_signed", -1, -3.0),
+        ("RISING tilt (+u)   ", 3.0 * u, "tilt_signed", +1, None),
+        ("FALLING tilt (-u)  ", -3.0 * u, "tilt_signed", -1, None),
+        ("SCOOP (+u^2)       ", 3.0 * (u * u - np.mean(u * u)), "curv_signed", +1, None),
+        ("DOME  (-u^2)       ", -3.0 * (u * u - np.mean(u * u)), "curv_signed", -1, None),
+    ]
+    print("      %-22s %14s %10s   %s" % ("case", "term", "value", "verdict"))
+    for name, d, term, want_sign, exact in signed_cases:
+        r = decompose(d, Q)
+        good = (r[term] > 0.0) if want_sign > 0 else (r[term] < 0.0)
+        if exact is not None:                          # level_signed must EQUAL mean(d), not merely
+            good &= abs(r[term] - exact) < 1e-12       # share its sign -- that pins the scale too
+        ok &= good
+        print("      %-22s %14s %+10.4f   %s" % (name, term, r[term], "OK" if good else "FAIL"))
+    print("      ⭐ `level_signed` is asserted EQUAL to mean(d), not merely same-signed: the scale is")
+    print("        what makes it quotable as 'the plugin reads N dB high' rather than just a sign.")
+
+    print("\n  2c SIGN-FLIP INVARIANCE -- fixing the basis signs must move NO unsigned quantity, so")
+    print("     no gated number, baseline or stored report can have moved with the session-128 fix.")
+    Qflip = Q * np.array([-1.0, -1.0, -1.0])
+    rng2 = np.random.default_rng(23)
+    worst_inv = 0.0
+    for _ in range(200):
+        d = rng2.normal(0.0, 3.0, len(freqs))
+        a, b = decompose(d, Q), decompose(d, Qflip)
+        for t in TERMS + ["rms"]:
+            worst_inv = max(worst_inv, abs(a[t] - b[t]))
+        worst_inv = max(worst_inv, float(np.max(np.abs(a["local_curve"] - b["local_curve"]))))
+    print("      worst |unsigned term| difference under a full column-sign flip: %.3e   %s"
+          % (worst_inv, "OK" if worst_inv < 1e-12 else "FAIL"))
+    ok &= worst_inv < 1e-12
+
     print("\n  3 COHERENCE -- the band census must separate ONE SHARED feature from a band that is")
     print("    merely noisy. Both cases below inject the SAME energy at the SAME band, so `share`")
     print("    cannot tell them apart; only the sign across rows can. If this fails, a census row")

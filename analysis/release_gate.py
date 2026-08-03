@@ -350,14 +350,27 @@ def thd_split(path):
     because GATE N certified those rows on a THD statistic — excluding them from the THD gate row
     while grading them on FR would be quoting the certification and refusing its consequence.
 
-    ⛔ AND THE SPLIT IS PRINTED BECAUSE THE POOLED ROW IS NOW A MIXTURE OF TWO OPPOSITE-SIGNED
-    POPULATIONS. The gated term is `abs(c[0])/sqrt(n)` RMS'd over rows — a MAGNITUDE — and the two
-    halves disagree about the DIRECTION: at full send the model over-distorts (signed +1.41 dB at
-    s110) and at the 12.071 dB lower send it UNDER-distorts (−0.77). So an rms over the union is
-    smaller than either population's own error, and the number falls for a membership reason rather
-    than a model one. `unsigned-aggregates-have-no-sign` (s109) meeting
+    ⛔ AND THE SPLIT IS PRINTED BECAUSE THE POOLED ROW IS A MIXTURE OF POPULATIONS THAT DISAGREE.
+    The gated term is `abs(c[0])/sqrt(n)` RMS'd over rows — a MAGNITUDE — so an rms over the union
+    can be smaller than either population's own error, and the number then falls for a membership
+    reason rather than a model one. `unsigned-aggregates-have-no-sign` (s109) meeting
     `aggregate-moved-check-membership-first` — the signed means are printed beside every rms so the
-    mixture cannot be read as an improvement."""
+    mixture cannot be read as an improvement.
+
+    ⛔⛔ SESSION 128 — TWO CORRECTIONS TO WHAT THE PRINTED SIGN MEANS. This docstring used to read
+    "at full send the model over-distorts (signed +1.41 dB at s110) and at the 12.071 dB lower send
+    it UNDER-distorts (−0.77)". BOTH halves are wrong, for two independent reasons:
+      (1) `shape_gate.basis` inherited arbitrary `np.linalg.qr` column signs, so `level_signed` was
+          **−mean(d)**: every sign this tool has printed since session 109 was BACKWARDS. Fixed at
+          the source in session 128; the gated rms values are bit-identical (they take abs).
+      (2) EVEN CORRECTED, THE POOLED SIGN IS NOT A DIRECTION. Measured convention-free on the raw
+          THD percentages over the bleed-free full-send OD rows (GATE Z,
+          `analysis/thd_locus_gate.py`), the ratio runs **+4.47 dB at DRIVE 0 × the quietest rung to
+          −4.21 dB at DRIVE max × the hottest** — the model over-distorts at low drive and
+          under-distorts at high drive, crossing zero inside the pool. So a single mean over that
+          plane is a weighted average of two opposite-signed regimes; quote the surface, not its
+          mean. `a-pooled-statistic-cannot-answer-about-its-own-axis`, on the sign rather than the
+          size."""
     _, rows, _ = SG.thd_rows(path)
     bands, caps = MG.load(path)
     drops, _, _ = MG.find_dropouts(bands, caps)
@@ -468,6 +481,16 @@ def print_report(path, m, thd):
         print("     signed means (the gated term is an unsigned rms and never carried a direction):")
         for lbl, (r, s, n) in m["thd_split"].items():
             print(f"       {lbl.strip():<26}rms {r:6.3f}   SIGNED mean {s:+6.3f}   n {n:>4}")
+        print("     ⛔⛔ SESSION 128: THE SIGN PRINTED ABOVE WAS INVERTED FROM SESSION 109 TO 127 —"
+              " `shape_gate.basis`\n       inherited arbitrary QR column signs, so `level_signed`"
+              " returned MINUS mean(d). NEGATIVE means the\n       MODEL DISTORTS LESS. Every"
+              " gated rms above is unaffected (it takes abs), and shape_gate's\n       selftest"
+              " gate 2c asserts that.\n     ⛔ AND DO NOT READ THIS POOLED SIGN AS THE DIRECTION"
+              " OF THE DEFECT EITHER — it changes sign across\n       the operating plane. GATE Z"
+              " (`analysis/thd_locus_gate.py`) measures it convention-free from the raw\n"
+              "       percentages: the model over-distorts at low drive / quiet stimulus and"
+              " under-distorts at high\n       drive / hot stimulus. A pooled mean over that"
+              " plane is membership-weighted, not a direction.")
 
     # SESSION 111: state the OD membership on every run. It changed, so a reader comparing against
     # any pre-s111 quote must be able to see which set produced this column without going to a doc
