@@ -15160,3 +15160,450 @@ a swap left the totals alone (s130's `_mutate_gate_ab.py` arm 6).
 4. **GATE AD's item 3 (AD3, the 800 Hz–1 kHz clean-tilt inversion)** — unowned by any work item for
    a third session now.
 5. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+## SESSION 135 (2026-08-04) — GATE AG: the reference DOES carry AF6's slope, it is not a uniform tilt, and a pure tilt cannot fix position and shape at once
+
+**Head item on entry:** session 134's `▶ NEXT` #1, verbatim — *"read GATE Q's `D(f)` at 2.9 kHz and
+ask whether its local slope has the required sign and size. That is a stored-report read, no render
+— and it converts '72 % of the rms is available' into 'the shape does/does not match', which is the
+only thing still separating this from a build."*
+
+⛔ **No render, no capture, no constant, no baseline move, no `src/` edit.** `s124_ship.json` is
+still the baseline; nothing under `src/`, `tests/` or `CMakeLists.txt` was opened, so ctest is
+unaffected and session 127's cache bill is not added to (no relink).
+
+**Built:** `analysis/drive_tilt_shape_gate.py` (**GATE AG**) + `analysis/_mutate_gate_ag.py`
+(**11/11**), `analysis/reports/s135_drive_tilt.json`. The surface is **imported** from
+`od_absolute_gate` (GATE Q), the feature windows from `feature_locus_gate` (GATE W), and AF6's
+requirement is **read from `analysis/reports/s134_sk_mechanism.json`**, never transcribed.
+
+### Why the obvious estimator is wrong here
+
+A least-squares slope over 1/3-octave bands is **biased at this vertex**. The bands nearest
+2934.8 Hz sit at −0.197 / +0.136 / +0.470 oct, so an LS line is effectively centred near 3225 Hz —
+and since the pedal's tilt STEEPENS with frequency, that overstates the slope at the vertex, **in
+the flattering direction**. AG fits a QUADRATIC in log2(f/F0) and takes its linear coefficient,
+which IS the derivative at F0. That also buys an exact known answer: adding `T·log2(f/F0)` to any
+curve must raise that coefficient by exactly T, whatever the curve underneath — **AG1b measures
+2.2e−14 dB/oct against an EXACT requirement**, with an injected ZERO as the arm's own built-in
+control.
+
+### AG3 — the two operands, every rung (the answer to NEXT #1)
+
+s117 (a delta cannot say which end moved) and s129 (an endpoint pair is not a ladder), both obeyed:
+
+| rung | MODEL slope | PEDAL slope | P − M |
+|---|---|---|---|
+| `sweep_clean` | +0.017 (sd 0.31) | −2.001 (sd 1.06) | −2.018 |
+| `sweep_drv_-18` | +0.070 (sd 0.05) | −2.211 (sd 0.42) | −2.281 |
+| `sweep_drv_-12` | +0.091 (sd 0.03) | −2.755 (sd 0.36) | −2.845 |
+| `sweep_drv_-6` | +0.111 (sd 0.02) | −3.945 (sd 0.57) | −4.056 |
+
+**MODEL rung-to-rung `+0.052 / +0.021 / +0.021`, span 0.094 dB/oct — pinned, and moving the wrong
+way. PEDAL `−0.210 / −0.544 / −1.190`, span 1.944, monotone falling 4/4 with ACCELERATING deltas,
+and monotone in 11 of 14 captures individually.** The model's span is **0.048×** the pedal's.
+
+⇒ item 6's signature, reproduced on a **third axis** (position → depth → now SLOPE) — and it is the
+axis AF6 says the fix must live on.
+
+### AG5 — sign and size: AVAILABLE
+
+| window | bands | MODEL dTILT | PEDAL dTILT | P − M | vs need |
+|---|---|---|---|---|---|
+| **±0.50** | 3 | +0.094 | −1.944 | **−2.038** | **1.72×** |
+| ±0.75 | 4 | +0.094 | −2.215 | −2.309 | 1.95× |
+| ±1.00 | 6 | +0.095 | −2.720 | −2.815 | 2.38× |
+| ±1.25 | 8 | +0.097 | −3.190 | −3.288 | 2.77× |
+
+±0.50 oct is **PRIMARY** because it is the only window whose full span (2075–4150 Hz) clears BOTH
+neighbouring migrating features — GATE W's `bt_notch` window tops at 1000 Hz and its `treble_notch`
+window starts at 4200. That containment is **asserted at AG1c, before any slope is read**, and it
+holds by only **50 Hz** at the top. Same sign as required in **13 of 14** captures.
+
+⇒ **AF6's −1.185 dB/oct requirement is CONTAINED in a defect already measured, at 1.72× its size.**
+
+### AG4 — ⭐⭐ THE SHAPE, and it is NOT what AF6 assumed
+
+AF6 flagged its own broadband extrapolation as an assumption. Measured, over the only three centres
+whose whole window clears both features:
+
+| centre | 1613 Hz | 2032 Hz | 2560 Hz |
+|---|---|---|---|
+| PEDAL − MODEL drive-tilt | −0.39 | −0.78 | **−1.44** |
+
+**Monotone steepening, −1.58 dB/oct per octave.** Above the clean band the same difference continues
+−2.8 / −5.5 / −8.5 at 3225 / 4064 / 5120 Hz — same direction, but those windows reach ND's treble
+notch (GATE AE: centres 6150–10708 Hz), so they are reported as a **trend and are NOT counted**.
+⚠ **n = 3 uncontaminated centres — a direction, not a broad measurement.**
+
+⇒ **the deficit is not a uniform tilt.** A candidate delivering a CONSTANT drive-dependent tilt
+would land on target at one frequency and be wrong at the others by a growing amount. **The
+mechanism must be frequency-dependent, not a tilt knob.**
+
+### AG6 — ⭐⭐ the vertex law over-predicts, and that is a NEW CONSTRAINT
+
+Applying AF6's own law to the pedal's measured tilt: `dx = −T/C` with the model's
+C = −11.124 dB/oct² gives **−11.4 %** against GATE W6's measured pedal walk of **−7.3 %** — same
+sign, over-predicting by **1.55×**.
+
+That is a result, not a rounding error. Reproducing the pedal's own −7.3 % from its own
+−1.944 dB/oct needs **C = −17.66 dB/oct², i.e. the pedal's peak is ~1.6× SHARPER than ours.**
+
+⇒ **giving the model the pedal's FULL measured tilt would OVERSHOOT the peak target.** Position and
+shape cannot both be fixed by a pure tilt while the two curvatures differ. A candidate must be gated
+on BOTH, and that is cheap to do.
+⚠ The implied curvature is a division of two ratios, and the pedal's vertex has never been fitted on
+a 1/48-oct grid (GATE W's locator could do it; the 1/3-oct report grid cannot). Treat −17.66 as an
+implication, not a measurement.
+
+### ⭐ Two free known answers from a cross-baseline control
+
+Running AG on `s118_clampfix` / `s120_newton` / `s124_ship` (same captures, three different `src/`):
+
+1. **The PEDAL's rung-to-rung deltas are IDENTICAL on all three** (`−0.210 / −0.544 / −1.190`,
+   span 1.944). They must be — it is the same reference audio — so this certifies the reference-side
+   measurement is a property of the captures and not of the model, the baseline, or the gate.
+2. ⭐⭐ **The MODEL's span collapses 0.830 → 0.100 dB/oct at s120.** Before session 120's `rtsafe`
+   Newton fix the model carried a **non-monotone** (`−0.682 / +0.199 / +0.631`) drive-dependent HF
+   slope of **0.83 dB/oct — 70 % of AF6's entire requirement — of NUMERICAL origin.** The solver fix
+   removed it. ⇒ not a regression: the model is now *cleanly* missing the mechanism, which is the
+   right state to build a candidate from, and it means any pre-s120 reading of this axis was
+   measuring the solver.
+
+### One restatement owed elsewhere
+
+AF6 sized its broadband figure as **72 % of GATE Q's `D(f)` rms using 3.01 dB** — an **s109-era**
+number that `CLAUDE.md` also carries. GATE Q on s118 / s120 / s124 reads **2.53 / 2.65 / 2.64 dB**.
+The same 2.16 dB is therefore **82 %** of the current term: the fraction goes UP and the conclusion
+strengthens. AG prints this restatement every run.
+
+### Mutation runner: 11/11
+
+`analysis/_mutate_gate_ag.py`. Seven refusal arms (AG1a/b/c, AG2's malformed-partial branch, AG2's
+asserted settings keys, AG4's empty membership, the AF-report vacuity arm) and **four
+computed-verdict arms** — one per verdict that could otherwise be narration (AG3's dose-response,
+AG3's "model pinned" comparison, AG4's "steepens", AG5's sign against the target). Verdict arms
+assert on the **verdict sentence**, never on a count (s130).
+
+⚠ **One arm's expectation was fixed, not the guard it hit.** AG4's empty-membership arm first
+lowered `SMOOTH_HI` to 2500, and was refused by **AG1c** — which reads the same bounds and fires
+earlier. That is the gate being better than the test's model of it (s119: when a mutation is caught
+by an EARLIER guard than you aimed at, fix the EXPECTATION). Raising `SMOOTH_LO` to 2000 instead
+keeps the vertex window contained, so the mutation reaches the guard it is aimed at.
+
+### ▶ NEXT, in order
+
+1. ⭐⭐ **Item 6's treble half is now sized, direction-confirmed and SHAPE-constrained; what it still
+   lacks is a physical carrier, and the search space is now well specified**: a
+   **frequency-dependent, drive-generated loss that steepens with frequency, at or UPSTREAM of the
+   clipper**, worth ~−2.0 dB/oct of drive-tilt at 2.9 kHz and growing above it. AF7 already refuted
+   the five post-clipper candidates; the next AF-style screen belongs on the **pre/at-clipper** side
+   (the J201 stage, the clipper's own frequency-dependent loop, the GRUNT/treble ladder feeding it).
+   ⛔ Do NOT screen a constant tilt — AG4 refutes that class before it is built.
+2. **Measure the pedal's own vertex CURVATURE on GATE W's 1/48-oct locator** to convert AG6's
+   implied −17.66 dB/oct² into a measurement. That decides how much of the available tilt a
+   candidate may spend, and it is the one number standing between AG6's constraint and a gate.
+3. **The bridged-T half of AB6 (τ × 0.9337) remains unowned** — unchanged from s134's #2; AG6's
+   peak-only tilt does not touch it.
+4. **GATE AD's item 3 (AD3, the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a fourth session.
+5. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+---
+
+## SESSION 136 (2026-08-04) — CLAUDE.md re-archived on its own 800-line trigger; no measurement, no code
+
+**Changed NO baseline, NO constant, NO `src/` file and NO analysis tool.** This session is entirely
+the documentation job session 135 flagged as the next session's first: `CLAUDE.md` closed session 135
+at **811 lines**, over the 800-line trigger the "Documentation discipline" rule sets. **811 → 722.**
+
+### The precondition, checked before any edit
+
+The discipline rule permits compression only where the material is already archived verbatim here.
+Verified first, not assumed: `grep '^## SESSION'` confirmed **124–135 all present** with full
+narrative, and every distinct number about to leave `CLAUDE.md` was grepped for in this file and
+found (`3025.8`, `11.97`, `204.5`, `437.8`, `92.6`, `24.871`, the whole s127 perf table, …).
+**0 of the checked values existed only in `CLAUDE.md`.** Nothing was deleted; four things were
+compressed to their verdicts plus pointers.
+
+### What was compressed, and why each was safe
+
+1. **Seven per-session STATUS bullets (s129–s135, 64 lines → 22).** Every one opened *"Session N
+   changed NO baseline, NO constant and NO `src/` file"* and then re-narrated results that are
+   **already rows in the CLOSED/REFUTED table twenty lines below**. Replaced by one bullet naming
+   all seven gates, their tools and their mutation-runner scores, plus the sentence that matters:
+   *the CLOSED/REFUTED table, not the bullet, is where they are read.*
+   ⭐ Three things were deliberately **kept** out of that collapse because they are live warnings
+   rather than results: AD being the project's first hardware-referenced gate **and not covering
+   §4's harmonic finding**; the s133 **thread race** in the mutation runner; and AG's cross-baseline
+   control showing any **pre-s120 reading of the drive-tilt axis was measuring the solver**.
+   Two flags were folded to one line because both are **discharged** (the `CMakeLists.txt` VERSION
+   bump, the `sk_gate_i_reconcile.py` naming collision).
+2. **The three ✅ DONE items (0/1/3, ~50 lines → ~20).** Item 3's perf table went out under
+   `rebuild-targets-dont-transcribe` — `PerfBenchmark` prints live numbers and the table's own
+   caveat says only within-run ratios are quotable, so a transcribed copy in the handover is exactly
+   the artefact that rots. The verdict, the ratios that generalise (−56…−59 % fast path, +18…+22 %
+   ADAA at the gated-ON factors, zero at 4×/8×) and the ⛔ do-not-re-open stayed.
+3. **Item 6's chronological re-narration (~145 lines → ~78).** This was the real bloat and the real
+   risk. The item had accreted one paragraph per session (s125 sag → AA6 → AB → AC → AF → AG), each
+   restating a refutation that the CLOSED/REFUTED table carries in full — i.e. `CLAUDE.md` was
+   duplicating *itself*. Restructured into three blocks that answer the three questions a session
+   opening the item actually has:
+   - **what is measured** — the W6 position table, the Y6 bass-peak table, the AD depth table and
+     the closed-form localisation of our own 2980 Hz peak, all **kept verbatim**;
+   - **what the target is now** — AF6's slope, stated once, with **three pre-registered gates** a
+     candidate must pass (frequency-dependent not constant-tilt; position AND shape; CLEAN
+     bit-identical). The three gates were scattered across three sessions' prose and are now a list;
+   - **what is already refuted** — a new **six-row table**, one line per candidate class, each with
+     its one-clause reason and session number.
+   ⭐ That last table is the change worth keeping. The refutations were the item's most valuable
+   content and its least findable: to learn "don't build a drive-dependent Sallen-Key" you had to
+   read to the bottom of a 145-line item. Six rows now say it at a glance, and each still points at
+   the full CLOSED/REFUTED row.
+4. **The "Uncommitted work" block.** It transcribed which session ranges were committed — stale by
+   construction, and the exact mistake `rebuild-targets-dont-transcribe` names (the old per-session
+   "Uncommitted at session N" blocks repeated it 28 times). Replaced by an instruction to run
+   `git status --porcelain` / `git log --oneline`.
+
+### ⛔ What was NOT touched, deliberately
+
+**The CLOSED/REFUTED table (41 data rows) and SHIPPED CONSTANTS (13 rows) were not edited at all** —
+row count asserted identical before and after. They are the load-bearing content of the file; the
+whole point of compressing the narrative around them is to make them easier to reach. Also untouched:
+the release-gate section, the standing rules, A3's five-exclusions sentence and its s125 corollary,
+and every open item that is still open (2, 4, 5, 7, 8, 9).
+
+### Headroom
+
+722 lines leaves ~78 before the trigger fires again. At the recent rate (~10 lines/session: a couple
+of CLOSED/REFUTED rows plus a STATUS bullet) that is roughly **8 sessions**. ⚠ The structural cause
+of the 811 was **item 6 growing a paragraph per session**; if it starts doing that again, the fix is
+to add a row to its refuted table rather than a paragraph to its body.
+
+### ▶ NEXT — unchanged from session 135; this session consumed no work item
+
+1. ⭐⭐ **Item 6's treble half: find a physical carrier.** The search space is well specified — a
+   **frequency-dependent, drive-generated loss that steepens with frequency, at or UPSTREAM of the
+   clipper**, worth ~−2.0 dB/oct of drive-tilt at 2.9 kHz and growing above it. AF7 refuted the five
+   post-clipper candidates; the next AF-style screen belongs on the **pre/at-clipper** side (the J201
+   stage, the clipper's own frequency-dependent loop, the GRUNT/treble ladder feeding it).
+   ⛔ Do NOT screen a constant tilt — AG4 refutes that class before it is built.
+2. **Measure the pedal's own vertex CURVATURE on GATE W's 1/48-oct locator**, converting AG6's
+   implied −17.66 dB/oct² into a measurement. It decides how much of the available tilt a candidate
+   may spend, and it is the one number between AG6's constraint and a usable gate.
+3. **The bridged-T half of AB6 (τ × 0.9337) remains unowned.**
+4. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a fifth session.
+5. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+---
+
+## SESSION 137 (2026-08-04) — GATE AH: the pedal's vertex curvature is MEASURED, AG6's implication is 17–28 % too sharp, and item 6's gate 2 is now a number
+
+**Changed NO baseline, NO constant and NO `src/` file.** Read-only, over GATE W's stored renders at
+GATE W's own settings. New tool `analysis/vertex_curvature_gate.py` (GATE AH) + its mutation runner
+`analysis/_mutate_gate_ah.py` (**11/11 arms**). Report: `analysis/reports/s137_vertex_curvature.json`.
+
+Executes session 135's `NEXT` #2 verbatim: *"measure the pedal's own vertex CURVATURE … converting
+AG6's implied −17.66 dB/oct² into a measurement."*
+
+### Why it mattered
+
+AB4/AF6 established the treble peak is a **VERTEX**, so the vertex law `Δx = −T/C` is what turns a
+drive-tilt into a peak walk. AF6 sized the requirement with it; AG5 measured that the reference
+carries **1.72×** that tilt; AG6 put the two together and found the law **over-predicts by 1.55×**,
+concluding *"the pedal's peak is ~1.6× sharper — C_pedal ≈ −17.66 dB/oct²"* and flagging that number
+as an **implication, not a measurement** (a division of two ratios; the pedal's vertex had never been
+fitted at all). Item 6's **gate 2** — *a candidate must be gated on position AND shape* — rested on it.
+
+⛔ **And AG6's OTHER operand needed checking too, which AG6 could not do.** Its `C_model` is AF1c's
+**closed-form** cascade curvature (−11.124) while its measured walk is a property of the **rendered**
+model — two different objects (post-clipper linear cascade vs the whole chain including the
+pre-clipper path and the mix). If they disagree at this feature, part of AG6's 1.55× is an object
+mismatch rather than a device difference. AH4 therefore measures **both** sides on **one** estimator.
+
+### AH1 — the two known answers
+
+- **(a) Injected parabola, exact algebra so the bar is 1e−9 and not a guess.** Adding
+  `0.5·C·log2(f/f0)²` to any curve must raise the fitted curvature by exactly `C`. Swept
+  C ∈ {0, −3, −11.124, +7.5}: worst error **5.9e−14**. **C = 0 is the arm's own built-in control**
+  (it must find nothing), per s133.
+- **(b) The estimator on GATE AB's CLOSED-FORM cascade must reproduce AF1c's stored curvature**, and
+  the stored value is **read from the s135 report, never transcribed**: **−11.079 vs −11.124, 0.40 %**
+  (bar 5 % — two grids, two centring conventions, one analytic curve). This is what makes AH4's model
+  column comparable to the number AG6 actually used.
+
+### AH3 / AH3b — membership, and the guard that had to be split
+
+GATE Q's pure-OD endpoints, `gain-n12` excluded (16), of which **8 resolve the peak on BOTH sides at
+all four rungs**. The 8 dropped are named, and **all 13 unresolved cells are on the PEDAL side** —
+which the gate now **computes and prints** rather than asserting: the first draft hard-coded that
+sentence in prose, and per `computed-verdicts-not-narrated` it was replaced with the measured
+partition (`sides = sorted({s for s, … in faint})`) before the mutation runner was written.
+
+A partial ladder is **split by its reason** (AG2's test plus s133's correction to s129's rule): a cell
+lost to **prominence** has an independently-measured physical reason ⇒ excluded and named; a cell lost
+to the window **EDGE** is a validity failure ⇒ **refuses**.
+
+⚠⚠ **THE PROMINENCE BAR SITS IN A DENSE REGION, NOT A GAP — so s109's "place the bar in the gap and
+assert the gap" is NOT available here, and pretending otherwise would have been the flattering move.**
+Swept, the surviving cell count runs **0.5 → 127 · 1.0 → 115 · 2.0 → 6 · 4.0 → 0**: no separation
+anywhere, i.e. the population is a continuum and *any* bar is a choice. The honest response is not a
+better threshold but **AH4b — re-run the whole measurement at each bar and print what the headline
+does**:
+
+| prominence bar | n captures | C_pedal | ratio |
+|---|---|---|---|
+| 0.5 dB | 15 | −12.845 | **1.179×** |
+| 1.0 dB (primary) | 8 | −14.674 | **1.346×** |
+
+⇒ verdict **BAR-SENSITIVE — the headline tracks the membership; quote it with its bar and n.**
+⭐ The direction survives both, which is the part that matters.
+
+**AH3b** asserts window containment **after locating and before any curvature is read** (AG1c's rule).
+⚠ It **cannot** be asserted from GATE W's windows alone, and the gate's first draft tried to and duly
+refused itself: `treble_peak` ends at 4200 Hz and `treble_notch` **starts** at 4200 Hz, so a
+window-bounds test fails at *any* fit half-width whatsoever. The bound that means something is over
+the vertices actually **located** (2434.7–3024.9 Hz; widest fit window 2169.1–3395.3 Hz, against
+`bt_notch` topping at 1000 and `treble_notch` starting at 4200) — still before any curvature is read,
+because **locating a vertex is not measuring one**.
+
+### AH2 — the window sweep, printed rather than hidden
+
+A vertex on a non-parabolic background has a **window-dependent** curvature. That is a property of the
+quantity, not a defect, so the fit half-width is swept and the dependence printed. The usability bar
+is **derived from the estimator's geometry, not chosen** — the fit's own vertex must land in the
+middle half of its own fit window (⚠ the first draft used a flat 0.02 oct at every half-width, which
+is a tolerance a correct implementation cannot meet):
+
+| half-width | points | C_model | C_pedal | ratio | usable |
+|---|---|---|---|---|---|
+| 1/24 | 4 | — | — | — | no (< 5 points for a 3-parameter fit) |
+| 1/16 | 6 | −10.881 | −14.940 | 1.373 | no (vertex 0.054 > 0.031 bar) |
+| **1/12** (primary, = AF1c's own window) | 8 | **−10.903** | **−14.674** | **1.346** | **yes** |
+| 1/8 | 12 | −10.869 | −13.052 | 1.201 | no (vertex 0.227 > 0.063) |
+| 1/6 | 16 | −10.848 | −12.780 | 1.178 | **yes** |
+
+⭐⭐ **The asymmetry in that table is the session's most useful structural finding: `C_model` is
+essentially INVARIANT (−10.85…−10.90, 1.005× over the whole sweep) while `C_pedal` moves 1.17×.** The
+model's peak really is the clean vertex of a linear cascade; the pedal's sits on a background that is
+not parabolic — which is AG4's non-uniform tilt showing up in a second statistic.
+
+### AH4 — the measurement
+
+Per stimulus rung, one estimator, one grid, primary half-width:
+
+| side | drv_−30 | drv_−18 | drv_−12 | drv_−6 | median | span |
+|---|---|---|---|---|---|---|
+| model | −10.968 | −10.908 | −10.897 | −10.871 | **−10.903** | 0.99× |
+| pedal | −13.781 | −14.416 | −15.165 | −14.932 | **−14.674** | 0.91× |
+
+**C_pedal / C_model = 1.346×.**
+
+### ⭐⭐ AH5 — AG6 re-closed, and its 1.55× turns out to be TWO effects
+
+| | |
+|---|---|
+| implied (s135, a division of two ratios) | **−17.664 dB/oct²** |
+| MEASURED, primary half-width | **−14.674** |
+| MEASURED, over the usable window range | −12.780 to −14.674 |
+| distance from the implication | **16.9 – 27.6 %** |
+| pedal sharper than model at EVERY usable window | **true** |
+
+⇒ **DIRECTION CONFIRMED, SIZE REDUCED.** ⚠ The verdict is **gated on the RANGE, not the primary
+point** — AH2 measures `C_pedal` moving with the fit window, so a verdict read off one window would be
+a property of that window (`a-lever-measured-at-one-rung-is-a-claim-about-that-rung`, applied to the
+estimator's own free parameter rather than to the stimulus).
+
+⭐ **And the decomposition closes from both ends** (s117 — an unexpectedly large effect is a request
+for a second derivation). AG6 got its implied curvature by **assuming the vertex law is exact on the
+pedal** and solving for C. Measured, the law is **not** exact:
+
+    AG6's over-prediction           1.5533×  (on the CLOSED-FORM C_model −11.124)
+    rescaled to the RENDERED C_model −10.903 → 1.5848×
+    = (curvature ratio 1.3459×) × (the vertex law's own residual on the pedal 1.1954×) = 1.6089×
+    agreement 1.5 %   PASS (bar 5 %)
+
+⇒ **AG6's 1.55× was two effects, not one: the pedal's vertex really is 1.35× sharper, AND the vertex
+law itself over-predicts by a further 1.20 ×** — which **AG4 already predicts**, because the law is a
+**local** linearisation and the pedal's tilt is not uniform. Attributing all of it to curvature is
+exactly how −14.67 became −17.66.
+
+⚠⚠ **The MODEL row is UNRESOLVED and must stay that way.** Its own law check reads predicted
+**+0.601 %** against measured **+0.194 %** — both below the locator's resolution — so the vertex law
+**cannot be tested on our side at all**. Only the pedal row resolves (predicted −8.77 % vs measured
+−7.34 %). That is not a failure; it is the same fact item 6 is built on (our peak is pinned), and the
+gate reports it as `resolved: false` rather than printing a ratio of two numbers that are both noise.
+
+### AH6 — cross-instrument, because AG6 mixed two of them
+
+AG5 reads the slope at 2935 Hz over ±0.5 oct of GATE Q's **1/3-octave band surface** (3 bands); AH6
+runs the identical quadratic-derivative estimator on GATE W's **1/48-oct transfer** (49 points, ~14×
+the sampling, a different H1 window).
+
+| side | drv_−30 | drv_−18 | drv_−12 | drv_−6 | change |
+|---|---|---|---|---|---|
+| model | +0.104 | +0.117 | +0.119 | +0.124 | **+0.021** |
+| pedal | −1.807 | −2.186 | −2.700 | −4.077 | **−2.269** |
+
+P−M = **−2.290 dB/oct** here against AG5's **−2.038**; same sign, |difference| 0.252 ≤ ½|AG5| ⇒
+**CORROBORATED — AG6's mixing of the 1/3-oct surface with the 1/48-oct locator is safe at this
+feature.** ⭐ Free by-product: the model's pinned tilt (+0.021 span) reproduces on a completely
+different instrument, as does the pedal's monotone 4/4 acceleration.
+
+### ⭐⭐⭐ AH7 — THE DELIVERABLE: item 6's gate 2, as a number
+
+| | |
+|---|---|
+| the walk the model must acquire (GATE W6's pedal median) | **−7.34 %** (−0.1099 oct) |
+| the model's MEASURED vertex curvature | **−10.903 dB/oct²** |
+| ⇒ **max drive-dependent tilt a candidate may deliver at 2935 Hz before it OVERSHOOTS position** | **−1.199 dB/oct** (range **−1.193 … −1.199**) |
+| the tilt the reference actually carries (AG5) | −2.038 dB/oct |
+| ⇒ a candidate reproducing the reference's FULL tilt overshoots by | **1.70×** |
+
+⭐ **The budget depends on `C_model` ONLY — the stable half**, and saying so is what stops AH4b's
+BAR-SENSITIVE verdict being read as a caveat on it, which it is not. `C_model` moves 1.005× over the
+usable fit windows and reads −10.898 / −10.903 over the two membership bars; the noisy quantity
+(`C_pedal`) **never enters the budget** — only the pedal's WALK (a GATE W6 median) and `C_model` do.
+
+⭐ **Corroboration nobody asked for:** AF6 sized its requirement at **−1.185 dB/oct** using the
+CLOSED-FORM curvature; AH7 gets **−1.199** from the RENDERED one — **1.2 % apart**. AF6's sizing
+survives having its curvature operand re-measured on a different object.
+
+⚠ **The budget is a POSITION constraint only.** AG4 already refuted the whole **constant-tilt** class
+on shape (the deficit steepens −1.58 dB/oct per octave), so *"deliver −1.199 dB/oct uniformly"* is
+**not a specification** — it is the ceiling the frequency-dependent candidate must respect **at the
+vertex**.
+
+### The mutation runner — 11 arms, and one of them was wrong
+
+`analysis/_mutate_gate_ah.py`, **11/11 behaved as required**: 8 refusal arms (AH1a, AH1b, AH3's
+edge-cell validity branch, AH3's prominence-bar sweep must actually turn the knob, AH3b, AH2's
+primary-window usability, AH4-vs-AH2 one-statistic-computed-twice, and a VACUITY arm requiring AG's
+operands to be READ rather than invented) plus — per s128 — **3 COMPUTED-VERDICT arms**, which are the
+only kind that can test a conclusion at all, because a well-built gate's findings deliberately never
+change its exit code:
+
+- AH5's comparison must print **REFUTED** when the pedal is made the blunter side;
+- AH6 must print **NOT CORROBORATED** when the stored AG5 value is sign-flipped;
+- AH5's decomposition closure must print **CHECK** when one of its three operands is perturbed.
+
+⚠ **One arm was wrong and the fix went to the ARM, not the guard** (s110, *suspect the mutation before
+the guard*): the first AH5-inversion arm injected a parabola that pushed a **pedal** peak onto the
+window bound, so **AH3's edge guard fired first** and the runner reported the wrong tag. The gate was
+behaving correctly — defence in depth. The repair steepens the **MODEL** instead, which cannot push a
+maximum toward an edge, and the arm then inverts AH5 exactly as intended.
+
+### ▶ NEXT
+
+1. ⭐⭐ **Item 6's treble half: find a physical carrier — unchanged as the head item, and now it has
+   a two-sided gate.** A **frequency-dependent, drive-generated loss that steepens with frequency, at
+   or UPSTREAM of the clipper**. AF7 refuted the five post-clipper candidates; the next AF-style
+   screen belongs on the **pre/at-clipper** side (the J201 stage, the clipper's own frequency-
+   dependent loop, the GRUNT/treble ladder feeding it). ⛔ Do NOT screen a constant tilt (AG4), and
+   ⛔ do not spend more than **−1.199 dB/oct** at the vertex (AH7).
+2. **The bridged-T half of AB6 (τ × 0.9337) remains unowned** — AF6/AG/AH's tilt is peak-only.
+3. ⚠ **`C_pedal` is bar- and window-sensitive (1.18–1.37×), and nothing yet explains WHY.** AH2 says
+   our vertex is clean and theirs sits on a non-parabolic background; that is consistent with AG4 and
+   is not measured as such. Cheap next read if item 6 stalls: fit a cubic and report the third-order
+   term per side, which would turn "not parabolic" into a number.
+4. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a sixth session.
+5. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.

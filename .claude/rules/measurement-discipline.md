@@ -506,6 +506,33 @@
   the gate should say so instead of trimming a tail (`self-selecting-scores`). A generous bar feels
   conservative and is not — it is just a different arbitrary number, and it fails in the flattering
   direction. (s109, GATE Q3)
+  - ⭐⭐ **WHAT TO DO WHEN THE COROLLARY FIRES — s137 IS THE FIRST TIME IT DID, AND "say so" IS NOT
+    ENOUGH ON ITS OWN: RE-RUN THE HEADLINE AT EVERY BAR AND PUBLISH THE SENSITIVITY.** GATE AH's
+    membership needs a prominence bar to decide which cells resolve a feature. Swept, the surviving
+    count runs **127 / 115 / 6 / 0** at 0.5 / 1.0 / 2.0 / 4.0 dB — a continuum with **no separation
+    anywhere**, so the entry above forbids asserting a gap and there is no defensible bar to find.
+    The move that keeps the gate honest is to make the bar an **axis rather than a decision**:
+    re-measure the headline at each bar and print the table (here **0.5 dB → n=15, C −12.85, ratio
+    1.179×** vs **1.0 dB → n=8, C −14.67, ratio 1.346×**), then emit a computed
+    **`BAR-SENSITIVE — quote it with its bar and n`** verdict. ⭐ Two things that makes possible and a
+    single number does not: the **direction** is visibly bar-independent (the finding), while the
+    **size** is not (the caveat) — and a downstream consumer can then be checked for whether it even
+    touches the sensitive quantity. Here it did not: the deliverable depends only on the *model's*
+    curvature, which moves 1.005× over fit windows and 0.04 % over bars, so the BAR-SENSITIVE verdict
+    was explicitly stated **not to reach it**. ⚠ Say that out loud at the consumer, or a caveat
+    attached to one number gets read as a caveat on everything printed near it. (s137, GATE AH4b/AH7)
+  - ⭐⭐ **A SHAPE PARAMETER FITTED OVER A WINDOW IS WINDOW-DEPENDENT — SWEEP THE WINDOW, GATE THE
+    VERDICT ON THE RANGE, AND READ THE ASYMMETRY.** A vertex's curvature on a non-parabolic background
+    has no single value; that is a property of the quantity, not a defect. AH2 swept the fit
+    half-width, took the usability bar from the **estimator's own geometry** (the fit's vertex must
+    land in the middle half of its own fit window) rather than from a round number — a first draft
+    used a flat 0.02 oct at every half-width, which is a tolerance a correct implementation cannot
+    meet — and gated the verdict on the **range across usable windows**, not on the primary point.
+    ⭐ The sweep's real payoff was unplanned and structural: **`C_model` is invariant to it (1.005×)
+    while `C_pedal` moves 1.17×**, which is an independent statement that our feature is a clean
+    vertex of a linear cascade and theirs is not — a second instrument agreeing with an already-
+    measured finding (AG4's non-uniform tilt), from a sweep run for a completely different reason.
+    (s137, GATE AH2)
   - ⭐⭐⭐ **AND THE FOLLOW-ON THAT COST SESSION 113 A WRONG CLASSIFICATION: "THE BIGGEST GAP IN THE
     SORTED VALUES" IS NOT A BIMODALITY TEST.** GATE S needed to separate condition-matched twin
     pairs from re-dialled ones, and its first bar was the largest ratio between adjacent sorted
@@ -1825,6 +1852,33 @@
   thing varying — an exact-zero endpoint of the mixing network is usually available and turns a
   2-parameter fit into a subtraction. ⚠ And when the two disagree, they may be different quantities
   rather than one of them being wrong: say which is which instead of picking. (s103, GATE K7)
+  - ⭐⭐⭐ **THE SHARPEST FORM, s137: A PARAMETER OBTAINED BY *INVERTING A LAW* ABSORBS THAT LAW'S OWN
+    RESIDUAL, SO IT IS SYSTEMATICALLY WRONG BY EXACTLY THE AMOUNT THE LAW MISSES — AND IT LOOKS LIKE
+    A MEASUREMENT OF THE DEVICE.** The vertex law `Δx = −T/C` over-predicted the reference's peak walk
+    by **1.55×**; session 135 solved it for `C`, got **−17.66 dB/oct²**, and correctly labelled it an
+    implication — but the *label* travelled as a caveat while the *number* travelled as a fact into
+    the gate a candidate was to be judged by. Measured directly on the same estimator as our own side,
+    `C_pedal` is **−14.67** (range −12.78…−14.67 over the usable fit windows) — **17–28 % blunter**.
+    ⭐ The discrepancy is not noise and it is fully accounted for: the law is a **local linearisation**
+    and the reference's tilt is not uniform (already measured, AG4), so the law over-predicts on the
+    reference by **1.20×** *on its own*, and `1.346 (the real curvature difference) × 1.195 (the law's
+    residual) = 1.609` against the inverted figure's **1.585 — 1.5 %**. ⇒ **inverting the law had
+    silently attributed 100 % of a two-part discrepancy to the one parameter being solved for.**
+    ⭐ GENERAL: whenever you solve a law for a parameter you cannot otherwise reach, you have assumed
+    the law is exact **on that data**; write that assumption down beside the number, and treat
+    measuring the parameter independently as the way to *size the law's residual* rather than as a
+    duplicate of work already done. The two disagreeing is the expected outcome, and their ratio is
+    itself the result. ⚠ Note which direction it ran: the inverted value was the more dramatic one
+    (a sharper vertex, a tighter constraint), so nothing about it looked suspicious.
+    (s137, GATE AH5; the family of `a-sizing-is-not-a-mechanism` — there a required move was read as
+    a build instruction, here a derived operand was read as a measurement)
+  - ⭐⭐ **AND MEASURE BOTH OPERANDS OF A RATIO ON THE SAME OBJECT — "the model's curvature" WAS TWO
+    DIFFERENT THINGS.** The same inversion divided a **rendered** model's peak walk by a **closed-form**
+    cascade's curvature (the post-clipper linear network alone, no pre-clipper path, no mix). They
+    happen to agree here to **2 %**, so the conclusion survived — but that was luck until it was
+    checked, and checking cost one extra column. **Before believing a cross-object ratio, re-measure
+    the numerator and denominator with one estimator on one object, and report the two figures side
+    by side.** (s137, GATE AH1b/AH4)
 - ⭐⭐ **WHEN A FIT WON'T CLOSE, FREE THE NUISANCE PARAMETER AS A CONTROL — IT SEPARATES "MY
   MEASUREMENT OF IT IS WRONG" FROM "THE MODEL IS WRONG", AND THOSE HAVE OPPOSITE NEXT STEPS.**
   GATE L's inverse takes the clean/OD ratio |ρ(f)| as MEASURED from two endpoint captures. When

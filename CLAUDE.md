@@ -153,6 +153,15 @@ high, execute routine work cheap) is what should persist.
 done. **Phase 9 (reference validation) is the only phase in progress**; Phase 10 (perf pass +
 release) has not started.
 
+✅ **RE-ARCHIVED AT SESSION 136** (the file hit 811 lines at the end of session 135 and its own
+800-line trigger made this the next session's first job). **Nothing was deleted** — every compressed
+passage was already present verbatim in `docs/session-log.md` under its own `## SESSION N` heading
+(124–135 all verified present before any edit), which is exactly the condition the discipline rule
+requires. What was compressed: seven per-session STATUS bullets → one; the three ✅ DONE work items
+(0/1/3) → their verdicts plus pointers; item 6's chronological re-narration of refutations that the
+CLOSED/REFUTED table below already carries in full. ⚠ **The CLOSED/REFUTED and SHIPPED CONSTANTS
+tables were not touched** — they are the load-bearing content and compressing them is never the move.
+
 #### STATUS
 
 - **Current baseline: `analysis/reports/s124_ship.json`** (162 captures) — session 124 shipped three
@@ -175,58 +184,36 @@ release) has not started.
   what it graded.
   ⛔ The absolute-ledger gates (K/M/O/P/Q) must be read against `s118_clampfix.json` or later — GATE O
   deliberately refuses any earlier report by name (session 119).
-- ⚠ **Session 129 changed NO baseline, NO constant and NO `src/` file** — it read stored data only
-  (`analysis/drive_locus_gate.py`, GATE AA, + its 7/7 mutation runner). `s124_ship.json` stands and
-  the gate is still 6 rows over SHIP. Its two results are in the CLOSED/REFUTED table and both bear
-  on open item 6. ⚠ It also flags an **unexplained `CMakeLists.txt` VERSION bump 0.5.0 → 0.5.1** that
-  it did not make and deliberately did not revert — see `docs/session-log.md` SESSION 129.
-- ⚠ **Session 130 likewise changed NO baseline, NO constant and NO `src/` file** — closed-form
-  arithmetic on shipped constants only (`analysis/bt_pair_shape_gate.py`, GATE AB, + its 7/7 mutation
-  runner). Its three results are in the CLOSED/REFUTED table and all bear on open item 6, which now
-  has **two sized sub-targets** rather than one. ✅ **The session-129 `CMakeLists.txt` VERSION flag is
-  DISCHARGED** — put to the user at the top of session 130, who confirmed 0.5.1 is intended; committed
-  as-is. Nothing is owed there.
-- ⚠ **Session 131 likewise changed NO baseline, NO constant and NO `src/` file** — it read
-  `s124_ship.json` only (`analysis/hw_trend_gate.py`, **GATE AD**, + its 8/8 mutation runner).
-  ⭐⭐ **It is the project's FIRST hardware-referenced gate.** `release_gate.py` is 100 % ND-referenced,
-  so until now nothing mechanically distinguished "moved toward ND" from "moved away from hardware"
-  — `reference-sources.md` §5 rule 2 said to make that distinction and only a human reading a rules
-  file could apply it. GATE AD reports the LEAN per hardware trend and grades **sign and ordering
-  only** (§5 rule 3: §3/§4 are PNG reads). Its four results are in the CLOSED/REFUTED table.
-  ⛔ It covers the three FR trends and **NOT** §4's harmonic finding (hardware's evens ~27 dB above
-  ND's), which is the largest hardware gap in the project and needs a harmonic instrument.
-  ⚠ **An untracked `analysis/sk_gate_i_reconcile.py` claiming GATE AC was on disk at session start
-  and is not session 131's** — it has no session-log entry. Flagged, not touched, not run.
-  ✅ **This IS session 132's own tool** (a naming collision — two sessions ran in this repo at
-  once; session 131 claimed that number first, so this work is filed as 132). See below.
-- ⚠ **Session 132 likewise changed NO baseline, NO constant and NO `src/` file** — closed-form
-  arithmetic on shipped constants, run against `s124_ship.json` only (`analysis/sk_gate_i_reconcile.py`,
-  **GATE AC**, + its 7/7 mutation runner). It answers session 130's own `NEXT` #3, which explicitly
-  gated its `NEXT` #1 (building an SK-bandwidth candidate) behind this reconciliation. Result in the
-  CLOSED/REFUTED table. Also fixed a stale comment in `bt_pair_shape_gate.py` (`PEDAL_DPEAK`'s
-  docstring said −7.92 %; the constant itself was always −7.34 %, the rung-1→rung-4 CHANGE, not
-  AA6's max/min−1 SPAN — no number moved, only the comment was wrong).
-- ⚠ **Session 133 likewise changed NO baseline, NO constant and NO `src/` file** — it read
-  `s124_ship.json` plus 24 re-renders (`analysis/hf_null_presence_gate.py`, **GATE AE**, + its
-  **10/10** mutation runner). It answers session 131's own `NEXT` #1. ⭐⭐ **It CONFIRMS AD5b's
-  bleed-free reading and strengthens it past any threshold** — the model's window contains **NO
-  interior extremum at all in 9 of 9 cells**, so the 0.69 dB was an inflection — **and it adds one
-  qualifier that changes what kind of fix the item needs**: the model is not featureless there, it
-  carries a MIX cancellation, so what we lack is ND's *drive-generated* null. Two rows in the
-  CLOSED/REFUTED table; both bear on open item 6, and a third measurement lands on item 9.
-  ⚠ Seven defects were found in the session's OWN instrument, one of them a **thread race inside the
-  mutation runner** — see `docs/session-log.md` SESSION 133 before reusing any of that machinery.
-- ⚠ **Session 134 likewise changed NO baseline, NO constant and NO `src/` file** — closed-form
-  arithmetic on the shipped post-clipper cascade plus two stored reports
-  (`analysis/sk_mechanism_locus.py`, **GATE AF**, + its **10/10** mutation runner). Its head item on
-  entry was sessions 132's and 133's identically-worded `NEXT` #1, *"build the Sallen-Key candidate"*;
-  the user's decision was to localise the mechanism before writing DSP, and **that decision is what
-  stopped a build with no physical carrier**. Three rows in the CLOSED/REFUTED table, all on item 6:
-  the SK-bandwidth frame is refuted as a MECHANISM (0 of 5 candidates reach) while AB6's arithmetic
-  stands as a SIZING, and the replacement target is a **drive-dependent −1.185 dB/oct slope near
-  2935 Hz**, at or upstream of the clipper. ⚠ One defect in its own instrument, found by its own
-  mutation runner: AF2 `sys.exit`ed on a physics OUTCOME (s108's rule, in its flattering direction —
-  it was discarding a *stronger* refutation than the one it printed).
+- ⚠⚠ **SESSIONS 129–137 CHANGED NO BASELINE, NO CONSTANT AND NO `src/` FILE.** Eight consecutive
+  read-only gate sessions (plus s136, doc-only), each a new gate over stored data or closed-form
+  arithmetic on shipped constants, each with its own mutation runner: **AA** `drive_locus_gate.py`
+  (7/7) · **AB** `bt_pair_shape_gate.py` (7/7) · **AD** `hw_trend_gate.py` (8/8) · **AC**
+  `sk_gate_i_reconcile.py` (7/7) · **AE** `hf_null_presence_gate.py` (10/10) · **AF**
+  `sk_mechanism_locus.py` (10/10) · **AG** `drive_tilt_shape_gate.py` (11/11) · **AH**
+  `vertex_curvature_gate.py` (11/11). ⇒ `s124_ship.json` stands, the release gate is still
+  **6 rows over SHIP**, and **every result of all eight is a row in the CLOSED/REFUTED table below**
+  — that table, not this bullet, is where they are read. Per-session narrative:
+  `docs/session-log.md` SESSION 129–137.
+  ⭐⭐ **AD is the project's FIRST hardware-referenced gate** — `release_gate.py` is 100 %
+  ND-referenced, so until s131 nothing mechanically distinguished "moved toward ND" from "moved away
+  from hardware"; AD grades **sign and ordering only** (`reference-sources.md` §5 rule 3 — §3/§4 are
+  PNG reads). ⛔ It covers the three FR trends and **NOT** §4's harmonic finding (hardware's evens
+  ~27 dB above ND's), still the largest hardware gap in the project and still needing a harmonic
+  instrument that nobody has built.
+  ⚠ **Two carry-forwards from those sessions, both live:**
+  - **Do not reuse s133's mutation machinery without reading `docs/session-log.md` SESSION 133** —
+    seven defects were found in that session's own instrument, one a **thread race inside the
+    mutation runner** (`parallel.pmap` is a `ThreadPoolExecutor`; a module-level injection flag
+    leaked across workers). Now also in `measurement-discipline.md` §1.
+  - ⭐ **Any pre-s120 reading of the drive-tilt axis was measuring the SOLVER, not the model** —
+    AG's cross-baseline control found the model's drive-dependent HF slope span collapsing
+    **0.830 → 0.100 dB/oct at s120**, i.e. `rtsafe` removed a spurious **non-monotone** slope of
+    numerical origin worth **70 % of AF6's whole requirement**. The pedal side is bit-identical
+    across all three baselines (same captures — a free known answer certifying the reference side).
+- ⚠ Two flags raised in that run are **DISCHARGED, nothing owed**: the unexplained `CMakeLists.txt`
+  VERSION bump 0.5.0 → 0.5.1 (s129 → user confirmed intended at the top of s130), and the untracked
+  `sk_gate_i_reconcile.py` that appeared mid-s131 (it is s132's own tool — a naming collision from
+  two sessions running in this repo at once).
 - **ctest 18/18** as of session 127 (`PerfBenchmark` added — the 18th; ~54 s, `RUN_SERIAL`, and that
   serial property is load-bearing, not tidiness: it times wall-clock per sample, so a co-scheduled
   ctest job contends for the cores it is measuring. ⛔ Do not copy `RUN_SERIAL` to any other test as
@@ -324,6 +311,12 @@ table in this file.
 | "a falling effective op-amp GBW under large signal is the obvious single physical cause of the SK half" (s130's named carrier for item 6's treble half, carried into two `NEXT` lists as the thing to build) | ⛔⛔ **REFUTED TWICE OVER, s134 — and the second half is immune to any datasheet number** | 134 | **(1) SIZE:** moving the peak −7.34 % needs a gain-bandwidth of **16.09 kHz**; TL07x ships **3.0 MHz typ / 2.5 MHz min**, so the requirement is **155× below the worst part TI sells**. At the real GBW the lever delivers **−0.025 %**. **(2) STRUCTURE, the stronger half:** gain-bandwidth is a **SMALL-SIGNAL** parameter — an op-amp in its linear region does not lose GBW as the signal grows; the large-signal limit is *slew*, a rate limit and not a bandwidth reduction. ⇒ there is **no amplitude at which this lever moves at all**, so the size arithmetic is moot. The sentence names a mechanism that does not exist. ⭐ Free by-product of the same sweep: the model's **ideal-op-amp assumption costs 0.025 %** at this feature, so nothing is owed to modelling finite SK bandwidth statically either. | `analysis/sk_mechanism_locus.py` (GATE AF) AF2 |
 | "item 6's treble half is a Sallen-Key BANDWIDTH move" — AB6's `SK τ × 1.1113` read as a build instruction | ⛔⛔ **THE ARITHMETIC STANDS; THE MECHANISM IS REFUTED — 0 of 5 physical candidates reach, s134** | 134 | Screened in closed form on the shipped cascade, each quoted at the spread end WORST for the conclusion: falling GBW **0.0064** of what is needed, slew limiting **0.020** (worst \|dV/dt\| anywhere is **0.160 V/µs** against an 8 V/µs minimum-spec part — 50× margin, never engaged), output rail clamping **0.029**, op-amp input capacitance **0.023**, film-cap voltage coefficient **0.031**. ⭐⭐ The rail-clamp row is the sharpest and its answer was already on disk: `railEnabled = true` ships, so the model **already carries seven post-clipper amplitude nonlinearities**, two of them on the Sallen-Key outputs — and GATE W6 measured what all seven do to this peak across the 24 dB ladder: **0.21 %, verdict FIXED, 34× short**. A saturating clamp compresses the fundamental almost uniformly across frequency, and a uniform gain change **cannot move a vertex** (AB2's own control). ⇒ **the question was never "add a post-clipper nonlinearity".** ⛔ Do NOT build a drive-dependent Sallen-Key. ⚠ AB6 is unharmed: `SK τ × 1.1113` is a correct **SIZING** of how far the peak must move, not a claim that anything moves the SK corners. | `analysis/sk_mechanism_locus.py` (GATE AF) AF3–AF5, AF7 |
 | item 6's treble half, stated in the right units | ⭐⭐ **IT IS A *SLOPE*, NOT A CORNER — SIZED, s134** | 134 | Every refutation above is about **corners**, and AB4 already established the peak is a **VERTEX** (the bridged-T's rise meeting three rolloffs). A vertex sits where the total slope crosses zero, so a drive-dependent **TILT** moves it with **no corner moving anywhere**. The vertex law `Δx = −T/C` turns AF1c's curvature (**−11.124 dB/oct²**) into a prediction with no fit in it: **predicted −1.223, measured −1.185 dB/oct, agreeing to 3.2 %**. ⇒ **a drive-dependent slope change of −1.185 dB/oct near 2935 Hz puts the peak exactly on target**, and it lives **at or UPSTREAM of the clipper**, not in the SK pair. ⚠⚠ **LOCAL number** — the curvature argument is strictly local; the broadband reading (**−7.49 dB over 100 Hz–8 kHz**, rms **2.16 dB**, i.e. **72 % of GATE Q's measured `D(f)` of 3.01 dB rms**) is an **assumption**, and an rms says nothing about whether `D(f)` is a monotone tilt at 2.9 kHz. ⭐ Cross-check: the same tilt moves the notch only **+0.83 %** against **+7.14 %**, so it is a **peak-only** lever — AB3's orthogonality reproduced from a third construction, and **the bridged-T half stays unowned**. | `analysis/sk_mechanism_locus.py` (GATE AF) AF6 |
+| AF6's sized target — *"a drive-dependent −1.185 dB/oct slope change near 2935 Hz"* — is it actually CARRIED by the reference? (s134's own `NEXT` #1, the last thing separating item 6 from a build) | ⭐⭐ **YES — RIGHT SIGN, 1.72× THE REQUIRED SIZE, s135** | 135 | Measured as the two OPERANDS, not a delta (s117), at every rung (s129), on a quadratic-derivative estimator that recovers an injected tilt to **2.2e−14** (exact algebra, not a guessed bar). **MODEL slope pinned: span 0.094 dB/oct across the 24 dB ladder, and moving the WRONG way (+0.052/+0.021/+0.021). PEDAL: span 1.944, monotone falling 4/4 with ACCELERATING deltas (−0.210/−0.544/−1.190)**, monotone in 11/14 captures individually; the model's span is **0.048×** the pedal's. P−M = **−2.038 dB/oct**, same sign in **13/14**. ⇒ item 6's signature on a **THIRD axis** (position → depth → SLOPE), and the axis AF6 says the fix lives on. ⚠ The primary ±0.5 oct window (2075–4150 Hz) is the only one clearing BOTH neighbouring migrating features (GATE W's `bt_notch` tops at 1000, `treble_notch` starts at 4200) — asserted at AG1c before any slope is read, and true by only **50 Hz** at the top. | `analysis/drive_tilt_shape_gate.py` (GATE AG) AG3/AG5 |
+| AF6's own flagged assumption — *"extrapolating it to a broadband tilt is an ASSUMPTION … whether the SHAPE matches is UNMEASURED"* | ⛔⛔ **MEASURED, AND THE ASSUMPTION IS WRONG — IT IS NOT A UNIFORM TILT, s135** | 135 | Over the only three centres whose whole window clears both features, PEDAL−MODEL drive-tilt runs **−0.39 / −0.78 / −1.44 dB/oct at 1613 / 2032 / 2560 Hz — monotone STEEPENING at −1.58 dB/oct per octave**, and the same difference continues −2.8/−5.5/−8.5 at 3225/4064/5120 Hz (same direction, but those windows reach ND's treble notch per GATE AE, so reported as a trend and **not counted**). ⇒ **a candidate delivering a CONSTANT drive-dependent tilt would land on target at one frequency and be wrong at the others by a growing amount — that whole class is refuted before it is built.** The mechanism must be frequency-dependent, not a tilt knob. ⚠ **n = 3 uncontaminated centres — a direction, not a broad measurement.** | `analysis/drive_tilt_shape_gate.py` (GATE AG) AG4 |
+| "a drive-dependent tilt fixes the treble peak" — the move AF6 sized, read as sufficient | ⚠⚠ **NOT SUFFICIENT — POSITION AND SHAPE CANNOT BOTH BE FIXED BY A PURE TILT, s135** | 135 | AF6's vertex law applied to the pedal's OWN measured tilt (−1.944 dB/oct) with the model's curvature predicts a **−11.4 %** peak walk against GATE W6's measured **−7.3 %** — same sign, over-predicting **1.55×**. Reproducing the pedal's walk from its own tilt needs **C = −17.66 dB/oct² against our −11.12, i.e. the pedal's peak is ~1.6× SHARPER than ours.** ⇒ **giving the model the pedal's full measured tilt OVERSHOOTS the peak target**; a candidate must be gated on position AND shape, which is cheap. ⚠ The −17.66 is a division of two ratios and the pedal's vertex has never been fitted on a 1/48-oct grid — an implication, not a measurement (open item, s135 `NEXT` #2). | `analysis/drive_tilt_shape_gate.py` (GATE AG) AG6 |
+| AG6's implied **`C_pedal` = −17.66 dB/oct²** — the number item 6's "position AND shape" gate rested on | ⭐⭐ **MEASURED, s137 — DIRECTION CONFIRMED, SIZE REDUCED, and AG6's 1.55× turns out to be TWO effects** | 137 | Both sides fitted on **one** estimator on GATE W's 1/48-oct locator (AG6 could not: its `C_model` was AF1c's **closed-form** cascade while its walk was a property of the **rendered** model — two different objects). Measured **`C_model` −10.903 / `C_pedal` −14.674, ratio 1.346×**; over the usable fit windows `C_pedal` runs −12.780…−14.674, i.e. **17–28 % short of −17.66**, and the pedal is sharper at **every** usable window. ⭐ The decomposition closes from both ends: AG6's **1.5533×** (rescaled to the rendered `C_model` → 1.5848×) = **(curvature ratio 1.3459) × (the vertex law's own residual on the pedal 1.1954) = 1.6089×, agreeing to 1.5 %** ⇒ **the pedal's vertex really is 1.35× sharper AND the vertex law itself over-predicts by a further 1.20×** — which **AG4 already predicts**, the law being a *local* linearisation against a tilt that is not uniform. Attributing all of it to curvature is exactly how −14.67 became −17.66. ⚠⚠ **Quote it with its bar and n**: the prominence bar sits in a **dense region, not a gap** (cells 127/115/6/0 at 0.5/1.0/2.0/4.0 dB), so no bar is assertable and AH4b re-measures at each — **0.5 dB → n=15, −12.845, 1.179×** vs **1.0 dB → n=8, −14.674, 1.346×**. Direction survives both. ⚠ The MODEL row is **UNRESOLVED by construction** (predicted +0.601 % vs measured +0.194 % walk, both under the locator's resolution) — the law cannot be tested on our side at all, which is item 6's own premise, not a defect. | `analysis/vertex_curvature_gate.py` (GATE AH) AH4/AH5/AH4b |
+| "AG6 mixed two instruments (GATE Q's 1/3-oct band surface for the tilt, GATE W's 1/48-oct locator for the walk), so its arithmetic may not be safe" | ⭐ **CORROBORATED — the mixing is safe AT THIS FEATURE, s137** | 137 | The identical quadratic-derivative estimator on the 1/48-oct transfer (49 points, ~14× the sampling, a different H1 window) gives P−M drive-tilt **−2.290 dB/oct** against AG5's **−2.038** — same sign, difference 0.252 ≤ ½\|AG5\|. Free by-product: the model's **pinned** tilt (+0.021 span) and the pedal's **monotone 4/4 acceleration** (−1.807 → −4.077) both reproduce on an instrument sharing no bands with AG's. ⚠ Scoped to this feature; it licenses no general mixing of the two instruments. | `analysis/vertex_curvature_gate.py` (GATE AH) AH6 |
+| GATE Q's `D(f)` rms = **3.01 dB** — quoted in this file, in `reference-sources.md`'s A3 chain, and imported by GATE AF as the denominator of its "72 %" | ⚠ **STALE (s109-era) — the current value is 2.64 dB, and the conclusion STRENGTHENS** | 135 | GATE Q on the three valid baselines reads **2.53 / 2.65 / 2.64 dB** (s118 / s120 / s124); 3.01 predates s115's constants and s118's clamp fix, and the absolute-ledger gates were never allowed to be read against s109 anyway. AF6's 2.16 dB is therefore **82 %**, not 72 %, of the measured drive-dependent term. ⛔ Do not re-quote 3.01. GATE AG prints the restatement every run. | `analysis/drive_tilt_shape_gate.py` AG7 |
 | `drive-1700_base-od @ sweep_drv_-6`, 50 Hz reading ~1400% THD | **RESOLVED — denominator artefact** | 122 | Model's 50 Hz fundamental collapses 41 dB below the pedal's (a cancellation-null read-point coincidence, same mechanism as the bass-notch/A3 row); numerator (harmonic energy) is ordinary on both sides. Not a distortion-generation defect; needs no separate work. | `analysis/feature_locus_gate.py` |
 
 ### THE RELEASE GATE
@@ -380,7 +373,7 @@ live hypothesis for it, not a settled artefact.
 
 ### Open work, in order
 
-Current ordering per session 128's own `▶ NEXT` (see `docs/session-log.md` for the superseded
+Current ordering per **session 137's** own `▶ NEXT` (see `docs/session-log.md` for the superseded
 orderings and why each item moved). ⚠ **The numbering below is historical and is NOT the priority
 order any more** — session 128 demoted item 2 (it turned out to be items 6 and 9 seen on another
 axis), so **item 6 is now the head item**. The numbers are kept because every rules file, gate
@@ -391,14 +384,9 @@ docstring and CLOSED/REFUTED row cites them.
    short version is that every OD-path LF constant is a weak negative lever, the two that reach a
    +25.2 % move **dissolve GAP #2 and the mid peak**, and the gap being closed is itself a
    `sweep_clean` phenomenon that collapses to +6.4 % at `drv_-6`.
-   ⭐⭐ **WHAT IT HANDS FORWARD, AND IT BELONGS TO ITEM 6, NOT HERE** (written as a numbered entry
-   rather than a paragraph, per `closing-an-item-drops-its-successor`): **our bass peak is
-   DRIVE-DEPENDENT too — 163.9 → 151.1 Hz, −7.8 %** — and so is the pedal's (7.8 %, W6). So the
-   bass peak is *not* another "ours is pinned, theirs walks" case like the treble peak; **both
-   walk, and they walk to different places.** That makes it a second instance of item 6's
-   frequency-dependent-nonlinearity target, at the opposite end of the band from the treble peak,
-   and it must be gated the same way: any candidate has to be checked at every stimulus rung, not
-   at `sweep_clean` alone.
+   ⭐⭐ **ITS SUCCESSOR IS FILED UNDER ITEM 6, NOT HERE** (per `closing-an-item-drops-its-successor`):
+   the bass peak is a second instance of item 6's target, at the opposite end of the band — see
+   item 6's own table, where it is carried with its numbers.
    ⛔ Do NOT re-open "point an optimiser at trebleR7/trebleC5/trebleC7" — priced and refuted.
 
 1. ✅ **DONE, SESSION 124 — the user enabled ADAA, gated by OS factor, with `clipK` re-anchored to
@@ -434,30 +422,15 @@ docstring and CLOSED/REFUTED row cites them.
      own". ⛔ And do not aim a constant at the pooled 3.561 — no single offset can move a surface
      that changes sign.
 3. ✅ **DONE, SESSION 127 — MEASURED, AND SESSION 124 IS THE LARGEST PERF WIN IN THE PROJECT: THE
-   WHOLE CHAIN IS ~2× FASTER AT EVERY OS FACTOR.** `tests/PerfBenchmark.cpp` (new, registered with
-   `add_test`, `RUN_SERIAL`, finite-only per `build.md` — timing is REPORTED, never gated). ⚠ Note
-   `PerfBenchmark` **did not exist** until this session; session 120's 356 ns/sample came from a
-   scratch probe long since deleted, so "re-run PerfBenchmark" meant "build it".
-   **Full chain, ns per base sample, 48 kHz, BLEND=100 % OD, DRIVE=0.85 (run the test for live
-   numbers — do not transcribe):**
-   | factor | shipped | pre-s124 | pow fast path | ADAA on top | **s124 NET** | shipped × realtime |
-   |---|---|---|---|---|---|---|
-   | 1× | 225.0 | 437.8 | −58.0 % | +22.5 % | **−48.6 %** | 92.6× (1.08 % of a core) |
-   | 2× | 475.8 | 911.1 | −55.7 % | +18.0 % | **−47.8 %** | 43.8× (2.28 %) |
-   | 4× | 708.6 | 1653.9 | −57.2 % | **+0.08 %** | **−57.2 %** | 29.4× (3.40 %) |
-   | 8× | 1297.4 | 3151.8 | −58.8 % | **−0.03 %** | **−58.8 %** | 16.1× (6.23 %) |
-   ⇒ ADAA's cost is **+18…+22 % at the two gated-ON factors and ZERO to noise at 4×/8×** — the OS
-   gate is doing exactly what it says, and that ±0.05 % is a free known answer (checksum-identical
-   arms must also time identically). The fast path is **−56…−59 % of the WHOLE CHAIN**, so it dwarfs
-   ADAA's cost everywhere and the net is a ~2× speed-up at every factor. Stage-level (clipper alone,
-   384 kHz, comparable to s120's arm): **314.6 → 110.1 ns/sample, −65.0 %**.
-   ⭐⭐ **AND THE ARITHMETIC CLOSES FROM BOTH ENDS, so the −65 % is the `pow` calls and nothing
-   else:** a direct microbenchmark on this machine reads **11.97 ns per `std::pow`**, and the pow
-   count per sample is 4 (initial `solveF`+`solveFp`) + 4 × ~2.9 iterations + 2 (final `vtcSub` for
-   `y`) ≈ **17.6**, predicting **211 ns** against a measured **204.5 ns** — 3 %.
-   ⚠ **Absolute ns/sample is machine- and run-specific** (this run reads arm 1 at 314.6 where s120
-   recorded 356.59, −11.8 %, on a laptop three sessions later). **Only the within-run ratios are
-   quotable**; the test says so in its own output.
+   WHOLE CHAIN IS ~2× FASTER AT EVERY OS FACTOR** (`tests/PerfBenchmark.cpp`, `add_test`,
+   `RUN_SERIAL`, finite-only per `build.md` — timing is REPORTED, never gated). The `pow` fast path
+   is **−56…−59 % of the WHOLE CHAIN** at every factor; ADAA costs **+18…+22 %** at the two gated-ON
+   factors and **zero to noise** at 4×/8× (a free known answer — checksum-identical arms must also
+   time identically), so the net is a ~2× speed-up everywhere. Arithmetic closed from both ends: a
+   `std::pow` microbenchmark × the per-sample pow count predicts the stage figure to **3 %**.
+   ⚠ **Absolute ns/sample is machine- and run-specific — only within-run ratios are quotable**, and
+   the test says so in its own output. **Run it for numbers; the s127 table is in
+   `docs/session-log.md` SESSION 127** (`rebuild-targets-dont-transcribe`).
    ⛔ Do NOT re-open "is the re-anchor worth it on perf grounds" — it is priced, and the price is
    negative by a factor of two.
    ⚠ (Historical, now moot: had `clipK` stayed at 2.4653, ADAA would have needed a general-k
@@ -485,29 +458,26 @@ docstring and CLOSED/REFUTED row cites them.
    | treble peak | 2977 → 2983 Hz (**FIXED, 0.2%**) | 2696 → **2498** Hz (7.9%) | 281 Hz @ clean → **485 Hz (19.4%) @ `drv_-6`** |
    | bridged-T | 715.8 → 716.9 Hz (**FIXED, 0.2%**) | 695.7 → **745.4** Hz (7.2%) | crosses over |
    | mid peak | 458 → **467** → 448 → 429 Hz | 447 → 440 → 414 → **419** Hz | +2.51 / +6.18 / **+8.29** / +2.41 % |
-   ⛔⛔ **THE "MID PEAK TRACKS" CLUE IS WITHDRAWN (s129) — AND WITH IT THIS ITEM'S "it is specific,
-   not global" PREMISE.** The line here used to read *"458 → 429 (9.0%) | 447 → 419 (8.0%) | ~2.5% —
-   ✅ this one TRACKS"* and concluded *"we already have a drive-dependent mechanism at ~450 Hz and
-   none at ~2.9 kHz."* Both halves are endpoint artefacts of a **non-monotone** pair: the interiors
-   are printed above, the model's goes **UP** before it comes down, and the error reaches **8.3 %
-   mid-ladder — 3.3× the 2.5 % that excused it**. mid_peak is also the least stable reading in the
-   set (across-condition range **34.1 %, 11.4×** the next widest). ⇒ the model has **no resolved
-   drive-dependent feature anywhere**; treat the deficit as **GLOBAL**, and see the two
-   CLOSED/REFUTED rows. ⛔ Do **not** gate a candidate on the mid peak in either direction — a
-   candidate that "fixes" it is probably fitting noise.
-   ⭐⭐ **AND A FOURTH FEATURE JOINED THIS ITEM IN s126, AT THE OTHER END OF THE BAND — THE BASS
-   PEAK, WHERE *BOTH* SIDES WALK.** Measured on ONE capture, both sides, all four rungs (GATE Y's
-   Y6 — not W6, which reads this feature `UNRESOLVED` on the model for a membership reason):
+   ⛔⛔ **THE "MID PEAK TRACKS" CLUE IS WITHDRAWN (s129), AND WITH IT THIS ITEM'S "it is specific,
+   not global" PREMISE** — the pair is **non-monotone** (interiors printed above), the error reaches
+   **8.3 % mid-ladder against the 2.5 % that excused it**, and mid_peak is the least stable reading
+   in the set (across-condition range **34.1 %, 11.4×** the next widest). ⇒ the model has **no
+   resolved drive-dependent feature anywhere**; the deficit is **GLOBAL**. ⛔ Do **not** gate a
+   candidate on the mid peak in either direction — a candidate that "fixes" it is probably fitting
+   noise. Full argument: the two s129 CLOSED/REFUTED rows.
+   ⭐⭐ **A FOURTH FEATURE JOINED IN s126, AT THE OTHER END OF THE BAND — THE BASS PEAK, WHERE
+   *BOTH* SIDES WALK.** Measured on ONE capture, both sides, all four rungs (GATE Y's Y6 — not W6,
+   which reads this feature `UNRESOLVED` on the model for a **membership** reason, not a physical
+   one: it is a mix cancellation and has no bleed-free reading at all):
    | feature | model | pedal | our error |
    |---|---|---|---|
    | bass peak (`ref-od`, s126) | 163.9 → **151.1** Hz (7.8%) | 206.0 → **160.8** Hz (28.1%) | **+25.7 % @ clean → +6.4 % @ `drv_-6`** |
    ⇒ unlike the treble peak this is **not** "ours is pinned and theirs walks" — ours walks too, just
-   **3.6× less far**, so the error is a difference of *rates*, not the presence-vs-absence of a
-   mechanism. Same target class (a frequency-dependent nonlinearity), second location, and it gives
-   the item a low-frequency anchor to gate candidates against.
-   ⚠ Quote the condition: on the **bleed-free** endpoints W6 reads the pedal's bass peak at a 7.8 %
-   span and non-monotone (195.7/199.0/186.7/201.3) — a different capture set at a different mix, so
-   the two are not interchangeable.
+   **3.6× less far**, so the error is a difference of *rates*, not presence-vs-absence. Same target
+   class, second location, and it gives the item a **low-frequency anchor to gate candidates
+   against**. ⚠ Quote the condition: on the **bleed-free** endpoints W6 reads the pedal's bass peak
+   at a 7.8 % span and non-monotone (195.7/199.0/186.7/201.3) — a different capture set at a
+   different mix, so the two readings are not interchangeable.
    ⭐⭐⭐ **WHAT MAKES OUR 2980 Hz PEAK — LOCALISED s125, CLOSED-FORM, NO FIT.** It is the
    **recovery bridged-T's rise out of its own 716 Hz notch, rolled off by the two Sallen-Keys.**
    Cascading the schematic values (bridged-T nodal solve × SK 10.7k × SK 3.3k × the clipper's
@@ -515,71 +485,61 @@ docstring and CLOSED/REFUTED row cites them.
    GATE W's measured **2977–2983 Hz — 1.5 %, with nothing fitted.**
    ⇒ **the treble peak is a pure POST-CLIPPER LINEAR feature, which is exactly why it is pinned to
    0.2 %** — it is downstream of every nonlinearity, so it *cannot* move with drive, by construction.
-   ⛔⛔ **AND THAT REFUTES THIS ITEM'S OWN FIRST CANDIDATE, WITHIN THE SAME SESSION — dynamic R19
-   supply sag acting through `a0`. IT MOVES THE PEAK THE WRONG WAY.** The claim written here first
-   was that sag lowers `a0`, which walks the `C14 ∥ R18` corner *"at 1/(2π·330k·220p) = 2.19 kHz,
-   i.e. exactly where the treble peak is"*. **Two errors, both caught by computing instead of
-   reasoning:** (i) 2.19 kHz is the **bare** pole; the *closed-loop* corner is
-   `[1/((1+a0)R16) + 1/R18] / 2πC14` = **6.29 kHz**, not 2.19, so it was never the peak's cause;
-   (ii) that expression **rises** as `a0` falls, so sag moves the peak **UP** — measured
-   `a0` 24.871 → 15 → 8 gives **2934.8 → 3025.8 → 3099.0 Hz**, while the pedal walks **down**.
-   ⚠ Sag is not thereby dead as a mechanism for the *nonlinear* deficit; what is dead is the
-   corner-shifting route and the 2.19 kHz coincidence. Do not re-derive either.
-   ⭐⭐ **WHAT SURVIVES, AND IT UNIFIES THIS ITEM WITH A3.** GATE W reads centres off `transfer_h1`
-   — the **fundamental**, harmonics rejected. So for the *pedal's* peak to walk with drive, the
-   pedal's **fundamental transfer must itself be drive-dependent**, i.e. its compression is
+   ⭐⭐ **AND IT UNIFIES THIS ITEM WITH A3.** GATE W reads centres off `transfer_h1` — the
+   **fundamental**, harmonics rejected. So for the *pedal's* peak to walk with drive, the pedal's
+   **fundamental transfer must itself be drive-dependent**, i.e. its compression is
    **frequency-dependent** where ours is closer to uniform. That is not a new defect: it is
-   **GATE Q's `D(f)` (rms 3.01 dB, "only a nonlinearity can carry it") seen in the frequency
-   domain.** ⇒ **the treble-peak walk and A3's untested dynamic half are the SAME finding on two
-   instruments**, which is why they share this item. Any candidate must be a *frequency-dependent*
-   nonlinearity, and must be gated on CLEAN staying bit-identical (the clipper is OD-only).
-   ⛔ The old third gate — *"and on the mid peak NOT moving (it already tracks at ~2.5 %)"* — is
-   **retired, s129**: the mid peak is unresolved, not tracking (see the table above).
-   ⭐⭐ **THE GATE THAT REPLACES IT IS SHARPER, AND IT IS A SHAPE TEST (s129, GATE AA6): the
-   candidate must COMPRESS the bridged-T's notch-to-recovery span by ~13.5 % across the ladder, not
-   SLIDE it.** The pedal's `bt_notch` rises **+7.15 %** while its `treble_peak` falls **−7.92 %** —
-   opposite ways, ratio 4/4 monotone **3.876 → 3.352**. A linear network scaled by `k` moves both by
-   `1/k` and holds that ratio fixed, so **every effective-element-value candidate is already refuted**
-   (sag moving a corner, nonlinear junction capacitance, any R/C drift). ⚠ Rests on "one network",
-   proven for the model and assumed for the pedal.
-   ⛔⛔ **AA6's ARGUMENT IS CORRECTED, AND ITS "look for a damping/loading mechanism" CONCLUSION IS
-   SUPERSEDED (s130, GATE AB) — see the three CLOSED/REFUTED rows.** In one line: **the ratio is not
-   invariant** (our own baseline breaks it by 44.5 % of the effect AA6 refuted on, because the peak is
-   a vertex against rolloffs the drift does not touch), element drift is refuted on **DIRECTION**
-   instead, and the two features turn out **~ORTHOGONAL** — the notch is ~100 % the bridged-T, the
-   peak ~79 % the **Sallen-Keys**.
-   ⭐⭐ **SO THIS ITEM'S TARGET IS TWO SIZED SUB-TARGETS, NOT ONE MECHANISM** (AB6, cond 1.30,
-   verified by evaluating the combination):
+   **GATE Q's `D(f)` seen in the frequency domain.** ⇒ **the treble-peak walk and A3's untested
+   dynamic half are the SAME finding on two instruments**, which is why they share this item.
+
+   ⭐⭐⭐ **THE CURRENT TARGET, IN THE RIGHT UNITS (AF6, size-confirmed by AG3/AG5): a
+   drive-dependent SLOPE change near 2935 Hz, worth −1.185 dB/oct, that STEEPENS with frequency, at
+   or UPSTREAM of the clipper.** A vertex sits where the total slope crosses zero, so a tilt moves it
+   with **no corner moving anywhere** — which is why every corner-based frame in the refuted table
+   below failed. The
+   reference carries it with margin (P−M = **−2.038 dB/oct = 1.72×** the requirement, same sign in
+   **13/14** captures, monotone 4/4 across the ladder) while ours is **pinned at 0.094 dB/oct and
+   moving the wrong way**. Size available: **82 %** of GATE Q's measured `D(f)`.
+   ⭐ AF6's −1.185 was derived from the **closed-form** cascade curvature; AH7 re-derives it as
+   **−1.199** from the **rendered** model's measured curvature — **1.2 % apart**, so the sizing
+   survives having that operand re-measured on a different object (s137).
+   **Three gates a candidate must pass, all cheap, all pre-registered:**
+   1. **Frequency-dependent, not a constant tilt** — the deficit steepens **−0.39 / −0.78 / −1.44
+      dB/oct at 1613 / 2032 / 2560 Hz** (AG4), so a constant-tilt class is ⛔ **refuted before it is
+      built**: it would land on target at one frequency and be wrong at the others by a growing amount.
+   2. ⭐⭐ **Position AND shape — AND THIS IS NOW A NUMBER, NOT AN IMPLICATION (AH7, s137): a
+      candidate may deliver AT MOST −1.199 dB/oct (range −1.193…−1.199) of drive-dependent tilt at
+      the vertex before it OVERSHOOTS the position target**, against the **−2.038** the reference
+      carries ⇒ spending the reference's full tilt overshoots **1.70×**. The pedal's vertex is
+      measured **1.35× sharper** (not AG6's implied ~1.6×). ⚠ The budget depends on **`C_model`
+      only** — the stable half (1.005× over fit windows, −10.898/−10.903 over membership bars) — so
+      AH4b's BAR-SENSITIVE verdict on `C_pedal` does **not** reach this number. ⚠ It is a **position
+      ceiling, not a specification**: gate 1 already refutes delivering it uniformly.
+   3. **CLEAN stays bit-identical** — the clipper is OD-only.
+   ⇒ the next AF-style screen belongs on the **pre/at-clipper** side (the J201 stage, the clipper's
+   own frequency-dependent loop, the ladder feeding it). ⚠ AF6's broadband extrapolation is an
+   **assumption about shape**, and gate 1 is what measures it; the −1.185 itself is **local**.
+
+   ⛔⛔ **CANDIDATE CLASSES ALREADY REFUTED — each has a CLOSED/REFUTED row; do not re-derive any of
+   them.** This list is the item's real value, and it is why the search space above is narrow:
+   | refuted class | why, in one clause | s |
+   |---|---|---|
+   | dynamic R19 supply sag shifting the `C14∥R18` corner | the closed-loop corner is **6.29 kHz, not the 2.19 kHz bare pole**, and it moves the peak **UP** as `a0` falls — the pedal walks down | 125 |
+   | every effective **element-value drift** (sag, junction capacitance, any R/C) | refuted on **DIRECTION** (drift moves both features the same way, the device moves them opposite) — ⛔ **not** on AA6's ratio-invariance argument, which our own baseline breaks by 44.5 % | 129/130 |
+   | one single mechanism for the SK **and** bridged-T halves | the two axes are **~ORTHOGONAL** (AB3): notch ≈100 % bridged-T, peak ≈79 % Sallen-Keys | 130 |
+   | the SK axis as a fix for GATE I's 8–16.3 kHz gap | different mechanism **classes** (filtering vs generative) and **36–46× too small**; deleting both SKs outright still falls 1.6–3.2 dB/oct short | 132 |
+   | the SK-**bandwidth** frame as a MECHANISM (falling GBW, slew, rail clamp, input C, film-cap Vco) | **0 of 5 reach**; GBW is **small-signal**, so no amplitude moves it at all — and we already ship **seven** post-clipper amplitude nonlinearities that W6 measures moving this peak **0.21 %** | 134 |
+   | a **constant** drive-dependent tilt | AG4, gate 1 above | 135 |
+   ⚠ **AB6's arithmetic is untouched by any of this** — it is a correct **SIZING** of how far each
+   feature must move, never a claim that anything in the circuit moves it (a sizing is not a
+   mechanism — `measurement-discipline.md` §1, s134). The two sub-targets stand, and **the
+   bridged-T half is still unowned**:
    | axis | required move across the ladder | carried by |
    |---|---|---|
    | treble peak | **SK time constants × 1.1113** (SK corners **−10.01 %**) | the two Sallen-Keys, 79 % |
    | bridged-T notch | **bridged-T time constants × 0.9337 (−6.63 %)** | the bridged-T, ~100 % |
-   ⭐⭐ **RECONCILED AGAINST GATE I, SESSION 132 (GATE AC) — NEITHER SAME MECHANISM NOR MUTUAL
-   REFUTATION.** The SK axis moves the treble peak TOWARD the pedal and the 8–16.3 kHz octave rate
-   AWAY from it (1 of 2 axes) — a filtering change can't be a generative one — AND the axis is
-   bounded: deleting both Sallen-Keys outright hands back only +18.25 dB/oct against a
-   +19.8…+21.5 dB/oct requirement at the hottest rung, short by 1.6–3.2 dB/oct even at that limit.
-   See the CLOSED/REFUTED table (GATE AC). GATE AC found no conflict, only a bounded, quotable
-   collateral cost in the (already-open, already-over-SHIP) HF region: −0.58 dB/oct and −3.10 dB at
-   16255 Hz at the hottest rung, 2.7% of GATE I's own gap there. ⛔ Do NOT aim a single mechanism at
-   the SK/bridged-T pair (AB3: orthogonal in this cascade). ⛔ Do NOT expect any candidate here to
-   move GATE I's gap — it is 36–46× too small on this axis and the two are different mechanism
-   classes.
-   ⛔⛔ **BUT SESSION 132's AND 133's "build the Sallen-Key candidate" IS WITHDRAWN, s134 — THE
-   SK-BANDWIDTH FRAME HAS NO PHYSICAL CARRIER** (`analysis/sk_mechanism_locus.py`, GATE AF; two
-   CLOSED/REFUTED rows above). **0 of 5** physical candidates reach a −10 % corner move: falling
-   op-amp GBW is **155× short AND structurally impossible** (GBW is small-signal, so there is no
-   amplitude at which it moves), slew limiting has a **50× margin** and never engages, and the model
-   **already ships seven post-clipper amplitude nonlinearities** — two on the SK outputs — which
-   GATE W6 measures moving this peak **0.21 %**. ⚠ AB6's arithmetic is untouched: `SK τ × 1.1113` is
-   a correct **SIZING** of the peak's required move, not a description of anything the circuit does.
-   ⭐⭐ **AND THE REPLACEMENT TARGET IS SIZED, IN THE RIGHT UNITS (AF6): a drive-dependent
-   −1.185 dB/oct SLOPE change near 2935 Hz**, which moves the vertex with no corner moving anywhere
-   (predicted −1.223 from the curvature alone, agreeing to 3.2 %). It lives **at or upstream of the
-   clipper**, it is **72 % of GATE Q's already-measured `D(f)`** — so the size is available — and it
-   moves the notch only **+0.83 %**, so it is peak-only and **the bridged-T half stays unowned**.
-   ⚠ The 72 % rests on treating the local slope as broadband; whether `D(f)`'s **shape** matches at
-   2.9 kHz is the next measurement and is a stored-report read, not a render.
+   ⚠ AF6's tilt moves the notch only **+0.83 %** against the required **+7.14 %**, so it is
+   **peak-only** — orthogonality reproduced from a third construction.
    ⭐⭐⭐ **TWO MORE INSTANCES JOINED THIS ITEM IN s131, ON A NEW AXIS — *DEPTH*, NOT CENTRE
    FREQUENCY** (`analysis/hw_trend_gate.py`, GATE AD; bleed-free, driven ladder, both sides, one
    estimator). Everything above is about where a feature SITS; these are about how DEEP it is, which
@@ -591,20 +551,19 @@ docstring and CLOSED/REFUTED row cites them.
    ⭐ A notch whose DEPTH collapses with drive is a **DAMPING / LOADING** change — the class AA6
    narrowed to, now corroborated from a statistic sharing no arithmetic with it. ⇒ **a candidate
    must compress a notch's depth with drive, not merely slide centres.**
-   ✅✅ **THE 4.5–6 kHz ROW IS NOW MEASURED, SESSION 133 (GATE AE) — AD5b WAS RIGHT, AND THE
-   CONCLUSION NEEDS ONE QUALIFIER THAT CHANGES WHAT A CANDIDATE MUST DO.** On GATE W's 1/48-octave
-   locator the model's window holds **NO interior extremum at all in 9 of 9** bleed-free driven
-   cells (threshold-free — the curve is monotone), against ND's 6 of 9 deepening monotonically with
-   drive. ⚠ **But the model is NOT featureless there**: on the LEVEL ladder it carries a **MIX
-   cancellation** (3 detents, verdict MIX) that dies with the clean tap, so AD5b read our side in
-   the one condition where its feature cannot appear — s126's membership trap, again. ⇒ **the
-   target is ND's DRIVE-GENERATED null: ours is a balance, theirs is a balance PLUS something the
-   OD path generates.** A candidate that only re-tunes filters cannot address this row.
-   ⛔ Do NOT re-open "is our prominence there really zero" — it is measured, with a synthetic
-   known answer proving the estimator finds an injected notch at 1/3/9 dB and nothing at 0.
-   ⛔ And nothing there is graded against hardware: `reference-sources.md` §1 gives the 5–6 kHz
-   null to **neither** reference. ⚠ Also quote the MEASURED band, not the "4.5–6 kHz" label — see
-   the CLOSED/REFUTED row.
+   ✅✅ **THE 4.5–6 kHz ROW IS MEASURED, SESSION 133 (GATE AE) — AD5b WAS RIGHT, WITH ONE QUALIFIER
+   THAT CHANGES WHAT A CANDIDATE MUST DO.** On GATE W's 1/48-oct locator the model's window holds
+   **NO interior extremum at all in 9 of 9** bleed-free driven cells (threshold-free — the curve is
+   monotone), against ND's 6 of 9 deepening monotonically with drive. ⚠ **But the model is NOT
+   featureless there** — on the LEVEL ladder it carries a **MIX cancellation** that dies with the
+   clean tap, so AD5b read our side in the one condition where its feature cannot appear (s126's
+   membership trap, again). ⇒ **the target is ND's DRIVE-GENERATED null: ours is a balance, theirs
+   is a balance PLUS something the OD path generates. A candidate that only re-tunes filters cannot
+   address this row.**
+   ⛔ Do NOT re-open "is our prominence there really zero" — measured, with a synthetic known answer
+   proving the estimator finds an injected notch at 1/3/9 dB and nothing at 0.
+   ⛔ Nothing there is graded against hardware (`reference-sources.md` §1: **neither** reference).
+   ⚠ Quote the MEASURED band, not the "4.5–6 kHz" label — see the CLOSED/REFUTED row.
 7. ⚠ **Capture question, while access lasts:** a clean same-session `gain-n18` MASTER ladder would
    let session 115's taper be resolved below its 0.85 dB knob-noise floor (7 of 9 detents already
    captured session 120 — see "Capture access status" below for the accuracy caveat). Read
@@ -699,19 +658,18 @@ construction and sits in the OD path only, where A3 lives.
 
 ### Uncommitted work
 
-✅ **Sessions 89–122 are ALL COMMITTED** — `df81360` (89–114), `9a0b255` (115–122) and `f927208`
-(the doc-consolidation pass). Session 122's "sessions 115–122 are uncommitted" flag and its
-"flag to the user" note are **discharged**; nothing is owed there.
-
-✅ **Sessions 123–128 are COMMITTED.** Run
-`git status --porcelain` for the live, authoritative state — do not transcribe it here
-(`rebuild-targets-dont-transcribe`; the old per-session "Uncommitted at session N" blocks were
-exactly this mistake, repeated 28 times, and are archived verbatim in `docs/session-log.md`).
-Session 128 touched only `analysis/` and doc files (no `src/`), so it did not add to session 127's
-cache-invalidation bill.
+⛔ **DO NOT TRANSCRIBE GIT STATE HERE. Run `git status --porcelain` and `git log --oneline -5`** —
+they are the live, authoritative answer (`rebuild-targets-dont-transcribe`; the old per-session
+"Uncommitted at session N" blocks were exactly this mistake, repeated 28 times, and are archived
+verbatim in `docs/session-log.md`). Every session up to and including the last one named in
+`git log` is committed; nothing older is owed.
 
 Regenerable/gitignored, not part of any commit decision: `analysis/reports/*.json`,
 `analysis/fit_logs/*.log`, `build/**`.
+
+⚠ **Sessions 128–135 touched only `analysis/` and doc files (no `src/`)**, so none of them added to
+session 127's cache-invalidation bill below — and the ctest 18/18 and `s124_ship.json` baseline
+carry across all of them unchanged.
 
 ⚠ **Session 127 relinked `OfflineRender` with a COMMENT-ONLY `FitParams.h` edit, so all 6501 entries
 / 133 MB of `analysis/reports/cache/` are unreachable and the next matrix run re-renders from scratch
