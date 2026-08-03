@@ -7,6 +7,17 @@
 > This is a rules file, not a reading list: skim it when you start, and re-read the relevant
 > section before you (a) build a new instrument, (b) trust an aggregate, or (c) ship a constant.
 > Per-incident detail is in `docs/session-log.md` and `docs/phase9-gap-log.md`.
+>
+> ⚠ **Doc-consolidation pass, session 122 (`docs/doc-consolidation-plan.md`): this file was reviewed
+> for merge-and-compress but NOT rewritten.** At ~1,900 lines across ~190 entries, most already
+> written as tight, hard-won prose, a full section-by-section merge that safely preserves every
+> entry name, every session tag, and every number-with-its-caveat is a multi-hour task on its own —
+> attempting it under the same pass as the CLAUDE.md/reference-sources.md rewrites risked exactly
+> the silent-loss failure mode this file itself warns against (§3, `computed-verdicts-not-
+> narrated`). Deferred as its own follow-up rather than done carelessly. If a future pass does
+> merge entries: do NOT delete them, keep every entry's **name** (cross-referenced from CLAUDE.md,
+> the memory files, and gate source comments), keep the session attributions, and never merge two
+> entries with different remedies (see the plan's §2 for the merge rule and per-section targets).
 
 ---
 
@@ -20,7 +31,7 @@
   still read the old value. (s35)
 - **Verify the BASELINE, not its LABEL.** A row labelled `none (H = 1)` was fitting a free broadband
   gain; four sessions of "improvement over baseline" measured the wrong thing. (s37)
-- **Verify the PREMISE, not the prior session's framing of it — SEVEN occurrences.** A
+- **Verify the PREMISE, not the prior session's framing of it — EIGHT occurrences.** A
   14-session-old gap characterisation had expired — unrelated fixes had dissolved it — and
   re-measuring took one command. A stale premise is the most expensive kind, because it selects the
   whole next workplan. (s38)
@@ -35,6 +46,29 @@
     dissolution is usually recorded where the work happened, not where the item is listed. Cost
     here: one grep against a whole session. ⚠ And when you find it, **fix the line and the source
     comments**, or the next session pays again. (s108)
+  - ⭐⭐ **EIGHTH, s116, AND IT IS THE SIBLING OF THE ENTRY ABOVE: THE *OTHER* SURVIVOR OF THE SAME
+    TABLE FELL FOR THE SAME REASON, EIGHT SESSIONS LATER.** GATE J9's conditioned marginals listed
+    two axes as "⭐⭐ REAL": `gruntIdx` and `level`. Session 103 refuted the conditioning premise
+    (`blend = 1.0` ⇒ bleed-free) and explicitly re-scoped the sub-gates built on it — but not the
+    *table*, so both verdicts travelled on. Session 108 caught GRUNT; LEVEL survived to head the
+    backlog for a further eight sessions until session 116 measured it and found it **entirely
+    dilution**. ⭐ GENERAL: **when a premise is refuted, grep for every verdict that rests on it and
+    withdraw them in the same session** — re-scoping the code that used the premise is not the same
+    as re-scoping the conclusions it produced, and a summary table is exactly where conclusions
+    outlive their support. ⚠ And note the payoff for finally doing it: with both entries closed the
+    table retires as a whole, which is itself a finding (the residual is not localised on any
+    control axis) that neither individual closure stated. (s116, GATE U)
+  - ⭐⭐ **A RECORDED DERIVED NUMBER CAN BE RIGHT IN VALUE AND WRONG IN LABEL — REPRODUCE IT FROM
+    THE RECORDED INPUTS, NOT BY FINDING A COMPUTATION THAT EMITS IT.** Session 112 recorded four
+    clean fractions as its matched-pair design. All four are genuine entries in the relevant table,
+    which is why they never looked suspect; but they were computed **without the taper** the shipped
+    stage applies, and three of the four have their two labels **transposed** (0.4286 is
+    (L=0.25, B=1.00), not (L=1.00, B=0.25)). Recomputing from the stated (L, B) took one command and
+    **0 of 4 reproduced**. ⭐ The check that works is directional: go *forward* from the recorded
+    inputs to the number, never *backward* from the number to a computation that matches it — the
+    latter is satisfiable by coincidence and here was satisfied four times out of four. ⚠ In the
+    project's favour, the underlying data was better than the record claimed (15 usable pairs, not
+    2), so the cost of the error was a wrong design, not a wrong answer. (s116, GATE U3)
 - ⭐ **"THE TEST ASSERTS IT" IS A CLAIM ABOUT ONE OPERATING POINT.** `Clipper.h`'s header says the
   D1/D2 clamps "essentially never fire (the test asserts it)". Measured at drive 0.85 / 8×, disabling
   them changes the output and removes an aperiodic regime — they fire, and `ClipperTest` passes
@@ -46,6 +80,77 @@
   oversampled rate, where 6 iterations left a measurable residual (0.35 dB on the alias figure) and
   a 4-of-21-tone aperiodic regime. Re-check any convergence claim at the rate the stage actually
   runs at, not the rate it was designed at. (s92)
+- ⭐⭐⭐ **A SOLVER-CONVERGENCE CLAIM IS A CLAIM ABOUT THE STIMULUS AS MUCH AS ABOUT THE RATE, AND
+  TWO INDEPENDENT SYNTHETIC CHARACTERISATIONS UNDERSTATED THE SAME DEFECT THE SAME WAY.** The
+  clipper solves an implicit equation per sample, warm-started from the previous sample. Session 118
+  swept it and recorded "1x only, absent at 8x". Session 120 swept it again, with a different
+  stimulus and a better instrument, and recorded "1x above ~2.5 V, 2x above ~4 V, absent at 4x/8x".
+  Both are artefacts of a **smooth, low-frequency probe signal**, which makes the previous sample a
+  good warm start and hides the overshoot entirely. Measured IN-CHAIN — temporary instrumentation
+  inside the stage, driven by the real `PedalDSP` — the plain solve is unconverged on **2.6 % of
+  23.25 M samples with residuals to 0.556 V, at 4x AND 8x, on only 2.9 V of drive**, because the
+  real signal is a 2499 Hz tone through the treble ladder and the GRUNT bank rather than a 110 Hz
+  sine. ⭐ GENERAL: for anything warm-started, iterative, or state-dependent, the *hardness* of the
+  problem is set by how fast the input moves between samples — so a synthetic sweep over
+  AMPLITUDE cannot bound it, and the authoritative measurement is the one taken with the real
+  upstream chain attached. Sweep amplitude to find the mechanism; quote the in-chain number.
+  (s120; the same family as `an-iteration-budget-justified-at-one-sample-rate` below, one axis over)
+  - ⚠ **And checking that your operating point is PHYSICALLY REACHABLE validates only the axis you
+    swept.** Mid-session I noticed my 2x figure was taken at 6 V while IC2_A rails at ~3.3 V, and
+    duly "corrected" the note to say 2x/4x/8x carry margin rather than exposure. The reachability
+    check was right and the conclusion was still wrong, because the axis that actually mattered was
+    the stimulus SPECTRUM, not the amplitude. **Ask what else the real system varies that your
+    sweep holds fixed, before concluding an operating point is unreachable.**
+- ⭐⭐⭐ **A BRACKETED GUARD CAN FIRE ON *SUCCESS*, AND THE OBVIOUS FIX ADMITS A LIMIT CYCLE — USE
+  THE TEXTBOOK ALGORITHM VERBATIM.** Three versions of one hand-rolled safeguard, each wrong
+  differently, each measured:
+  **(1) STRICT** `cand > lo && cand < hi`: at the exact root `F(w)` rounds to **0.0**, so the Newton
+  step is 0 and the candidate lands ON the endpoint that *is* `w` — the guard reads that as "Newton
+  left the bracket" and bisects away from the root it had already found. The arm was worse than the
+  unguarded solve at every operating point, including benign ones.
+  **(2) NON-STRICT** `cand < lo || cand > hi`: now Newton at `a` may propose exactly `b` and at `b`
+  propose exactly `a`, both ON the endpoints, so neither the range test nor the fallback ever fires
+  and the bracket never shrinks. Measured: 16 iterations with the step still at half the bracket
+  width, on a method that is supposed to be unconditionally convergent.
+  **(3) NR `rtsafe`**: range test **plus** a SUFFICIENT-DECREASE test (`|2f| > |dwOld*fp|` — "Newton
+  is not at least halving") → exact everywhere at every rate.
+  ⭐ GENERAL: a safeguarded iteration needs BOTH a containment condition and a progress condition;
+  containment alone permits cycling, and its boundary cases collide with convergence. When a
+  standard algorithm exists, transcribe it rather than deriving the guard from first principles —
+  the second condition is exactly the part that looks redundant and is not. (s120)
+- ⭐⭐ **A STRICTLY MONOTONE RESIDUAL GIVES ROOT UNIQUENESS, NOT NEWTON'S GLOBAL CONVERGENCE.** The
+  stage header had asserted for ~110 sessions that "F'(W) remains a sum of strictly negative terms,
+  so the Newton solve keeps its global-convergence property". Monotonicity gives a unique root and
+  makes a bracket valid; it says nothing about whether Newton reaches it. A sigmoid VTC is nearly
+  FLAT in saturation, so a step taken from out there is enormous and overshoots to the far side —
+  which is the entire defect. ⚠ The tell is that the sentence names a real property and then a
+  different conclusion; check that the stated premise actually implies the stated guarantee, not
+  merely that both are true-sounding. (s120; the family of `a-bound-derived-for-a-component-in-
+  isolation-is-not-a-bound-on-the-combined-shape`)
+- ⭐⭐⭐ **COMPARING TWO INDEPENDENT INSTANCES OF A STATEFUL NONLINEAR CHAIN MEASURES TRAJECTORY
+  DIVERGENCE, NOT SOLVER ACCURACY — MEASURE THE ONE-STEP ERROR ON A *SHARED* TRAJECTORY.** Running
+  the shipped solver and a converged reference side by side on the same input, and differencing the
+  outputs, looks like the obvious accuracy test and is not: the trapezoidal companion-cap recursion
+  `ieq = 2g*dv - ieq` is **lossless**, so an injected 1e-15 never decays, and the VTC's a0 = 24.9
+  amplifies it. Measured, two solvers that BOTH solve the equation to 4e-16 per sample produced
+  trajectories differing by **0.7 V**. The correct instrument re-solves from the shipped arm's own
+  state each sample, records `|w - w_ref|`, and advances on one trajectory only. ⭐ Both quantities
+  are real and worth reporting — the divergence is what reaches the listener — but only the
+  one-step figure can size a *solver*, and mixing them made a good candidate look catastrophic and
+  refuted a warm-start improvement that was actually fine. (s120)
+- ⭐⭐ **A GATE THAT HAS FAILED FOR N SESSIONS MAY BE FAILING FOR A DIFFERENT REASON THAN THE ONE ON
+  RECORD — AND TWO CAUSES CAN BE INDISTINGUISHABLE TO THE TEST THAT DIAGNOSED IT.** `OSValidationTest`
+  failed from session 44 to 119. Session 92 rebuilt its instrument, established three independent
+  lines of evidence, and attributed it to "genuine fold-down from the un-ADAA'd CD4049 VTC". Fixing
+  the *solver* — nothing to do with ADAA — moved the 8x floor **-24.6 -> -61.2 dB** and the test
+  passes. Session 92 was not careless: a non-converged solve produces a **signal-dependent** error,
+  so it folds at exactly the same `|N*f0 - m*fs_os|` loci its bin-matching test used, and it also
+  shrinks with rate, so its 192 kHz-base control is equally consistent with either cause. ⭐ GENERAL:
+  when two candidate mechanisms both predict your discriminator's signature, the discriminator has
+  not discriminated — say "consistent with", and look for a test where they differ (here: revert one
+  candidate and re-measure, which costs one rebuild). ⚠ And state what does NOT fall: ADAA is still
+  open, some genuine fold-down surely remains, and only "this test's failure was dominated by it"
+  is retired. (s120)
 - **A gate must be calibrated against the defect's SIGNATURE, not a proxy for it.** A flat-topping
   gate keyed on "16 consecutive samples above 0.985×peak" rejected a long-trusted reference capture
   peaking 7.6 dB below full scale — a sine spends ~5.5 % of its period up there. The real signature
@@ -54,6 +159,76 @@
   moves" failed on a render already proven sound, because 6 rows are inert *by construction*
   (BLEND=0 ⇒ OD out of circuit). That is the only thing separating "the candidate is bad" from "my
   gate is bad". (s84)
+- ⭐⭐⭐ **A WASH-OUT / DELTA / SPAN CANNOT SAY WHICH END MOVED, AND A HEAD ITEM WILL BE WRITTEN AS IF
+  IT COULD.** GATE R summarised the 320 Hz null as one number per (DRIVE, side): the wash-out
+  `prom(clean) − prom(drv_-6)`. From the pedal's DRIVE-max value of **−7.38** the project derived the
+  head item *"a null whose depth grows with level"* and carried it for **seven sessions**. Split by
+  rung, the pedal's DRIVE-dependence is **9.88 dB at the quiet end against 3.11 dB at the driven
+  end**, and the model's is the mirror image (**2.11 / 10.39**) — so the two sides put their
+  drive-dependence at OPPOSITE ends and the named target was the end where the pedal is flat. A
+  correction aimed there is aimed at the wrong corner. ⭐ GENERAL: whenever a difference is the
+  headline, print its two operands per condition before naming a target from it — and if the two
+  sides' operands move at different ends, say so, because that is a structural finding a difference
+  cannot express. Same family as `difference-statistics-hide-common-mode` (which is about the two
+  SIDES sharing an error) and `a-pooled-statistic-cannot-answer-about-its-own-axis` (s105) — here the
+  averaged-away axis is the one the conclusion was about. (s117, GATE V3)
+- ⭐⭐ **A "COLLAPSE" IN A POOLED CELL MAY BE PRESENT IN ONLY SOME CONDITIONS — SPLIT THE CELL BEFORE
+  NAMING IT A DEFECT.** The DRIVE-max × quiet cell that carries session 117's whole finding pools to
+  a median of **4.99 dB** against a DRIVE-0 reference of 14.87. Per condition it is
+  **2.78 / 3.95 / 4.99 / 11.55 / 13.25** — collapsed in 3 of 5, INTACT in 2, with a **6.56 dB gap**
+  between the groups, and the across-condition spread at that cell (10.47 dB) is 2.3× the same
+  cell's spread at DRIVE 0. ⇒ the honest statement is not "the null collapses at DRIVE max" but "it
+  collapses in 3 of the pedal's 5 switch settings at DRIVE max". ⭐ The split was also the most
+  informative thing in the session — the three that collapse are the settings feeding the clipper
+  hardest — which is the usual pattern: a median hides the very structure worth chasing. ⚠ And flag
+  such an ordering rather than claiming it; n = 5 with 2–3 levels per switch cannot establish it.
+  (s117, GATE V4; s108's P4 applied to a single cell rather than to a headline)
+- ⭐⭐ **AN ARGV STAMP DOES NOT COVER A SHIPPED CONSTANT — STAMP THE BINARY TOO.** GATE R writes a
+  `.args.json` beside every render and reuses the file when the recorded argv matches. That stamp
+  exists *because* of `rebaseline-all-derived-artefacts`, and it covered half the problem: it never
+  looked at the render binary, so session 115's three shipped DSP constants (17:31) did not
+  invalidate a 10:37 cache and session 116's gate sweep silently re-read renders of a superseded
+  build. `comprehensive_report._cache_key` had always hashed the binary's (size, mtime_ns); this had
+  not. ⭐ The repair pattern that makes such a fix safe retroactively is the useful part: **measure
+  the consequence before changing the cache key.** Re-rendering all 16 endpoints with the current
+  binary moved the scored statistic by **1.848e-08 dB** — the pure-scalar derivation confirmed rather
+  than assumed — so every stored number survived and the fix cost nothing. ⚠ And note the one-shot
+  nature: once the cache is refreshed, a cached-vs-fresh comparison becomes a tautology, so the check
+  must read the cached STAMP's binary signature and report **NOT APPLICABLE** rather than a free
+  0.000 dB PASS. A guard that quietly becomes a tautology is worse than no guard. (s117, GATE V1b)
+- ⭐⭐⭐ **DE-DUPLICATING BY *AVERAGING* IS RIGHT FOR A CONTRAST AND WRONG FOR AN ABSOLUTE LEVEL.**
+  GATE R pools every statistic over CONDITIONS, averaging MASTER-only duplicates first — correct, and
+  s110 R7's own fix. But **one** of its statistics (R6b) deliberately compares **absolute H1 levels**
+  rather than prominences, because two prominences referred to different baselines cannot be ranked.
+  MASTER is a pure gain, so it is inert for every contrast in the gate and is exactly what moves a
+  level: the two members of a MASTER duplicate genuinely differ, and their mean is a level neither
+  render has. R6b was also the last statistic still pooling by FILE, so it took a median across two
+  MASTER settings. ⇒ **an absolute-level statistic must SELECT a reference member, never average
+  members that differ by the very quantity it measures.** ⭐ The tell was a coincidence, per the entry
+  below: five cells shifting by *exactly* −3.8999 dB. (s117)
+- ⭐⭐ **AN EXACTLY-REPEATED DELTA IS A GAIN, AND IT IS USUALLY COMPUTABLE — SO COMPUTE IT AND CLOSE
+  THE ARITHMETIC BOTH WAYS.** Re-running GATE R moved 106 of 211 stored leaves, and five of them by
+  **exactly −3.8999 dB**. That is `kOutputMakeup` 2.599 → 4.3297 (**+4.4330 dB**) plus the retired
+  power-law taper → shipped PWL at master noon (**−8.3329 dB**) = **−3.8999**, i.e. the two
+  session-115 constants, predicted to four decimal places from the shipped source. The two cells that
+  shifted *differently* then localised a real defect (a `master-1100` duplicate at master 0.4, where
+  the same constants net −1.9656 dB). ⭐ **Close it from both ends**: reconstructing the old pooled
+  median from the new per-file values plus the two per-master gains returned **+3.305 dB** against a
+  stored **+3.305**, which simultaneously confirmed the diagnosis AND validated session 115's shipped
+  taper at a **second, non-noon detent** through a code path sharing nothing with s115's own
+  acceptance check. ⚠ Beware the intermediate step: my first delta mixed the gain with my own
+  membership change (6 files → 5), which is `aggregate-moved-check-membership-first` committed while
+  investigating a different bug — isolate the two before drawing a conclusion. (s117; the fourth
+  occurrence of `an implausible coincidence is a bug report`, and the first where chasing it produced
+  two confirmations rather than a defect)
+- ⭐⭐ **A MUTATION TEST THAT SCORES ONLY `rc != 0` CANNOT TELL A FIRING GUARD FROM A CRASH.** Session
+  117's runner was extended to match each failure line's own `Vn:` tag against the guard the mutation
+  was aimed at, and it earned that immediately: the vacuity mutation (point the cache at an absent
+  directory) made the gate die in `os.listdir` with a `FileNotFoundError` **before** reaching the
+  guard, and on exit code alone it read as a clean success. ⭐ Two lessons: **check guard IDENTITY,
+  not just non-zero exit** — s109's "a mutation must land on the code path the guard reads", enforced
+  mechanically rather than by inspection; and **a gate should REFUSE where it would otherwise crash**,
+  because a stack trace hands the next session a symptom instead of a reason. (s117)
 - ⭐⭐ **A DEFECT ATTRIBUTED TO AN INSTRUMENT IS A HYPOTHESIS, AND IT IS USUALLY CHEAPER TO TEST THAN
   TO FIX.** "`transfer()` is a CSD, so it cannot reject harmonics" was written down as fact, selected
   a whole session's workplan, and is **wrong**: an exponential sweep separates orders **in time**
@@ -140,6 +315,39 @@
   the pad at once. ⚠ Note what this does NOT touch: the 153-capture matrix never differences two
   captures against each other, so a mis-dialled twin is invisible there and is a **capture** fact,
   not a model one. (s113, GATE S3)
+  - ⭐⭐ **THIRD OCCURRENCE, s116, ON A THIRD AXIS — AND THE DETENT IS WHAT MAKES IT A MEASUREMENT
+    RATHER THAN AN ANECDOTE.** Three conditions in GATE U's family are captured twice, 11–12 days
+    apart, different file hashes. The raw MODEL render is bit-identical (1.8e−15 dB — a known
+    answer, the render being a deterministic function of the settings), so all the disagreement is
+    the reference's: **0.283 dB at BLEND 9 o'clock, 6.8e−07 dB at BLEND noon, 2.561 dB at
+    3 o'clock**, i.e. a **4e+06×** separation with the mechanical detent in the middle. ⭐ Because
+    one arm of the comparison is a KNOWN ANSWER and the other is a physical knob, the result is
+    unambiguous — there is no "maybe the analysis moved" branch. ⚠ And it is not a curiosity: it is
+    the **noise floor of every matched-pair instrument that re-dials a knob**, which is why GATE U
+    refuses to attribute a surviving 0.103 dB effect to anything.
+- ⭐⭐⭐ **A PER-ROW GAIN MATCH MAKES A TWO-SOURCE MIXER EXACTLY MATCHABLE WITH ONE NUMBER — THE
+  SAME BLINDNESS THAT HIDES A LEVEL ERROR IS A DESIGN TOOL.** The standing rule is that
+  `comprehensive_report`'s per-row null gain makes the matrix blind to any pure level error (s103,
+  9.3 dB of it). Read constructively: if a stage's output is `a·OD + b·CLEAN`, and any scalar is
+  deleted before differencing, then a graded row depends on the two controls feeding that stage
+  **only through the ratio `b/a`**. So two captures at equal clean fraction have *identical* mixing
+  as far as the statistic can tell — which turns an otherwise hopeless collinearity (GATE K6:
+  r(LEVEL, bleed) = −0.961, verdict refused) into a clean matched-pair design, and settled a
+  14-session-old "REAL" verdict as pure dilution. ⭐ GENERAL: when a nuisance factor is
+  multi-dimensional, work out what the *statistic* can actually see of it; matching that is enough,
+  and it is usually far easier than matching the factor. Same family as
+  `a-degeneracy-is-a-lever-on-the-axis-it-is-not-degenerate-on` (s109), one level up. (s116, GATE U)
+- ⭐⭐ **WHERE THE DESIGN ADMITS A PATH IDENTITY, DO NOT FIT A SLOPE.** GATE U first split a
+  confounded effect into "dilution" and "LEVEL" by regressing the statistic on the nuisance factor
+  at fixed LEVEL. Four such ladders existed and gave slopes of **−1.84 / −2.34 / −3.37 / −3.83** per
+  unit over different ranges — the relation is curved, interacting, or both — and the choice of
+  slope moved the answer from +0.03 dB to −0.46 dB, i.e. the whole verdict. The same split was
+  available with **no fit at all**: walk A→B→C through the bleed-matched capture, so leg 1 varies
+  LEVEL at held bleed and leg 2 varies bleed at fixed LEVEL, and the two sum to the measured total
+  **identically**. ⭐ The identity is also a free known answer — it holds only if all three values
+  come from one consistent membership, so a dropped or double-counted row breaks it. ⚠ And run it
+  from every anchor that closes the path, not one: GATE U's best pair gives LEVEL's share as −42 %
+  and the ten-pair spread is −62 %…+44 %, which is the honest statement. (s116, GATE U6/U6b)
 - ⭐⭐ **A SHIPPED STAGE'S CLOSED FORM TAKES THE STAGE'S INPUT, NOT THE UI's — AND A TAPER SITS
   BETWEEN THEM.** GATE S computed each capture's clean-bleed fraction by calling
   `level_law_gate.coef_closed` (the shipped `LevelBlend` algebra, correctly imported rather than
@@ -285,6 +493,27 @@
   duplicates **must** agree — asserting it (measured **1.16e−07 dB/oct** across nine detents) turns a
   discard into a known answer, and it is the 4th independent confirmation of circuit.md's pure-gain
   claim. A dedup that throws information away is a missed check. (s114)
+- ⭐⭐⭐ **READING THIS FILE IS NOT THE SAME AS CHECKING WHETHER THE GUARD YOU ARE ABOUT TO WRITE IS
+  ALREADY IN IT — I RE-COMMITTED A DOCUMENTED MISTAKE VERBATIM.** GATE R had already found, fixed
+  and written up that the sub-20 Hz deconvolution residue is **signal-proportional regularisation
+  residue, not a floor** (it tracks the stimulus almost 1:1, −35.4 → −15.1 dB across the ladder),
+  and that using it as an exclusion **deleted exactly the cells carrying that gate's headline**.
+  GATE W's first draft used it as an exclusion. It refused **480 readings**, including every
+  low-frequency cell of the dose-response, and the gate duly reported the bass notch — *the feature
+  the whole item started from* — as UNRESOLVED on both sides. ⭐ The generalisable habit is
+  mechanical: **when you write a guard, grep this file for the quantity it guards on** ("floor",
+  "residue", "prominence") before writing it, not after it fires. ⚠ And note the resolution is the
+  same one GATE R reached — *don't depend on the fragile quantity*: a notch bottom below the residue
+  means the DEPTH is unresolved, and a centre is set by the flanks, so the honest handling is to
+  print the depth caveat and keep the centre. (s122)
+- ⭐⭐ **`self-selecting-scores` INSIDE A KNOWN ANSWER IS THE WORST PLACE FOR IT, BECAUSE THE KNOWN
+  ANSWER IS WHAT LICENSES EVERYTHING BELOW.** GATE W's first W1 validated its locator against GATE
+  R's stored frequencies by picking **the sweep whose reading agreed best** — then read a *second*
+  feature at that same sweep. It selected `sweep_clean` (which minimises the first feature's error)
+  and there the second feature has a prominence of 0.46 dB, giving a 7.3 % "FAIL" that had nothing
+  to do with the locator. ⇒ **a known answer must NAME its condition**, taken from the source it is
+  reproducing (GATE R builds its arms at `sweep_drv_-18`, and says so in its own code). Choosing the
+  condition by agreement measures agreement, not the instrument. (s122)
 - **Mutation-test a guard.** A new `assert_anchors_match` read the wrong JSON key, returned `None` on
   every real report and fell through to its "cannot verify" branch — a warning that reads as
   diligence while checking nothing. (s88, same class as s80)
@@ -293,6 +522,17 @@
     against two perfectly good guards. s110's rule applied again: **suspect the mutation before the
     guard.** For an exit-on-empty guard the meaningful mutation is at the *data* level (make the
     class genuinely empty), not at the predicate. (s114)
+  - ⚠ **AND THE THIRD WAY A PREDICATE MUTATION MISLEADS: IT CAN FIRE THE RIGHT GUARD AND PRINT A
+    MESSAGE THAT CONTRADICTS ITSELF.** GATE W's endpoint-count mutation loosened the comparison
+    (`!= EXPECT` → `!= EXPECT - 1`) instead of touching the data, so the guard duly refused — and
+    its message read **"GATE Q's endpoint count moved (16 vs 16)"**, i.e. a refusal claiming a
+    change while printing two identical numbers. The guard was correct; the runner had scored it
+    green; only reading the message caught it. Mutating the DATA instead (drop one endpoint) gives
+    **"(15 vs 16)"**. ⭐ GENERAL: a mutation test must be read for what the failure *says*, not only
+    for a non-zero exit and the right guard tag (s117) — a message that could not be true is a
+    defect in the test even when the gate under test is sound, because the next session debugging a
+    real refusal will be handed a contradiction. Same family as s95's "a red light with the wrong
+    label sends the next session after the wrong defect". (s122)
 - **A control measured on the quantity the instrument ANCHORS on cannot fail.** An odd-order control
   scored H3 and returned `+0.00` everywhere: every side is anchored on its own H3/H1 crossing, so H3
   is pinned by construction. Rebuilt on H5 it moved. (s80)
@@ -324,6 +564,68 @@
   over an operating point the pedal itself sets*) applied to the **headline gate**, not to a one-off
   instrument, and it is `aggregate-moved-check-membership-first`'s **ninth** occurrence — the first
   where the aggregate moved the *flattering* way because the data set grew. (s112)
+- ⭐⭐⭐ **A SECOND, INDEPENDENT DERIVATION IS WORTH THE HOUR IT COSTS — IT CAUGHT A 12 dB FRAME BUG
+  THAT EVERY INTERNAL CHECK PASSED.** Session 115 predicted `kOutputMakeup = 4.337` from capture-side
+  ladder algebra (GATE T), then rewrote the calibration tool and got **1.0876**. The tool's own
+  checks were all green — the ladder was monotone, the taper fit was good, the pure-gain known answer
+  returned 0.0000 dB — because none of them touched the absolute frame. The ratio of the two answers
+  was **3.98, i.e. exactly 12 dB**: the rewrite compared an `n12`-frame capture level against a
+  full-send-frame render, having dropped the `gain_correction` the previous version applied. ⭐ **A
+  round dB number in a discrepancy is a pad, not a coincidence** — 12, 6 and 18 dB here are all
+  interface sends, so check the frames before checking the physics. ⚠ And note the pedigree: this is
+  the *same class of bug session 41 documented in the same file*, and the comment explaining it was
+  right there. **Re-reading why a line exists is cheaper than rediscovering it.** ⭐ The durable fix
+  is a FRAME GUARD with a known answer: rendering at the OLD constant must reproduce the OLD anchor
+  capture's level (it does, +0.014 dB). That keeps session 106's circular check — but demoted from a
+  conclusion to a frame pin, which is the only thing it was ever evidence of. (s115)
+- ⭐⭐ **A THRESHOLD BELOW YOUR STORAGE PRECISION CANNOT PASS, AND WILL REPORT PHYSICS THAT ISN'T
+  THERE.** An acceptance check asked whether a constant's change was a pure scalar and required the
+  relative deviation to be < 1e−9. It reported **"NOT SCALAR"** at every setting, on a measured
+  deviation of **1.08e−07** — which is **0.91× float32 eps**, i.e. the render's own WAV quantisation.
+  The ratio itself was exactly the predicted 1.665910. ⭐ GENERAL: before setting a numerical bar,
+  work out the precision of the *pipe the data came through* — file format, sample format, and any
+  intermediate round-trip — and set the bar a decade above it. A bar tighter than the storage is not
+  strict, it is broken, and it fails in the alarming direction rather than the flattering one, which
+  is at least the safer way round. (s115)
+- ⭐⭐⭐ **"IT'S CLIPPED" AND "IT'S THE SAME FILE TWICE" LOOK IDENTICAL AT THE PEAK AND ARE TOLD APART
+  IN ONE LINE: CLIPPING IS NOT A PURE GAIN.** Session 112 saw two MASTER detents peaking at exactly
+  0.98850 with 3160 samples pinned and diagnosed a ceiling. Session 115 measured per segment: the
+  pinning is confined to **one** segment (the hottest ladder rung), while `sweep_clean` and `cal_1k`
+  sit at −26 and −15 dBFS peak with **zero** pinned samples — and the two files' level difference is
+  constant to **0.0000 dB across a 33 dB span of segment level**. A ceiling cannot move a −33 dBFS
+  segment by the same number of dB as a −0.1 dBFS one, so the pair is one capture duplicated or one
+  mis-set knob, not a saturated one. ⭐ **The test needs no threshold and no reference**: take the
+  level difference at several segments spanning as wide a range as the signal offers, and ask
+  whether it is constant. Constant ⇒ a gain (knob, pad, routing). Level-dependent ⇒ a nonlinearity.
+  ⚠ **Why it was worth re-testing a settled diagnosis:** the two causes have *different
+  consequences*. "Clipped" condemns the whole file; "mis-dialled" leaves every unpinned segment
+  perfectly usable — and the shipped `kOutputMakeup` anchor is read on one of those clean segments,
+  so the defect reaching `src/` was a 4.447 dB knob error that the clipping story would have
+  mis-attributed and mis-sized. Same family as `an-instrument-defect-is-a-hypothesis`, applied to a
+  *capture* defect. (s115, GATE T3)
+- ⭐⭐⭐ **RE-CONFIRMING A CONSTANT AGAINST THE CAPTURE IT WAS FITTED TO IS CIRCULAR, AND IT READS AS
+  THE STRONGEST POSSIBLE EVIDENCE.** `kOutputMakeup` was calibrated in session 41 as
+  `R_capture(master=1.0) / R_model(master=1.0)` from one file. Session 106 re-measured model−pedal
+  at that same setting, got **+0.007 dB**, and recorded *"`kOutputMakeup = 2.599` is CONFIRMED RIGHT
+  and must not be touched."* That 7-millidecibel agreement is not a confirmation — it is the
+  *definition* of having been anchored there, and it is guaranteed to hold however wrong the capture
+  is. The capture was 4.447 dB off. ⭐ GENERAL: a single-point calibration can only be checked
+  against something the fit did not see — a different capture of the same condition, a different
+  send, a physical bound, or the constant's own consistency across the rest of the control's travel.
+  ⚠ And note the tell that was available and unread: the tool's own consistency check (the same one
+  session 41's `A FAILING ACCEPTANCE CHECK IS A BLOCKER` lesson is about) reports the error at the
+  *other* knob positions — a single-point anchor that is wrong shows up there, never at the anchor.
+  (s115, GATE T5)
+- ⭐⭐ **WHEN A CORRUPTED REFERENCE IS THE DENOMINATOR, IT CONTAMINATES EVERY DERIVED QUANTITY, NOT
+  JUST THE ONE YOU CAME FOR — AND THE FIX IS NOT A SCALAR.** The same bad capture anchors
+  `kOutputMakeup` *and* is `lv[1.0]` in `ratio = lv[m] / lv[1.0]` for every taper point, so
+  `masterTaperExp` is contaminated too. Correcting only the makeup (×1.667) and keeping the taper
+  would move the model **+1.29 dB at master noon**, where it already reads **+1.65 dB hot** — i.e.
+  the obvious one-line fix makes the mid-travel worse. On the corrected ladder the per-point
+  exponent spans **1.74…3.51 (2.02×)**, so no power law fits at all and the pair has to be
+  re-derived together. ⭐ GENERAL: before applying a correction, grep for every other place the
+  corrupted quantity appears; and check the corrected data still admits the *model form* you were
+  fitting, because a bad reference can be what made a one-parameter law look adequate. (s115, GATE T6)
 - ⭐⭐⭐ **A SATURATED CAPTURE READS AS A *FLAT REGION OF THE CONTROL LAW*, WHICH IS A PLAUSIBLE
   PHYSICAL RESULT — SO CHECK A LADDER'S ENDS FOR PINNING BEFORE READING ITS SHAPE.** The MASTER
   ladder's top two detents, `master-1545_gain-n12` and `master-1700_gain-n12`, both peak at exactly
@@ -444,8 +746,8 @@
   full-send twins (same settings, 12.071 dB apart, so every nuisance cancels), the model's THD level
   term moves −1.106 dB mean / −1.039 median, 11 of 14 pairs same-signed. A population that looked
   like noise to exclude was actually the only free second operating point in the whole capture set.
-- ⚠⚠ **`aggregate-moved-check-membership-first` — TEN occurrences, and this list itself had gone
-  stale (it read "SEVEN" while CLAUDE.md had already logged nine — the counter is a claim with a
+- ⚠⚠ **`aggregate-moved-check-membership-first` — ELEVEN occurrences, and this list itself had gone
+  stale once (it read "SEVEN" while CLAUDE.md had already logged nine — the counter is a claim with a
   date on it, same as any other).** An aggregate that fails to reproduce has usually gained or lost
   rows, not changed value. Every shared row was bit-identical each time. **Never quote a matrix
   total without its capture count.**
@@ -518,6 +820,93 @@
 - **Split the aggregate and check reachability BEFORE fitting.** One band was 82 % of a metric and
   the parameter about to be fitted provably could not move it. Use a member-matched control, not a
   whole-band one. (s40)
+- ⭐⭐⭐ **WHEN A PARAMETER CARRIES TWO MEANINGS AND A FIT CONSUMES ONE OF THEM, EVERY DERIVED
+  QUANTITY THAT USED THE OTHER MEANING IS NOW WRONG — AND NOTHING IN THE FIT'S OWN VALIDATION WILL
+  SAY SO.** `Clipper.h`'s D1/D2 window was `±rail − satLo`, which is exactly right while `satLo`
+  means *"output swing toward the GND rail"* — for a rail-to-rail CMOS inverter that swing **is** the
+  self-bias trip point Vm, and the diodes clamp the absolute node voltage `w + Vm`. Session 44's A5
+  re-fit turned `satLo` into a fitted **knee scale** and moved it 3.15 → 0.4377 V. The amplitude
+  meaning was refitted; the *geometric* meaning silently came along, and the window slid from
+  [−3.750, +6.450] to [−1.038, +9.162] — i.e. the D2 floor moved 2.71 V **into** the region node W
+  occupies. Measured 74 sessions later: D1 never fires, D2 fires on **0.39 % (DRIVE noon) to 7.6 %**
+  of in-chain clipper samples, and at 384 kHz the clamp is the *entire* deviation from the converged
+  solve — worth up to the full 1.036 V output swing, not via `y` (the VTC is already saturated out
+  there) but via `wPrev` and the C14 companion-cap state, which is updated from the **clamped** `w`.
+  ⭐ GENERAL: after any re-fit, grep the parameter's name and ask of every use *"is this consuming
+  the meaning that was fitted, or a different one?"* ⭐⭐ And prefer a fix that makes the coupling
+  **unrepresentable**: the repair here was not a better number but deleting the mutable copy of the
+  window so `process()` reads the physical constant directly and no fit can reach it. (s118)
+- ⭐⭐ **A PER-STAGE TEST THAT RUNS THE *NOMINAL* CONSTANTS CANNOT CERTIFY A CLAIM ABOUT THE
+  *SHIPPED* BUILD — AND IT WILL PRINT PASS WHILE THE SHIPPED BUILD VIOLATES IT.** `ClipperTest`
+  Test 5 existed precisely to assert "D1/D2 never engage", and it default-constructed `Clipper`
+  (never calling `setNonlinear`) and compared against `Clipper::kClampLo/kClampHi`. So it validated
+  a stage the plugin does not ship, and passed for 74 sessions on a property that was false in the
+  one that does. ⚠ The header even said `kA0/kSatLo/kSatHi are NOMINAL placeholders … these tests
+  validate the STRUCTURE` — correct for the corner shapes, the polarity and the coupling form, and
+  **wrong for any assertion whose truth depends on the amplitudes**. ⭐ Sort every per-stage
+  assertion into *structure-invariant* (nominal is fine, and is the point) vs *amplitude-dependent*
+  (must run the shipped fit), and run both arms for the second kind. Session 92 had already noticed
+  the symptom — "`ClipperTest` must be probing a gentler point" — and it was not a gentler point, it
+  was **a different stage**. (s118; the per-stage-test form of `verify-the-BASELINE-not-its-LABEL`)
+- ⭐⭐⭐ **AN EXCURSION ENVELOPE MEASURED WITH THE LIMITER ENGAGED UNDERSTATES THE ENVELOPE THAT
+  LIMITER WOULD SEE IF REMOVED — SO IT CANNOT SIZE ITS OWN WINDOW.** Having found the clamp firing,
+  I measured node W's envelope in-chain to check the proposed replacement window would be inert. It
+  read **[−2.458, +5.417] V**, comfortably inside the candidate [−3.257, +6.943] — a clean,
+  quotable "the fix restores inertness with 0.80 V of margin". It was contaminated by the very
+  mechanism under test: the old clamp was itself holding the negative excursions down. Re-measured
+  **with the new window in place**, the true envelope is **[−3.927, +5.127]** and the clamp still
+  fires, on 0.05–0.25 % (a 30–70× reduction, not elimination). ⭐ GENERAL: to size a limiter, measure
+  the signal with the limiter **disabled**, or iterate the measurement to a fixed point — never
+  through it. ⚠ And note which way the error ran: the contaminated measurement was the flattering
+  one, and it would have shipped as a claim of inertness. (s118)
+- ⭐⭐⭐ **`rebaseline-all-derived-artefacts`, IN ITS BASELINE-*EPOCH* FORM: "INVISIBLE TO THE MATRIX"
+  IS NOT "INVISIBLE", AND THE GATES A CHANGE'S OWN JUSTIFICATION NAMES ARE EXACTLY THE ONES THAT
+  NEEDED THE RE-RENDER.** Session 115 shipped `kOutputMakeup` 2.599 → 4.3297 (+4.4330 dB) and
+  replaced the MASTER power law with a PWL taper (−8.3329 dB at noon, net −3.8999), verified at the
+  sample level that both are pure per-row scalars, and **deliberately did not re-baseline** — sound,
+  because `comprehensive_report` gain-matches every row and deletes a scalar exactly. Its own block
+  even says the change *"is a correctness fix for GATE K/M/O/Q's **absolute** ledgers"*. Those
+  ledgers are **not** gain-matched. Sessions 115, 116 and 117 then all swept them against the
+  pre-change `s114_baseline.json` anyway. ⛔ The bill arrived in session 118: a fresh render was
+  differenced against s114 and the −3.90 dB scalar showed up on every non-gain-matched instrument,
+  where it was **misattributed to session 118's own change** — GATE Q's L(f) moved −3.78 dB at all
+  13 bands and a complete `one-knob-two-jobs-is-compensating` synthesis was written around it before
+  GATE O's ledger printed the two session-115 constants side by side, to 0.001 dB, and refuted it.
+  The real contribution of the change under test was **≈0.12 dB**. ⭐ Two rules fall out. **(a)** When
+  you justify skipping a re-baseline, write down *which instruments the change IS visible to* — and
+  re-run those. **(b)** Before differencing two reports on any absolute statistic, check they were
+  rendered from the same `src/`; a report's provenance is part of its membership. ⚠ And note it also
+  flipped a load-bearing verdict nobody was looking at: GATE O's A3 clean-side exoneration reads
+  0.109 on the stale render and **1.122 (NOT EXONERATED)** on a current one. (s118)
+- ⭐⭐⭐ **WHEN A GAIN-MATCHED AND A NON-GAIN-MATCHED INSTRUMENT DISAGREE ABOUT THE SAME RENDER,
+  DIFFERENCE THEM PER BAND BEFORE ARGUING — A FLAT DELTA IS A SCALAR, AND A SCALAR HAS A
+  PROVENANCE.** Session 118's clamp fix improved the 162-capture matrix (OD band-RMS 2.149 → 2.088,
+  p99 11.442 → 10.712) and simultaneously *worsened* GATE Q by 1.57 dB (4.014 → 5.583). Per band,
+  GATE Q's linear term `L(f)` had moved by **−3.78 dB at all 13 bands, flat to 0.01 dB, with the sd
+  columns unchanged**, while its nonlinear term `D(f)` moved ≤0.2 dB anywhere. ⇒ the entire
+  disagreement was a **pure gain** — which the matrix's per-row null match deletes and GATE Q, having
+  no gain match, reports in full. ⭐ The per-band difference is what makes this diagnosable at all:
+  *a flat delta with unchanged spread is never a shape regression.* ⚠ But do not stop at "it's a
+  scalar" and assume it is yours — this one belonged to a **different session** (see the entry
+  above). Having identified a scalar, the next question is *whose*, and the arithmetic of every
+  constant shipped since the baseline was rendered will usually answer it exactly.
+  ⭐⭐ **And the corollary that rescued the session: a scalar cancels in any statistic that differences
+  two stimulus levels.** So the compression law and `D(f)` were immune to the confound and stayed
+  attributable to the change under test — which is where its real effect turned out to be (the
+  drive-max over-compression excess −2.33 → +0.40 dB). **When a comparison is confounded by a gain,
+  the difference-of-differences statistics still work; identify them and quote only those.** (s118)
+- ⭐⭐ **TWO NAMED CAUSES CAN BE ONE CAUSE PLUS ITS SYMPTOM — DISABLE THEM ONE AT A TIME.** Session 92
+  localised an 8× aperiodicity to `Clipper::process` with two causes: **(a)** `kNewtonIters = 6` not
+  converged at the 384 kHz internal rate, and **(b)** the D1/D2 clamp applied *outside* the solve.
+  Measured separately on an independent transcription (bit-identical to the shipped stage, gated
+  before anything was read): at 384 kHz, **6 iterations with the clamp REMOVED reproduce the
+  converged solve to 7e-14 V**, so (a) is false at 8×. Non-convergence is real but is a **separate,
+  1×-only** defect — at 48 kHz and ≥2 V in it hits 11 % of samples with a full-swing error, and it
+  is absent at 8×. The clamp corrupts `wPrev`, which corrupts the next sample's warm start, which is
+  what made the solve *look* unconverged. ⭐ Session 92's own strongest datum already said so — *"at
+  60 iterations **with the clamp disabled**, 20 of 21 tones are exactly periodic"* — the disabling
+  was doing the work, and the iteration count was along for the ride. When a diagnosis names two
+  mechanisms, vary each alone before writing both into the backlog. (s118)
 - **`defective-rows-must-not-vote`.** A constant fitted over rows containing a known unfixed defect
   lands on a compensating error. `clipC15` was selected at 1.5 nF by 28 GRUNT flat/boost rows
   carrying an unrelated gap; the correct value was ~5.2 nF. (s36/s37)
@@ -669,6 +1058,63 @@
 
 ## 3. Gates, controls and verdicts
 
+- ⭐⭐⭐ **A KNOWN ANSWER THAT AN EARLIER SUB-GATE ALREADY GUARANTEES IS NOT A KNOWN ANSWER — IT IS
+  A RESTATEMENT, AND IT PASSES ON DATA IT WAS MEANT TO REJECT.** GATE O6b needed to confirm that two
+  MASTER captures are the *same signal* (so their pedal sides cancel and a correction applies). The
+  first version asked *"do they differ by a PURE GAIN?"* — span **0.00015 dB**, a beautiful pass.
+  Worthless: **O6 already asserts that ANY two MASTER detents differ by a pure gain**, because the
+  stage is an attenuation-only divider. The test restated the topology and could not discriminate.
+  The mutation that pointed it at `master-1200` — a genuine, different detent — **passed**, which is
+  how it was caught. ⭐ The replacement discriminates because only a duplicate makes the *pedal* term
+  vanish: what remains must then equal the **model's own taper step**, predicted from the shipped
+  constants with no free parameter (measured −2.7572 vs predicted −2.7574). ⇒ **before writing a
+  known answer, list what the gate has ALREADY established and check the new test is not implied by
+  it** — and always run the mutation that should break it, because a vacuous check looks exactly
+  like a strong one from its output. (s119; the family of `empty-gate-must-fail` and
+  `anchored-quantities-cannot-register-a-cost` — a check that cannot fail)
+- ⭐⭐ **A RESIDUAL THAT IS ~0 BY SINGLE-POINT CALIBRATION IS NOT EVIDENCE, ON ANY BASELINE.**
+  GATE O's "clean signal-path residual" reads **−0.005 dB** after the s119 repair and read **+0.008**
+  before it — and both are near zero **by construction**, because `kOutputMakeup` is calibrated at
+  exactly that point. Pre-s115 it was ~0 against a capture 4.447 dB low *with the model 4.43 dB
+  quiet*: two errors cancelling, which is the circularity GATE T5 identified. ⇒ **a term the model
+  was fitted to cannot certify the model**; what such a term CAN do is cross-check two independent
+  derivations of the calibration (here s115's render-based re-derivation against GATE T's
+  capture-side algebra, agreeing to 0.005 dB), and that is all it may be quoted for. ⭐ The verdict
+  must rest on the quantities the fit did NOT see — in GATE O, the route gap and the provenance
+  transfer, which is why "quote the bound, not the residual" was already the rule. ⚠ And check
+  whether the invisible error even matters: here a calibration error is common-mode (a post-chain
+  scalar) so it cancels in A3's excess — invisible *and* harmless, which are two different claims
+  and both need showing. (s119)
+- ⭐ **WHEN A MUTATION IS CAUGHT BY AN EARLIER GUARD THAN YOU AIMED AT, FIX THE EXPECTATION, NOT THE
+  GUARD.** A runner that checks guard IDENTITY (s117) will report WRONG GUARD when a mutation aimed
+  at the ledger is refused by the anchor's positivity check first. That is the gate being *better*
+  than the test's model of it — defence in depth. Re-point the expected tag and record why. (s119)
+- ⭐⭐⭐ **A DETERMINISM KNOWN ANSWER MUST BE ASKED OF THE RAW QUANTITY — STRIP ANYTHING *FITTED*
+  FROM THE OTHER SIDE OF THE DIFFERENCE FIRST.** GATE U checks that two captures of the same
+  condition produce the same MODEL render, which is a genuine known answer: the render is a
+  deterministic function of the settings. Asked of the report's `plugin_db` it **failed by
+  0.785 dB** and the gate refused against perfectly correct data — because `plugin_db` carries
+  `gain_db_applied`, a null gain **fitted against that row's PEDAL capture**, so a pedal-side
+  difference (two separate recordings) propagates straight into the model column. Asked of
+  `plugin_db − gain_db_applied` it is **1.8e−15 dB**. ⭐ GENERAL: any column downstream of a fit
+  against the *other* side is not that side's own quantity, and a known answer stated about "the
+  model" must be evaluated on the model's own numbers. ⚠ Note both failure directions are live: the
+  same slip can also make two genuinely different renders look identical if the fit absorbs the
+  difference. (s116, GATE U2)
+- ⭐⭐ **AN ATTRIBUTION QUESTION NEEDS AN EFFECT TO ATTRIBUTE — CHECK THE SIZE BEFORE READING THE
+  CORRELATION.** GATE U7 asks which of two carriers explains what survives a control. Its first
+  version printed a confident verdict off **r = −0.669** while the surviving effect was
+  **0.103 dB**, against a re-dial noise floor the same gate had already measured at 0.28–2.56 dB.
+  A correlation computed over noise is still a number, and it will still have a sign. ⭐ Order the
+  checks: *is there an effect?* then *how big?* then *what carries it?* — and make the gate answer
+  **NOT ANSWERABLE** when the first question fails, rather than proceeding to the third. Same family
+  as `empty-gate-must-fail`, but the population is non-empty and merely uninformative, which is
+  harder to notice. (s116, GATE U7)
+- ⭐ **A PERCENTAGE SHARE IS ONLY DEFINED WHEN THE COMPONENTS SHARE A SIGN.** A decomposition
+  printed "LEVEL's share −42 %, dilution carries 142 %", which reads as a quantitative split and is
+  arithmetic noise: the two legs move in opposite directions, so neither "share" means anything.
+  State the signed magnitudes and say plainly that the two arms move opposite ways. Reserve
+  percentages for the case where both components have the total's sign. (s116, GATE U4b)
 - ⭐⭐ **HARD-EXIT ON THE GATE'S OWN VALIDITY, NOT ON HOW THE PHYSICS COMES OUT — OR A FINDING
   SILENTLY SUPPRESSES EVERY MEASUREMENT BELOW IT.** GATE P's first P5 `sys.exit`ed on "the per-pair
   pedestal spreads 3.38 dB, so the mean is not describing a shared quantity". That is *the result*,
@@ -712,6 +1158,18 @@
   read as a broken guard when the guard was fine. **Patch module-level constants at module level,
   and treat "this guard didn't fire" as a hypothesis about the mutation before it is one about the
   guard.** (s110)
+  ⭐⭐ **AND A VACUOUS MUTATION CAN BE WORTH KEEPING AS A MEASUREMENT.** GATE W needed a mutation
+  meaning "the locator reports a biased centre", and two successive attempts were inert and both
+  read as GUARD DEAD (`suspect the mutation before the guard`, twice in one session): **(i)** a
+  12 dB amplitude tilt across the grid — a vertex slides by the tilt divided by the CURVATURE, so on
+  a 15–20 dB-deep notch it moved essentially nothing (**amplitude bias is not frequency bias**);
+  **(ii)** a 5 % multiplicative bias on the frequency GRID — **necessarily** inert, because the grid
+  is log-UNIFORM, so scaling it merely re-indexes the same set of cell centres and each cell still
+  averages the real curve around its own reported centre. (ii) is worth recording rather than
+  deleting: it **proved an invariance property of the locator** nobody had thought to ask for. The
+  honest mutation biases the *reported* vertex — and it cleanly separates the two known answers,
+  breaking the ABSOLUTE comparison while leaving the RATIO one untouched, which is exactly the
+  division of labour those two guards exist to have. (s122)
 - **`computed-verdicts-not-narrated` — FOUR occurrences.** A conclusion hard-coded into a tool's
   output outlives the condition it described and prints above a table contradicting it. Derive every
   verdict line from the data, and make it state the opposite when the data says so. (s34, s61, s68)
@@ -1053,6 +1511,34 @@
   needed, GATE IT AGAINST THE FIRST (`|signed| == |delta|` elementwise) rather than trusting that
   the new one agrees. Same family as `verify-the-BASELINE-not-its-LABEL`, one level down: the
   label here is the function name. (s102, GATE J12)
+- ⭐⭐⭐ **WHEN A *REFERENCE* IS CORRECTED, RE-POINT EVERY CONSUMER OF IT — THE CORRECTION IS NOT
+  DONE WHEN THE CONSTANT SHIPS.** Session 115 proved `master-1700_gain-n12_base-clean.wav` is
+  **4.447 dB low**, re-derived the MASTER ladder from fresh captures, and shipped `kOutputMakeup`
+  +4.4330 dB against the *corrected* value. It did not re-point **GATE O**, whose ledger takes its
+  master-unity anchor from that same capture. For four sessions the gate therefore measured a
+  correctly-calibrated model against a reference row the project had already retired — and on the
+  first render containing the new constants it flipped a load-bearing verdict, reporting A3's clean
+  side as **"NOT EXONERATED, 112 % of the excess"** where the truth is 11 %. ⭐ The tell was
+  arithmetic and available immediately: the disputed term had moved by **exactly the shipped
+  constant** (+4.4330 dB, to four decimals, in two independent band selections), which no physical
+  effect does. **Grep for the corrupted artefact's NAME across the whole analysis tree the moment
+  it is retired** — here it also appears in three probes and a capture-matrix list — and record
+  which consumers were re-pointed and which were only flagged. ⚠ Note the asymmetry that makes this
+  easy to miss: the shipping session *knows* it corrected something and reasons about the constant;
+  the consumer is a file it never opened. (s119; the mirror of the entry below — there the derived
+  artefact went stale under a live source, here the *source* was fixed and the derived reader was
+  not)
+- ⭐⭐ **A KNOWN ANSWER BUILT ON SHIPPED CONSTANTS IS ALSO A BASELINE-EPOCH GUARD, FOR FREE.** GATE
+  O6b predicts a measured step from the shipped MASTER taper read out of `FitParams.h`. On a report
+  rendered *before* session 115 that prediction misses — and the measured value matches the
+  **retired** power law instead, to 0.0003 dB. So the gate can now name the failure precisely
+  (*"this report predates session 115 and was rendered from a different `src/`"*) rather than
+  blaming the data. ⇒ **whenever a gate's known answer can be phrased in terms of a constant the
+  plugin ships, phrase it that way**: it costs nothing extra and it converts the silent
+  stale-epoch read — the failure that cost session 118 a retracted conclusion — into a refusal with
+  a diagnosis. ⚠ And accept the consequence: such a gate will **refuse every pre-change report**,
+  which is correct. Keep the superseded reading printed as a labelled CONTROL so old quotes stay
+  reproducible. (s119)
 - ⭐⭐⭐ **`rebaseline-all-derived-artefacts` RUNS BACKWARDS TOO: THE DERIVED ARTEFACT CAN BE FINE
   AND THE *SOURCE* CAN MOVE UNDER IT — AND NOW THAT CAPTURES ARE CHEAP AND RE-RECORDABLE, THAT IS
   THE LIKELIER DIRECTION.** GATE R takes its membership and its dropout exclusions from a stored
@@ -1171,6 +1657,13 @@
   word-splitting bug produced a *wrong verdict about the thing under test* rather than an obvious
   crash. In `zsh` use an ARRAY — `ARGS=(...)` expanded as `"${ARGS[@]}"` — echo `${#ARGS[@]}` against
   the expected count, and make any comparison assert its inputs EXIST before comparing them.)
+- ⭐ **`empty-gate-must-fail`, in a throwaway probe, is still `empty-gate-must-fail` — ASSERT THE
+  SAMPLE COUNT.** A one-off diagnostic ran nine renders with `--os 3`; `OfflineRender` accepts only
+  1/2/4/8, so every render exited rc=2 having processed nothing, the instrumented counter printed
+  `n=0`, and my summary table reported a clean **`0.0000 %` clamping at every condition** — the
+  answer I was hoping not to see, delivered as a pass. The fix is one line (`assert n > 0` and
+  refuse on a non-zero rc) and it belongs in scratch probes too, not just in gates: a probe that
+  reports a *number* is a gate, whatever it is called. (s118, and the Nth occurrence)
   ⚠ **The mirror-image trap, s109: an argparse option whose VALUE starts with `--` is swallowed as
   an option.** A new `--render-arg` passthrough called as `--render-arg --input-ref --render-arg 0.9`
   fails with *"expected one argument"* — argparse cannot tell a value from a flag. That one at
@@ -1185,6 +1678,41 @@
   State the mode. (s82)
 
 ## 6. Reading physical measurements
+
+- ⭐⭐⭐ **A FEATURE'S CENTRE FREQUENCY IS ONLY A *CORNER* IF THE FEATURE IS MADE BY A NETWORK — AND
+  IN A MIXED-PATH CHAIN MOST OF THEM ARE NOT.** Six peak/notch centre mismatches were flagged off
+  FR overlays and read as "the model's filters are in the wrong place". This chain's output is
+  `a·OD + b·CLEAN`, and a sum of two paths produces **cancellation** features belonging to neither,
+  whose centre is set by where the two are equal-and-opposite — i.e. by the path BALANCE, not by any
+  R-C product. Measured, **not one of the six was a corner error**: two vanish entirely when the
+  clean tap is removed, three are not a fixed feature on at least one side, and the one everybody
+  cared about (the 320 Hz null) was **right to 0.7 %**. ⭐ The discriminator needs **no threshold**,
+  because it is a knob that changes only the mix: LEVEL sits downstream of every filter, so a
+  network corner **cannot** move with it and a cancellation **must** — and at LEVEL max the clean
+  coefficient is exactly zero, so a cancellation feature **vanishes**. ⇒ **before reading any centre
+  mismatch as an element target, find a control that moves the mix but no filter, and sweep it.**
+  Same family as `dilution-fakes-a-resonance` (s60), one level up: there a flat effect read through
+  a mixer looked peaked; here the mixer manufactures the feature outright. (s122, GATE W)
+- ⭐⭐ **AN EXTREMUM-FINDER OVER A NAMED WINDOW IS NOT A FEATURE DETECTOR — IT ALWAYS RETURNS
+  SOMETHING.** `locate(window, "min")` returns the window's minimum whether or not a notch is there,
+  so on a curve with no feature it returns an inflection, with a plausible frequency and a
+  respectable distance from both edges. It read a 0.46 dB inflection at 659.8 Hz as "the bridged-T
+  notch" and produced a 7.3 % known-answer FAIL against a locator that was fine. ⇒ every located
+  centre needs a **prominence** guard as well as an edge guard, the bar swept with its count
+  asserted to move (s106 N5) — **and the guards must apply to PERTURBATION ARMS too**, not just to
+  the data: an unguarded arm reading is how a window that no longer contains the moved feature reads
+  as the physics failing. (s122; the sibling of `a-positional-index-is-a-shape-claim` — naming the
+  feature buys nothing if the estimator may then report a non-feature inside the name)
+- ⭐⭐⭐ **A POOLED RATIO CAN BE 7× THE MATCHED ONE WHEN THE TWO SIDES' FEATURES ARE DIFFERENT
+  *KINDS*.** The treble peak read **1.152×** pooled over the bleed-free endpoints and **1.022×** at
+  matched LEVEL. Neither is wrong; they answer different questions. The pooled read spans the drive
+  ladder, and across it the model's peak is **FIXED to 0.2 %** while the pedal's slides **7.9 %** —
+  so the "gap" is largely the difference between a fixed network and a drive-generated feature,
+  differenced as though they were the same quantity. ⭐ The check that exposes it is free and should
+  be standard: **ask whether each side's feature is even the same kind of object** (does its centre
+  move with drive? a fixed linear network's cannot) *before* quoting a ratio between them. And quote
+  the paired ratio with its IQR — a gap smaller than its own scatter is NOT RESOLVED, whatever its
+  median says. (s122, GATE W5/W6)
 
 - ⭐⭐⭐ **A SIGN PREDICTED FROM "WHERE THE NULL IS" IS REALLY A PREDICTION ABOUT WHERE THE
   *SOURCE* IS — AND IN A CHAIN WITH TWO NONLINEARITIES THOSE ARE DIFFERENT QUESTIONS.** GATE R was
