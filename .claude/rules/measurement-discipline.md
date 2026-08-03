@@ -164,6 +164,40 @@
   candidate and re-measure, which costs one rebuild). ⚠ And state what does NOT fall: ADAA is still
   open, some genuine fold-down surely remains, and only "this test's failure was dominated by it"
   is retired. (s120)
+- ⭐⭐⭐ **AN ATTRIBUTION IS NOT A MEASUREMENT — A MECHANISM WORD SUPPLIED BY A *READER* CAN TRAVEL
+  INTO A STANDING RULE AND THEN ACQUIRE A PROHIBITION, WHILE THE GATE IT CITES SAYS THE OPPOSITE.**
+  GATE I measured three things about the OD 8–16.3 kHz region: our clean-path HF is right (G1), the
+  pedal **gains** with frequency where our path rolls off with the gap growing monotonically with
+  drive (G2 ⇒ *drive-generated, pedal side*), and — **G3 — it is NOT the `fs/(N+1)` fold mechanism**,
+  the excess passing through 16 kHz as a smooth plateau (mean +15.07 dB, **spread 0.73 dB over
+  6 kHz**; H2's local prominence −0.03 dB, 30th percentile of its own null) where a fold deposits a
+  peak. The gate also prints *"NOT claimed: that the region is ENTIRELY artefact"* and *"whether the
+  gate should still grade these bands is a **USER DECISION**, not this tool's."* `CLAUDE.md` carried
+  it for 11 sessions as **"it is ND's own ALIASING artefact… not ours to fix"** plus a ⛔ **STOP
+  AIMING MODEL WORK** prohibition — three claims where one was measured. ⭐ **The word "aliasing"
+  appears nowhere in the gate's findings; it was added in summary, and summaries do not carry the
+  refutation that lives two sub-gates down.** ⚠⚠ The sharpest part: the gate's own docstring
+  preserves the user's session-89 instruction verbatim — *"DO NOT dismiss this as 'ND aliasing' —
+  that is not established and it is not a reason to skip the band"* — so the rule was the exact move
+  its own source forbade. ⭐ GENERAL: **when a gate's verdict names a LOCATION and a DOSE-RESPONSE,
+  those are the findings; any MECHANISM noun added on top is a hypothesis and must be written as
+  one.** Before a region is declared out of scope, check the citing text against the cited tool's
+  printed verdict — and treat "X ≠ ours to fix" as needing its own evidence, separate from "X is on
+  their side". (s125)
+- ⭐⭐ **A CLASSIFICATION OF THE FORM "these two are not the same KIND of thing" IS A DIAGNOSIS, NOT
+  AN EXONERATION — AND IT READS AS ONE.** GATE W classified three flagged mismatches as *(c) not a
+  fixed-network feature on at least one side — its centre moves with drive*, correctly concluding
+  that a ratio between a fixed feature and a moving one is **not an element target**. That is right
+  and it does not mean nothing is wrong: where the moving side is the **reference**, (c) says *the
+  device has a mechanism the model lacks*, which is the most actionable finding class there is.
+  Measured, our treble peak is **FIXED to 0.2 %** across a 24 dB ladder while the pedal's walks
+  2696 → 2498 Hz ⇒ we are **281 Hz out at clean and 485 Hz (19.4 %) out at the hottest stimulus** —
+  wrong at *every* operating point, with the error growing. The item was nonetheless closed and the
+  successor dropped. ⭐ GENERAL: after any "not comparable" verdict, ask **"comparable or not, is our
+  side right at each condition separately?"** — a ratio being meaningless does not make the absolute
+  error meaningless. ⚠ And check WHICH statistic the summary carried: the reassuring 1.022× was one
+  capture set (LEVEL ladder at `sweep_clean`) and the same feature reads 1.152× on the pure-OD
+  endpoints — both legitimate, only one quoted forward. (s125)
 - ⭐⭐⭐ **"IT IS NOT A MEMORYLESS FUNCTION" IS A CLAIM ABOUT THE *STAGE*; THE THEOREM IT IS USED TO
   DISQUALIFY IS ABOUT THE *NONLINEARITY*. CHECK WHICH OBJECT THE PREMISE NAMES.** Three source files
   asserted from session 6 to 122 that 1st-order ADAA "does not apply" to the CD4049 clipper because
@@ -2011,6 +2045,35 @@
 - ⭐⭐ **A handover that is not updated is worse than absent, because the stale version reads as
   current.** Session 75 closed without updating `CLAUDE.md`; it cost most of session 76 to
   rediscover. (s76)
+- ⭐⭐⭐ **A SESSION THAT CLOSES AN ITEM *AND* OPENS ITS SUCCESSOR IN THE SAME `▶ NEXT` BLOCK IS THE
+  HIGHEST-RISK SHAPE FOR A HANDOVER — THE CLOSURE COMPRESSES TO ONE LINE AND THE SUCCESSOR DOES
+  NOT.** Session 122's `NEXT` item 1 was *"⛔ Do NOT open any centre-frequency item"* and its item 2
+  was *"what the audit DOES hand forward… ND's ~712 Hz and ~2.6 kHz features move **7–8 % with
+  drive**, where a post-clipper passive network's cannot — which is **new**, and is **the one thing
+  here worth a look on its own terms**"*. Item 1 reached `CLAUDE.md`'s backlog; **item 2 reached
+  nothing and survives only in `docs/session-log.md`.** So the consolidation kept the prohibition and
+  dropped the finding it was handing over — and three later sessions read the prohibition as though
+  the whole area were settled. ⭐ GENERAL: **when compressing a `NEXT` list, walk it looking for
+  items whose NEIGHBOUR was closed**, because a tidy ✅/⛔ line beside a paragraph is exactly the
+  pairing that survives asymmetrically; and when a session closes something, make its successor a
+  *numbered backlog entry in the same edit*, never a paragraph in the narrative. ⚠ This is the
+  sibling of `a-backlog-line-can-outlive-its-own-dissolution-by-70-sessions` with the sign flipped:
+  there a dead item survived because the refutation did not travel, here a live item died because
+  the closure did. **Both are the same defect — the label travels and the content does not.** (s125)
+- ⭐⭐ **AN EXCLUSION LIST'S *CLASS* IS AS LOAD-BEARING AS ITS ENTRIES, AND NOBODY STATES IT — SO
+  "we have excluded everything" CAN MEAN "we have excluded one KIND of thing, five times".** A3's
+  load-bearing sentence is five exclusions carried together for ~20 sessions: no single **element**,
+  no post-clipper **linear** element of any order, no GRUNT-side **cap**, not a fittable
+  **constant**, no **fixed linear** network. Every one is a *static* object; **a dynamic mechanism
+  had never been tested**, and the clause used to justify stopping — *"its shape MIGRATES with
+  stimulus"* — is the **signature of one**. Worse, the project had already sized it: GATE Q split the
+  deficit into `L(f)` (rms 2.72 dB, linear) and `D(f)` (**rms 3.01 dB**, whose own source says *"only
+  a nonlinearity can carry it"*), so a nonlinear target had existed for 16 sessions and appeared on
+  no work list. ⭐ GENERAL: **after writing "X is excluded", write down what the exclusions have in
+  common** — if they share a class, the honest status is "class C excluded", not "X is closed", and
+  the complement of C is the untested workspace. ⚠ The tell is available for free: a property the
+  exclusions all *assume* (here: time-invariance) that the defect itself is documented to *violate*.
+  (s125)
 - **Exclude explicitly, with the evidence recorded, never silently.** (s40)
 - ⭐ **A GATE THAT LIVES IN A MARKDOWN TABLE IS A TRANSCRIPTION, AND TRANSCRIPTIONS ROT.** The Phase 9
   release gate's "now" column was hand-read into `CLAUDE.md`. Re-measured from the same file, same
