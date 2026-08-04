@@ -140,12 +140,11 @@ high, execute routine work cheap) is what should persist.
 > anything else. (Session 89's "keep it short, archive at 120 lines" instruction failed for 32
 > sessions because it gave no fixed home for legitimate per-session output; this rule gives one.)
 >
-> **Session 122 consolidation (2026-08-03):** this file was 5,980 lines; the auto-loaded rules files
-> totalled ≈10,000 lines read into every session before work begins. Compressed per
-> `docs/doc-consolidation-plan.md`. The full per-session narrative for sessions 1–122 (and every
-> "Uncommitted at session N" git-state snapshot) is now in `docs/session-log.md`, verbatim, nothing
-> paraphrased or deleted. Every ⛔/⚠ refutation marker was preserved either in the CLOSED / REFUTED
-> table below or in the compressed rules files.
+> **Session 122 consolidation (2026-08-03):** this file was 5,980 lines and the auto-loaded rules
+> files ≈10,000, read into every session before work begins. Compressed per
+> `docs/doc-consolidation-plan.md`; the full sessions-1–122 narrative (and every "Uncommitted at
+> session N" snapshot) is in `docs/session-log.md`, verbatim. Every ⛔/⚠ refutation marker was
+> preserved, in the CLOSED / REFUTED table below or in the compressed rules files.
 
 ### Where we are
 
@@ -153,14 +152,11 @@ high, execute routine work cheap) is what should persist.
 done. **Phase 9 (reference validation) is the only phase in progress**; Phase 10 (perf pass +
 release) has not started.
 
-✅ **RE-ARCHIVED AT SESSION 136** (the file hit 811 lines at the end of session 135 and its own
-800-line trigger made this the next session's first job). **Nothing was deleted** — every compressed
-passage was already present verbatim in `docs/session-log.md` under its own `## SESSION N` heading
-(124–135 all verified present before any edit), which is exactly the condition the discipline rule
-requires. What was compressed: seven per-session STATUS bullets → one; the three ✅ DONE work items
-(0/1/3) → their verdicts plus pointers; item 6's chronological re-narration of refutations that the
-CLOSED/REFUTED table below already carries in full. ⚠ **The CLOSED/REFUTED and SHIPPED CONSTANTS
-tables were not touched** — they are the load-bearing content and compressing them is never the move.
+✅ **RE-ARCHIVED AT SESSIONS 136 AND 141**, both times on this file's own 800-line trigger, both
+times with every compressed passage verified present verbatim in `docs/session-log.md` first —
+which is the condition the discipline rule requires. ⚠ **The CLOSED/REFUTED and SHIPPED CONSTANTS
+tables have never been touched by either pass** — they are the load-bearing content and compressing
+them is never the move. What each pass compressed: `docs/session-log.md` SESSION 136 / 141.
 
 #### STATUS
 
@@ -184,18 +180,25 @@ tables were not touched** — they are the load-bearing content and compressing 
   what it graded.
   ⛔ The absolute-ledger gates (K/M/O/P/Q) must be read against `s118_clampfix.json` or later — GATE O
   deliberately refuses any earlier report by name (session 119).
-- ⚠⚠ **SESSIONS 129–140 CHANGED NO BASELINE, NO CONSTANT AND NO `src/` FILE.** Eleven consecutive
+- ⚠⚠ **SESSIONS 129–141 CHANGED NO BASELINE, NO CONSTANT AND NO `src/` FILE.** Twelve consecutive
   read-only gate sessions (plus s136, doc-only), each a new gate over stored data or closed-form
   arithmetic on shipped constants, each with its own mutation runner: **AA** `drive_locus_gate.py`
   (7/7) · **AB** `bt_pair_shape_gate.py` (7/7) · **AD** `hw_trend_gate.py` (8/8) · **AC**
   `sk_gate_i_reconcile.py` (7/7) · **AE** `hf_null_presence_gate.py` (10/10) · **AF**
   `sk_mechanism_locus.py` (10/10) · **AG** `drive_tilt_shape_gate.py` (11/11) · **AH**
   `vertex_curvature_gate.py` (11/11) · **AI** `at_clipper_tilt_gate.py` (10/10) · **AJ**
-  `pre_clipper_tilt_gate.py` (12/12) · **AK** `j201_shaper_tilt_gate.py` (12/12). ⇒ `s124_ship.json`
+  `pre_clipper_tilt_gate.py` (12/12) · **AK** `j201_shaper_tilt_gate.py` (12/12) · **AL**
+  `deficit_exponent_gate.py` (14/14). ⇒ `s124_ship.json`
   stands, the release gate is still
-  **6 rows over SHIP**, and **every result of all ten is a row in the CLOSED/REFUTED table below**
+  **6 rows over SHIP**, and **every result of all twelve is a row in the CLOSED/REFUTED table below**
   — that table, not this bullet, is where they are read. Per-session narrative:
-  `docs/session-log.md` SESSION 129–139.
+  `docs/session-log.md` SESSION 129–141.
+  ⚠⚠ **`know-when-to-stop-measuring` NOW FIRES ON THE NEXT SESSION, and s141 said so in writing.**
+  The rule is *"if a session's next step is a refinement of a component of a defect that has no
+  candidate fix, go and ship something instead."* s141 was a **premise audit** (it could have
+  overturned two standing refutations), so it is exempt; a thirteenth screen would not be. **The
+  next session should either build AL5's specified resonance candidate or move to the release
+  gate's other open rows** — a user decision, flagged not taken.
   ⚠ **Session 139 found and fixed a defect in session 138's own gate** — GATE AI read
   `clipC12`/`clipC13` RAW as the flat/boost GRUNT caps where `Clipper::gruntCap()` composes them as
   **ADD-caps** (`Flat = c11+c12`, `Boost = c11+c13`), i.e. 47.00/220.0 nF against the shipped
@@ -246,13 +249,8 @@ tables were not touched** — they are the load-bearing content and compressing 
 - Session 118's D1/D2 clamp-window fix and session 120's `rtsafe` solve are both **KEPT** (user
   decisions, taken at the top of session 120). Session 124's ADAA enable + `clipK` re-anchor is
   likewise a **user decision**, taken after the matrix price was measured.
-- ⛔⛔ **CAPTURE ACCESS IS ENDING (session 111, 2026-08-02).** Read `reference-sources.md` §0's
-  re-instated row and "Project-specific carry-forwards" → "Capture access status" before assuming
-  any capture not already on disk is obtainable. If a session needs one, ask the user immediately.
-- **Read order for a fresh session:** this file → `.claude/rules/reference-sources.md` (what the
-  captures actually are) → `.claude/rules/measurement-discipline.md` (the traps) →
-  `docs/phase9-validation.md` §0 (backlog). Full per-session narrative: `docs/session-log.md` and
-  `docs/phase9-gap-log.md`.
+- ⛔⛔ **Capture access is ending, and the read order for a fresh session** — both stated in full at
+  the top of "Current step"; not repeated here.
 
 #### SHIPPED CONSTANTS
 
@@ -329,6 +327,11 @@ table in this file.
 | item 6's **three remaining pre/at-clipper carriers** — the J201's Miller/junction capacitance, IC2_A's GBW and slew, the GRUNT caps' voltage coefficient (AI's own printed UNSCREENED list) | ⛔⛔ **ALL THREE REFUTED, s139 — so EVERY NAMED CARRIER ON BOTH SIDES OF THE CLIPPER IS NOW REFUTED** | 139 | **J201 Miller:** the stage has **\|A\| = 0.565 < 1** at the vertex (shipped `jfetGm` 0.10 mS into `Zout ∥ Zin_ladder` = 5.654 kΩ), so the Miller factor is **1.565** and the candidate **reduces to the bare junction capacitance**; the budget needs **388 pF** against **4.85 pF** at the part's datasheet max (**80×**), and at a ceiling **2.5× the datasheet max** it reaches **0.17 %**. ⭐⭐ **And it is refuted on SHAPE by an argument that generalises past it:** every "a capacitance grows with drive" mechanism is one real pole whose corner moves, for which `d ln\|dT\|/d ln f = 2/(1+u) ≤ **2 EXACTLY**`; AG4's deficit steepens as **f^2.84** (adjacent pairs 2.99 / 2.69, gated on the weaker). ⇒ **no single moving pole can carry this, at any size.** **IC2_A:** GBW is a **small-signal** parameter so no amplitude moves it (AF2, **inherited** — a fact about the part, not the stage; 11× short on size besides); slew carries a **12× margin AT THE VERTEX** on a full-rail square wave. **GRUNT V-coeff:** a falling cap moves the tilt **POSITIVE at all three positions** where the defect is negative ⇒ **0 of 3 on sign**, independent of film-vs-ceramic. ⚠ Refuted is a list of **named carriers**, not the existence of a mechanism; AG5's deficit is untouched (**1.72×** the requirement). ⚠ AJ2c is **n = 3 centres**. | `analysis/pre_clipper_tilt_gate.py` (GATE AJ) AJ2–AJ5 |
 | item 6's LAST unscreened pre-clipper carrier — the **J201's SHAPER as a TILT mechanism** (s139's own `NEXT` #1(b); AJ refuted the J201's *capacitance*, a different carrier) | ⛔⛔ **REFUTED ON ALL THREE ROUTES, s140 — so the named-carrier search is exhausted INCLUDING the J201's nonlinearity** | 140 | `JfetStage.h` makes the stage a **current source** (`Gm = gm/k`, `Rout = ro·k`, open-circuit `Gm·Rout = gm·ro` FLAT), so the shelf acts only through LOADING — which splits the candidate into three. **(1) The shaper AS SHIPPED:** memoryless ⇒ its incremental gain is a **scalar**, log-magnitude gains a constant, tilt unchanged **below 1e−14 dB/oct at any compression to 40 dB** — AB2's control, no threshold. **(2) gm SAG through `k(s)`** (the nonlinear-degeneration coupling the Wiener-Hammerstein model omits, and says so): reaches **2.46 % of budget at `gm → 0`**, a limit at which a JFET has no transconductance left. ⭐⭐ And refuted far harder **on SHAPE, by an argument sharper than AJ2c's bound** — the deficit **RISES** with frequency (+2.989/+2.693 adjacent pairs) while the mechanism **FALLS** (**−1.884/−1.926**): not merely under the exact `≤+2` single-pole bound but **on the wrong side of ZERO**, strongest where the deficit is weakest. **(3) amplitude-dependent compression** (the shaper is driven *through* the shelf, so it sees a frequency-dependent level — route 2 does not model this): bounded **for ANY shaper shape** by the shelf's own variation across the window, `dG/dA ∈ [−1,0]` ⇒ **0.0274 dB/oct = 2.29 % of budget**, so no re-fit of `s`/`a`/ceiling can move it. ⭐⭐⭐ **COMMON ROOT CAUSE:** the shelf's corners are the **zero at 219.2 Hz** and the **pole at 291.6 Hz** — **both a decade below the 2935 Hz vertex** — which is why two routes computed completely differently agree to 0.2 pp. ⭐⭐ **AND THE METHODOLOGICAL RESULT: this carrier PASSES item 6's GRUNT-sign gate 3/3** (the J201 is upstream of the switch and tilt is linear, so its contribution is GRUNT-independent — asserted at **1.07e−14**) unlike `a0` (1 of 3) and the GRUNT V-coeff (0 of 3), **and is still refuted** ⇒ **sign-admissibility is NECESSARY, NOT SUFFICIENT**; a screen built on sign alone would have passed it. ⚠ SCOPE: this is the J201 as a **tilt** mechanism at the vertex — it says nothing about its **even-order harmonic** role (`reference-sources.md` §4, still live). | `analysis/j201_shaper_tilt_gate.py` (GATE AK) AK2–AK5 |
 | GATE AI's flat/boost GRUNT caps | ⚠ **DEFECT FOUND AND FIXED, s139 — VERDICT UNCHANGED** | 139 | AI read `clipC12`/`clipC13` **raw** (47.00 / 220.0 nF) where `Clipper::gruntCap()` composes **ADD-caps** (`Flat = c11+c12`, `Boost = c11+c13` → 50.69 / 223.69 nF). Re-run at both cap sets and diffed: `cut` **bit-identical**, `flat`/`boost` move **≤0.009 dB/oct**, every reach and sign unchanged, and AI3's defect column **bit-identical** (caps do not enter it) — two free known answers, both held. Composed in one place (`grunt_caps()`) so the raw reading cannot return. ⇒ **AI's refutation stands.** | `analysis/at_clipper_tilt_gate.py::grunt_caps` |
+| AJ2c/AK3b's load-bearing exponent — *"the deficit steepens as f^2.84"* — measured on **n = 3** centres and quoted forward by two later sessions (s140 `NEXT` #2 flagged it) | ⭐⭐ **CONFIRMED ON A 14× FINER SURFACE AND 4× THE n, s141 — the two whole-class refutations rest on a measurement** | 141 | Re-measured on GATE W's 1/48-oct transfer with AH's own estimator and membership, at **12 NON-OVERLAPPING centres** (overlapping ones are one curve sampled finely and are never quoted as an n). Limb regression **2.685** against AG4's **2.841**; across five half-widths it runs **2.53–2.90**. ⭐ Certified by an injected-KNOWN-EXPONENT known answer that does the one thing that matters: an injected **2.000 reads 1.977** and an injected **2.840 reads 2.779**, so the estimator **discriminates the class bound from the measurement** — a +0.84 bias would have *manufactured* AJ2c. ⭐ And the bias is **negative and grows with p**, i.e. the estimator UNDERSTATES the exponent, the conservative direction. ⚠ Free by-product: AL1c recomputes the class's own `≤2` bound by **finite difference**, sharing no algebra with AJ2c's analytic `2/(1+u)`, and gets **2.0000** for both the pole *appearing* and the pole *moving*. | `analysis/deficit_exponent_gate.py` (GATE AL) AL1/AL4 |
+| AJ2c's **gating statistic and its phrasing** — *"EVERY adjacent pair exceeds the bound (weakest 2.693)"* | ⛔ **THE PHRASING IS REFUTED AND THE STATISTIC IS THE WRONG ONE — the CONCLUSION survives on better ground, s141** | 141 | **(1)** On the fine surface the weakest ⅓-oct pair is **−0.117** (weakest RAW adjacent pair **−10.349**), so the deficit does **NOT** beat the bound pointwise. **(2)** The per-pair statistic is **not scale-free**: it divides a log-ratio by the centre spacing, so as a half-width sweep narrows, the same noise is divided by a smaller number — measured, the raw adjacent minimum runs **−10.3 at 1/24 oct → +2.02 at 1/6 oct** on ONE dataset whose regression barely moves. AJ2c's version was sound only because its centres were a fixed ⅓ oct apart. ⭐⭐ **(3) The statistic the bound EXACTLY implies is the ENDPOINT one**: integrating `d ln\|g\|/d ln f ≤ 2` over `[a,b]` gives `endpoint exponent ≤ 2` for the whole class, whatever it does in between. That needs **no fit**, has the largest lever arm, and cannot be rescued by a favourable interior. Measured: **> 2 at 5/5 half-widths, smallest 2.530.** ⇒ **a single moving pole is refuted as the carrier of the WHOLE limb, and was never refuted pointwise. Quote the endpoint reading.** | `analysis/deficit_exponent_gate.py` AL4 |
+| "the deficit steepens with frequency" — the shape, as a description of the band | ⚠⚠ **IT IS NOT MONOTONE — there is an interior MINIMUM at ~1348 Hz that AG4's three centres could never have seen, s141** | 141 | \|D\| **FALLS** 1.116 → 0.245 dB/oct over 1070 → 1348 Hz, then **RISES** to 4.410 at 3814 Hz. AG4's centres (1613/2032/2560) all sit **above** the minimum, so its wording describes **one limb**; a single power law over the whole band is not defined, and AL4 fits the rising limb with the split **computed as the argmin of \|D\|**, not chosen. ⭐ Nothing has looked below 1348 Hz because AG4's window rule never admitted it, and *a deficit that falls then rises is the natural signature of two contributions, not one corner*. ✅ Single-signed at **12/12**, so no log below is a zero-crossing artefact — the outcome most likely to sink the exponent programme, and it held. | `analysis/deficit_exponent_gate.py` AL3 |
+| AG3's *"the MODEL's slope is PINNED (span 0.094 dB/oct) and moving the wrong way"* — quoted by item 6 as a property of the model | ⚠⚠ **IT IS A *LOCAL* READING AT A ZERO CROSSING OF THE MODEL'S OWN DRIVE-TILT, s141** | 141 | Across FREQUENCY the model's drive-tilt runs **−1.765 dB/oct at 1070 Hz to +0.389 at 3814 Hz — range 2.154, which is 0.73× the pedal's own 2.953** — and **crosses zero at ~2724 Hz, −7.2 % from the 2935 Hz vertex**, which is where AG3 reads it. ⇒ the model is **not** pinned across this band; it is passing through zero at the one frequency the statistic was taken. Those are different statements with different consequences for a candidate. ⚠ Recorded as measured: **why** the crossing sits near the vertex is NOT explained and is not claimed to be more than a coincidence. | `analysis/deficit_exponent_gate.py` AL3 |
+| item 6's carrier as a **complex pole pair** (a resonance whose damping or corner moves) — the two-pole structure s140 `NEXT` #1(c) asked for, and the class AA6/AD5 independently narrowed to (DAMPING / LOADING) | ⭐⭐ **ADMISSIBLE IN SHAPE — but NO SHIPPED RESONANCE REACHES IT, and the admissible band is now a NUMBER, s141** | 141 | A complex pair **can** exceed the `2.000` real-pole bound where no number of real poles can (a sum of f² terms is f²). But at the **shipped** Sallen-Key operating points, against a target of **2.685 at the vertex**: **IC4_B** (f0 10730 Hz, Q 0.4635, w = 0.27) gives **1.200 / 1.477** — deep in its own f² regime; **IC4_A** (f0 3337 Hz, Q 0.6912, w = 0.88) sits essentially **AT** its resonance, where the Q-mechanism's own slope change passes through **zero**. ⇒ **0 of 2**, and it is **AK's root cause in a second guise: a carrier's corner must be PLACED right, not merely present.** ⭐⭐⭐ **THE POSITIVE SPEC (at ≥25 % of the mechanism's own max size): a Q/damping route needs a resonance at ~2.3–2.8 kHz with the vertex on its UPPER skirt (w ≈ 1.07–1.28); an f0-move route needs ~3.2–5.8 kHz (and NONE at Q = 0.4635).** ⚠ SHAPE ONLY — necessary, never sufficient (AK5). ⚠ Mechanism sizes on the shipped linear cascade, not priced renders. | `analysis/deficit_exponent_gate.py` (GATE AL) AL5 |
 | `drive-1700_base-od @ sweep_drv_-6`, 50 Hz reading ~1400% THD | **RESOLVED — denominator artefact** | 122 | Model's 50 Hz fundamental collapses 41 dB below the pedal's (a cancellation-null read-point coincidence, same mechanism as the bass-notch/A3 row); numerator (harmonic energy) is ordinary on both sides. Not a distortion-generation defect; needs no separate work. | `analysis/feature_locus_gate.py` |
 
 ### THE RELEASE GATE
@@ -537,11 +540,16 @@ docstring and CLOSED/REFUTED row cites them.
       evaluation per GRUNT cap.
    5. ⭐⭐ **POLE COUNT (added s139, free and threshold-free — the sharpest of the five).** For a
       single real pole whose corner moves, `d ln|dT|/d ln f = 2/(1+u)`, **bounded above by 2
-      EXACTLY**, for every pole frequency and every f. The deficit steepens as **f^2.84**
-      (adjacent-pair exponents 2.99 / 2.69). ⇒ **a candidate built on one moving pole is refuted
-      before it is sized**, and what is needed is **two poles, or a distributed mechanism**.
-      ⚠ n = 3 uncontaminated centres — widening it needs a finer surface, not a wider window
-      (AG1c's windows clear ND's `treble_notch` by only 50 Hz).
+      EXACTLY**, for every pole frequency and every f. ⇒ **a candidate built on one moving pole is
+      refuted before it is sized**, and what is needed is **two poles, or a distributed mechanism**.
+      ⭐⭐ **RE-MEASURED s141 ON A 14× FINER SURFACE AND 4× THE n, AND IT HOLDS — but state it the
+      way GATE AL does, not the way AJ2c did.** ⛔ **Do NOT say "every adjacent pair exceeds the
+      bound"** (AJ2c's wording): the weakest ⅓-oct pair is **−0.117**, the per-pair statistic is
+      **not scale-free**, and the deficit is **not monotone across the band** (interior minimum at
+      ~1348 Hz). ✅ **Say instead: the ENDPOINT exponent over the rising limb is > 2 at 5/5
+      half-widths, smallest 2.530, limb regression 2.53–2.90** — which is the statistic the
+      pointwise bound **exactly implies** (integrate it), needs no fit, and cannot be rescued by a
+      favourable interior. Two CLOSED/REFUTED rows carry the full argument.
    6. ⭐⭐ **THE CARRIER'S OWN FREQUENCY DEPENDENCE MUST *RISE* NEAR THE VERTEX (added s140) — and
       this one is a POSITIVE SPECIFICATION, not another veto.** Every mechanism screened so far
       whose corners sit *below* the vertex delivers a tilt change falling as ~**f^−1.9** there,
@@ -549,6 +557,17 @@ docstring and CLOSED/REFUTED row cites them.
       is *stronger* than gate 5's `≤2` bound. ⇒ **a viable carrier must have structure AT or ABOVE
       ~2.9 kHz**; anything cornering a decade low is spent before it reaches the feature, whatever
       its size. This is what killed the J201 shaper on two of its three routes.
+      ⭐⭐⭐ **SHARPENED INTO A BAND, s141 (GATE AL5).** A **complex pole pair** is the one structure
+      that clears gate 5's real-pole bound (a sum of f² terms is still f², so no number of real
+      poles helps), and it only does so from a narrow position: a **Q/damping** route needs a
+      resonance at **~2.3–2.8 kHz with the vertex on its UPPER skirt (w ≈ 1.07–1.28)**; an
+      **f0-move** route needs **~3.2–5.8 kHz** (and reaches nothing at Q = 0.4635). ⛔ **Neither
+      shipped Sallen-Key is in either band** — IC4_B (10.7 kHz) sits at w = 0.27 in its own f²
+      regime, IC4_A (3.34 kHz) at w = 0.88 essentially AT resonance, where the Q-mechanism's own
+      slope change crosses zero. ⭐ Note the convergence: **AA6 and AD5 narrowed item 6 to a
+      DAMPING / LOADING class from statistics sharing no arithmetic with this**, and the Q route is
+      exactly that class. **Nothing has yet asked what in this chain could have a resonance near
+      2.5 kHz at all** — that is the buildable next question.
    ⛔⛔ **THE "next screen belongs pre/at-clipper" INSTRUCTION IS SPENT (s139/s140): that side has
    now been screened to exhaustion and every named carrier on it fell.** Do not re-open the J201
    Miller cap, IC2_A's GBW/slew, the GRUNT caps' V-coefficient, `a0`, or **the J201's shaper
@@ -570,7 +589,8 @@ docstring and CLOSED/REFUTED row cites them.
    | the **J201's Miller / junction capacitance** | the stage has **\|A\| = 0.565 < 1**, so there is no Miller multiplication to modulate; **0.17 %** of budget at 2.5× the datasheet max | 139 |
    | **IC2_A's GBW and slew** | GBW is **small-signal** (AF2, inherited — no amplitude moves it); slew has a **12× margin at the vertex** | 139 |
    | the **GRUNT caps' voltage coefficient** | moves the tilt **POSITIVE at all three positions**; the defect is negative at all three ⇒ **0 of 3 on sign** | 139 |
-   | ⭐⭐ **ANY single moving pole** — i.e. the whole "a capacitance grows with drive" class, whatever the element | `d ln\|dT\|/d ln f = 2/(1+u) ≤ **2 exactly**`; the deficit steepens as **f^2.84** ⇒ a candidate needs **two poles or a distributed mechanism** | 139 |
+   | ⭐⭐ **ANY single moving pole** — i.e. the whole "a capacitance grows with drive" class, whatever the element | `d ln\|dT\|/d ln f = 2/(1+u) ≤ **2 exactly**`; the deficit's **ENDPOINT exponent over the rising limb is > 2 at 5/5 half-widths (smallest 2.530)** ⇒ a candidate needs **two poles or a distributed mechanism**. ⚠ Re-measured s141 at 4× the n; quote the endpoint reading, **not** AJ2c's refuted "every adjacent pair" | 139/141 |
+   | **both SHIPPED Sallen-Keys** as the complex-pair carrier | the pair is the one structure that clears the real-pole bound, and **neither is positioned to**: IC4_B at **w = 0.27** (own f² regime, 1.20/1.48), IC4_A at **w = 0.88** (essentially AT resonance, where the Q-mechanism crosses zero) ⇒ **0 of 2** against a 2.685 target | 141 |
    | the **J201's SHAPER**, all three routes (as shipped / gm sag through `k(s)` / amplitude-dependent compression) | memoryless ⇒ a pure gain change (**<1e−14**); gm sag is **2.46 %** at `gm→0` AND falls as **f^−1.9** where the deficit rises as **f^+2.8**; compression bounded **for any shaper** by the shelf's 0.0274 dB/oct. Root cause: the shelf corners at **219/292 Hz**, a decade below the vertex | 140 |
    ⭐⭐⭐ **⇒ EVERY NAMED CARRIER ON BOTH SIDES OF THE CLIPPER IS NOW REFUTED — INCLUDING THE J201's
    OWN NONLINEARITY (s140) — and the frame itself is the open question** — see the NEXT list. The

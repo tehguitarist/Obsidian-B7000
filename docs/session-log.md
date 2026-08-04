@@ -16125,3 +16125,265 @@ the gate always prints rather than a property it measures.
 4. ⚠ **`C_pedal`'s window/bar sensitivity (s137 NEXT #3)** — unchanged.
 5. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a ninth session.
 6. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+## SESSION 141 (2026-08-04) — GATE AL: the f^2.84 exponent survives a 4× larger n, but AJ2c's phrasing and its gating statistic do not, and the deficit turns out to be non-monotone
+
+Session 140 closed with two things: a `NEXT` #1 frame question with no named carrier left anywhere,
+and a `NEXT` #2 flag that **the exponent everything now rests on is still three points**:
+
+> ⚠ The exponent is still n = 3 centres (AG4's membership). Both AJ2c and now AK3b rest on it, so
+> it is carrying more weight each session. Widening it needs a finer surface, not a wider window.
+
+This session did **#2 before #1**, deliberately. `measurement-discipline.md` §1 carries eight
+occurrences of `verify-the-PREMISE-not-the-prior-session's-framing-of-it`, and the shape was the
+textbook one — a number measured once for one purpose, quoted forward by two later sessions for
+purposes it was never sized for. **An audit that can INVALIDATE two whole-class refutations is
+worth more than adding a third**, and if `f^2.84` were an artefact of three points on a coarse
+grid then AJ2c had refuted the largest candidate class in the project wrongly.
+
+**`analysis/deficit_exponent_gate.py` (GATE AL), 14/14 mutation arms
+(`analysis/_mutate_gate_al.py`), `analysis/reports/s141_deficit_exponent.json`. No `src/` file, no
+constant and no baseline moved — the twelfth consecutive read-only gate session.** ~4 s per run.
+
+### The instrument is not a new one, and that is the point
+
+AG4 reads slopes off GATE Q's **1/3-octave** band surface, so a ±0.5 oct window holds 3 bands and
+only three centres have a window wholly inside GATE W's feature-free band (1000–4200 Hz). **That is
+a property of the GRID, not of the physics.** GATE AH had already built the finer instrument for a
+different question *and cross-validated it against AG at this very feature* (AH6). So GATE AL
+imports AH's loader and AH's estimator verbatim rather than writing a third:
+
+* surface — GATE W's 1/48-oct smoothed `transfer_h1` (462 pts), GATE W's own cached renders
+* estimator — `AH.tilt_at`, the linear coefficient of a quadratic in log2(f/f0), i.e. AG's own
+* captures — GATE Q's pure-OD endpoints ex `gain-n12`, AH's own membership (16)
+
+⚠⚠ **The n that is quoted is the INDEPENDENT one.** A dense scan gives 91 centres whose windows
+overlap almost completely — one curve sampled finely, not 91 measurements. Quoting that as an n
+would be a worse error than the n=3 the gate exists to fix. Non-overlap is **asserted**, not
+assumed of the construction, and every verdict is taken from the non-overlapping set.
+
+| half-width (oct) | pts/fit | centres (Hz) | **independent n** | dense n |
+|---|---|---|---|---|
+| 1/24 | 5 | 1039.7–3925.3 | 24 | 95 |
+| 1/16 | 7 | 1054.8–3869.1 | 16 | 93 |
+| **1/12 (PRIMARY, AH's own)** | **9** | **1070.2–3813.6** | **12** | 91 |
+| 1/8 | 13 | 1101.5–3705.0 | 8 | 87 |
+| 1/6 | 17 | 1133.8–3599.5 | 6 | 83 |
+
+### AL1 — the known answers, and the one the gate's credibility rests on
+
+**(a) injected TILT**, exact algebra, worst |err| **2.04e-14** including the zero control.
+
+⭐⭐ **(b) injected known EXPONENT — the decision-relevant arm.** It is not enough that the
+estimator works; it must be shown to **DISCRIMINATE the class bound from the measurement**, because
+that separation *is* the conclusion AJ2c and AK3b draw. An estimator biased by +0.84 would have
+manufactured both. Injecting a perturbation whose local slope is exactly `A·(f/f_ref)^p` makes the
+deficit a pure power law of exponent `p`:
+
+| injected p | recovered | bias |
+|---|---|---|
+| 0.000 (constant deficit — the arm's own control) | 0.056 | +0.057 |
+| **2.000** (the class bound) | **1.977** | −0.023 |
+| **2.840** (the measurement) | **2.779** | −0.061 |
+| 4.000 | 3.864 | −0.136 |
+
+⇒ an injected 2.000 reads **1.977 (< 2.840)** and an injected 2.840 reads **2.779 (> 2.000)**.
+⭐ Note the bias is **negative and grows with p** — the finite-window quadratic *understates* the
+exponent, which is the conservative direction for a refutation that needs the exponent to be large.
+
+**(c) the class bound, recomputed by FINITE DIFFERENCE** over the same spacing the measurement
+uses, sharing **no algebra** with AJ2c's analytic `2/(1+u)`. Both sub-cases — the pole *appearing*
+(AJ2c's own form) and the pole *moving* — come back **2.0000**. A real cross-check, not a
+restatement.
+
+**(d)** AG4's n=3 exponent recomputed from **its own stored columns**: **2.841** (pairs 2.989 /
+2.693) — the audited statistic is reproduced from the source report, never transcribed.
+
+### ⭐⭐ AL3 — the deficit is NOT MONOTONE, and AG4 could never have seen it
+
+| centre Hz | MODEL dTilt | PEDAL dTilt | deficit |
+|---|---|---|---|
+| 1070.2 | −1.765 | −2.881 | **−1.116** |
+| 1201.2 | −1.398 | −1.903 | −0.504 |
+| **1348.3** | −1.092 | −1.337 | **−0.245  ← minimum** |
+| 1513.4 | −0.837 | −1.158 | −0.322 |
+| 1698.8 | −0.623 | −1.236 | −0.613 |
+| 1906.8 | −0.442 | −1.069 | −0.626 |
+| 2140.3 | −0.283 | −1.200 | −0.916 |
+| 2402.4 | −0.144 | −1.162 | −1.019 |
+| 2696.6 | −0.011 | −1.495 | −1.484 |
+| 2996.6 | +0.118 | −1.967 | −2.085 |
+| 3397.5 | +0.248 | −3.084 | −3.333 |
+| 3813.6 | +0.389 | −4.021 | **−4.410** |
+
+**|D| FALLS from 1.116 at 1070 Hz to 0.245 at 1348 Hz, then rises to 4.410 at 3814 Hz.** AG4's
+three centres (1613 / 2032 / 2560) **all sit above that minimum**, so *"the deficit steepens with
+frequency"* describes **one limb** and the instrument was never able to see the other. A single
+power law over the whole band is not defined; AL4 fits the rising limb and names the exclusion,
+with the split **computed as the argmin of |D|**, not chosen.
+
+✅ **Single-signed at 12/12**, so `log|D|` is well defined and nothing below is a zero-crossing
+artefact. (This was the outcome most likely to sink the whole exponent programme, and it held.)
+
+⭐⭐ **AND A SECOND FINDING NOBODY WAS LOOKING FOR: the MODEL's own drive-tilt CROSSES ZERO at
+~2724 Hz, −7.2 % from the 2935 Hz vertex.** AG3 reads the model's drive-tilt *at the vertex* and
+reports it **PINNED** (span 0.094 dB/oct across the 24 dB ladder), which item 6 carries as a
+property of the model. Across FREQUENCY it is nothing of the kind: over 1070–3814 Hz it moves
+**2.154 dB/oct, 0.73× the pedal's own 2.953 range**. ⇒ *"the model is pinned"* is a **LOCAL reading
+taken at a zero crossing of the model's own drive-tilt curve**, not a property of the model across
+this band. ⚠ Recorded as measured; why the crossing sits near the vertex is **not** explained here
+and is not claimed to be more than a coincidence.
+
+### ⭐⭐⭐ AL4 — the exponent CONFIRMED, and AJ2c's GATING STATISTIC corrected
+
+⚠⚠ **The gated statistic is the ENDPOINT-to-endpoint exponent, not AJ2c's weakest adjacent pair,
+and that is a CORRECTION rather than a loosening.** Integrate the pointwise bound:
+
+    d ln|g| / d ln f <= 2 on [a,b]  =>  ln|g(b)| - ln|g(a)| <= 2 ln(b/a)
+    i.e.  ENDPOINT exponent  ln|g(b)/g(a)| / ln(b/a)  <=  2,  EXACTLY, for the whole class.
+
+So a single moving pole **cannot** produce a limb whose endpoint exponent exceeds 2, whatever it
+does in between. That makes the endpoint reading (i) *mathematically implied* by the bound rather
+than fitted, (ii) the **most robust** statistic available — two values, the largest possible lever
+arm, no per-pair noise amplification and no regression — and (iii) impossible to rescue with a
+favourable interior.
+
+| half | n_limb | limb (Hz) | \|D\| ends | **ENDPOINT expo** | limb regression | weakest ⅓-oct pair |
+|---|---|---|---|---|---|---|
+| 1/24 | 20 | 1310–3925 | 0.120 → 4.882 | **3.375** | 2.898 | −0.117 |
+| 1/16 | 13 | 1368–3869 | 0.252 → 4.833 | **2.842** | 2.649 | 1.625 |
+| **1/12** | **10** | **1348–3814** | **0.245 → 4.410** | **2.779** | **2.685** | 1.743 |
+| 1/8 | 7 | 1310–3705 | 0.279 → 3.878 | **2.530** | 2.534 | 2.244 |
+| 1/6 | 5 | 1429–3600 | 0.291 → 3.702 | **2.752** | 2.653 | 2.016 |
+
+⇒ **CONFIRMED: the endpoint exponent exceeds the class bound at 5/5 half-widths, smallest 2.530**,
+on **10 independent centres at the primary (3.3× AG4's n)**, and the limb regression **2.685**
+reproduces AG4's **2.841**. Dense scan (75 overlapping, shape only): **2.603**.
+**AJ2c's and AK3b's shape refutations rest on a measurement, not on three points.**
+
+⚠ **BUT NOT UNIFORMLY, AND AJ2c SAID IT WAS.** Its wording is *"EVERY adjacent pair exceeds the
+bound"*; on this surface the weakest ⅓-oct pair is **−0.117** and the weakest RAW adjacent pair is
+**−10.349**. The deficit steepens faster than f² **across the limb** while containing sub-ranges
+where it does not. ⇒ a single pole is refuted as the carrier of the **WHOLE limb** and was never
+refuted pointwise. **Quote the endpoint reading, never the per-pair one.**
+
+⭐ **Why the per-pair statistic misbehaves is itself the lesson.** A pair exponent is
+`log|D_j/D_i| / log(f_j/f_i)`: its DENOMINATOR is the centre spacing, so as a half-width sweep
+narrows and centres crowd together the same noise is divided by a smaller number. Measured, the raw
+adjacent-pair minimum runs **−10.3 at 1/24 oct → +2.02 at 1/6 oct** on ONE dataset whose regression
+barely moves (2.53–2.90) — the spread is the **estimator's**, not the deficit's. AJ2c's version was
+sound *because its centres were a fixed ⅓ oct apart*; it simply is not scale-free, and a sweep is
+exactly what exposes that. GATE AL fixes the pair spacing at ⅓ oct (AG4's own) so rows are
+comparable across the sweep and the measurement matches the construction its bound is computed with.
+
+### ⭐⭐ AL5 — the positive specification s140 asked for, and another mis-positioned carrier
+
+| structure | max exponent | note |
+|---|---|---|
+| ONE real pole, appearing | **2.000** | the refuted class (AL1c) |
+| ONE real pole, moving | **2.000** | the refuted class (AL1c) |
+| N real poles, all below corner | **2.000** | a sum of f² terms is f² |
+
+Complex pole pair, at the **SHIPPED** Sallen-Key operating points, target **2.685** at the vertex:
+
+| stage | f0 Hz | Q | w@vertex | Q-change | f0-move | reaches? |
+|---|---|---|---|---|---|---|
+| IC4_B R24/R25/C18/C27 | 10730.2 | 0.4635 | 0.2735 | 1.200 | 1.477 | **no** |
+| IC4_A R26/R27/C19/C20 | 3336.9 | 0.6912 | 0.8795 | −19.450 (sign chg) | 0.522 | **no** |
+
+⇒ **NO shipped resonance reaches it.** IC4_B is deep in its own f² regime (w = 0.27); IC4_A sits
+essentially **AT** its resonance (w = 0.88), where the Q-mechanism's own slope change passes through
+zero. ⭐ **This is AK's root cause in a second guise: a carrier's corner has to be PLACED right, not
+merely present** — and it is the third independent time this session's family of gates has landed
+there.
+
+⭐⭐⭐ **WHERE a resonance would have to sit (the positive spec), at ≥25 % of its own max size:**
+
+| kind | Q | admissible w | **required f0 (Hz)** |
+|---|---|---|---|
+| Q-change | 0.4635 | 1.114–1.280 | **2292–2634** |
+| Q-change | 0.6912 | 1.068–1.209 | **2428–2749** |
+| Q-change | 0.7071 | 1.066–1.205 | 2436–2754 |
+| Q-change | 1.0000 | 1.044–1.150 | 2552–2811 |
+| Q-change | 2.0000 | 0.606–1.068 | 2748–4842 |
+| f0-move | 0.4635 | — | **NONE at usable size** |
+| f0-move | 0.6912 | 0.504–0.601 | 4885–5824 |
+| f0-move | 1.0000 | 0.676–0.820 | 3577–4341 |
+| f0-move | 2.0000 | 0.839–0.916 | 3204–3499 |
+
+⇒ **a Q/damping mechanism needs a resonance at ~2.3–2.8 kHz with the vertex on its UPPER skirt
+(w ≈ 1.07–1.28); an f0-move needs one at ~3.2–5.8 kHz.** ⚠ SHAPE ONLY — admissible in shape is
+**necessary, never sufficient** (AK5 is the standing example of a carrier passing every sign gate
+and dying on size), and these are mechanism sizes on the shipped linear cascade, not priced renders.
+
+### The mutation runner — 14/14, and it found TWO real gate defects
+
+8 refusal arms + 6 computed-verdict arms, one per verdict the gate emits (including the one this
+whole session existed to make reachable: **"AJ2c DOES NOT SURVIVE"**, driven by raising the stored
+bound to 5.0 — if that outcome were unreachable the audit would have been decorative).
+
+⚠ **Three arms failed on the first run and all three were the TEST's fault, in two documented ways:**
+* **caught by an EARLIER guard (s119 — fix the expectation, not the guard), twice.** The two AL3
+  verdict arms perturbed `deficit_at` unconditionally, which also shifted AL1b's *injected* known
+  answers, so AL1b refused before AL3 was reached. Fixed by conditioning the perturbation on
+  `inject is None` so it touches only the measurement it is aimed at.
+* **a VACUOUS/mis-aimed arm.** The arm aimed at AL2's primary-usable branch raises `AH.MIN_PTS`,
+  which makes the estimator return `None` everywhere — and AL1a evaluates the estimator *at* the
+  primary, so it fires first. ⇒ AL2's branch is **structurally unreachable**, and is now labelled in
+  the gate as an invariant kept against a future refactor and **explicitly not claimed as tested**
+  (s133's exact resolution). The arm was re-pointed to what it actually tests.
+* ⚠ A weak arm reads NARRATED: scaling the deficit by `(f0/1000)^3` does **not** make it monotone
+  (the measured fall is 4.55× over a 1.26× frequency ratio, so any exponent below ~6.6 fails).
+  Raised to `^8`.
+
+⭐ **Two REAL defects in the gate, both found only by the runner and both of the "refuse, don't
+crash" family (s117):** AL1a died with `TypeError: unsupported operand type(s) for -: NoneType and
+NoneType` when the estimator was under-sampled, and AL4's sign-change early return did not populate
+a key `main` prints (`KeyError: 'uniform_verdict'`) — a branch that fires only on unusual data, so
+the sign-scan arm is the only thing that ever executes it. Both now refuse with a reason.
+
+### CLAUDE.md re-archived on its own 800-line trigger (second time; s136 was the first)
+
+Adding s141's four CLOSED/REFUTED rows and the item-6 edits took the file 779 -> 808, past its own
+trigger. Rather than hand the next session a debt this session created, two blocks of **pure
+per-session narrative about past doc operations** were compressed to pointers, both verified
+present in this log first (the discipline rule's own condition): the s136 re-archive paragraph and
+the s122 consolidation paragraph. A third saving was pure **de-duplication**, not compression — the
+capture-access warning and the fresh-session read order appeared verbatim BOTH in the "Current
+step" preamble and again ~130 lines later in STATUS; the second copy is now a pointer.
+⚠ **The CLOSED/REFUTED and SHIPPED CONSTANTS tables were not touched**, as in s136 — they are the
+load-bearing content. Final: **799 lines**, back under the trigger.
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **The frame question is still the head item (s140 `NEXT` #1), and AL sharpens the brief it
+   hands over.** What is now specified rather than merely vetoed: the carrier must be a **resonance
+   whose damping or corner moves with drive**, sitting at **~2.3–2.8 kHz** (Q/damping route, vertex
+   on its upper skirt) or **~3.2–5.8 kHz** (f0 route) — and **neither shipped Sallen-Key is in
+   either band**. ⚠ Note the convergence worth checking before anything is built: AA6 and AD5
+   independently narrowed item 6 to a **DAMPING / LOADING** class from two statistics sharing no
+   arithmetic with this one, and AL5's Q-change route is exactly that class. Nothing has yet asked
+   what in this chain could have a resonance near 2.5 kHz at all.
+2. ⭐⭐ **AL3's non-monotonicity is unexplained and is a finding in its own right.** |D| has an
+   interior minimum at ~1348 Hz. A deficit that falls then rises is not one mechanism with one
+   corner; it is the natural signature of two contributions, or of one whose sign structure changes.
+   Nobody has looked below 1348 Hz because AG4's window rule never admitted it.
+3. ⭐ **The model's own drive-tilt zero crossing (~2724 Hz, −7.2 % from the vertex) wants an
+   explanation or an explicit "coincidence" ruling.** It re-frames AG3's "PINNED", which item 6
+   quotes as a property of the model, into a local reading at a crossing.
+4. ⚠ **Re-quote AJ2c's phrasing wherever it appears.** Its conclusion stands; *"every adjacent pair
+   exceeds the bound"* does not. `analysis/pre_clipper_tilt_gate.py`'s own AJ2c text and CLAUDE.md's
+   item 6 gate 5 both carry it.
+5. **The bridged-T half of AB6 (τ × 0.9337) remains unowned.** Unchanged for twelve sessions.
+6. ⚠ **`C_pedal`'s window/bar sensitivity (s137 `NEXT` #3)** — unchanged.
+7. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a tenth session.
+8. **Items 4/5/9 and Phase 10's unbuilt probes** (`FeatureProfile`, `OSFidelity`) — unchanged.
+
+⚠⚠ **STANDING CONCERN, RAISED EXPLICITLY (`know-when-to-stop-measuring`, s75–88).** This is the
+**twelfth consecutive read-only gate session**. The discipline file's own rule reads: *"If a
+session's next step is a refinement of a component of a defect that has no candidate fix, that is
+the signal to go and ship something instead."* This session was a **premise audit** rather than a
+refinement — it could have overturned two standing refutations, and it materially changed two
+statements — so the rule does not fire on it. It plainly fires on the *next* one unless that
+session either builds AL5's specified resonance candidate or moves to the release gate's other
+open rows. Flagging to the user rather than deciding it here.
