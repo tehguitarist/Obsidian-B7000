@@ -144,10 +144,36 @@ EXONERATION_MAX_RATIO = 0.15
 DUP_PURE_GAIN_MAX_SPAN_DB = 0.01
 DUP_TAPER_STEP_MAX_DB = 0.05
 
-# The MASTER taper exponent session 115 RETIRED.  Deliberately transcribed -- it no longer exists
-# in FitParams.h, so it cannot be read from the header, and it is used for DIAGNOSIS ONLY (naming
-# a pre-s115 report as such) and never to gate anything.
-RETIRED_MASTER_TAPER_EXP = 1.998
+# EVERY RETIRED MASTER TAPER, newest first.  Deliberately transcribed -- none of these exists in
+# FitParams.h any more, so none can be read from the header, and they are used for DIAGNOSIS ONLY
+# (naming a stale report as belonging to a given epoch) and never to gate anything.
+#
+# ⚠⚠ SESSION 146 -- THIS LIST EXISTS BECAUSE IT GREW.  Until s146 there was one retired form (the
+# power law) and the guard below named "PREDATES SESSION 115" when it matched.  s146 retired the
+# TWO-SEGMENT PWL in turn, and the guard, knowing nothing about it, reported a stale s124 report
+# as "either the captures are wrong or the taper is not rendering as specified" -- two alarming
+# and wrong diagnoses -- when the real answer was simply "this report predates s146".  A guard
+# that names epochs has to be EXTENDED every time an epoch ends, or it degrades into a puzzle
+# exactly when it fires.  Add the next retired form HERE when you retire one.
+RETIRED_MASTER_TAPER_EXP = 1.998                    # power law, retired s115
+RETIRED_S115_PWL2 = (0.5927, 0.1137)                # 2-segment PWL, retired s146
+
+
+def _retired_epoch_pred(caps, fa, fb):
+    """(label, predicted dB step) for each retired taper form, for diagnosis only."""
+    ma, mb = master_of(caps, fa), master_of(caps, fb)
+    out = []
+    p = RETIRED_MASTER_TAPER_EXP
+    out.append((f"the power law (exp {p}), retired s115",
+                20.0 * np.log10(ma ** p / mb ** p)))
+    xb, fbk = RETIRED_S115_PWL2
+
+    def pwl2(x):
+        return (fbk * x / xb) if x <= xb else (fbk + (1.0 - fbk) * (x - xb) / (1.0 - xb))
+
+    out.append((f"the 2-segment PWL (brk {xb}, frac {fbk}), retired s146",
+                20.0 * np.log10(pwl2(ma) / pwl2(mb))))
+    return out
 
 
 # --------------------------------------------------------------------------------------------
@@ -173,28 +199,43 @@ def is_silent(caps, f, sweep):
 
 
 def shipped_master_taper():
-    """The two-segment PWL MASTER taper constants, READ from src/dsp/FitParams.h.
+    """The THREE-segment PWL MASTER taper constants, READ from src/dsp/FitParams.h.
 
     Read rather than transcribed: this gate's known answer is only a known answer if it uses the
     constants the plugin actually ships (`verify-the-CONSTANT-not-the-prose`, s35).  Session 115
     RETIRED `masterTaperExp`, so a stale power-law reader would silently find nothing -- hence the
     hard failure rather than a default.
+
+    ⚠⚠ SESSION 146 -- THE FORM CHANGED AGAIN (two segments -> three) AND `masterTaperBreak`
+    CHANGED MEANING with it: it is now the FIRST of two breaks, and its value moved
+    0.5927 -> 0.3318.  This function previously returned two values and `master_div` rebuilt a
+    two-segment curve from them.  Left alone, BOTH would still have run -- the names still
+    resolve and the arithmetic is still valid Python -- and this gate's "known answer" would
+    have silently become a comparison against a curve the plugin does not implement.  That is
+    exactly s118's `when a parameter carries two meanings and a fit consumes one of them`, and
+    it is why the two new names are REQUIRED here rather than defaulted: a missing
+    `masterTaperBreak2` now means the source and this gate have diverged, which must be loud.
     """
     src = open(K.FITPARAMS, encoding="utf-8").read()
     vals = {}
-    for name in ("masterTaperBreak", "masterTaperFrac"):
+    for name in ("masterTaperBreak", "masterTaperFrac", "masterTaperBreak2", "masterTaperFrac2"):
         m = re.search(rf"\b{name}\s*=\s*([0-9.eE+-]+)\s*;", src)
         if not m:
             sys.exit(f"GATE O6b FAIL: {name} not found in {K.FITPARAMS}.  The shipped MASTER taper "
                      f"has changed shape; re-derive this known answer rather than adjusting it")
         vals[name] = float(m.group(1))
-    return vals["masterTaperBreak"], vals["masterTaperFrac"]
+    return (vals["masterTaperBreak"], vals["masterTaperFrac"],
+            vals["masterTaperBreak2"], vals["masterTaperFrac2"])
 
 
-def master_div(x, brk, frac):
+def master_div(x, brk, frac, brk2, frac2):
     """MasterOut::setMaster's divRatio -- deliberately a re-derivation, not a call into the stage,
     so the check can still fail if the shipped curve moves."""
-    return (frac * x / brk) if x <= brk else (frac + (1.0 - frac) * (x - brk) / (1.0 - brk))
+    if x <= brk:
+        return frac * x / brk
+    if x <= brk2:
+        return frac + (frac2 - frac) * (x - brk) / (brk2 - brk)
+    return frac2 + (1.0 - frac2) * (x - brk2) / (1.0 - brk2)
 
 
 def master_of(caps, f):
@@ -573,37 +614,42 @@ def gate_o6b(absfr, caps, nonhf, u_file, out):
     d = err_curve(absfr, other[0], SWEEPS[0]) - err_curve(absfr, u_file, SWEEPS[0])
     span = float(d[nonhf].max() - d[nonhf].min())
     meas = float(d[nonhf].mean())
-    brk, frac = shipped_master_taper()
-    pred = 20.0 * np.log10(master_div(master_of(caps, other[0]), brk, frac)
-                           / master_div(master_of(caps, u_file), brk, frac))
+    tap = shipped_master_taper()
+    pred = 20.0 * np.log10(master_div(master_of(caps, other[0]), *tap)
+                           / master_div(master_of(caps, u_file), *tap))
     print(f"   known answer: {other[0].split('_')[0]} vs {u_file.split('_')[0]} (model-pedal)")
     print(f"      measured  {meas:+.4f} dB, span {span:.6f} dB")
-    print(f"      predicted {pred:+.4f} dB  = the shipped PWL taper step (brk {brk}, frac {frac}),")
+    print(f"      predicted {pred:+.4f} dB  = the shipped 3-segment PWL taper step")
+    print(f"                  (brk {tap[0]}, frac {tap[1]}, brk2 {tap[2]}, frac2 {tap[3]}),")
     print( "                  which is what remains IF AND ONLY IF the pedal sides cancel")
     if span > DUP_PURE_GAIN_MAX_SPAN_DB:
         sys.exit(f"GATE O6b FAIL: the two detents differ by {span:.4f} dB across frequency, not a "
                  f"pure gain (bar {DUP_PURE_GAIN_MAX_SPAN_DB}) -- MASTER is attenuation-only, so "
                  f"either this reconstruction or circuit.md's topology note is wrong")
     if abs(meas - pred) > DUP_TAPER_STEP_MAX_DB:
-        # Before blaming the captures, check the likeliest cause: a report rendered BEFORE session
-        # 115 replaced the power law.  This makes the gate a real baseline-EPOCH guard -- the thing
+        # Before blaming the captures, check the likeliest cause: a report rendered from a
+        # DIFFERENT src/ epoch.  This makes the gate a real baseline-EPOCH guard -- the thing
         # session 118 discovered the hard way, that "invisible to the matrix" is not "invisible".
-        old = 20.0 * np.log10(master_of(caps, other[0]) ** RETIRED_MASTER_TAPER_EXP
-                              / master_of(caps, u_file) ** RETIRED_MASTER_TAPER_EXP)
-        if abs(meas - old) <= DUP_TAPER_STEP_MAX_DB:
-            sys.exit(f"GATE O6b FAIL: measured {meas:+.4f} dB matches the RETIRED power-law taper "
-                     f"(exp {RETIRED_MASTER_TAPER_EXP}, predicts {old:+.4f}), not the shipped PWL "
-                     f"({pred:+.4f}).  ⇒ THIS REPORT PREDATES SESSION 115 and was rendered from a "
-                     f"different src/.  Re-render before reading any ABSOLUTE ledger off it: the "
-                     f"matrix's per-row gain match hides s115's constants, this gate does not")
+        epochs = _retired_epoch_pred(caps, other[0], u_file)
+        for label, old in epochs:
+            if abs(meas - old) <= DUP_TAPER_STEP_MAX_DB:
+                sys.exit(
+                    f"GATE O6b FAIL: measured {meas:+.4f} dB matches {label}, which predicts "
+                    f"{old:+.4f} -- NOT the currently shipped taper ({pred:+.4f}).\n"
+                    f"  ⇒ THIS REPORT WAS RENDERED FROM AN OLDER src/ AND IS STALE FOR EVERY "
+                    f"ABSOLUTE LEDGER.  Re-render before reading one off it: the matrix's per-row "
+                    f"gain match hides a MASTER taper change, this gate does not.\n"
+                    f"  ⚠ This is NOT a capture defect and NOT a rendering bug -- do not go "
+                    f"looking for one.")
+        tried = "; ".join(f"{lab} -> {v:+.4f}" for lab, v in epochs)
         sys.exit(f"GATE O6b FAIL: measured {meas:+.4f} dB vs the shipped taper's {pred:+.4f} dB "
-                 f"(bar {DUP_TAPER_STEP_MAX_DB}), and it does not match the retired power law "
-                 f"either ({old:+.4f}).  Either these two captures are not the duplicate GATE T3 "
-                 f"reports, or the shipped MASTER taper is not rendering as specified")
+                 f"(bar {DUP_TAPER_STEP_MAX_DB}), and it matches NO retired form either "
+                 f"({tried}).  Either these two captures are not the duplicate GATE T3 reports, "
+                 f"or the shipped MASTER taper is not rendering as specified")
     print(f"      agree to {abs(meas - pred):.4f} dB  => the pedal sides DO cancel: the")
     print( "         duplication is confirmed here, independently of GATE T's WAV-level read.")
-    print( "      ⭐ Free second result: this validates the session-115 PWL taper on the render,")
-    print( "         through a path sharing nothing with s115's own acceptance check.")
+    print( "      ⭐ Free second result: this validates the SHIPPED PWL taper on the render,")
+    print( "         through a path sharing nothing with the taper tool's own acceptance check.")
 
     print(f"\n   CORRECTION (imported from GATE T, not transcribed): +{corr:.3f} dB on the PEDAL")
     print( "      provenance: the fresh gain-n18 capture of this detent, promoted through the")

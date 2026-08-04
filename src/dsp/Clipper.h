@@ -176,6 +176,17 @@ public:
     // is that the reference is physical and the fit must not reach it. If a future
     // re-fit of the K/clipSat family restores a physical satLo, this constant and
     // that one will agree again on their own.
+    // ⛔⛔ SESSION 142 — THAT LAST SENTENCE IS NOW KNOWN TO DESCRIBE SOMETHING THAT
+    // CANNOT HAPPEN BY RE-FITTING, so do not wait for it. A physical satLo needs the
+    // drive at node W to rise 5.442x (+14.72 dB, the VTC being homogeneous), every
+    // stage from the jack to node W is schematic-fixed, and the only free scalar —
+    // kInputRef — would have to reach 4.898 V/FS against an ABSOLUTE supply ceiling of
+    // 2.777 (1.76x / +4.93 dB over). See the FitParams.h clipSat block for the full
+    // arithmetic. ⇒ THE RESIDUAL 0.05-0.25 % D2 FIRING IS THEREFORE EXPECTED TO PERSIST
+    // for as long as the fitted ceiling is soft-low, and it is STILL not a reason to
+    // widen kTripPointV: this window is physics and the fit is what is off. What the
+    // residual now means is a standing, quantified marker of the soft-low ceiling, not
+    // a pending repair.
     static constexpr double kTripPointV = 2.657; // circuit.md / session-42 solve
     static constexpr double kClampHi = 9.6 - kTripPointV;  // +6.943 V
     static constexpr double kClampLo = -0.6 - kTripPointV; // -3.257 V

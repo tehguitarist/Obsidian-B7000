@@ -71,6 +71,24 @@
     analysis site is the one you are already editing and therefore the one that never gets missed;
     the chooser's site is the one that costs someone a session. ⚠ And keep the refuted option
     *selectable* — the refutation must stay reproducible — but say so at the option. (s124)
+  - ⭐⭐⭐ **TENTH, s148, AND IT IS THE STRONGEST FORM: AN "EVERYTHING IS REFUTED" CLAIM IS ABOUT THE
+    CARRIERS THAT WERE **NAMED**, NOT ABOUT THE SPACE — AND THE AUDIT THAT FINDS THE MISSING ONE IS
+    MECHANICAL.** Sessions 139/140 closed with *"EVERY named carrier on both sides of the clipper is
+    now refuted"*; s145 then censused the chain for resonances, found none, and the two together
+    turned the open item's head question into a FRAME question — which is a much more expensive place
+    to be than "screen the next carrier". The claim was false. The J201 drain node's **output
+    resistance** (`ro`, `rq2`) sagging with the operating-point current is a shipped fit parameter,
+    **static in the model**, and absent from every refuted table, every session block and every gate.
+    ⭐⭐ **The tell was free and unread, and it is the generalisable part: the gate that closed the
+    space had the missing parameter in its own signature.** GATE AK's mechanism function is
+    `drain_db(gm, ro, rq2, zin)` — it ACCEPTS all three and swept `gm` only. ⇒ **for every gate that
+    screened a stage, diff the parameters its mechanism function ACCEPTS against the ones it actually
+    SWEPT; the difference is the unscreened set.** That is a `grep` and a read, against a frame
+    question that had already consumed one session and was about to consume more. ⚠ Note the two
+    directions this can go and report both: here the missed carrier turned out to be **refutable**
+    (three interlocking ways), so the headline is true again — but it was restored by measurement,
+    not by the claim having been right. A claim that is accidentally true is still a claim nobody
+    checked. (s148, GATE AN)
   - ⭐⭐ **A RECORDED DERIVED NUMBER CAN BE RIGHT IN VALUE AND WRONG IN LABEL — REPRODUCE IT FROM
     THE RECORDED INPUTS, NOT BY FINDING A COMPUTATION THAT EMITS IT.** Session 112 recorded four
     clean fractions as its matched-pair design. All four are genuine entries in the relevant table,
@@ -958,6 +976,80 @@
   positive half: the bound does not merely refute, it **specifies** — what is needed is two poles
   or a distributed mechanism, which is a sharper brief than "find a frequency-dependent
   nonlinearity". (s139, GATE AJ2c)
+  - ⭐⭐⭐ **AND THE STRONGEST FORM OF THE SAME IDEA, s145: A BOUND CAN SOMETIMES BE PROVED OVER THE
+    WHOLE **PARAMETER SPACE**, NOT JUST OVER THE SHIPPED POINT — WHICH IS THE DIFFERENCE BETWEEN
+    "this stage does not do X" AND "no re-fit of this stage can ever do X".** Asking whether the
+    clipper's shunt-feedback loop can resonate, the cheap answer is to evaluate its poles at the
+    shipped `clipA0` and GRUNT caps and report "real". That is true and weak: the whole open item is
+    about a mechanism nobody has found yet, so a future session re-fitting `a0` re-opens it. Written
+    out, the loop's denominator is `a s² + b s + c` with `b = (1+a0)(R16 Cg + R18 C14) + Cg R18`, and
+    **AM-GM gives `b ≥ (1+a0)·2√(R16 Cg R18 C14)` ⇒ `b² ≥ 4ac` for EVERY positive R, C and every
+    a0 ≥ 0**, with equality only at a repeated real pole. ⇒ resonance is impossible **by topology**.
+    ⭐ GENERAL: when a screen's answer would be "not at these values", spend ten minutes asking
+    whether the inequality closes **symbolically** — a two-line AM-GM or Cauchy–Schwarz step often
+    turns a shipped-point observation into a structural one, and structural results do not expire
+    when a constant moves. ⚠ **A hand-done algebra step is exactly what a mutation test is for**:
+    the claim is backed by a 20 000-draw random sweep over R ∈ [1e1,1e7], C ∈ [1e-12,1e-5],
+    a0 ∈ [1e-2,1e3] (min normalised discriminant **5.2e-5**), and the arm that drops one term from
+    `b` breaks the bound and must be caught. Do not ship a "for all values" claim whose only support
+    is that you did the algebra correctly. (s145, GATE AM4)
+- ⭐⭐⭐ **A TRANSFER-FUNCTION KNOWN ANSWER VALIDATES *TOPOLOGY* AND IS STRUCTURALLY BLIND TO WHICH
+  **VALUE SET** YOU FED IT — BECAUSE IT FEEDS BOTH SIDES THE SAME ONE.** Building a stamp-level
+  netlist for every stage, the obvious guard is to compare each netlist's transfer against the
+  project's already-validated oracle; here that passed at **3.7e-12 over 20 netlists**, which reads
+  as total coverage. It is not. Both sides are evaluated **at the same component values**, so if the
+  gate had censused the *drawn* schematic values instead of the *shipped fitted* ones — a live risk
+  in this project, where `trebleC7` ships **147×** off the drawing — the oracle would have moved
+  with it and the check would agree **perfectly**. The transfer comparison cannot see it, ever.
+  ⭐ The fix is a separate, cheap **divergence guard**: assert the two value sets actually differ
+  (11 of 12 treble values do) and name them. ⭐ GENERAL: **for any known answer of the form "my
+  implementation agrees with a trusted one", list what both sides share as INPUT — that shared input
+  is precisely what the check cannot validate**, and it needs its own guard. Same shape as
+  `imposed-checks-cannot-corroborate` (s44) and `a-known-answer-that-starts-at-its-own-answer`
+  (s104): the agreement is real and the thing you wanted assurance about was never at risk of
+  disagreeing. ⚠ Found by the mutation runner, which reported the arm `GUARD DEAD` — correctly, since
+  before the divergence guard existed there was nothing for it to hit. (s145, GATE AM1a)
+  - ⭐⭐⭐ **THE PREDICTED SECOND OCCURRENCE, s149 — AND IT HAD ALREADY HAPPENED, IN THREE GATES,
+    FOR TEN SESSIONS. WRITING THE GUARD IN ONE GATE DOES NOT PROTECT THE OTHERS.** The entry above
+    was written at s145 as a near-miss caught by a mutation runner. Three *earlier* gates had
+    already committed it for real: `AJ.ladder_zin` computed the treble ladder as
+    `EQ.treble_attack_tf(f, position)` — **the drawn defaults, no element values passed at all** —
+    and GATE AK and GATE AN inherited the same `Zin` by calling that one function. Measured, **11 of
+    12 values differ** from the shipped fit (R7 ×8.23, C6 ×0.063, C7 ×0.0076, C8 → 0). ⭐⭐ **AJ *did*
+    have a known answer on that quantity, and it is exactly the blind kind this entry describes:
+    AJ1d checks `ladder_zin` is PROBE-INDEPENDENT (1 k vs 47 k, passing at 3.9e−14) — which validates
+    the EXTRACTION and is satisfied by any network whatsoever, because both sides share the element
+    set as input.** ⭐ GENERAL, and it is the addition: **a divergence guard belongs at every site
+    that CONSUMES the value set, not only in the gate that first noticed the trap** — grep for the
+    accessor, not for the guard, and note that a shared helper function silently multiplies one
+    defect across every gate that imports it. Same family as `a refutation has to land where the
+    thing is CHOSEN` (s124), pointed at a guard instead of an enum. ⚠⚠ And the payoff structure is
+    worth copying: the consequence was **measured, not argued** (s139's discipline — run both value
+    sets and diff the stored reports), which showed all three verdicts holding *and* three published
+    numbers wrong, including one whose stated reason INVERTED (`|A| = 0.565 < 1` → **2.778 > 1**).
+    ⭐⭐ **The reason it survived is the durable lesson: the defect reached only the EXPLANATORY
+    columns. AJ's GRADED reach is read at an absolute 10 pF ceiling and its exponent bound is
+    analytic, so both were BIT-IDENTICAL** — so *"nothing that was gated on moved"* is precisely how
+    a wrong shared input goes ten sessions without a symptom, and it is an argument for auditing the
+    inputs rather than waiting for a gate to go red. (s149, GATE AO)
+- ⭐⭐⭐ **A STORED BAND THAT IS A *UNION OVER A NUISANCE PARAMETER* CANNOT GRADE A SINGLE INSTANCE —
+  AND THE TELL IS THAT IT CONTRADICTS THE GATE IT CAME FROM.** GATE AL published an admissible
+  band for item 6's carrier, computed by sweeping five trial Q values and taking the **union** of
+  the resulting windows. Importing that band and asking "is this resonance inside it?" is a
+  **category error**: the union is wide enough to contain positions that are admissible only at
+  *some other* Q. Run that way, the new gate reported the 3.3 kHz Sallen-Key **admissible** — the
+  exact opposite of AL5's own verdict on the same stage, from the same numbers. ⭐ **The
+  contradiction is the diagnostic**: importing a prior gate's target is right (`the target must be
+  IMPORTED, never transcribed`), and when the import then disagrees with the source gate's published
+  verdict, suspect the **shape of the imported statistic** before suspecting either gate's physics.
+  ⭐ The repair is to import the source's *functions* rather than its *summary* — recompute the band
+  at each instance's **own** Q through AL5's own `pair_mechanism`/`fd_exponent`, so the two gates
+  cannot drift apart and the grading is conditional rather than pooled. ⚠ GENERAL: before grading
+  anything against a stored range, check whether that range is a **measurement** or an **envelope
+  over a swept parameter** — the two look identical in a JSON file, and only one of them is a bar.
+  Same family as `a-pooled-statistic-cannot-answer-about-its-own-axis` (s105), one level over: there
+  the pooling averaged away the axis the conclusion was about, here it *unions* away the axis the
+  admissibility depends on. (s145, GATE AM5)
 - ⭐⭐ **A "SHIPPED STAGE'S OWN INPUT" INCLUDES HOW ITS CONSTANTS ARE *COMPOSED*, NOT ONLY WHAT
   DOMAIN THEY ARE IN.** s113's entry (below/above, `a shipped stage's closed form takes the
   STAGE's input`) is about a taper sitting between the knob and the algebra. The same trap has a
@@ -2078,6 +2170,46 @@
 
 ## 4. Fits, searches and degeneracy
 
+- ⭐⭐⭐ **WHEN THE ERROR IS IN *x* AND NOT IN *y*, LEAST-SQUARES OVER ALL POINTS IS THE WRONG
+  LIKELIHOOD — AND THE FIX IS TO MAKE THE TRUSTWORTHY POINTS *CONSTRAINTS*, NOT HEAVIER WEIGHTS.**
+  The MASTER ladder is nine captures whose LEVELS are exact (a pure-gain check reads 0.0002 dB
+  band-span) but whose knob ROTATIONS are hand-set estimates. Fitting a taper by least-squares over
+  all of them silently treats nine uncertain-x points as nine good y-observations, which let **six
+  estimates outvote the one position that is known** — and the shipped curve was consequently
+  **1.86 dB wrong at the centre detent**, the one interior rotation with no freedom at all. ⭐ The
+  repair is not inverse-variance weighting (which still lets a big enough pile of estimates drag the
+  answer): it is to **pin the curve through the trusted point exactly and let the estimates choose
+  only the remaining shape**. ⭐⭐ GENERAL: **ask which axis your observations are uncertain on before
+  choosing an objective.** Uncertain-y → weighted least squares. Uncertain-x with a few exact points
+  → constrain on the exact ones. ⚠ And identify the exact points from something INDEPENDENT of the
+  fit: here a physical property (the pot has a mechanical reference at both stops and the centre
+  detent, GATE S3/s113) and the user's own statement agreed on the same three positions, and the
+  captures confirmed it without being told (0.0000 dB across two sessions there, 0.33–1.77 dB
+  elsewhere). ⚠⚠ Check the exact points are *genuinely independent observations* first — two files
+  agreeing to 0.0000 dB is equally consistent with one being a digital copy of the other; scalar-null
+  them (here −84…−86 dB, the same floor as detents whose levels DISAGREE by 1.19 dB, so they are real
+  separate takes). (s146)
+- ⭐⭐ **A ONE-SIGNED RESIDUAL DIAGNOSES AN INADEQUATE MODEL *FAMILY*; THE rms DOES NOT — AND WHEN
+  THE NOISE IS HAND JITTER, THE BIAS IS THE ONLY STATISTIC THAT CAN.** Adding parameters always
+  lowers rms, so "the richer form fits better" is not evidence of anything (and below the measurement
+  floor it is evidence of overfitting). But knob-placement noise has **no preferred sign**, so a
+  residual that is one-signed across the estimated points cannot be noise and must be structure. Here
+  the 2-segment taper pinned to the trusted point carried **+1.232 dB of bias** where 3 segments
+  carried **−0.329** — and the *reason* was structural and visible in advance: the first segment runs
+  from the ORIGIN, so it is a straight line and **cannot be convex**, which is exactly what the data
+  wanted below the break. ⇒ **print the residual's MEAN beside its rms, and when they disagree,
+  believe the mean.** ⚠ And justify a richer family on properties the objective did NOT ask for
+  before quoting its rms: here the shipped curve's segment slopes RISE monotonically (0.172 → 0.368 →
+  2.413, i.e. a convex, physically-buildable resistive track) and it lands inside the textbook
+  A-taper 10–15 % half-rotation band — neither of which any term of the fit knew about, and the
+  convexity is now asserted by a test that FAILS if it is lost. (s146)
+- ⭐⭐ **A CANDIDATE'S OWN SEARCH MUST NOT BE SEEDED FROM THE INCUMBENT'S PARAMETERISATION.** A
+  one-parameter constrained fit was started at the shipped break, which was correct while the
+  shipped form had one break — and the moment that constant's MEANING changed (first of two, in the
+  new 3-segment form) the seed landed outside the candidate family's valid region entirely, so the
+  "fit" **silently returned its own starting value** with no error. Multi-start from a grid over the
+  parameter's own admissible range instead. ⚠ Same root cause as the meaning-change trap below, one
+  level down: the optimiser inherited a stale assumption nobody thought of as an assumption. (s146)
 - **A monotone objective with no interior minimum is a degeneracy, not a fit.** "Make the clipper see
   less" killed the s5/s6 clipper fits, the GAP #3b C13 candidate and the rail-voltage fit. Require
   the objective to push back from BOTH sides. (many)
@@ -2260,6 +2392,19 @@
   filename would have missed. ⚠ The lesson that is ADDED: when a quick scratch statistic disagrees
   with the pipeline's own instrument, **the scratch one is the suspect** — reproduce the
   disagreement both ways before writing the conclusion into a handover. (s110, GATE R3b)
+- ⭐⭐ **A GUARD THAT NAMES *EPOCHS* MUST BE EXTENDED EVERY TIME AN EPOCH ENDS, OR IT DEGRADES INTO A
+  PUZZLE EXACTLY WHEN IT FIRES.** GATE O6b's known answer is phrased in terms of a shipped constant
+  precisely so it REFUSES a report rendered from an older `src/` (s119's design, and it works). Its
+  fallback then tries to *name* the stale epoch — and it knew only one retired form, the power law.
+  When a second form was retired, the guard fired correctly on a stale report and reported *"either
+  these captures are not the duplicate GATE T3 reports, or the shipped MASTER taper is not rendering
+  as specified"* — two alarming, wrong diagnoses, either of which would send the next session hunting
+  a capture defect or a DSP bug that does not exist. Extended to a LIST of retired forms it
+  identifies the epoch to **0.0002 dB** and says so explicitly. ⭐ GENERAL: when you retire a form
+  that any epoch guard names, **add the retired form to that guard in the same edit** — the guard's
+  value is entirely in its diagnosis, and a correct refusal with a wrong reason is worse than a bare
+  refusal because it is actionable in the wrong direction. Same family as `a refutation has to land
+  where the thing is CHOSEN` (s124), pointed at a guard rather than at an enum. (s146)
 - **`rebaseline-all-derived-artefacts`.** Changing an upstream global expires the intermediate CSVs
   and the fixed-amplitude gates too, not just the headline baseline. Three occurrences (s35, s45,
   s65). Fix: every render writes a `.args.json` stamp of its exact argv; every read checks it.
@@ -2721,6 +2866,49 @@
   caveat, build an instrument to resolve the caveat. Each closed an item honestly and nothing
   shipped. **If a session's next step is a refinement of a component of a defect that has no
   candidate fix, that is the signal to go and ship something instead.**
+- ⭐⭐⭐ **A BACKLOG ITEM'S PROPOSED *REPAIR* IS A CLAIM, NOT A TASK — AUDIT IT BEFORE SPENDING THE
+  FIT, BECAUSE A MEASUREMENT AND ITS PROPOSED REMEDY TRAVEL AS ONE SENTENCE AND ONLY THE MEASUREMENT
+  GETS CHECKED.** Open-work item 5 read: *"the model's VTC amplitude is fitted 5.4× below the
+  physical rail … A K/`clipSat` re-fit against a physical ceiling is the real repair."* The first
+  half is true and reproduces exactly. The second half had **never been computed**, and it is
+  **false**: the VTC is homogeneous, so a physical ceiling needs 5.442× more drive at node W; every
+  stage from the jack to that node is schematic-fixed; so the only free scalar would have to reach
+  **4.898 V/FS against an absolute supply ceiling of 2.777** — over by 1.76×. The pedal's own 9 V
+  supply forbids the repair, and the item had been proposing it for ~24 sessions. ⭐ **GENERAL: read
+  a backlog line as two separate claims — "X is wrong" and "doing Y would fix it" — and put the
+  second one through the same audit as the first.** A remedy inherits the credibility of the
+  measurement it is stapled to, which is exactly why nobody checks it. ⚠ Two corollaries this
+  session paid for: **(a)** the refutation usually lives on a **different axis** than the item is
+  written on (here supply arithmetic, not fit cost — s134's *refute on the axis the parameter lives
+  on*, applied to a backlog entry rather than a candidate); and **(b)** the direction can get
+  *worse* while the item sits — s109 shipped `kInputRef` 1.2596 → 0.90 without re-fitting `clipSat`,
+  moving the pair **further** from what the proposed repair needed. **An unattempted remedy is not a
+  frozen one.** (s142)
+- ⭐⭐ **AND A "same job as item N" CROSS-REFERENCE IS A CLAIM ABOUT A *LEVER*, SO IT NEEDS THE SAME
+  CHECK — CORRUPTED INPUT REACHING A TOOL IS NOT THE SAME AS CORRUPTED INPUT REACHING THE NUMBER
+  THAT BINDS.** Item 5's remedy was gated by a `kInputRef ≤ 1.509` fence, and the tool producing that
+  fence *is* legitimately on item 4's list of consumers of a capture proven **4.447 dB low** — which
+  made "correcting item 4 unlocks item 5" look compelling (4.447 dB is ×1.667, in exactly the
+  starved direction). It is refuted by reading the tool: it emits **two independent families of
+  bound**, and the binding one is **pure schematic arithmetic with no capture in it**
+  (`2.35/(2.2·10^(−3/20))`), while every capture-derived bound is **2.9–3.6× looser and has never
+  bound at all**. ⭐ **GENERAL: when a constraint is blamed on a data defect, find WHICH of the
+  tool's bounds actually binds first** — a tool that prints several and takes the min will happily
+  let you attribute the min to whichever input you were already suspicious of. ⚠ And the same read
+  shrinks the other item honestly: item 4 became *hygiene, not a lever*, which is worth writing down
+  because an item believed to gate another gets scheduled ahead of things that matter more. (s142)
+- ⭐⭐ **A COINCIDENCE COMPUTED FROM AN INVALID OPERAND MANUFACTURES A CORROBORATION, AND IT IS THE
+  ONE CASE WHERE `an-implausible-coincidence-is-a-bug-report` POINTS THE WRONG WAY.** A capture's
+  "clean gain" column sat **13.98 dB** above its reference row; adding GATE T's independently derived
+  **4.447 dB** correction gave **18.43 dB** against GATE T's own **+18.500 dB** for that detent —
+  agreement to **0.07 dB**, from a code path sharing no arithmetic with GATE T's derivation. That is
+  textbook `close it from both ends`, and it is **worthless**: the column reads the −18…−3 dBFS rung
+  that session 115 had already measured as **PINNED** (peak 0.98850), so the operand is a **ceiling,
+  not a level**. ⭐ **GENERAL: before celebrating a two-way closure, check that every operand in it
+  was VALID at the condition it was read** — an agreement is only evidence if each side could have
+  disagreed, and a clipped reading has no freedom to. ⚠ The habit that catches it is cheap: the
+  project already *knew* that segment was pinned, so the check is "has any prior session said
+  anything about this exact (file, segment)?" before quoting it. (s142)
 - ⭐⭐⭐ **"X IS THE DOMINANT COST" IS A LOCALISATION, NOT A SIZE — AND AN UNSIZED FINDING IS FILED BY
   ITS READER'S GUESS, WHICH FOR "a couple of `pow` calls" IS "a few percent".** Session 120 localised
   the clipper's dominant per-sample cost correctly, wrote *"the real perf lever here"*, and quoted no

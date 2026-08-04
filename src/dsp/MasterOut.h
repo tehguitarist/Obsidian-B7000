@@ -83,13 +83,24 @@ public:
     static constexpr double kR46 = 100.0e3;  // output pulldown to GND
     static constexpr double kR47 = 1.0e3;    // series output resistor (spec 1k out Z; unloaded → no drop)
 
-    // MASTER audio-taper shape — TWO-SEGMENT PIECEWISE LINEAR (session 115). `Break` is the
-    // rotation at which the wiper has reached `Frac` of full resistance; linear either side.
+    // MASTER audio-taper shape — THREE-SEGMENT PIECEWISE LINEAR (session 146; was two-segment
+    // s115, a power law before that). The wiper reaches `Frac` of full resistance at rotation
+    // `Break`, and `Frac2` at `Break2`; linear in between and either side.
     // (The retired power-law exponent `kMasterTaperExp = 1.43` lived here until session 115.)
-    // Defaults are the fitted session-115 values, so a default-constructed MasterOut matches
+    // Defaults are the fitted session-146 values, so a default-constructed MasterOut matches
     // the shipped FitParams. Both endpoints stay exact regardless of these numbers.
-    static constexpr double kMasterTaperBreak = 0.5927;
-    static constexpr double kMasterTaperFrac = 0.1137;
+    //
+    // ⚠⚠ `kMasterTaperBreak` CHANGED MEANING at session 146: it is now the FIRST of two breaks,
+    // not THE break, and its VALUE moved 0.5927 -> 0.3318 accordingly. Anything that reads it
+    // and reconstructs a two-segment curve is now silently wrong — the s118 lesson
+    // (`when a parameter carries two meanings and a fit consumes one of them`). The known
+    // consumers were re-pointed in the same session: PedalChain::applyFitParams,
+    // tests/MasterOutTest.cpp::taperRatio, analysis/offline_render.cpp's --fit map, and
+    // analysis/a3_decomposition_gate.py::master_div. Grep before adding another.
+    static constexpr double kMasterTaperBreak = 0.331781;
+    static constexpr double kMasterTaperFrac = 0.056905;
+    static constexpr double kMasterTaperBreak2 = 0.659183;
+    static constexpr double kMasterTaperFrac2 = 0.177468;
 
     MasterOut() = default;
 
@@ -108,28 +119,45 @@ public:
         // x ∈ [0,1]. divRatio = Rbot/Rp (wiper→GND tap):
         // x=1 (full CW) → 1.0 → unity; x=0 → 0.0 (wiper at VD, silent).
         //
-        // ⭐ SESSION 115 — TWO-SEGMENT PIECEWISE LINEAR, replacing the power law.
-        // A real audio ("A") taper is MANUFACTURED as two linear resistive segments, and this
-        // pot measures like one: fraction `frac` of full resistance is reached at rotation
-        // `brk`, linear either side. The power law was not a close approximation to it — on the
-        // corrected ladder its per-point exponent spans 1.74…3.51, i.e. no single exponent
-        // exists. See FitParams::masterTaperBreak for the full provenance.
+        // ⭐⭐ SESSION 146 — THREE-SEGMENT PIECEWISE LINEAR, replacing session 115's two.
+        // A real audio ("A") taper is MANUFACTURED as linear resistive segments; the question
+        // is only how many. TWO cannot describe this pot, and the reason is structural rather
+        // than a matter of fit quality: with the first segment running from the ORIGIN, the
+        // curve below the break is a straight line and therefore cannot be CONVEX there — so
+        // forcing it through the one knob position the captures actually pin (MASTER noon, the
+        // centre detent, where the pot has no freedom and two capture sessions agree to
+        // 0.0000 dB) drives the bottom of the travel 1.4–3.4 dB hot. A third segment removes
+        // that constraint. See FitParams::masterTaperBreak for the full provenance.
+        //
+        // The shipped segment slopes RISE monotonically (0.172 → 0.368 → 2.413 ratio per
+        // rotation), i.e. the curve is convex — what a real audio track looks like, and a
+        // property no term of the objective asked for.
         //
         // Both endpoints are EXACT by construction, which the topology requires:
         //   x=0 → 0 (the wiper is on VD)   x=1 → 1 (unity at full CW, circuit.md MASTER).
         knob = x;
-        const double b = (masterTaperBreak > 1.0e-9 && masterTaperBreak < 1.0) ? masterTaperBreak : 0.5;
-        const double f = (masterTaperFrac > 0.0 && masterTaperFrac < 1.0) ? masterTaperFrac : 0.1;
-        divRatio = (x <= b) ? (f * x / b)
-                            : (f + (1.0 - f) * (x - b) / (1.0 - b));
+        // Fall back to the compiled defaults unless the whole set is ordered and in range —
+        // a partially-valid set would silently produce a non-monotone "taper".
+        const bool ok = masterTaperBreak > 1.0e-9 && masterTaperBreak < masterTaperBreak2
+                        && masterTaperBreak2 < 1.0 && masterTaperFrac > 0.0
+                        && masterTaperFrac < masterTaperFrac2 && masterTaperFrac2 < 1.0;
+        const double b1 = ok ? masterTaperBreak : kMasterTaperBreak;
+        const double f1 = ok ? masterTaperFrac : kMasterTaperFrac;
+        const double b2 = ok ? masterTaperBreak2 : kMasterTaperBreak2;
+        const double f2 = ok ? masterTaperFrac2 : kMasterTaperFrac2;
+        divRatio = (x <= b1) ? (f1 * x / b1)
+                 : (x <= b2) ? (f1 + (f2 - f1) * (x - b1) / (b2 - b1))
+                             : (f2 + (1.0 - f2) * (x - b2) / (1.0 - b2));
     }
 
     // Phase-7/10C capture fit (FitParams.h): re-applies the CURRENT knob position through the
     // new curve, so a taper refit doesn't leave a stale divRatio.
-    void setTaper(double brk, double frac) noexcept
+    void setTaper(double brk, double frac, double brk2, double frac2) noexcept
     {
         masterTaperBreak = brk;
         masterTaperFrac = frac;
+        masterTaperBreak2 = brk2;
+        masterTaperFrac2 = frac2;
         setMaster(knob);
     }
 
@@ -163,6 +191,8 @@ private:
     // Phase-7 capture-fit taper shape + the knob position it was applied to.
     double masterTaperBreak = kMasterTaperBreak;
     double masterTaperFrac = kMasterTaperFrac;
+    double masterTaperBreak2 = kMasterTaperBreak2;
+    double masterTaperFrac2 = kMasterTaperFrac2;
     double knob = 1.0;
     RailClamp rail;
 

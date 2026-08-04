@@ -45,7 +45,26 @@ RAIL_POS = 2.7             # TL07x output limit, session 21 (DERIVED from the ab
 RAIL_KNEE = 0.35           # RailClamp.h: soft compression starts RAIL_KNEE below the hard limit
 EQPREGAIN = 22.0e3 / 10.0e3  # |−R29/R28|
 
-K_SHIPPED = 3.377          # GainStaging.h kInputRefNominal (the number under test)
+K_SHIPPED = 3.377          # session-17 kInputRef — the number A5 put UNDER TEST. Kept as a
+                           # labelled historical control so session 44's quote stays reproducible.
+K_SHIPPED_NOW = 0.90       # GainStaging.h, session-109 (the value the plugin actually ships)
+
+# ⭐⭐ SESSION 142 — WHICH OF THIS TOOL'S BOUNDS ACTUALLY BINDS, AND WHY IT MATTERS FOR ITEM 4.
+# The fence every clipper fit since session 44 has been run against is `kInputRef <= 1.509`, and
+# that is `k_clean` from SECTION (1): (RAIL_POS - RAIL_KNEE) / (EQPREGAIN * 10^(-3/20)) = 2.35 /
+# (2.2 * 0.70795). Every term is schematic-derived — the 8.65 V rail, VD, IC5_B's fixed -2.2, the
+# session-21 TL07x rails, and the hottest ladder rung. ** NO CAPTURE ENTERS IT. **
+# Section (2)'s capture-derived bounds come out at 4.375-5.493, i.e. 2.9-3.6x LOOSER, so they do
+# not bind and never have.
+# ⇒ CONSEQUENCE FOR OPEN-WORK ITEM 4: this tool is on item 4's list of consumers of the corrupted
+#   `master-1700_gain-n12_base-clean.wav` (GATE T: 4.447 dB low), and that is correct — but the
+#   corruption reaches ONLY a non-binding column of section (2). Re-pointing it CANNOT move the
+#   1.509 fence, so it cannot unlock the physical-clipSat re-fit that open-work item 5 proposed.
+#   Measured, not argued. (Item 5 is separately refuted outright — FitParams.h's clipSat block.)
+# ⚠ AND THAT ROW IS DOUBLY UNUSABLE AS A BOUND, for a reason worth stating so nobody quotes it:
+#   section (2) reads the -3 dBFS rung, which is exactly the ONE segment session 115 measured as
+#   PINNED in that file (peak 0.98850, -0.10 dBFS). So its `out@-3 dBFS` is a ceiling, not a level,
+#   on top of the mis-dialled knob. It is printed, and it must not be quoted.
 
 HOTTEST_RUNG_DB = -3.0     # gen_test_signal.py::LEVEL_STEPS_DB tops out here
 RUNGS = list(range(-36, -2, 3))
@@ -87,11 +106,32 @@ def main():
     k_rail = RAIL_POS / (EQPREGAIN * 10 ** (HOTTEST_RUNG_DB / 20.0))
     k_clean = (RAIL_POS - RAIL_KNEE) / (EQPREGAIN * 10 ** (HOTTEST_RUNG_DB / 20.0))
     print()
-    print(f"  kInputRef ceilings implied (V/FS), shipped = {K_SHIPPED}:")
+    print(f"  kInputRef ceilings implied (V/FS)   [session-17 value under test = {K_SHIPPED}; "
+          f"SHIPPED now = {K_SHIPPED_NOW}]:")
     print(f"    ≤ {k_supply:.3f}   supply ceiling — no op-amp on this rail can beat it")
     print(f"    ≤ {k_rail:.3f}   TL07x hard limit (session-21 derived rails)")
     print(f"    ≤ {k_clean:.3f}   TL07x knee — the level at which distortion actually STARTS,")
     print(f"              i.e. what 'the pedal reads 0.0000% THD at −3 dBFS' actually requires")
+    print(f"    ** THIS IS THE BINDING FENCE, AND IT IS CAPTURE-FREE (s142) ** — every term is "
+          f"schematic-derived,\n       so no capture correction anywhere can relax it.  Shipped K "
+          f"({K_SHIPPED_NOW}) has {20 * np.log10(k_clean / K_SHIPPED_NOW):.2f} dB of headroom "
+          f"left to it (x{k_clean / K_SHIPPED_NOW:.3f}).")
+
+    # ---- s142: the closed-form question open-work item 5 actually turned on --------------
+    SATSUM, VDD_CLIP = 0.4377 + 0.59791, 5.636     # FitParams.h (s44 A5) / circuit.md (s42 solve)
+    L = VDD_CLIP / SATSUM
+    k_req = K_SHIPPED_NOW * L
+    print()
+    print(f"  ITEM 5 (s142) — could a PHYSICAL clipper ceiling ever be driven on this supply?")
+    print(f"    shipped clipSat sum {SATSUM:.4f} V is {100 * SATSUM / VDD_CLIP:.1f} % of the "
+          f"{VDD_CLIP} V rail  =>  needs x{L:.3f} ({20 * np.log10(L):+.2f} dB)")
+    print(f"    the VTC is homogeneous and every stage jack->node W is schematic-fixed, so the only")
+    print(f"    free scalar is kInputRef:  {K_SHIPPED_NOW} x {L:.3f} = {k_req:.3f} V/FS required")
+    print(f"    vs the ABSOLUTE supply ceiling {k_supply:.3f}  =>  over by x{k_req / k_supply:.2f} "
+          f"({20 * np.log10(k_req / k_supply):+.2f} dB)  ** INFEASIBLE **")
+    print(f"    K at that absolute ceiling supplies only {100 * (k_supply / K_SHIPPED_NOW) / L:.1f} "
+          f"% of the needed scale "
+          f"({100 * (k_clean / K_SHIPPED_NOW) / L:.1f} % to the binding fence).")
 
     # ------------------------------------------------ (2) the model-free output-node bound
     print()
@@ -133,7 +173,13 @@ def main():
     print("  'clean gain' is the pedal's measured jack-to-jack voltage gain on that rung — compare")
     print("  it against the schematic chain (IC5_B −2.2 × Baxandall ≈ 0.93 × mids ×1 × MASTER divider),")
     print("  which is +6.7 dB at master max BEFORE the divider. A large positive difference is")
-    print("  unmodelled gain, and `kOutputMakeup` = 3.684 (+11.33 dB) is currently absorbing it.")
+    print("  unmodelled gain, and `kOutputMakeup` is currently absorbing it.")
+    print("  ⚠ s142: the line above used to name `kOutputMakeup` = 3.684 (+11.33 dB). Session 115")
+    print("    shipped 4.3297 (GATE T: the old anchor capture was 4.447 dB low). Do not quote 3.684.")
+    print("  ⛔ s142: the `master-1700_gain-n12_base-clean.wav` row is NOT a usable bound — its")
+    print("    −3 dBFS rung is the one segment session 115 measured PINNED (peak 0.98850), so its")
+    print("    `out@-3 dBFS` is a ceiling rather than a level, on top of the mis-dialled knob. It")
+    print("    does not bind (see section 1), so nothing downstream depends on it — but do not quote it.")
 
     # ------------------------------------------------------- (3) the pedal's ladder, for the record
     print()

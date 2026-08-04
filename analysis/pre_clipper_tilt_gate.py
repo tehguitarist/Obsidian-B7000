@@ -37,6 +37,29 @@ WHY THIS EXISTS (session 139, executing session 138's `NEXT` #1 to completion).
   ⚠ n = 3 centres.  Reported as a bound the class must satisfy and a measurement that exceeds
   it, NOT as a fit.
 
+  ⛔⛔ SESSION 141 CORRECTION -- THE CONCLUSION STANDS, THIS GATE'S PHRASING AND ITS GATING
+  STATISTIC DO NOT.  Do NOT re-quote AJ2c as *"every adjacent pair exceeds the bound"*.
+  GATE AL (`analysis/deficit_exponent_gate.py`) re-measured the exponent on GATE W's 1/48-oct
+  transfer -- a 14x finer surface, 12 non-overlapping centres, 4x this gate's n -- and found:
+    (1) the deficit does NOT beat the bound POINTWISE (weakest 1/3-oct pair -0.117, weakest raw
+        adjacent pair -10.349), so the "every pair" wording is false off this gate's own grid;
+    (2) the per-pair statistic is NOT SCALE-FREE -- it divides a log-ratio by the centre
+        spacing, so narrowing the half-width divides the same noise by a smaller number (the raw
+        adjacent minimum runs -10.3 at 1/24 oct -> +2.02 at 1/6 oct on ONE dataset whose
+        regression barely moves).  AJ2c's version was sound ONLY because its three centres sit a
+        fixed 1/3 octave apart; it does not generalise, and it is not the statistic to build on;
+    (3) the statistic the pointwise bound EXACTLY implies is the ENDPOINT one -- integrating
+        d ln|g|/d ln f <= 2 over [a, b] gives endpoint exponent <= 2 for the whole class,
+        whatever it does in between.  No fit, largest lever arm, cannot be rescued by a
+        favourable interior.  Measured over the rising limb: **> 2 at 5/5 half-widths, smallest
+        2.530**, limb regression 2.53-2.90 (AG4's 2.841 reproduces as 2.685).
+    (4) and |D| is NOT MONOTONE across the band -- interior minimum at ~1348 Hz -- so AG4's
+        three centres (1613/2032/2560) all sit on ONE LIMB and a single power law over the whole
+        band is not even defined.
+  ⇒ the single-moving-pole class IS refuted as the carrier of the whole rising limb, and was
+  NEVER refuted pointwise.  QUOTE AL4's ENDPOINT READING, not this gate's pair column.  The
+  readings below are kept unchanged so every pre-s141 quote stays reproducible.
+
 WHAT THIS GATE DOES **NOT** CLAIM.
   * It does not measure how far the J201's junction capacitance actually moves.  It does not
     need to: AJ2 SOLVES for the capacitance required and compares against a ceiling set well
@@ -88,6 +111,14 @@ import contextlib                       # noqa: E402
 import io                               # noqa: E402
 with contextlib.redirect_stdout(io.StringIO()):
     import eq_reference as EQ           # noqa: E402  treble_attack_tf, jfet_source_z
+    import resonance_census as AM       # noqa: E402  shipped_treble / drawn_treble (s149)
+
+# ⚠⚠ WHICH TREBLE-LADDER ELEMENT SET `ladder_zin` USES.  'shipped' is correct and is the default;
+# 'drawn' reproduces every pre-session-149 number in this gate, GATE AK and GATE AN.  Settable from
+# the environment so GATE AO can run a whole gate BOTH ways in isolated subprocesses and diff the
+# stored reports -- a module-level flag mutated in-process is the s133 thread-race trap, and a
+# subprocess has no shared state to leak.
+LADDER_VALS = os.environ.get("B7K_LADDER_VALS", "shipped")
 
 AG_REPORT = "analysis/reports/s135_drive_tilt.json"
 AH_REPORT = "analysis/reports/s137_vertex_curvature.json"
@@ -131,7 +162,44 @@ def _die(msg):
 # ---------------------------------------------------------------------------
 # Blocks
 # ---------------------------------------------------------------------------
-def ladder_zin(f, position="flat", zs_probe=1.0e3):
+def ladder_kwargs(position="flat", which=None):
+    """The element set the ladder Zin is computed FROM.  'shipped' | 'drawn' | a dict.
+
+    ⚠⚠ CORRECTED SESSION 149 — this function did not exist, and `ladder_zin` below called
+    `EQ.treble_attack_tf(f, position)` with eq_reference's **DRAWN** defaults.  Sessions 99/100
+    re-fitted SEVENTEEN treble/ATTACK constants and changed the topology (R8/R11 became a tap
+    ladder, the C5 leg gained a damping resistor, `trebleC8` ships at **0** — C8 out of circuit),
+    so the drawn set is not the network the plugin runs: R7 x8.23, C6 x0.063, C7 x0.0076.  GATE AM
+    hit exactly this and guards it (AM1a's shipped-vs-drawn divergence guard); GATE AJ, and through
+    `ladder_zin` also GATE AK and GATE AN, did not.  `verify-the-BASELINE-not-its-LABEL`.
+
+    Imported from `resonance_census`, never transcribed — one definition of "the shipped ladder"
+    for the whole analysis tree (s145 AM5: import the source gate's FUNCTIONS, not its summary).
+    'drawn' is kept reachable so every pre-s149 number stays reproducible, and GATE AO diffs the
+    two rather than asserting the difference is small.
+    """
+    which = LADDER_VALS if which is None else which
+    if isinstance(which, dict):
+        return dict(which)
+    if which == "shipped":
+        return AM.shipped_treble(position)
+    if which == "drawn":
+        return AM.drawn_treble()
+    _die(f"ladder_kwargs — unknown element set {which!r}; expected 'shipped', 'drawn' or a dict.")
+
+
+def ladder_divergence(position="flat"):
+    """(n_moved, total, {name: (drawn, shipped)}) — AM1a's guard, re-asserted where AJ uses it.
+
+    A gate that computes Zin from the wrong value set still runs and still prints plausible,
+    monotone numbers; the only thing that catches it is asserting the two sets actually DIFFER.
+    """
+    dr, sh = AM.drawn_treble(), AM.shipped_treble(position)
+    moved = {k: (dr[k], sh[k]) for k in dr if not math.isclose(dr[k], sh[k], rel_tol=1e-9)}
+    return len(moved), len(dr), moved
+
+
+def ladder_zin(f, position="flat", zs_probe=1.0e3, which=None):
     """Input impedance of the treble/ATTACK ladder at node G (the J201 drain).
 
     Extracted from eq_reference's ALREADY-VALIDATED nodal solve rather than re-deriving the
@@ -140,9 +208,13 @@ def ladder_zin(f, position="flat", zs_probe=1.0e3):
         tf(Zs) / tf(0) = Zin / (Zin + Zs)   =>   Zin = Zs * ratio / (1 - ratio)
 
     AJ1d asserts that two different probe impedances return the same Zin.
+
+    ⚠⚠ `which` selects the ELEMENT SET — see `ladder_kwargs`.  It defaults to the module-level
+    `LADDER_VALS`, i.e. the SHIPPED ladder, corrected session 149.
     """
-    h0 = EQ.treble_attack_tf(f, position)
-    hz = EQ.treble_attack_tf(f, position, Zs=zs_probe)
+    kw = ladder_kwargs(position, which)
+    h0 = EQ.treble_attack_tf(f, position, **kw)
+    hz = EQ.treble_attack_tf(f, position, Zs=zs_probe, **kw)
     ratio = np.asarray(hz) / np.asarray(h0)
     return zs_probe * ratio / (1.0 - ratio)
 
@@ -250,8 +322,25 @@ def gate_aj1(f0, half, out):
     if rel > KA_TOL_REL:
         _die(f"AJ1d — the ladder input impedance is probe-dependent ({rel:.3e}), so the Miller "
              f"factor built on it is not a measurement.")
+
+    # (e) ⚠⚠ ADDED SESSION 149 — the EPOCH guard, and its absence was a real defect.  Until s149
+    # this gate computed `ladder_zin` from eq_reference's DRAWN defaults while s99/s100's fit had
+    # moved 11 of 12 treble values (R7 x8.23, C6 x0.063, C7 x0.0076, C8 -> 0), and GATE AK and
+    # GATE AN inherited the same Zin through this function.  Nothing caught it because a
+    # probe-independence check (d) is satisfied by ANY network -- it validates the extraction, not
+    # the value set (`for any known answer of the form "my implementation agrees with a trusted
+    # one", the shared INPUT is what the check cannot validate`, s145 AM1a).  GATE AM already had
+    # this guard; the correction is only complete once the gate that USES the value carries it too.
+    n_div, n_tot, _ = ladder_divergence("flat")
+    print(f"  (e) shipped-vs-drawn ladder divergence : {n_div}/{n_tot} values differ  "
+          f"(element set '{LADDER_VALS}', bar >= 10)")
+    if LADDER_VALS == "shipped" and n_div < 10:
+        _die(f"AJ1e — only {n_div} of {n_tot} treble values differ between the shipped and drawn "
+             f"sets, but s99/s100 re-fitted 17 of them. Either `shipped_treble` has started "
+             f"returning the drawn set, or the fit was reverted; either way this gate would be "
+             f"screening a network the plugin does not run. GATE AO's whole subject.")
     out["aj1"] = {"cancel": cancel, "inject_worst": inj, "oracle_worst_db": worst,
-                  "zin_rel": rel}
+                  "zin_rel": rel, "ladder_vals": LADDER_VALS, "ladder_divergent": n_div}
 
 
 # ---------------------------------------------------------------------------
@@ -271,11 +360,25 @@ def gate_aj2(f0, half, budget, avail, ag4, out):
     print(f"  at the {f0:.0f} Hz vertex:  |Z_drain| = Zout_jfet || Zin_ladder = "
           f"{zd_at / 1e3:.3f} kohm")
     print(f"                              |A| = gm*|Z_drain| = {a_at:.4f}")
-    print(f"\n  ⭐⭐ MILLER MULTIPLICATION NEEDS VOLTAGE GAIN, AND THIS STAGE HAS |A| = "
-          f"{a_at:.2f} < 1")
-    print(f"     at the vertex — it is a transconductance into a ~{zd_at / 1e3:.1f} kohm ladder,")
-    print(f"     not a voltage amplifier.  The Miller factor (1+|A|) is {1 + a_at:.3f}, so the")
-    print(f"     'Miller' candidate reduces to the BARE junction capacitance.")
+    # ⛔⛔ CORRECTED SESSION 149.  This block used to PRINT `|A| = {a_at:.2f} < 1` and conclude that
+    # the candidate "reduces to the BARE junction capacitance" — a hardcoded comparison, i.e.
+    # `computed-verdicts-not-narrated` in the one place it inverts a physical claim.  On the DRAWN
+    # ladder |A| really was 0.565; on the SHIPPED ladder it is 2.778, so the old text printed
+    # "2.78 < 1".  GATE AO carries the full correction; the size refutation below is unaffected
+    # (it is read at an absolute ceiling), and AJ2c's exponent bound is analytic.
+    if a_at < 1.0:
+        print(f"\n  ⭐⭐ MILLER MULTIPLICATION NEEDS VOLTAGE GAIN, AND THIS STAGE HAS |A| = "
+              f"{a_at:.3f} < 1")
+        print(f"     at the vertex — it is a transconductance into a ~{zd_at / 1e3:.1f} kohm "
+              f"ladder,")
+        print(f"     not a voltage amplifier.  The Miller factor (1+|A|) is {1 + a_at:.3f}, so the")
+        print(f"     'Miller' candidate reduces to the BARE junction capacitance.")
+    else:
+        print(f"\n  ⚠⚠ |A| = {a_at:.3f} >= 1 AT THE VERTEX, so there IS Miller multiplication and")
+        print(f"     the candidate does NOT reduce to the bare junction capacitance.  The Miller")
+        print(f"     factor (1+|A|) is {1 + a_at:.3f} — this row's refutation therefore rests on")
+        print(f"     SIZE (the reach at the ceiling below) and on AJ2c's exponent bound, NOT on the")
+        print(f"     absence of multiplication.  ⛔ Do not re-quote '|A| < 1' (GATE AO, s149).")
     print(f"\n  Cin at the datasheet MAXIMUM (Ciss {J201_CISS_MAX_PF:.1f} pF, Crss "
           f"{J201_CRSS_MAX_PF:.1f} pF) : {cin_at * 1e12:.2f} pF")
 
@@ -355,15 +458,26 @@ def gate_aj2(f0, half, budget, avail, ag4, out):
           f"every pole frequency and every f")
     # Gate on the WEAKEST adjacent pair, not on the regression slope: that is the reading most
     # favourable to the candidate, so clearing it is the stricter statement.
+    # ⛔ s141: this statistic is NOT scale-free and does NOT generalise off these three
+    # fixed-1/3-oct centres — see the AJ2c correction block in the module docstring.  It is left
+    # computing exactly what it always did (pre-s141 quotes stay reproducible); what changed is
+    # what may be QUOTED from it, and the printed verdict below now says so.
     shape_ok = min(pair) <= SINGLE_POLE_EXPONENT_BOUND
     if shape_ok:
         print(f"\n  ⚠ the measured exponent is INSIDE the class's bound — the shape screen does "
               f"NOT refute\n     this candidate, and the verdict must rest on size alone.")
     else:
-        print(f"\n  ⛔ EVERY adjacent pair exceeds the bound (weakest {min(pair):.3f} vs 2.000) — "
-              f"the deficit\n     steepens FASTER than any moving single pole can, so the whole "
-              f"'a capacitance grows\n     with drive' class is refuted on SHAPE, with no size "
-              f"argument and no threshold.")
+        print(f"\n  ⛔ on AG4's three fixed-⅓-oct centres every adjacent pair exceeds the bound "
+              f"(weakest\n     {min(pair):.3f} vs {SINGLE_POLE_EXPONENT_BOUND:.3f}) — the deficit "
+              f"steepens FASTER than any moving single pole can, so the\n     whole 'a capacitance "
+              f"grows with drive' class is refuted on SHAPE, with no size\n     argument and no "
+              f"threshold.")
+        print(f"  ⛔ BUT DO NOT QUOTE THAT PHRASING (s141).  The pair statistic is not scale-free "
+              f"and the\n     deficit does NOT beat the bound POINTWISE on a finer surface "
+              f"(weakest ⅓-oct pair −0.117).\n     Quote GATE AL's ENDPOINT exponent over the "
+              f"rising limb instead: > 2 at 5/5 half-widths,\n     smallest 2.530 — the statistic "
+              f"this bound EXACTLY implies.  The class refutation stands\n     on THAT reading, "
+              f"not on this one.  See the docstring's s141 correction block.")
     print(f"  ⚠ n = {len(rows4)} centres (AG4's own membership).  A bound the class must satisfy "
           f"and a\n    measurement that exceeds it — not a fit.")
 
@@ -568,7 +682,9 @@ def gate_aj5(c1, c2, c3, out):
                             "right sign and an admissible shape; this is a CANDIDATE")
     elif not shape1:
         v["j201_miller"] = (f"REFUTED ON SHAPE AND SIZE — the deficit steepens as f^{expo:.2f} "
-                            f"(weakest adjacent pair f^{expo_min:.2f}), above the exact f^2 bound "
+                            f"(this gate's weakest adjacent pair f^{expo_min:.2f}; ⛔ s141 — quote "
+                            f"GATE AL's ENDPOINT exponent > 2 at 5/5 half-widths, smallest 2.530, "
+                            f"NOT the pair column), above the exact f^2 bound "
                             f"every moving single pole obeys; and even at a capacitance ceiling "
                             f"{J201_CIN_CEILING_PF / J201_CISS_MAX_PF:.1f}x the part's datasheet "
                             f"maximum it reaches {100 * reach1:.2f}% of the budget")

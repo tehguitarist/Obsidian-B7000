@@ -281,7 +281,8 @@ public:
 
         drive.setTaperExp(f.driveTaperExp);
         levelBlend.setTaperExp(f.levelTaperExp);
-        masterOut.setTaper(f.masterTaperBreak, f.masterTaperFrac);
+        masterOut.setTaper(f.masterTaperBreak, f.masterTaperFrac,
+                           f.masterTaperBreak2, f.masterTaperFrac2);
 
         c21.r = f.c21R;
         recovery.setComponents(f.btR22, f.btR23, f.btC16, f.btC17);

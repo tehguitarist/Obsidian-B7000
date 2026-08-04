@@ -48,10 +48,21 @@ struct FitParams
     // three GRUNT corner frequencies (the input-node impedance is R18/(1+A0)), so
     // it is constrained by two independent measurements at once — fit it against
     // the GRUNT voicing and the drive-sweep level together, not either alone.
-    // clipSatLo/clipSatHi are the per-side VTC ceilings; their SUM is the
-    // R19-dropped effective rail (nominal ~7 V, below the 8.6 V op-amp rail) and
-    // their DIFFERENCE is the even-harmonic asymmetry. Fit to the drive-sweep
-    // Farina THD(f) + low-frequency-tone H2/H3 balance.
+    // clipSatLo/clipSatHi are the per-side VTC ceilings; their SUM is bounded ABOVE
+    // by the R19-dropped effective rail and their DIFFERENCE is the even-harmonic
+    // asymmetry. Fit to the drive-sweep Farina THD(f) + low-frequency-tone H2/H3
+    // balance.
+    // ⚠ SESSION 142: this line used to read "their SUM **is** the R19-dropped effective
+    // rail (nominal ~7 V, below the 8.6 V op-amp rail)". TWO errors in one clause.
+    // (a) "~7 V" is exactly the round figure session 42 called out as "a rail no
+    //     calculation ever produced" -- the DERIVED, self-consistent value is
+    //     **VDD = 5.636 V** (circuit.md; analysis/clipper_rail_selfconsistent.py), and
+    //     the crowbar current is self-limiting, which a fixed-drop prior cannot express.
+    // (b) "is the rail" states an EQUALITY where the physics gives a one-sided bound:
+    //     a CMOS inverter cannot swing PAST its rail, so the sum is bounded from ABOVE
+    //     only. A sum below the rail is not a supply violation -- which is the whole
+    //     reason the 18 % flag below is SOFT. The equality reading is what made the
+    //     session-118 clamp bug possible in the first place.
     // ** SESSION 44 (Phase 9 / A5 step 2): RE-FITTED under the clean path's supply bound. **
     // The session-17 family was fitted with kInputRef FROZEN at 3.377 — a value session 41 then
     // proved IMPOSSIBLE (IC5_B's fixed -2.2x would need 5.26 V of swing on a +/-4.325 V supply).
@@ -70,6 +81,32 @@ struct FitParams
     // clipper's drive scales with K, so a 2.7x lower K pulls the fitted ceiling down with it).
     // A fit forcing satsum back into session-15's [1.5, 4]/side fence costs 34.1 -> 201.8 and pins
     // THREE parameters at once (step7_a5_sqphys.log) — that region is jointly infeasible.
+    //
+    // ⛔⛔⛔ SESSION 142 — DO NOT RE-FIT THIS FAMILY AGAINST A PHYSICAL CEILING. OPEN-WORK ITEM 5
+    // PROPOSED EXACTLY THAT FOR ~24 SESSIONS AND **THE PEDAL'S OWN 9 V SUPPLY FORBIDS IT.** Closed
+    // form, no fit, no render, no threshold — every input is schematic-derived or shipped:
+    //   * the VTC is HOMOGENEOUS (vtc_{L*s}(L*w) = L*vtc_s(w)), so raising the ceilings by L
+    //     preserves the clipper's operating point ONLY if the drive at node W also rises by L;
+    //   * L = VDD/satsum = 5.636/1.0356 = **5.442x (+14.72 dB)**  (per side: satLo x6.07, satHi x4.98);
+    //   * everything from the jack to node W is schematic-FIXED — IC1_A unity, the J201 stage, the
+    //     treble/ATTACK ladder, IC2_A = 1 + R15/(R17+DRIVE+R32), R16 — so the ONLY free scalar is
+    //     kInputRef, and it would have to become 0.90 x 5.442 = **4.898 V/FS**;
+    //   * against that: TL07x knee (the binding clean-THD fence) **1.509**, TL07x hard limit 1.734,
+    //     and the ABSOLUTE supply ceiling **2.777** — "no op-amp on this rail can beat it", since it
+    //     is just VD/(2.2 x 10^(-3/20)) from the 8.65 V rail and IC5_B's fixed -2.2.
+    //   => the requirement exceeds even the ABSOLUTE supply ceiling by **1.76x (+4.93 dB)**. Taking
+    //      K to that absolute ceiling supplies only **56.7 %** of the needed scale (30.8 % to the
+    //      binding fence). ** A physical clipSat is not merely expensive to fit; it is unreachable
+    //      on this supply. ** (analysis/clean_headroom_bound.py section 1 for the ceilings.)
+    // ⭐ This refutes the route on the AXIS THE PARAMETER LIVES ON (supply arithmetic), which is
+    //   strictly stronger than session 44's fit-cost argument above: a cost of 201.8 invites "try a
+    //   better optimiser", whereas a supply bound cannot be argued down.
+    // ⚠ AND THE DIRECTION HAS MOVED THE WRONG WAY SINCE ITEM 5 WAS WRITTEN: session 44 fitted this
+    //   family at kInputRef = 1.2596; session 109 shipped **0.90** (1.40x lower) WITHOUT re-fitting
+    //   clipSat. By the co-scaling above that puts the pair further from physical, not closer.
+    // ⇒ what remains open is NOT a fit but a PHYSICAL question: either the clipper's ceiling really
+    //   is ~5.4x low, or ~14.7 dB of gain ahead of node W is missing from the model. The second
+    //   branch is UNTESTED. Do not spend a fit before deciding which.
     double clipA0 = 24.871;      // session-44 A5 re-fit (was 26.142, session-17)
     double clipSatLo = 0.4377;   // session-44 A5 re-fit (was 2.0067, session-17)
     double clipSatHi = 0.59791;  // session-44 A5 re-fit (was 2.9321, session-17)
@@ -404,8 +441,76 @@ struct FitParams
     // control that cannot mute is a usability regression. Recorded as a departure, not an
     // oversight (reference-sources.md §1 makes the captures authoritative for pot laws, so this
     // is a knowing exception on one point).
-    double masterTaperBreak = 0.5927;   // rotation at which the wiper reaches masterTaperFrac
-    double masterTaperFrac = 0.1137;    // fraction of full resistance at that rotation
+    // ⭐⭐⭐ SESSION 146 — THE TWO-SEGMENT FORM IS RETIRED IN TURN; THIS IS NOW THREE SEGMENTS,
+    // AND `masterTaperBreak` HAS CHANGED MEANING (first of two breaks, 0.5927 -> 0.3318).
+    // ⛔ Do NOT read the s115 numbers above as current: rms 1.28 / floor 0.847 / 9.6% at half
+    // rotation all belong to the retired two-segment fit. What survives from s115 is the FORM
+    // argument (a real A taper is linear segments, not a power law) and the retirement of the
+    // power law itself.
+    //
+    // WHAT CHANGED THE ANSWER: session 120 captured a COMPLETE second MASTER ladder at the
+    // `gain-n18` send (s115 had it only at the top two detents), and the user stated which
+    // knob positions are trustworthy: "0700, 1200, and 1700 are 100% trustworthy, all other
+    // positions are best estimations."  Those three are exactly the positions where the pot has
+    // a physical reference (both hard stops + the centre detent) — and the captures say so
+    // without being told: across two sessions 12+ days apart the spread is 0.0000 dB at 0700
+    // and 0.0000 dB at 1200, against 0.33-1.77 dB everywhere else. The files are confirmed
+    // INDEPENDENT recordings, not digital copies (scalar-nulled they read -84..-86 dB, the same
+    // floor as detents whose levels DISAGREE by 1.19 dB). Two separate sources, same answer.
+    //
+    // ⇒ THE FIT IS NOW A CONSTRAINT, NOT A LEAST-SQUARES OVER NINE EQUAL POINTS. Six of the
+    // seven interior detents are ESTIMATES of a rotation, so their error is in x, not in y (the
+    // LEVEL of every capture is exact — the pure-gain check reads 0.0002 dB band-span across
+    // all nine). Averaging them in let six estimates outvote the one position that is known.
+    //
+    // THE DEFECT THAT FOUND, AND IT NEEDS NO FIT TO STATE: at MASTER noon the s115 taper is
+    // 1.86 dB QUIET — 186x the pin's own uncertainty (0.010 dB, s112 recording repeatability,
+    // reference-sources.md §0). Equivalently, in the units a pot taper is actually specified in:
+    //     reference at half rotation  11.89 %   <- inside the textbook A-taper 10-15% band
+    //     s115 model at half rotation   9.59 %   <- below it
+    // circuit.md calls VR8 a "100k A". Nothing in any objective knew that.
+    // ⭐ Independently corroborated by the s120 listening test ("MASTER: plugin needs ~0.61 to
+    // match the pedal's loudness"): an ear said turn it UP at noon, and the captures say the
+    // model is 1.86 dB short there. ⚠ That ear figure does NOT resolve the old flagged
+    // coincidence with masterTaperBreak=0.5927 — the level-match rotation (0.5951) and the old
+    // break sit 0.0024 apart, far below an ear's resolution of a knob position, so the
+    // coincidence DISSOLVES (two indistinguishable explanations) rather than being decided.
+    //
+    // WHY THREE SEGMENTS AND NOT TWO PINNED. Pinning noon inside the two-segment family gives
+    // xb 0.6115 / fb 0.1454 and puts the BOTTOM of the travel 1.4-3.4 dB hot, because segment 1
+    // runs from the origin and a straight line cannot be convex. Measured, over the six
+    // estimated positions (+ = model louder than capture):
+    //     m          0.125  0.250  0.375  0.625  0.750  0.875     rms    bias
+    //     s115      +0.45  +1.49  -0.47  +0.13  +1.52  -0.74    0.960  +0.399
+    //     2-seg pin +2.31  +3.36  +1.39  -0.30  +1.41  -0.77    1.881  +1.232
+    //     3-seg pin -0.52  +0.52  -0.36  -0.82  +0.31  -1.10    0.665  -0.329
+    // The BIAS column is the diagnostic, not the rms: hand jitter has no preferred sign, so a
+    // one-signed residual means the FAMILY is inadequate. Three segments absorbs it.
+    //
+    // ⚠⚠ THREE PARAMETERS AGAINST SIX ESTIMATED POINTS IS WHERE OVERFITTING LIVES, so the
+    // candidate is NOT justified by its rms (extra freedom always buys rms). It ships because
+    // THREE things hold at once and only the third is a fit statistic:
+    //   (i)   EXACT at the one trusted interior position — a constraint, not a fitted target;
+    //   (ii)  segment slopes RISE monotonically, 0.172 -> 0.368 -> 2.413, i.e. a convex,
+    //         physically-buildable resistive track; the tool FAILS if convexity is lost;
+    //   (iii) it fits the estimated positions better than the incumbent (0.665 vs 0.960 rms)
+    //         while CARRYING a constraint the incumbent does not.
+    // ⛔ Do NOT "improve" this by adding a fourth segment — (iii) is already below the 1.075 dB
+    // knob floor, so any further rms gain is fitting the hand that turned the knob.
+    //
+    // ⚠ The knob-repositioning floor is 1.075 dB rms / 1.770 worst over FREE positions (n=5),
+    // NOT s115's 0.847: that figure pooled the free positions with the 0700 hard stop reading
+    // exactly 0.000, which deflates an rms. The two populations are split on a PHYSICAL
+    // property (does the pot have a reference here?), established by GATE S3 (s113) before any
+    // spread here was read — not on the spreads themselves.
+    //
+    // ⚠ divRatio(0) is still EXACTLY 0, unchanged and still a knowing departure — see the note
+    // above. Derivation + all guards: analysis/master_taper_makeup.py, report
+    // analysis/reports/s146_master_recal.json.
+    double masterTaperBreak = 0.331781;   // rotation at which the wiper reaches masterTaperFrac
+    double masterTaperFrac = 0.056905;    // fraction of full resistance at that rotation
+    double masterTaperBreak2 = 0.659183;  // rotation at which the wiper reaches masterTaperFrac2
+    double masterTaperFrac2 = 0.177468;   // fraction of full resistance at the second break
 
     // ---- C21 (100n) inter-stage coupling into the tone stack ----------------
     // The 100n cap is schematic-verified; the resistance it works against is the

@@ -199,6 +199,33 @@ target_link_libraries(PerfBenchmark
 add_test(NAME PerfBenchmark COMMAND PerfBenchmark)
 set_tests_properties(PerfBenchmark PROPERTIES RUN_SERIAL TRUE)
 
+# Phase-10 FIDELITY probe (build.md "Performance & fidelity probes") — the last of
+# the three specified probes to be built. Measures how far 1x/2x/4x sit from the 8x
+# reference and DECOMPOSES the gap into top-octave droop / wanted-harmonic error /
+# aliasing, which have three different remedies.
+#
+# Registered as a FINITE-ONLY test, same rule as PerfBenchmark: every assertion is a
+# finiteness check, a known answer (determinism, clean-path factor invariance,
+# reference-vs-itself) or a non-vacuity control. Nothing gates on the SIZE of a
+# fidelity number — no such bar has been derived, and inventing one here would be
+# exactly the "threshold you guessed" that measurement-discipline.md warns about.
+#
+# ⛔ Deliberately NOT given RUN_SERIAL. It measures spectra, not wall-clock, so it is
+# parallel-safe — and build.md names PerfBenchmark as the ONE exception to
+# "run tests in parallel, always". Copying that property here would make the
+# exception look like house style, which the PerfBenchmark comment forbids.
+juce_add_console_app(OSFidelity)
+target_sources(OSFidelity PRIVATE tests/OSFidelity.cpp)
+target_link_libraries(OSFidelity
+    PRIVATE
+        juce::juce_dsp
+        chowdsp::chowdsp_wdf
+        xsimd
+    PUBLIC
+        juce::juce_recommended_config_flags)
+target_compile_options(OSFidelity PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME OSFidelity COMMAND OSFidelity)
+
 # Headless editor snapshot tool (build.md "UI changes" testing pattern) — renders the real
 # editor off-screen at min/default/max UI scale to PNGs for visual review. NOT registered with
 # add_test() — it's a visual-inspection tool, not a pass/fail gate.

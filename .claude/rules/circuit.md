@@ -324,8 +324,14 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > correct CMOS practice, drawn explicitly on primary p.4 to the right of the power column. So they
 > sit at a rail and draw only the datasheet's 0.02 µA quiescent, NOT crowbar current. This matters
 > enormously and is not a detail: if those inputs FLOATED at mid-rail, all six sections would draw
-> and the self-consistent rail would collapse to **2.70 V**, at which the shipped `clipSat` sum of
-> 4.94 V is not merely implausible but **impossible (183 % of the available swing)**.
+> and the self-consistent rail would collapse to **2.70 V**.
+> ⚠ **SESSION 142 — the second half of this sentence has been REMOVED, because it was stale.** It
+> read: *"…at which the shipped `clipSat` sum of 4.94 V is not merely implausible but **impossible
+> (183 % of the available swing)**"*. 4.94 V is the **session-17** pair; the model has shipped
+> **1.0356 V** since session 44, which is only **38 %** of 2.70 V and therefore perfectly possible.
+> ⇒ **the collapse case must be ruled out on the SCHEMATIC evidence alone** — the grounded spare
+> inputs, verified twice below — and the clipSat arithmetic can no longer be offered as a second,
+> independent reason. See the "Consequence for `clipSat`" note further down for the full correction.
 > ✅ **AND THE BACKUP SCHEMATIC INDEPENDENTLY AGREES (session 43, 600 DPI)** — so this is now
 > triple-checked, not single-sourced. The backup draws the five spares as an explicit row across
 > the TOP-LEFT of its single page (region A, columns 3–6), designators **U3B–U3F** (backup U3 =
@@ -339,9 +345,28 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 >
 > **Consequence for `clipSat`.** `Clipper.h`'s satLo/satHi are OUTPUT SWING toward the GND and +VDD
 > rails, and a CMOS inverter swings essentially rail-to-rail (datasheet VOL ≈ 0.05 V,
-> VOH ≈ VDD − 0.05), so **their SUM is bounded by ≈ VDD = 5.64 V**. The shipped sum 4.939 V is
-> **88 %** of that — physically consistent. Also note the datasheet's RECOMMENDED VCC range is
-> **3–18 V**, so any candidate implying a rail under 3 V is outside the device's own spec.
+> VOH ≈ VDD − 0.05), so **their SUM is bounded by ≈ VDD = 5.64 V** — and note the bound is **FROM
+> ABOVE ONLY**; a sum below the rail is not a supply violation. Also note the datasheet's
+> RECOMMENDED VCC range is **3–18 V**, so any candidate implying a rail under 3 V is outside the
+> device's own spec.
+>
+> ⛔⛔ **STALE FOR 98 SESSIONS — CORRECTED SESSION 142. This passage used to end "The shipped sum
+> 4.939 V is 88 % of that — physically consistent", and it had not been true since session 44.**
+> 4.939 V is the **session-17** pair (2.0067 + 2.9321). Session 44's A5 re-fit changed satLo's
+> MEANING from an output swing to a fitted **knee scale** and moved the pair to
+> **0.4377 / 0.59791 — sum 1.0356 V, i.e. 18.4 % of the rail, 5.442× LOW.** So the one file the
+> project calls its source of truth was certifying as "physically consistent" a number the model
+> has not carried for 98 sessions, while `FitParams.h` and `Clipper.h` both flagged the real
+> figure correctly the whole time. ⇒ `verify-the-CONSTANT-not-the-prose`, in the worst place for it.
+> ⚠ **And the correction costs the paragraph above some of its force**, which is why it must be
+> stated rather than quietly patched: the "2.70 V floating-spares collapse" case was ruled absurd
+> partly *because* 4.94 V would be **183 %** of 2.70 V and therefore impossible. At the true
+> 1.0356 V that argument no longer bites (1.0356 V is only 38 % of 2.70 V). **The collapse case is
+> still ruled out — but on the schematic evidence alone** (the five spare sections' inputs are tied
+> to GND, verified at 600 DPI on primary p.4 *and* independently on the backup, n = 1 in the rail
+> solve), **not on the clipSat arithmetic.** Quote the schematic, not the 183 %.
+> ⛔ **DO NOT read the 5.442× as a defect to be re-fitted away** — session 142 measured that route
+> and the pedal's own supply forbids it. See `CLAUDE.md`'s CLOSED/REFUTED table (open-work item 5).
 
 ### Recovery + bandlimiting (IC2_B, IC4_B, IC4_A)
 | Ref | Value | Function |
@@ -521,6 +546,16 @@ only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
 > output buffer IC6_B — so IC6_B buffers the post-Master signal feeding BOTH ¼" (R47) and the XLR DI.
 > No new op-amp needed (reuses IC6_B). Calibrate unity/headroom at build (calibration doc §2); a small
 > make-up may be wanted since a post-EQ divider can only attenuate.
+> ⭐⭐ **THE "A TAPER" CALL IS NOW CORROBORATED BY MEASUREMENT (session 146), and it was an [ENG]
+> guess when it was written.** A pot taper is specified by its fraction at HALF rotation, and the
+> reference measures **11.89 %** there — inside the textbook audio-taper band of 10–15 %. That
+> reading comes from MASTER noon, the one interior knob position with a mechanical reference, where
+> two capture sessions 12+ days apart agree to **0.0000 dB** and the user independently confirms the
+> position is trustworthy. ⚠ The model shipped **9.59 %** (below the band) until s146; it now ships a
+> 3-segment PWL at 11.89 %. Nothing in the fitting objective knew what an A taper is, so this is a
+> genuine outside corroboration of the `[ENG]` choice of VR8's taper — not a circular one.
+> Derivation: `analysis/master_taper_makeup.py`, `FitParams::masterTaperBreak`.
+>
 > **Sim-checked (2026-07-19, open item c):** C36(2u2) into the 100k pot gives a 0.72 Hz HPF corner —
 > inaudible; the divider is flat, attenuation-only, unity at full CW; pot loading on the IC6_A op-amp
 > output is negligible. Bonus: the stock board has NO bias resistor on IC6_B(+) after C36 (verified),

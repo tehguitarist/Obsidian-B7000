@@ -16387,3 +16387,1358 @@ refinement — it could have overturned two standing refutations, and it materia
 statements — so the rule does not fire on it. It plainly fires on the *next* one unless that
 session either builds AL5's specified resonance candidate or moves to the release gate's other
 open rows. Flagging to the user rather than deciding it here.
+
+---
+
+## SESSION 142 (2026-08-04) — item 5 audited before it was fitted: the inconsistency is real, the proposed repair is refuted on the pedal's own supply, and four stale documentation claims fall with it
+
+**User decision at the top of the session.** Session 141 ended with `know-when-to-stop-measuring`
+firing and an explicit flagged-not-taken choice. Put to the user as four options; the user chose
+**item 5 — re-fit the clipper against the physical rail**, i.e. go and ship a constant rather than
+run a thirteenth read-only screen. ⚠ **No constant shipped, and the reason is the finding:** the
+route the user picked is refuted by arithmetic that had never been done. Stated plainly here rather
+than quietly substituted.
+
+### 0. Cleared first, because it needed no decision — s141 `NEXT` #4
+
+`analysis/pre_clipper_tilt_gate.py` was the last carrier of AJ2c's refuted phrasing (CLAUDE.md's
+item 6 gate 5 and its refuted-class table were already corrected in s141). Three sites annotated:
+the module docstring's AJ2c block (a full four-point correction), the printed AJ2c verdict, and the
+AJ5 `j201_miller` verdict string. **The gate's readings are deliberately left computing exactly what
+they always did** so every pre-s141 quote stays reproducible; what changed is what may be quoted.
+Verified by re-running: `f^2.84`, weakest pair `f^2.69`, `0.17 %` reach, all three AJ5 verdicts and
+the whole GRUNT sign table **unchanged**, rc = 0. And verified structurally with a `git diff` filter
+— every changed line is docstring prose or a `print`/verdict string, **no logic touched**.
+
+### 1. The premise audit, and the first thing it found: the evidence was already on disk
+
+Item 5 proposed *"a K/`clipSat` re-fit against a physical ceiling is the real repair (same job as
+item 4)"*. Before fitting anything, `verify-the-PREMISE-not-the-prior-session's-framing-of-it`.
+
+`FitParams.h` already recorded, from session 44: *"A fit forcing satsum back into session-15's
+[1.5, 4]/side fence costs 34.1 -> 201.8 and pins THREE parameters at once (step7_a5_sqphys.log) —
+that region is jointly infeasible."* **That log is still on disk** (`check-for-unread-data-first`,
+now its **7th** occurrence — a whole session was once nearly spent regenerating data that already
+existed). Read it, plus `step7_a5_sq2.log` (the shipped fit, cost 34.1).
+
+**The comparison is CLEAN — checked, not assumed.** The obvious way this argument could have been
+worthless is a confound: `sqphys` prints `** SQUARE-LAW CONSTRAINT ACTIVE **`, which is a *second*
+experiment. But `sq2` prints it too, and both carry identical `clipA0` [20,30] and `kInputRef`
+[0.4, 1.509] fences, identical targets, identical held params. **The only difference is the
+`clipSat` floor** ([1.5,4] vs the widened [0.1,4]) ⇒ the 5.9× cost increase isolates exactly that
+floor. So s44's verdict is not confounded, and the audit *strengthened* the record rather than
+overturning it — an honest outcome worth recording as such.
+
+What `sqphys` actually pinned, confirming FitParams.h's "three parameters" to the digit:
+
+| param | fitted | fence | |
+|---|---|---|---|
+| `clipSatLo` | 1.5 | [1.5, 4] | **on its floor** |
+| `kInputRef` | 1.5088 | [0.4, 1.509] | **on its CEILING** |
+| `clipA0` | 20.052 | [20, 30] | **on its floor** |
+
+and even so it reached `clipSatLo+Hi = 3.239 V` = **57.5 % of the rail, not 100 %**.
+
+⭐ `bound-resting-means-unidentified` says the outside bound is the missing equation, and the bound
+being rested on is the **`kInputRef` ceiling**. So the whole question is: where does 1.509 come from?
+
+### 2. The hypothesis this generated, written down with its falsifier, and then refuted
+
+`kInputRef <= 1.509` comes from `analysis/clean_headroom_bound.py` — which is **the first name on
+open-work item 4's list of consumers of the corrupted MASTER anchor** (`master-1700_gain-n12_base-
+clean.wav`, which GATE T proved **4.447 dB low**). That is why item 5 says *"same job as item 4"* —
+not a vague grouping: item 4's corrupted capture appears in the tool that sets item 5's binding
+fence. 4.447 dB is a factor of **1.667**, and `1.509 × 1.667 = 2.516`, a large move in exactly the
+direction `sqphys` was starving for.
+
+**Refuted by arithmetic, before any render** (`write the falsifier next to the hypothesis`, s125).
+The tool has two independent sections and only one of them binds:
+
+- **Section (1)** — `k_clean = (RAIL_POS − RAIL_KNEE)/(EQPREGAIN · 10^(−3/20)) = 2.35/(2.2 ·
+  0.70795) = ` **1.5088**. Every term is schematic-derived: the 8.65 V rail (9 V − D3's 0.35 V),
+  VD = 4.325, IC5_B's fixed −2.2, the session-21 TL07x rails, and the hottest ladder rung.
+  **No capture enters it.**
+- **Section (2)** — the capture-derived, "model-free output-node" bounds. Measured: **5.493**
+  (`ref-clean`), **4.375** (the corrupted capture), **5.258** (`bass-0930`). All **2.9–3.6× looser
+  than section (1)**. They do not bind and never have.
+
+⇒ **correcting item 4 cannot relax item 5's constraint.** Item 4 is hygiene, not a lever, and its
+CLAUDE.md entry now says so.
+
+⚠ **Free by-product — that row is DOUBLY unusable and must not be quoted even loosely.** Section (2)
+reads the −3 dBFS rung, which is precisely the **one segment session 115 measured as PINNED** in
+that file (peak 0.98850, −0.10 dBFS). So its `out@−3 dBFS` is a **ceiling, not a level**, on top of
+the mis-dialled knob. Nothing downstream depends on it, but it is annotated in the tool.
+
+⚠⚠ **A coincidence I nearly reported as a corroboration, and did not.** That row's "clean gain"
+reads **+14.90 dB** against `ref-clean`'s **+0.92** at master noon — a gap of **13.98 dB**. Add
+GATE T's 4.447 dB correction and you get **18.43 dB**, against GATE T's independently-derived
+**+18.500 dB** for that detent: agreement to **0.07 dB**, from a code path sharing nothing with
+GATE T's derivation. Extremely tempting (`close it from both ends`). **It is not usable**, because
+the reading it rests on is the pinned segment — a clipped number cannot corroborate a level. Recorded
+as a trap so the next session that spots the same 0.07 dB does not spend an hour on it.
+
+### 3. The result: the supply forbids it, in closed form
+
+Having established that no capture correction can help, the question becomes purely physical, and it
+answers itself with no fit, no render and no threshold. Scratch script kept out of the repo; every
+input is schematic-derived or a shipped constant.
+
+The VTC is **homogeneous**: `vtc(w) = −satLo · sig(a0·w/satLo)` gives `vtc_{L·s}(L·w) = L·vtc_s(w)`.
+So raising the ceilings by `L` preserves the clipper's operating point **only if the drive at node W
+rises by `L` as well**.
+
+```
+shipped clipSat sum      : 1.0356 V   (18.4 % of the 5.636 V rail)
+physical per-side target : satLo -> 2.657 V (x6.07),  satHi -> 2.979 V (x4.98)
+ceiling scale needed     : x5.442  (+14.72 dB)
+=> kInputRef required    : 0.90 x 5.442 = 4.898 V/FS
+
+  vs TL07x knee (binding fence)  1.5088  -> x3.25  (+10.23 dB OVER)   INFEASIBLE
+  vs TL07x hard limit            1.7336  -> x2.83  ( +9.02 dB OVER)   INFEASIBLE
+  vs ABSOLUTE supply ceiling     2.7770  -> x1.76  ( +4.93 dB OVER)   INFEASIBLE
+
+  K at the absolute ceiling supplies 56.7 % of the needed scale (30.8 % to the binding fence)
+```
+
+Every stage from the jack to node W is **schematic-fixed** — IC1_A unity, the J201 stage, the
+treble/ATTACK ladder, IC2_A `= 1 + R15/(R17+DRIVE+R32)`, R16 — so `kInputRef` is genuinely the only
+free scalar, and the absolute ceiling is not an op-amp choice: it is `VD/(2.2 · 10^(−3/20))` off the
+supply itself, *"no op-amp on this rail can beat it"*.
+
+⭐ **This refutes on the AXIS THE PARAMETER LIVES ON** (s134's rule), which is strictly stronger than
+s44's fit-cost argument: a cost of 201.8 invites *"try a better optimiser / different start"*; a
+supply bound cannot be argued down.
+
+⚠ **And the direction has moved the WRONG way since item 5 was written.** s44 fitted this family at
+`kInputRef = 1.2596`; **s109 shipped 0.90** — 1.40× lower — **without re-fitting `clipSat`**. By
+FitParams.h's own co-scaling statement (*"the clipper's drive scales with K, so a lower K pulls the
+fitted ceiling down with it"*) that puts the pair further from physical, not closer. The backlog item
+was not merely stale; it was pointing in a direction that had got harder for ~24 sessions.
+
+⚠⚠ **An unexplained numerical coincidence, flagged and NOT built on.** `sqphys` reached **57.5 %**
+of the rail; the closed form says the absolute ceiling supplies **56.7 %** of the needed scale. Two
+different constructions. The obvious explanation does *not* reproduce it — drive-scaling from `sq2`
+predicts satsum `1.0356 × (1.5088/1.2596) = 1.241 V`, not 3.239; `sqphys` bought its extra ceiling by
+driving `clipA0` to its floor and paying 5.9× on the objective. Treat as coincidence until someone
+explains it (`an implausible coincidence is a bug report` — this one is logged, not resolved).
+
+### 4. What replaces item 5, and the one branch nobody has tested
+
+The inconsistency itself is untouched and confirmed. What is refuted is the *repair*. Restated, item
+5 is a **physical question with two branches**:
+
+**(a)** the clipper's ceiling really is ~5.4× low and the model's OD path is structurally quiet at
+the clipper; **or (b) ~14.7 dB of gain ahead of node W is missing from the model.**
+
+**(b) has never been tested.** It is not obviously absurd: `trebleC7` ships **147× off schematic** as
+a ~183 Hz high-pass that *attenuates* the OD path, s100 re-fitted **17** treble/ATTACK-ladder
+constants explicitly as an *"OD-path absolute-level fix"*, and A3's central finding is that **the OD
+path is quiet, absolutely** (GATE O, 4.38 dB over 100–400 Hz). ⛔ **But that is a hypothesis with a
+suggestive size, not a measurement** — 14.7 dB and 4.38 dB are not the same quantity and nothing has
+related them. Do not fit before deciding which branch.
+
+⚠ Also worth noting against branch (a): a physical ceiling with `kInputRef` unchanged would mean the
+clipper **barely clips at all**, which is a large accuracy regression rather than a repair. So both
+branches close off the naive edit from opposite sides.
+
+### 5. Four stale documentation claims, found in passing, all corrected
+
+1. ⛔⛔ **`circuit.md` — the source-of-truth file — certified a value the model has not carried for
+   98 sessions.** *"The shipped sum 4.939 V is 88 % of that — physically consistent."* 4.939 V is the
+   **session-17** pair; s44 moved it to **1.0356 V (18.4 %)**. Meanwhile `FitParams.h` and
+   `Clipper.h` **both flagged the real figure correctly the whole time** ⇒ `verify-the-CONSTANT-not-
+   the-prose`, in the worst possible place. ⚠ **The correction costs a standing argument some of its
+   force, so it is stated rather than patched:** the "2.70 V floating-spares collapse" case was ruled
+   out *partly because* 4.94 V would be **183 %** of 2.70 V; at 1.0356 V that is **38 %** and the
+   argument no longer bites. The collapse case still falls — **on the schematic evidence alone**
+   (spare inputs tied to GND, 600 DPI, primary p.4 *and* the backup, independently). ⛔ Quote the
+   schematic, never the 183 %.
+2. **`FitParams.h`: *"their SUM **is** the R19-dropped effective rail (nominal ~7 V…)"*** — two
+   errors in one clause. `~7 V` is exactly the round figure s42 identified as *"a rail no calculation
+   ever produced"* (derived: **5.636 V**, self-limiting crowbar current). And *"is the rail"* states
+   an **equality** where the physics gives a **one-sided** bound — a CMOS inverter cannot swing *past*
+   its rail, so a sum *below* it is no violation. That is why the 18 % flag is **SOFT**, and losing
+   the one-sidedness is what made the session-118 clamp bug possible.
+3. **`Clipper.h`'s closing sentence** — *"If a future re-fit of the K/clipSat family restores a
+   physical satLo, this constant and that one will agree again on their own"* — describes something
+   that **cannot happen by re-fitting**. Annotated: the D1/D2 residual (0.05–0.25 %) is therefore
+   **expected to persist**, as a standing quantified marker of the soft-low ceiling rather than a
+   pending repair — and still not a reason to widen `kTripPointV`.
+4. ⚠ **CLAUDE.md's own cache bill was already paid.** It claimed *"all 6501 entries / 133 MB … are
+   unreachable and the next matrix run re-renders from scratch (~25 min)"*. Measured against the
+   binary's `(size, mtime_ns)` — what `_cache_key` actually hashes — of **6663** entries **6501
+   predate** the binary (unreachable, exactly s127's figure) and **162 postdate** it, and 162 is
+   exactly the current matrix's capture count. ⇒ that render already happened; the matrix is **fully
+   cached** and the next run is fast. **Do not budget 25 minutes.** The 6501 stale entries are
+   reclaimable disk (138 MB total).
+
+Also annotated in `clean_headroom_bound.py`: `K_SHIPPED = 3.377` (session-17, kept as a **labelled
+historical control** so s44's quote stays reproducible, with the shipped 0.90 printed beside it) and
+a prose reference to `kOutputMakeup = 3.684` (s115 shipped **4.3297**). The tool now also prints the
+s142 closed-form item-5 block and states which of its own sections binds.
+
+### 6. Uncommitted / cache posture
+
+⛔ **`src/` was edited (comments only, `FitParams.h` + `Clipper.h`) and DELIBERATELY NOT REBUILT.**
+The 162 warm cache entries are still valid. Whoever next builds pays the ~25 min re-render **once**,
+and should batch their own `src/` edits into that single build (`build.md`'s rule; s127's lesson).
+Nothing in `src/` changed behaviourally — every edit is inside a comment block — so `s124_ship.json`
+remains the correct baseline, the release gate is still **6 rows over SHIP**, and **ctest is
+unaffected** (not re-run; nothing compiled).
+
+⚠⚠ **CLAUDE.md is now 866 lines, over its own 800-line trigger.** This session added five
+CLOSED/REFUTED rows and rewrote two backlog items. Per the documentation-discipline rule, **the next
+session's first job is to re-archive** — and per s136/s141's precedent, only after verifying every
+compressed passage is present verbatim here first, and **never** by compressing the CLOSED/REFUTED or
+SHIPPED CONSTANTS tables, which are the load-bearing content.
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **Item 5 branch (b) is the new, never-tested question, and it is cheap to scope: is ~14.7 dB
+   of pre-clipper gain missing from the model?** The suggestive coincidences (`trebleC7` 147× off
+   schematic as an *attenuating* 183 Hz high-pass; s100's 17-constant "OD-path absolute-level fix";
+   A3's 4.38 dB absolutely-quiet OD path) are **not** a measurement and must not be treated as one.
+   The honest first step relates the two quantities or shows they cannot be related.
+2. ⚠ **Re-archive CLAUDE.md before anything else** (866 > 800) — see §6 for the conditions.
+3. **The head item is unchanged and still unowned: AL5's resonance band** (~2.3–2.8 kHz Q/damping
+   route, ~3.2–5.8 kHz f0 route; neither shipped Sallen-Key is in either band). Nothing has yet asked
+   what in this chain could resonate near 2.5 kHz at all. s141 `NEXT` #1–#3 all still stand.
+4. **The remaining three item-4 consumers are unchecked** — `clean_headroom_probe.py`,
+   `clean_thd_check.py`, `captures.py`'s Tier-1 list. Now known to be hygiene.
+5. **Unchanged and unowned:** AB6's bridged-T half (τ × 0.9337, thirteen sessions), GATE AD3's
+   800 Hz–1 kHz clean-tilt inversion (eleventh session), item 9's L4(a)-vs-(b), items 7/8, and Phase
+   10's unbuilt `FeatureProfile` / `OSFidelity` probes.
+
+⚠ **`know-when-to-stop-measuring` — where this session stands.** This was **not** a thirteenth
+screen: it was a premise audit that the user's own chosen direction required, it **refuted that
+direction outright** on supply arithmetic, it **shrank item 4**, and it corrected **four** stale
+documentation claims including one in the source-of-truth file. But it shipped **no constant**, and
+the reason is that the constant it was asked to ship cannot honestly move. ⇒ the rule now fires
+**hard** on the next session: item 5 branch (b) is a scoping question, not a build, so the next
+session should either land a `src/` change or take the Phase 10 probes. Flagging, not deciding.
+
+---
+
+## SESSION 143 (2026-08-04) — CLAUDE.md re-archived on its own 800-line trigger (third time); no measurement, no code
+
+**Changed NO baseline, NO constant, NO `src/` file and NO analysis tool.** This session is the
+documentation job session 142 named as the next session's first: `CLAUDE.md` closed s142 at **866
+lines**, over the 800-line trigger the "Documentation discipline" rule sets. **866 → 745.**
+
+### The precondition, checked before any edit
+
+The discipline rule permits compression only where the material is already archived verbatim here.
+Verified first, not assumed: `grep '^## SESSION'` confirmed **124–142 all present**, and **25
+distinct numbers/tokens** about to leave or shrink in `CLAUDE.md` were grepped for in this file —
+`202,001`, `50.69`, `223.69`, `0.5.1`, `sk_gate_i_reconcile`, `6663`, `6501`, `138 MB`, `3.377`,
+`3.684`, `4.898`, `2.777`, `56.7`, `201.8`, `57.5`, `34.1`, `11.4`, `195.7`, `2934.8`, `1348`,
+`2.530`, `0.0274`, `0.4635`, `17.44`, `15.07`. **25 of 25 found; 0 existed only in `CLAUDE.md`.**
+The four capture batches (s111/112/113/120) were separately confirmed present with full per-batch
+purpose before their inventory bullets were collapsed to a pointer.
+
+⭐ **One target was checked and then DELIBERATELY NOT COMPRESSED**: the s122 doc-consolidation
+paragraph. `grep` found **0** occurrences of `doc-consolidation-plan` or `5,980` in this log, so it
+is *not* archived here and the rule forbids compressing it. (s141 recorded compressing "the s122
+consolidation paragraph"; what survives in `CLAUDE.md` is evidently what it left, and it stays.)
+The check is the point: two of the ~27 candidate passages failed it, and both were kept.
+
+### ⛔ What was NOT touched, mechanically verified
+
+**`git diff -U0 CLAUDE.md | grep '^-| ' | wc -l` returns 0** — i.e. **not one table row anywhere in
+the file was deleted or modified** this session (a modification would show as a deletion plus an
+addition). That is a stronger check than the row-count assertion s136 used, because it also catches
+an edit *within* a row. SHIPPED CONSTANTS (13 data rows) and CLOSED/REFUTED (58 data rows) are
+therefore provably untouched, as in s136 and s141. Also untouched: the standing rules, A3's
+five-exclusions sentence and its s125 corollary, the release-gate bars and pre-registered fallback,
+and every open item that is still open.
+
+### What was compressed, and why each was safe
+
+1. **STATUS (~105 → ~70 lines).** The s129–s142 bullet kept its gate→tool index but dropped the
+   mutation-runner scores; the **s139 GATE AI cap-defect paragraph** went out because it is already
+   a CLOSED/REFUTED row twenty lines below (`CLAUDE.md` duplicating *itself*, the same failure s136
+   found); the **two discharged flags** bullet went out entirely — "discharged, nothing owed" is
+   spent text; the s124 baseline known-answer and the s128 shape_gate note compressed to their
+   verdicts plus pointers. ⭐ Kept deliberately, as live warnings rather than results: AD being the
+   only hardware-referenced gate **and not covering §4's harmonic finding**, the s133 mutation-runner
+   **thread race**, and AG's **pre-s120 readings measured the solver** control.
+2. **The release-gate section's s125 correction block (17 → 6 lines).** Pure **de-duplication**, not
+   compression: the same correction, the same quotes and the same numbers appear again ~110 lines
+   later as the "HF region" standing rule. The standing-rules copy is canonical and was left intact;
+   the release-gate copy is now a pointer to it. ⭐ Same edit fixed a real staleness — that section
+   still ran its example command against `s120_newton.json` and said "as of `s120_newton.json`",
+   two baselines behind STATUS's own instruction to quote everything against `s124_ship.json`.
+3. **Item 6 (166 → 129 lines), and the structural fix s136 prescribed.** s136 compressed this item
+   145 → 78 and wrote: *"if it starts doing that again, the fix is to add a row to its refuted table
+   rather than a paragraph to its body."* It grew back to 166 by exactly that route. The largest
+   single saving was **converting the candidate gates from six numbered prose blocks into a table**
+   — which also caught a stale label nobody had noticed: the header still read **"Three gates a
+   candidate must pass"** while six were listed. The table header now says SIX and carries an
+   explicit ⚠ *"when a session adds one, add a ROW"*. The AL5 band brief was promoted out of gate
+   6's body to sit under the table as the item's current brief.
+4. **Open items 0/1/3/4/5/9 and the capture-batch inventory**, each to its verdict plus a pointer —
+   with the ⛔ prohibitions and the user's verbatim s120 accuracy caveat kept word-for-word.
+
+### Headroom
+
+745 leaves **55 lines** before the trigger fires again — at the recent ~10 lines/session that is
+roughly 5 sessions. ⚠ The structural cause has now been diagnosed twice and is recorded in
+`CLAUDE.md`'s own "Where we are" block so the next session reads it before adding to item 6.
+
+### ▶ NEXT — unchanged from session 142; this session consumed no work item
+
+⚠⚠ **`know-when-to-stop-measuring` is STILL UNSPENT and s143 does not discharge it** — this was the
+file's own mandated re-archive, not a measurement and not a build. The flag stands exactly as s142
+left it: **the next session should either land a `src/` change or take Phase 10's unbuilt probes**
+(`FeatureProfile`, `OSFidelity`).
+
+1. ⭐⭐⭐ **The frame question is the head item (s140/s141).** The brief is now a band, not a veto:
+   the carrier must be a **resonance whose damping or corner moves with drive**, at **~2.3–2.8 kHz**
+   (Q/damping, vertex on the upper skirt) or **~3.2–5.8 kHz** (f0 route) — and **neither shipped
+   Sallen-Key is in either band**. **Nothing has yet asked what in this chain could have a resonance
+   near 2.5 kHz at all.**
+2. ⭐⭐ **AL3's non-monotonicity is unexplained and is a finding in its own right** — |D| has an
+   interior minimum at ~1348 Hz, the natural signature of two contributions rather than one corner.
+   Nobody has looked below 1348 Hz because AG4's window rule never admitted it.
+3. ⭐ **The model's own drive-tilt zero crossing (~2724 Hz, −7.2 % from the vertex)** wants an
+   explanation or an explicit "coincidence" ruling.
+4. ⚠ **Item 5 branch (b) — is ~14.7 dB of gain ahead of node W missing from the model?** Untested,
+   and a *scoping* question rather than a build. Decide the branch before spending a fit.
+5. **The bridged-T half of AB6 (τ × 0.9337) remains unowned.** Unchanged for fourteen sessions.
+6. **GATE AD's AD3 (the 800 Hz–1 kHz clean-tilt inversion)** — unowned for a twelfth session.
+7. **Items 4/7/8/9 and Phase 10's unbuilt probes** — unchanged.
+
+⚠ **Uncommitted at this point: sessions 142 and 143 together** (s142's premise audit + doc
+corrections, s143's re-archive). Nothing in either touches DSP behaviour; s142's `src/` edits are
+comments only and were deliberately not rebuilt, so the warm cache and `s124_ship.json` stand.
+
+## SESSION 144 (2026-08-04) — GATE-free at last: Phase 10's `OSFidelity` probe is BUILT, and it decomposes the low-OS gap into droop / wanted-distortion / aliasing
+
+**The first session since 128 to add executable code, and the first since 127 to build.** It spends
+the `know-when-to-stop-measuring` flag that s142 raised and s143 explicitly did not discharge, by
+taking the second of the two options that flag left open: *"land a `src/` change or take Phase 10's
+unbuilt probes"*. No constant shipped — every named carrier for item 6 is refuted, so there was
+none to ship. `OSFidelity` is now the **19th ctest** (was 18/18 since s127), runs in **15.4 s**, and
+is finite-only per `build.md`.
+
+### Why this probe and not `FeatureProfile`
+
+`build.md` specifies three Phase-10 probes; `PerfBenchmark` landed at s127 and the other two never
+did. `FeatureProfile`'s stated lever — accurate-omega vs `omega4` — **does not exist in this pedal**:
+the omega provider belongs to chowdsp's diode models, and this chain's nonlinearities are the CD4049
+VTC (an implicit Newton solve) and the J201 shaper. Its other candidate levers (the `pow` fast path,
+ADAA's cost) were **already measured at s127**. `OSFidelity` had no such overlap and answers a
+question nothing in the suite asks.
+
+### What it measures, and what it deliberately does not duplicate
+
+`OSValidationTest` already gates delay-comp factor-independence, the ADAA gate's liveness and scope,
+the alias floor at 2499 Hz, and ADAA's benefit on that floor at 2x. **Every one of those is an
+ABSOLUTE property of one factor.** This probe measures a RELATIVE one — distance from the 8x
+reference — and decomposes it, which is `build.md`'s literal commission: *"separates the wanted
+distortion (faithful at low OS) from aliasing + top-octave droop"*.
+
+⚠⚠ **The confound it had to be designed around is NEW since s124.** The shipped build gates ADAA by
+OS factor, so the low-OS arms are not "the same chain with less oversampling" — they run a different
+approximation. A naive 1x-vs-8x difference mixes the discretisation question with the ADAA question
+and can attribute neither. Blocks 1–2 therefore hold **ADAA off at every factor** (`clipAdaaMaxOs=0`,
+the same move and the same reason as OSValidationTest's delay-comp block), and block 3 asks the ADAA
+question separately.
+
+### ⭐⭐ RESULT 1 — the top-octave droop, measured for the first time (ADAA held off ⇒ discretisation only)
+
+OD path, DRIVE 0.15, dB re the 8x reference:
+
+| f | 1x | 2x | 4x |
+|---|---|---|---|
+| 5.0 kHz | −0.485 | −0.108 | −0.020 |
+| 8.0 kHz | **−2.348** | −0.476 | −0.092 |
+| 11.0 kHz | −4.948 | −1.105 | −0.214 |
+| 14.0 kHz | −11.060 | −2.182 | −0.396 |
+| 16.0 kHz | **−20.650** | **−3.031** | −0.556 |
+
+⇒ **the shipped 2x realtime default costs up to 3.03 dB at 16 kHz, and 1x costs 20.65 dB.** Below
+3.2 kHz every factor agrees to within the block's own floor, so the defect is strictly a top-octave
+one.
+⭐ **Cross-project corroboration nobody asked for:** `dsp.md` records the *template's reference
+build* at "1x ≈ −4 dB @8k / −10 @12k / −21 @16k". Ours reads −2.3 @8k, −11.1 @14k, −20.7 @16k — a
+different circuit reproducing the same law, which is what a pure discretisation artefact should do.
+⚠ **`src/utils/Prewarp.h` ships and is referenced by NOTHING** (grep: matches only inside its own
+header). ⛔ But it is **not** the remedy here and must not be reached for: `dsp.md` says explicitly
+that a cap inside the oversampled region is already discretised at the high rate and must not be
+prewarped, and these caps are. The option in `dsp.md` that *does* fit is its third one — a fixed
+high-shelf with gain set **per OS factor** (≈0 at 4x/8x, so transparent at the default). Unbuilt, and
+**not proposed here**: it is a DSP change and would owe its own gate and a re-baseline.
+
+### ⭐⭐ RESULT 2 — the wanted distortion IS faithful at low OS. That is `build.md`'s actual question.
+
+Harmonic-ladder rms vs the 8x reference, restricted to harmonics **below 5 kHz** (see the defect
+note below for why the restriction is load-bearing):
+
+| f0 | 1x | 2x | 4x | alias excess at 1x |
+|---|---|---|---|---|
+| 506.84 Hz (bass-realistic) | **0.183 dB** | 0.039 | 0.008 | **+45.60 dB** |
+| 2499.02 Hz | **0.511 dB** | 0.115 | 0.018 | **+40.83 dB** |
+
+⇒ **what a low-OS user loses is the top octave and the alias floor — not the distortion character.**
+The generation error at 1x is a fifth of a dB where the alias floor is 45 dB worse: two orders of
+magnitude apart, on the same renders.
+⚠ **Quote the membership**: the 506.84 Hz low band is **n = 8** orders; the 2499 Hz low band is
+**n = 1** (H2 alone), i.e. a single reading wearing an rms's clothes. The probe prints both counts
+every run.
+
+### ⭐⭐⭐ RESULT 3 — the shipped ADAA policy judged as FIDELITY rather than as alias energy. Never asked before.
+
+Both prior instruments (GATE X, OSValidationTest's benefit column) score ADAA on **alias energy
+alone**. But ADAA1 is a *different approximation* — a 2-point average — not merely a cleaner one, so
+"reduces aliasing" and "is closer to the truth" are two claims and only the first had ever been
+measured. Scoring both arms against the **same** 8x reference (which carries no ADAA either way):
+
+| f0 | factor | Δ alias vs ADAA-off | Δ ladder<5k |
+|---|---|---|---|
+| 506.84 Hz | 1x | **+1.91 dB (WORSE)** | −0.008 |
+| 506.84 Hz | 2x | −5.70 | +0.023 |
+| 2499.02 Hz | 1x | **−20.27** | +0.527 |
+| 2499.02 Hz | 2x | **−15.08** | +0.209 |
+
+⇒ **At the shipped 2x default the policy is a win at both fundamentals** — which is the case that
+matters, and it vindicates s124's decision on an axis s124 never measured. **At 1x it is a large win
+at 2.5 kHz and a small net LOSS at a bass-realistic fundamental.**
+⭐ And in **3 of 4 cells it costs ladder accuracy** — small (≤0.53 dB) but always the same sign:
+ADAA moves the wanted harmonics slightly *away* from the 8x truth while moving the alias floor
+*toward* it. Two axes, opposite directions, and only one was on record.
+⚠ **NOT a proposal to change `clipAdaaMaxOs`.** The 1x loss is +1.91 dB on a floor already at
+−44.3 dB, i.e. inaudible, and n = 2 fundamentals is not a frequency dependence. Recorded as a
+characterisation of a shipped policy, not a defect in it.
+
+### ⚠ TWO DEFECTS FOUND IN THIS SESSION'S OWN INSTRUMENT, both caught by its own known answers
+
+**(a) The 0.3 s settle, inherited from OSValidationTest's FR block, failed the clean-path known
+answer.** The clean tap is base-rate and only *delayed*, and Goertzel magnitude is phase-invariant,
+so BLEND=0 magnitude is **forbidden** to depend on the OS factor. It read **4.437e-07 dB** against a
+1e-9 bar. The residual was **frequency-ordered** (4.4e-07 at 200 Hz → 1.1e-10 at 16 kHz), i.e.
+wearing its own diagnosis: a decaying-LF contaminant. Cause: MasterOut is two ~0.72 Hz high-passes
+(τ = 0.22 s), so 0.3 s is **1.4 τ** and leaves ~26 % of the transient alive — and because each factor
+delays the clean tap by a *different* number of samples, each factor's window starts at a different
+point on that ramp. Settling 4 s everywhere gives **2.381e-12 dB**, i.e. **185,000× better and
+comfortably under the original bar**.
+⭐ **The bar was right and the settle was wrong.** Widening 1e-9 → 1e-6 would have gone green,
+preserved a contaminated FR table (it also put a spurious constant +0.005 dB on the droop table's
+100–400 Hz rows), and deleted the only guard that could see it.
+⚠⚠ **GENERALISABLE, and it points at an existing file: `OSValidationTest` settles its FR/delay-comp
+block at 0.3 s and only its driven block at 4 s.** Its own header derives the 4 s figure and applies
+it to one block. The same contamination is therefore present in its delay-comp table — **harmless
+there**, because that bar is 0.1 dB, five orders of magnitude above the effect — but the 0.3 s figure
+is what this file inherited, and it is a trap for the next reader. **A settle derived for one block
+of a file is not a property of that block; it is a property of the chain's slowest pole.**
+
+**(b) The unbanded ladder rms measured the droop and called it distortion error.** First run: 1x
+ladder rms **27.8 dB**, driven almost entirely by orders above 10 kHz — where block 1 of the *same
+run* independently measures a −5…−21 dB FR deficit. A harmonic is a signal at n·f0, so it is rolled
+off by exactly the droop being reported separately: unbanded, the metric **double-counts one defect
+as two**, which is the precise failure `build.md` commissions this probe to avoid. Fixed with a
+band split at **5 kHz**, and the cutoff is derived from block 1's own numbers (−0.485 dB at 5.0 kHz
+vs −2.348 at 8.0 kHz), not chosen — the constant carries a note saying to move it if those move.
+
+### ⚠ An unexplained LF pedestal of +0.0055 dB — three candidates excluded, then STOPPED
+
+The droop table's 100–1600 Hz rows read a constant few-thousandths of a dB where discretisation must
+give ~0. Chased, because an implausible coincidence is a bug report:
+
+- **Not settling residue** — that is now 2.4e-12 dB on the same settle.
+- **Not FIR passband ripple**, which was the natural guess and which I *wrote into the file as the
+  explanation* before testing it. JUCE's half-band FIR is applied once up and once down per stage
+  and the stage counts are 0/1/2/3, so ripple predicts the pedestal to **grade 3:2:1** across
+  1x/2x/4x. Printing one more decimal shows **~1:1:1** (1x 0.0047–0.0068, 2x 0.0052–0.0055, 4x
+  0.0055 flat). The signature is absent; the hypothesis is dead. ⭐ `an-attribution-is-not-a-
+  measurement`, committed and caught inside one session, by the cheapest possible instrument — a
+  `%.4f` instead of a `%.3f`.
+- **Not the nonlinear solve converging with rate** — that predicts collapse as drive → 0. The
+  `[nl-probe]` block measures 4x re 8x at 200.7 Hz: **+0.00546 dB at DRIVE 0.15, +0.00549 at DRIVE
+  0.01** — unchanged, fractionally *larger*. Carrier is linear-side.
+
+⭐ **What the structure says, since the mechanism does not:** 1x/2x/4x form a **cluster** (2x and 4x
+agree to <0.0003 dB) and the **8x reference is the outlier**, sitting ~0.0055 dB below all three. So
+it is a property of the 3-stage/384 kHz path, not a droop that grows as the factor falls.
+⛔ **And then stopped, deliberately.** 0.0055 dB = 0.06 %, three orders of magnitude below every
+number this file quotes, it moves no verdict, and three candidates are already excluded. Recorded as
+a floor **with its exclusions**, explicitly not an open work item — `know-when-to-stop-measuring`
+applied to my own curiosity rather than to someone else's backlog.
+
+### Build / cache state
+
+⚠⚠ **THE CACHE BILL IS PAID AND RE-ARMED, AND `CLAUDE.md`'s row saying otherwise IS NOW STALE.**
+This session performed the **first build since s142's comment-only edits** to `FitParams.h` and
+`Clipper.h`, so `OfflineRender` relinked and its `(size, mtime_ns)` signature moved — which is what
+`comprehensive_report._cache_key` hashes. The 162 warm entries s142 measured are now unreachable and
+**the next matrix run re-renders from scratch (~25 min)**. Nothing is corrupted: no DSP behaviour
+changed in either session (s142 comments only; s144 adds `tests/OSFidelity.cpp` and a CMake target),
+so **`s124_ship.json` still stands as the baseline** — this is a speed cost, not a correctness one.
+✅ `cmake --build build` clean for OSFidelity; the `JUCE_STANDALONE_APPLICATION` redefinition
+warnings are pre-existing, from `EditorSnapshot` linking the plugin target.
+✅ **ctest 19/19** in 70.6 s wall (`-j 12`). OSFidelity is deliberately **not** `RUN_SERIAL`: it
+measures spectra, not wall-clock, and `build.md` names PerfBenchmark as the ONE exception to
+"run tests in parallel, always" — copying that property would make the exception look like style.
+
+### ▶ NEXT
+
+1. ⭐⭐ **The 1x/2x top-octave droop now has a number and no owner.** `dsp.md`'s per-OS-factor
+   high-shelf is the matching remedy (≈0 at 4x/8x ⇒ transparent at the default). It is a **user
+   decision**, not an obvious win: it changes shipped DSP, owes a gate and a re-baseline, and only
+   affects users who leave the OS factor below 4x. ⛔ Do not reach for `Prewarp.h` — wrong tool for
+   caps inside the oversampled region (`dsp.md` says so explicitly).
+2. **`FeatureProfile` remains unbuilt, and this session argues it should stay that way** in its
+   template form — its stated lever does not exist in this pedal and its other levers were priced at
+   s127. If it is ever built, it needs a new brief, not the template's.
+3. ⚠ **`OSValidationTest`'s 0.3 s FR settle** — harmless at its own 0.1 dB bar, but it is where this
+   session's defect (a) came from. Worth a one-line note at that block rather than a change.
+4. **Item 6's frame question is still the head item** (s140/s141): a resonance whose damping or
+   corner moves with drive, at ~2.3–2.8 kHz (Q route) or ~3.2–5.8 kHz (f0 route); neither shipped
+   Sallen-Key is in either band, and nothing has yet asked what in this chain could resonate near
+   2.5 kHz at all. Unchanged — this session did not touch it.
+5. Items 2/4/5(b)/7/8/9, AL3's non-monotonicity, the model's ~2724 Hz tilt zero-crossing, AB6's
+   unowned bridged-T half, and AD3's 800 Hz–1 kHz clean-tilt inversion — all unchanged.
+
+⚠ **Uncommitted at this point: sessions 142, 143 and 144 together.**
+
+---
+
+## SESSION 145 (2026-08-04) — GATE AM: the resonance census. Nothing at or upstream of the clipper can resonate AT ALL, at any frequency, for any component values
+
+**One read-only gate, `analysis/resonance_census.py` (GATE AM), + `analysis/_mutate_gate_am.py`
+(12 arms, 12/12).** No `src/` change, no render, no re-baseline. It answers the question s144's
+`NEXT` #4 left standing verbatim — *"nothing has yet asked what in this chain could resonate near
+2.5 kHz at all"* — which was AL5's own buildable next question.
+
+### Why the question was worth a whole gate
+
+s141's AL5 turned item 6's gate 6 from a veto into a **positive specification**: the only structure
+that clears gate 5's exact real-pole bound (`d ln|dT|/d ln f ≤ 2`, and a sum of f² terms is still
+f², so no NUMBER of real poles helps) is a **complex pole pair**, and only from a narrow position —
+a **Q/damping** route needs a resonance at ~2.3–2.8 kHz with the vertex on its upper skirt
+(w ≈ 1.07–1.28), an **f0-move** route needs ~3.2–5.8 kHz. AL5 checked the two shipped Sallen-Keys
+and found **0 of 2**. Nobody had then asked the obvious follow-up: *is there a third candidate
+anywhere?* A census is the only honest way to answer it, because "I could not think of one" is not
+a measurement.
+
+### AM1 — the known answers, and one of them SHARPENS the gate it imports from
+
+**(a) 20 netlists vs the validated oracle.** The census needs every stage as a stamp-level netlist,
+which is new code, so each one's transfer is compared against `analysis/eq_reference.py`'s own
+already-validated implementation across the band. Worst relative error **3.68e-12** over 20
+(stage × switch-position × knob) combinations — treble ladder in all three ATTACK throws at BOTH
+the drawn and the shipped values, the recovery bridged-T, both Sallen-Keys, the clipper loop at all
+three GRUNT positions, the DRIVE stage at both gain extremes, both MidBands, the Baxandall at two
+knob settings.
+⭐ **The shipped-vs-drawn divergence guard is a separate check and it earned its place in the
+mutation run** (arm 2). AM1a evaluates my netlist and the oracle **at the same values**, so a
+swapped value set moves both together and agrees *perfectly* — the transfer check validates
+TOPOLOGY and structurally cannot see "you censused the drawn network". The guard asserts the two
+value sets actually differ (11 of 12 treble values do). Without it that arm was `GUARD DEAD`.
+
+**(b) A two-sided synthetic control.** A 3-section RC ladder whose poles are KNOWN real reads
+`max|Im/Re| = 0.000e+00`; a Butterworth Sallen-Key whose pair is KNOWN complex recovers
+**Q = 0.7071068 against the exact 0.7071068**. The AM2/AM3 bar is then the ladder's own floor ×1000
+(**1e-9**) rather than a guessed number. A negative result needs an instrument shown able to return
+the positive — `a-negative-result-wants-a-synthetic-arm` (s133).
+
+**(c) The pencil vs AL5's own closed form.** `AL.sk_params` and the generalised eigenvalue solve
+agree on IC4_B to **4.4e-16** and IC4_A to **2.2e-16**, so AM5's grading is comparable to AL5's
+rather than merely similar.
+⭐⭐ **And it sharpens AL5's IC4_B row into a different statement.** AL5 recorded IC4_B as a
+resonance in the wrong place (f0 10730 Hz, w = 0.27, "deep in its own f² regime"). Its **Q is
+0.4635 — below 0.5 — so it is OVERDAMPED and has no complex pair at all.** It is not a mis-placed
+resonance; it is not a resonance. This is a strictly stronger reading of the same numbers AL5
+printed, and the gate computes the label rather than asserting it (mutation arm 12 raises C1 to
+4n7, Q crosses 0.5, and the label must change).
+
+### AM2 — the census: 24 rows, in signal order, and exactly ONE complex pair in the whole chain
+
+Every stage from the input jack to the output buffer, each with its natural frequencies read off
+the pencil (or, for a stage with ≤1 capacitor, disposed of **by order** — a first-order system
+cannot have a complex pair, and the gate quotes each such stage's own source comment for the cap
+count rather than assuming it):
+
+| position | stages | verdict |
+|---|---|---|
+| **pre-clipper** | InputBuffer, JFET gate, J201 drain + treble ladder (all 3 ATTACK throws, 5th order each), DRIVE IC2_A at both gain extremes | **all real** |
+| **at clipper** | the shunt-feedback loop at all 3 GRUNT positions | **all real** |
+| **post-clipper** | OdCoupling, recovery bridged-T, Sallen-Key IC4_B | **all real** |
+| | **Sallen-Key IC4_A — f0 3336.9 Hz, Q 0.6912** | ⭐ **COMPLEX PAIR — the only one** |
+| **post-BLEND** | C21 highpass, EqPreGain, Baxandall (5th order), all six MidBand positions, MasterOut | **all real** |
+
+⚠⚠ **The census is of the chain's LINEAR structure, and that is NOT a gap — it is closed by two
+results this project already owns.** Both nonlinearities are **memoryless maps**: the CD4049 VTC is
+memoryless in node W (s123 — which is exactly what let ADAA1 apply to it), and the J201 shaper is
+memoryless as shipped (s140/AK2, *"its incremental gain is a scalar"*). A memoryless map has no
+state, so it contributes **no natural frequency**. ⇒ every pole in this chain is in the table above.
+Stated in the gate's own output, because without it a reader can reasonably ask whether the
+nonlinear stages were skipped.
+
+### AM3 — the passive half, asserted on the shipped stamps rather than cited
+
+A network of resistors and capacitors only has G and C both symmetric positive semi-definite, so
+`det(G + sC) = 0` has real non-positive roots. That is a textbook theorem and this project has been
+burned by textbook properties quoted outside their conditions three times (GATE I's −24 dB/oct,
+s93's swept-vs-stepped, s103's monotone-pot), so it is **measured on the actual stamps**:
+`sym(G) = sym(C) = 0.0e+00` and non-negative minimum eigenvalues at every passive stage, with
+`max|Im/Re| = 0.000e+00` throughout.
+
+⭐ **With a mutation control that can produce the positive.** Bootstrapping C17's bottom plate from
+the bridged-T's output with gain `g` — positive feedback being *the* resonance mechanism, and `g=0`
+being the shipped passive stage exactly:
+
+| g | 0.00 | 0.50 | **0.90** | **1.00** | 1.50 |
+|---|---|---|---|---|---|
+| | all real | all real | **COMPLEX** | **COMPLEX** | all real (and unstable — over-bootstrapped) |
+
+So "every passive stage is real" is a statement about the circuit, not about the classifier. Arm 6
+of the mutation run clamps that sweep to `g = 0` and requires the gate to refuse as **vacuous** —
+s106's N5 rule, applied to a control rather than to a threshold.
+
+### AM4 — the at-clipper loop is real-pole for ALL component values, not just the shipped ones
+
+The clipper's shunt-feedback loop is the **one active structure at or before the clipper**, so
+"the shipped values give real poles" would have been too weak: a re-fit of `clipA0` or a GRUNT cap
+could move them. It cannot. With `Zin = R16 + 1/(s·Cg)` and `Zf = R18 ∥ 1/(s·C14)`, the closed
+loop's denominator `Zf + (1+a0)·Zin` clears to `a s² + b s + c` with
+
+    a = (1+a0) R16 R18 Cg C14
+    b = (1+a0)(R16 Cg + R18 C14) + Cg R18
+    c = (1+a0)
+
+Poles are complex iff `b² < 4ac`. By **AM-GM**, `b ≥ (1+a0)(R16 Cg + R18 C14) ≥ (1+a0)·2√(R16 Cg
+R18 C14)`, so `b² ≥ 4(1+a0)² R16 R18 Cg C14 = 4ac`, with equality only at `R16 Cg == R18 C14` (a
+repeated REAL pole) — and the extra `+Cg·R18` in `b` only pushes it further apart. ⇒ **the
+discriminant is non-negative for every positive R16, R18, Cg, C14 and every a0 ≥ 0.**
+
+⭐ **The algebra is hand-done, so it is mutation-proofed by a random sweep**: 20 000 draws over
+R ∈ [1e1, 1e7], C ∈ [1e-12, 1e-5], a0 ∈ [1e-2, 1e3] give a minimum normalised discriminant
+`(b²−4ac)/b² = **5.23e-5 ≥ 0** everywhere. Arm 7 drops the `R18·C14` term from `b`, which breaks
+the bound, and the sweep must catch it. Shipped operating points, for the record (a0 = 24.871):
+GRUNT cut 1216 / 11431 Hz, flat 153 / 6613 Hz, boost 36 / 6373 Hz — all real, all two-pole.
+
+### AM5 — the verdict, graded at each resonance's OWN Q
+
+⚠⚠ **A grading defect found and fixed mid-session, and it would have contradicted AL5.** The first
+draft read each resonance against AL5's stored `band`, which is a **UNION over five trial Q
+values** — reading a single resonance against the union's min/max is a category error, and it duly
+reported IC4_A **admissible**, the opposite of AL5's own verdict on the same stage. Each resonance
+is now graded **at its own Q**, recomputed through AL5's own `pair_mechanism`/`fd_exponent` so the
+two gates cannot drift apart.
+
+    target (imported from s141_deficit_exponent.json): exponent 2.685 at the 2934.8 Hz vertex,
+    at >= 25 % of the mechanism's own maximum size
+
+| resonance | position | f0 | Q | w@vtx | admissible w at THIS Q | reaches? |
+|---|---|---|---|---|---|---|
+| Sallen-Key IC4_A | post | 3336.9 Hz | 0.6912 | 0.8795 | Q route [1.068, 1.209]; f0 route [0.504, 0.601] | **no** |
+
+⭐⭐⭐ **`resonances at or UPSTREAM of the clipper (where AF6 puts the carrier): 0`** — and this is
+stronger than a count, because AM3 and AM4 make it exhaustive over parameter space, not just over
+the shipped point. Every stage on that side is either **passive RC** (real poles by the theorem,
+asserted on the stamps) or an **active loop provably real-pole for all values**. ⇒ **AL5's positive
+specification cannot be met by any structure the model contains on the side AF6 requires. Item 6's
+carrier is either a structure the model OMITS, or it is not a resonance.**
+⚠ And the one resonance that does exist does not reach at its own Q either, which **reproduces
+AL5's 0-of-2 from a completely different construction** rather than contradicting it.
+
+### AM6 — what the model omits, since AM5's verdict is about the shipped model
+
+AM5 is a statement about our model, so the honest follow-up is which energy-returning structures the
+real circuit has that the census never saw. `circuit.md`'s element list has **exactly one**, and the
+shipped source has already sized it — quoted rather than re-derived, so it is not left as a gap:
+
+* **C4 (22n) bootstrapping Q2's gate to its source** — the ONLY positive-feedback path at or
+  upstream of the clipper. Its corner into `R9∥R10 = 500k` is **14.47 Hz, i.e. 203× BELOW the
+  2935 Hz vertex**, so C4 is a short across the whole audio band and the bootstrap contributes no
+  dynamics there. `JfetStage.h` models it as exactly that (a static `kRq2 = 1 MΩ`, with the header's
+  own note). ⇒ omitted as a **dynamic** element, and the omission cannot hide a 2.5 kHz resonance:
+  a single-pole bootstrap three decades down has none to hide.
+* **Inductors: a computed scan of `circuit.md` for an `L<n>` designator returns 0** (its BOM
+  reconciles R1–R54, C1–C39, ICs, Q1/Q2, D1–D4 and no L). With no inductor anywhere, the only route
+  to a complex pair is a **controlled source** — and AM2 enumerates every one the chain has.
+  ⚠ The scan excludes `L1/L2/L3`, which are the treble ladder's **node** names in circuit.md's own
+  node graph; arm 9 removes that exclusion and requires the gate to refuse rather than proceed.
+
+⚠ **NOT claimed: that the DEVICE has no resonance there.** Only that the MODEL has none, and that
+the one structure the model simplifies cannot be the carrier.
+
+### Defects found in this session's own instrument
+
+Five, all in the gate or its runner, none in `src/`:
+
+1. **AM1c was checking a property that could not exist.** The first draft asked whether IC4_B's pair
+   sat in AL5's band; at Q = 0.4635 there is no pair. Made pole-agnostic, which is what turned a
+   duplicate of AL5 into a sharpening of it.
+2. **AM5's union-band grading** (above) — would have contradicted AL5 on IC4_A.
+3. **The AM3 mutation control could not fire** in the first draft (the sweep did not reach a gain
+   that bootstraps). Fixed, then mutation-guarded so it cannot silently go vacuous again.
+4. **Two arms were the s119 case — the gate being better than the test's model of it.** The obvious
+   AM1c arm (swap the Sallen-Key's C1/C2, moving Q but not f0) is caught by **AM1a first**, because
+   a Q change *is* a transfer change. Re-pointed the arm to corrupt the **comparison** instead of
+   the network; the guard was not weakened.
+5. **Two arms patched constants that live in an IMPORTED module** (`bt_pair_shape_gate`'s `SK_A`/
+   `SK_B`), so a source-level pattern could never match. Fixed with s139's form: a **module-level
+   monkey-patch injected into the mutant after its imports**, which lives and dies with the
+   subprocess — nothing to restore, and no leak into a concurrent run.
+
+**12 arms, 12/12 behaving as required** (9 refusals with guard-identity checks, 3 computed-verdict
+arms per s128 — each must flip the headline *and* stop printing the old one).
+
+### Build / cache state
+
+No `src/` change, no build, no render. **`s124_ship.json` still stands**; the ~25 min matrix cache
+bill s144 re-armed is still owed and untouched. ctest not re-run (nothing compiled).
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **Item 6's head question is now sharply posed and it is a FRAME question, not another
+   element screen.** AM5 says the resonance route needs a structure the model does not contain, and
+   AM6 says the only omitted energy-returning element is three decades too low to be it. So the
+   live branches are: **(a)** the carrier is not a resonance at all — in which case gate 5's
+   real-pole bound and gate 6's rising-with-frequency spec have to be satisfied by something else
+   (a distributed mechanism, or two poles the model lacks); or **(b)** the real circuit has a
+   resonance our schematic does not draw — which is the standing *"the document is right AND the
+   unit differs"* third branch, and would be the first time it was invoked for a **topology**
+   rather than a value. ⚠ (b) is not free: it needs a mechanism, not a licence.
+2. ⚠ **Do NOT re-open "which shipped stage could resonate".** AM2/AM3/AM4 answer it exhaustively —
+   AM4 over all parameter values, not just the shipped point — so a re-fit cannot create one.
+3. **Item 5(b) is still the other untested physical branch** (~14.7 dB of gain ahead of node W
+   missing from the model), and it is untouched by this session.
+4. s144's `NEXT` #1 (the 1×/2× top-octave droop, a user decision), #2 (`FeatureProfile` stays
+   unbuilt), #3 (`OSValidationTest`'s settle note), and items 2/4/7/8/9, AL3's non-monotonicity, the
+   model's ~2724 Hz tilt zero-crossing, AB6's unowned bridged-T half, AD3's 800 Hz–1 kHz clean-tilt
+   inversion — all unchanged.
+
+⚠ **Uncommitted at this point: sessions 142, 143, 144 and 145 together.**
+
+---
+
+## SESSION 146 (2026-08-04) — GATE-free: the MASTER taper is REFITTED AND SHIPPED, from a trust statement rather than a better fit
+
+**Open work item 7, closed — and it shipped four constants.** The head item was *"a clean
+same-session `gain-n18` MASTER ladder would let session 115's taper be resolved below its 0.85 dB
+knob-noise floor"*. It did, but not the way the item imagined: what resolved it was **the user's
+statement about which knob positions are trustworthy**, not the extra data on its own.
+
+### 146.1 The n18 ladder, and three validity checks before any level was read
+
+Session 120 captured all nine MASTER detents at the `gain-n18` send (s115 had n18 only at the top
+two). Before using it:
+
+- **PINNING: none.** Every n18 file peaks ≤ −28 dBFS, per segment. (s112/s115's trap: a saturated
+  capture reads as a flat region of the control law.)
+- **PURE GAIN: worst band-span 0.0002 dB across all nine detents** against the n18 top. MASTER is a
+  post-EQ attenuator into a unity buffer, so this is forbidden to have frequency structure — GATE
+  O6's known answer, applied to the whole new ladder rather than to a pair.
+- ⛔ **`_archive/master-1700_gain-n18_base-clean.wav` is CONFIRMED BAD and excluded by name.** It
+  differs from the current n18 top **at the same hard stop** by a **frequency-dependent 11.27 dB
+  span**, which a pure gain cannot produce. This is s112's "the whole archived session was
+  contaminated" finding, now pinned to a specific file by a forbidden-structure test rather than by
+  its directory.
+
+### 146.2 The user's trust statement, and the measurement that corroborates it
+
+> *"0700, 1200, and 1700 are 100% trustworthy, all other positions are best estimations."*
+
+This **supersedes the s120 carry-forward**, which had listed five positions as "somewhat the most
+accurate" (adding 0930 and 1430). Not cosmetic — it removes the only two non-mechanical positions
+anyone had treated as reliable.
+
+⭐⭐ **And it is independently corroborated, which is what licenses using it as a constraint.** The
+three trustworthy positions are exactly the three where the pot has a **physical reference** (both
+hard stops + the centre detent), and the captures say so without being told: across two capture
+sessions 12+ days apart the spread is **0.0000 dB at 0700 and 0.0000 dB at 1200**, against
+**0.33–1.77 dB** everywhere else. ✅ The files are **confirmed independent recordings, not digital
+copies** — scalar-nulled they read **−84…−86 dB, the same floor as detents whose levels DISAGREE by
+1.19 dB**, so the agreement is not arithmetic. Two separate sources, same three positions. (GATE S3's
+mechanical-reference finding, s113, reproduced on MASTER.)
+
+### 146.3 What that changes about the fit — it is a CONSTRAINT, not a target
+
+Six of the seven interior detents are **estimates of a rotation**, so their error is in **x**, not
+in y: the LEVEL of every capture is exact (0.0002 dB). Least-squares over all seven treats them as
+seven equally good y-observations — the wrong likelihood, and it let six estimates outvote the one
+position that is known. Of the three trusted positions, m=0 is the divider null we deliberately do
+not reproduce and m=1 is the anchor (0 dB by construction), so **exactly one enters the fit: m=0.5.**
+
+⭐⭐ **THE DEFECT, AND IT NEEDS NO FIT TO STATE: the s115 taper was 1.86 dB QUIET at MASTER noon** —
+**186× the pin's own uncertainty** (0.010 dB, s112 recording repeatability). In the units a pot
+taper is actually specified in:
+
+| | half-rotation fraction | A-taper spec 10–15% |
+|---|---|---|
+| reference (pedal) | **11.89 %** | INSIDE |
+| s115 model | **9.59 %** | BELOW |
+
+`circuit.md` calls VR8 a "100k A". Nothing in any objective knew that.
+
+⭐ **Independently corroborated by the s120 listening test** ("MASTER: plugin needs ~0.61 to match
+the pedal's loudness") — an ear said turn it UP at noon; the captures say the model is 1.86 dB short
+there. ⚠⚠ **But that ear figure does NOT resolve the old flagged coincidence with
+`masterTaperBreak = 0.5927`, and this session's first write-up of it overclaimed that it did.** The
+level-match rotation (0.5951) and the old break sit **0.0024 apart** — far below an ear's resolution
+of a knob position — so there are two indistinguishable explanations and the **coincidence
+DISSOLVES rather than being decided**. What survives is directional agreement only. (Open work
+item 10 closes on that basis, not on a resolution.)
+
+### 146.4 Why THREE segments — a structural argument, not a fit-quality one
+
+Pinning noon inside the **two-segment** family gives xb 0.6115 / fb 0.1454 and puts the **bottom of
+the travel 1.4–3.4 dB hot**, because segment 1 runs from the ORIGIN and a straight line cannot be
+convex. Over the six estimated positions (+ = model louder than capture):
+
+| taper | 0.125 | 0.250 | 0.375 | 0.625 | 0.750 | 0.875 | rms | **bias** |
+|---|---|---|---|---|---|---|---|---|
+| s115 (2-seg) | +0.45 | +1.49 | −0.47 | +0.13 | +1.52 | −0.74 | 0.960 | **+0.399** |
+| 2-seg, pinned | +2.31 | +3.36 | +1.39 | −0.30 | +1.41 | −0.77 | 1.881 | **+1.232** |
+| **3-seg, pinned (SHIPPED)** | −0.52 | +0.52 | −0.36 | −0.82 | +0.31 | −1.10 | **0.665** | **−0.329** |
+
+⭐ **The BIAS column is the diagnostic, not the rms**: hand jitter has no preferred sign, so a
+one-signed residual means the FAMILY is inadequate. Three segments absorbs it.
+
+⚠⚠ **Three parameters against six ESTIMATED points at a 1.08 dB floor is where overfitting lives**,
+so the candidate is explicitly **NOT** justified by its rms. It ships because three things hold at
+once and only the third is a fit statistic:
+1. **EXACT at the one trusted interior position** — a constraint, not a fitted target;
+2. **segment slopes RISE monotonically, 0.172 → 0.368 → 2.413** — a convex, physically-buildable
+   resistive track (`MasterOutTest` FAILS if convexity is lost);
+3. it fits the estimated positions **better than the incumbent (0.665 vs 0.960 rms)** *while
+   carrying a constraint the incumbent does not*.
+
+⛔ **Do NOT add a fourth segment** — (3) is already below the 1.075 dB knob floor, so any further
+rms gain is fitting the hand that turned the knob.
+
+### 146.5 The knob floor was overstated as 0.847, and it is 1.075
+
+s115 quoted **0.847 dB rms, n=4** — pooling the free positions with the **0700 hard stop reading
+exactly 0.000**, which deflates an rms. Split on the PHYSICAL property (does the pot have a
+reference here?), established by GATE S3 *before* any spread here was read:
+
+- **FREE positions: rms 1.075 dB, worst 1.770, n=5** ← the floor the shape is resolved against
+- **MECHANICAL refs: rms 0.000, n=2** ← no freedom, ~0 by construction
+
+s115's own figure **reproduces exactly (0.847) under its own membership rule**, printed as a control.
+
+### 146.6 Shipped, and the known answers
+
+| constant | was → now |
+|---|---|
+| `masterTaperBreak` | 0.5927 → **0.331781** ⚠ **and it CHANGED MEANING — first of two breaks** |
+| `masterTaperFrac` | 0.1137 → **0.056905** |
+| `masterTaperBreak2` | *(new)* → **0.659183** |
+| `masterTaperFrac2` | *(new)* → **0.177468** |
+
+- ✅ **`MasterOut` implements it to 0.0000 dB at five rotations INCLUDING BOTH BREAKS** (the render
+  known answer; a segment-boundary off-by-one shows exactly there and nowhere else).
+- ✅ **`kOutputMakeup` re-derives to 4.3297 — bit-identical to shipped.** It is anchored at
+  master=1.0 where the taper is 1 for every parameter set, so it is **taper-independent by
+  construction**; measured anyway.
+- ✅ **ctest 19/19.** `MasterOutTest` gained a Test 0 (convexity, monotonicity, exact endpoints,
+  A-taper band) and its master set went from `{1.0, 0.5, 0.25}` — which **never touched the top
+  segment at all** — to six values covering all three segments and both breaks.
+- ✅ Noon error **−1.86 → −0.00 dB**; whole-travel worst **1.86 → 1.10 dB**; rms **1.134 → 0.616**
+  (0.6× the floor).
+
+### 146.7 ⚠⚠ THE MEANING CHANGE, AND THE FOUR CONSUMERS IT WOULD HAVE SILENTLY BROKEN
+
+`masterTaperBreak` now means the FIRST of two breaks. Every consumer that rebuilds a two-segment
+curve from it **still runs, still produces plausible numbers, and is silently wrong** — s118's
+*"when a parameter carries two meanings and a fit consumes one of them"*. All were re-pointed in the
+same session: `PedalChain::applyFitParams`, `tests/MasterOutTest.cpp::taperRatio`,
+`analysis/offline_render.cpp`'s `--fit` map, and `analysis/a3_decomposition_gate.py::master_div`
+(which now REQUIRES the two new names rather than defaulting, so divergence is loud).
+
+⚠ **It also caught the tool itself twice.** `master_taper_makeup.py` evaluated its own "SHIPPED"
+row through `pwl2` after the constants changed under it, and its pinned-2 diagnostic **seeded its
+optimiser from `SHIP_XB`** — which, once that value meant something else, landed outside the valid
+region so the "fit" silently returned its start. ⇒ **a candidate's own search must not depend on the
+incumbent's parameterisation.**
+
+### 146.8 GATE O's epoch guard fired correctly and diagnosed WRONGLY — extended
+
+GATE O6b refused `s124_ship.json`, which is right (that report predates the change). But its epoch
+fallback knew only the **power law**, so it reported *"either these captures are not the duplicate
+GATE T3 reports, or the shipped MASTER taper is not rendering as specified"* — two alarming and
+wrong diagnoses. Extended to a LIST of retired forms; it now identifies the epoch to **0.0002 dB**
+(measured −2.7572 vs the retired 2-seg PWL's −2.7574) and says explicitly *"NOT a capture defect and
+NOT a rendering bug — do not go looking for one."*
+⭐ GENERAL: **a guard that names epochs must be EXTENDED every time an epoch ends**, or it degrades
+into a puzzle exactly when it fires.
+
+### ▶ NEXT
+
+1. **Item 6's frame question is still the head item**, untouched by this session — s145's `NEXT` #1
+   (a: not a resonance at all; b: a structure the schematic does not draw).
+2. **Item 5(b)** — ~14.7 dB of gain ahead of node W missing from the model — still the other
+   untested physical branch.
+3. Items 2/4/8/9, AL3's non-monotonicity, the ~2724 Hz tilt zero-crossing, AB6's unowned bridged-T
+   half, AD3's 800 Hz–1 kHz clean-tilt inversion, and s144's top-octave droop decision — unchanged.
+
+### 146.9 The re-baseline, and the mutation control that makes it a result
+
+**`analysis/reports/s146_mastertaper.json`** (162 captures, identical membership to `s124_ship.json`,
+0 from cache — s144's build had already cold-started it).
+
+✅ **Every gated release-gate row is BIT-IDENTICAL to `s124_ship.json`** — all 14 cells, to the
+digit; still **6 rows over SHIP**. That is what a per-row scalar MUST do, since
+`comprehensive_report` fits a null gain per row before differencing.
+
+⚠⚠ **But an unmoved matrix is equally consistent with the constants never reaching the renderer, so
+"unmoved" is only a result once the mutation control fires. It does:**
+
+| master | n rows | fitted null-gain move (s146 − s124) |
+|---|---|---|
+| 0.0 | 4 | **+0.0000** ← endpoint, exact by construction in BOTH tapers |
+| 0.125 | 4 | +0.9725 |
+| 0.25 | 4 | +0.9725 |
+| 0.375 | 4 | −0.1059 |
+| 0.5 | **608** | **−1.8621** (min) |
+| 0.625 | 4 | +0.9523 |
+| 0.75 | 4 | +1.2110 |
+| 0.875 | 4 | +0.3614 |
+| 1.0 | 4 | **+0.0000** ← endpoint, exact by construction in BOTH tapers |
+
+⭐⭐ **Closes from both ends**: the closed-form taper delta at noon is **+1.862 dB** (−20.362 →
+−18.500), and the fitted null gain on 608 report rows moved **−1.8621** — agreement **0.0001 dB**.
+The two endpoints moving **exactly 0.0000** is a second free known answer (both tapers are exact
+there whatever their parameters). **Graded per-band shape moved 3.4e−08 dB**, i.e. float32 storage.
+
+✅ **A3 is untouched**, as the topology requires — MASTER is common-mode between the clean and OD
+paths and cancels in A3's excess. GATE O on the new baseline: **clean-branch bound 0.475 dB vs
+OD-path deficit 4.403 dB** (0.48 / 4.38 on s118).
+
+⭐ **And GATE O6b now passes and doubles as an independent validation of the shipped taper**:
+measured **−3.1186** vs predicted **−3.1189 dB**, agreeing to **0.0003 dB**, through a render path
+sharing nothing with `master_taper_makeup.py`'s own acceptance check.
+
+⚠ **CLAUDE.md crossed its 800-line trigger with this session (810) — re-archiving is the next
+session's first job.**
+
+---
+
+## SESSION 147 (2026-08-04) — CLAUDE.md re-archived on its own 800-line trigger (fourth time), and three stale claims found while compressing
+
+**Doc-only. No measurement, no render, no `src/` change, no constant.** ctest not re-run (nothing
+executable moved). The baseline stays `analysis/reports/s146_mastertaper.json` and the release gate
+stays 6 rows over SHIP.
+
+### 147.1 The trigger and the precondition
+
+CLAUDE.md stood at **815 lines** against its own 800-line rule, which names re-archiving as the next
+session's first job. The precondition that rule sets — *every compressed passage must be verified
+present verbatim in `docs/session-log.md` FIRST* — was checked before any edit: SESSION 142 through
+146 are all present as `## SESSION N` blocks, and spot-checks on the s146 narrative numbers
+(`1.8621`, `3.4e−08`, `0.475 dB`, `Test 0`, the `{1.0, 0.5, 0.25}` master-set widening, `70.2`,
+`15.4 s`) all resolved in the log.
+
+**Result: 815 → 773 lines.** The CLOSED/REFUTED and SHIPPED CONSTANTS tables were not touched, as in
+every prior pass — they are the load-bearing content.
+
+### 147.2 What was compressed
+
+- **The re-archive history block** in "Where we are" — the s146 "over the trigger" warning was spent
+  and became a fourth entry in the ✅ RE-ARCHIVED line.
+- **The STATUS baseline bullet** — merged with the separate "s146 shipped four constants ⇒
+  `s124_ship.json` is a stale epoch" bullet, which had already been discharged (`✅ DONE —
+  re-baselined`). The mutation-control numbers that make "the matrix did not move" a result rather
+  than a vacuous pass were kept; the derivation pointer replaced the derivation.
+- **The sessions-129–145 bullet** — the thirteen gate tool filenames were removed because each is
+  already the pointer column of its own CLOSED/REFUTED row; the bullet now says so explicitly.
+- **The ctest bullet** — s146's `MasterOutTest` narrative compressed, `PerfBenchmark`'s `RUN_SERIAL`
+  prohibition kept in full.
+- **Open items 3, 5, 9 and the ✅ DONE item 7** — prose only; every number, prohibition and pointer
+  retained.
+- **Open item 6** — the named structural cause (it grows a paragraph per session). 135 → ~120 lines,
+  all four tables (W6 features, bass peak, the six candidate gates, the refuted classes, AB6's
+  sub-targets, the depth axis) untouched. What compressed was the prose around them, most of which
+  restated a refuted-table row in the same file — notably the AL5 band and the AM census, which were
+  a paragraph each *and* a row each.
+
+⚠ **One compression was attempted and REVERTED**: the Build-sequence steps 1–8, which are COMPLETE
+and re-read every session. The replacement claimed *"the full template wording is in
+`docs/session-log.md`"* and that is **false** — `grep` returns 0 for "Switch topologies" and
+"Full-chain integration". That is exactly the precondition the discipline rule exists to enforce, so
+the original was restored rather than the pointer being fixed. ⇒ **if a future pass wants those 27
+lines, it must archive them here first.**
+
+### 147.3 Three stale claims found while compressing — the reason a re-archive is not clerical
+
+All three are the project's own `a-backlog-line-can-outlive-its-own-dissolution` pattern, and all
+three were found only because compressing forces you to read every sentence.
+
+1. ⛔⛔ **The A3 corollary block named *"open-work item 6's dynamic-sag candidate"* as A3's most
+   likely carrier. That candidate is REFUTED — twice**, and both refutations are rows in the same
+   file: s125 (dynamic R19 supply sag shifting the `C14∥R18` corner — the closed-loop corner is
+   6.29 kHz, not the 2.19 kHz bare pole, and it moves the peak **UP** where the pedal walks down) and
+   s138 (the clipper's own `a0` sag — its sign **flips with the GRUNT switch** and the defect's does
+   not). The block's conclusion survives — item 6 *is* A3's dynamic half — but the **mechanism noun**
+   had to go, because a session reading that sentence would inherit a refuted carrier. Corrected in
+   place with an explicit ⛔ note naming both refutations, and a CLOSED/REFUTED row added.
+2. ⛔ **The same block quoted `D(f)` rms as 3.01 dB, twice** — the s109-era value, which CLAUDE.md's
+   own CLOSED/REFUTED table marks **STALE** with *"⛔ Do not re-quote 3.01"* (current 2.53/2.65/2.64
+   on the three valid baselines). `verify-the-CONSTANT-not-the-prose`, committed inside the file that
+   carries the rule. Now quotes 2.64 with a pointer to its row.
+3. ⚠ **The s120 `gain-n18` MASTER ladder was recorded in "Capture access status" as *"Not yet
+   analysed — re-running `analysis/master_taper_makeup.py` against it is open work item 7 above"*.**
+   Item 7 CLOSED at s146 and that ladder is precisely what it analysed. Corrected to record what the
+   ladder actually bought: **≤0.593 dB of movement against a 1.075 dB knob floor**, i.e. necessary
+   but not sufficient — what resolved the taper was the user's later trust statement.
+
+⇒ the generalisable point, which is already in `measurement-discipline.md` §1 in two forms
+(`a-refutation-has-to-land-where-the-thing-is-CHOSEN`, s124; `a-backlog-line-can-outlive-its-own-
+dissolution-by-70-sessions`, s108): **a refutation lands in the table and not in the prose that cites
+the refuted thing**, and CLAUDE.md is now the fourth file in this project where that has happened
+(after `FitParams.h`'s enum, `circuit.md`'s clipSat paragraph, and the GRUNT/LEVEL summary table).
+
+### 147.4 Headroom
+
+⚠ **STALE AS OF SESSION 148 — the trigger was raised to 1200 lines (target still under 800), so the
+"27 lines" below is a s147-era reading, not the live rule.** CLAUDE.md's own discipline block is the
+authority. Left in place because a session-log block is a historical record.
+
+773 lines leaves **27 lines** before the trigger fires again — roughly two to three sessions at item
+6's historical growth rate. ⚠ The structural fix remains the one s136 named and s143/s147 have now
+each hit: **when item 6 gains a result, add a ROW to its refuted table or edit an existing gate —
+never a new paragraph to its body.** Every pass so far has been able to compress item 6 only by
+deleting prose that duplicated a row that already existed.
+
+---
+
+## SESSION 148 (2026-08-04) — GATE AN: the "every named carrier is refuted" claim was OVERSTATED, and the carrier it missed is now refuted three ways
+
+**No `src/` change, no constant, no render, no rebuild.** ctest not re-run (nothing executable
+moved). The baseline stays `analysis/reports/s146_mastertaper.json` and the release gate stays 6 rows
+over SHIP. New: `analysis/jfet_rout_tilt_gate.py` (GATE AN), `analysis/_mutate_gate_an.py` (13/13),
+`analysis/reports/s148_jfet_rout_tilt.json`.
+
+### 148.1 The documentation-discipline change (user request, done first)
+
+CLAUDE.md's re-archive rule was **exceeds 800 lines ⇒ re-archive**. Raised to **exceeds 1200 lines
+⇒ re-archive, compressing to under 800**. The target did not move; only the trigger did, so a
+session gets more room before compression is mandatory without changing how compressed the file
+should be once it happens. The file stood at 777 lines when the change was made, so the change is
+not a response to being over. The historical ✅ RE-ARCHIVED line (s136/141/143/147, all fired on the
+old 800 trigger) was deliberately left alone — it is an accurate record of past events.
+
+⚠ **s147.4's "Headroom" paragraph is now stale by construction** — it says *"773 lines leaves 27
+lines before the trigger fires again"*, which was true at s147 and is not the live rule. Annotated in
+place rather than rewritten, since a session-log block is a historical record. The live rule is
+CLAUDE.md's own.
+
+### 148.2 Why GATE AN exists — a headline that had gone further than its evidence
+
+Sessions 139/140 closed with *"EVERY named carrier on both sides of the clipper is now refuted"*, and
+s145's GATE AM then censused the chain for resonances and found none at or upstream of the clipper.
+That pair is what turned item 6's head item into a FRAME question. Grounding branch (a) — *"gate 5's
+real-pole bound and gate 6's rising-with-frequency spec have to be satisfied by something else … two
+poles the model lacks"* — turned up a carrier that is none of the refuted ones:
+
+**`ro` and `rq2` — Q1's drain output resistance and Q2's active-load output resistance — sagging
+with the operating-point current.** Three facts, each checked rather than assumed:
+
+1. Both are **shipped fit parameters** (`jfetRo` = 200.00 k, `jfetRq2` = 1000.00 k).
+2. Both are **STATIC in the model** — AN1b brace-matches `JfetStage.h` and finds the only mutations
+   at lines 268/269 inside `setNonlinear`, never in `process()`. The mechanism is genuinely absent.
+3. A drive-dependent drain output resistance appears in **no CLOSED/REFUTED row, nowhere in
+   `docs/session-log.md`, and in no gate.** `grep` for "ro sag" / "output resistance" over the log,
+   CLAUDE.md, the rules and `analysis/*.py` returns nothing.
+
+⭐⭐ **And the tell was inside GATE AK itself: its own mechanism function is
+`drain_db(gm, ro, rq2, zin)` — it takes `ro` and `rq2` as arguments and never moved either.** AK
+swept `GM_SAG_FRACS` only. So the exhaustiveness claim was a claim about the carriers that had been
+*named*, and it read as a claim about the space.
+
+### 148.3 Why it is a genuinely different carrier from AK's route 2
+
+From `JfetStage.h`'s own class note, `k(s) = 1 + gm·Zs` with `Zs = R6∥C3`, `Gm = gm/k`,
+`Rout = ro·k`, and the drain-node block is `T = Gm(f)·(Zout(f) ∥ Zin_ladder(f))`.
+
+**`ro` does not appear in `k(s)` at all.** AK's `gm` sag acts *through the shelf*, whose corners are
+the zero at 219.2 Hz and the pole at 291.6 Hz — a decade below the 2935 Hz vertex, which is exactly
+why route 2 falls as f^−1.884 and reaches 2.46 %. An `ro`/`rq2` change instead scales `Zout` **flat
+in frequency**, so its whole frequency dependence comes from the **divider against `Zin_ladder(f)`**
+— a multi-pole network with structure at the vertex, and therefore the one place gate 5's
+single-pole bound could be beaten without a resonance (a divider against N poles is not one moving
+pole). That was the reason to screen it rather than assume AK covered it.
+
+⭐ **The mechanism is ONE-parameter, and that is physics rather than a modelling choice.** A JFET's
+output resistance is `ro = 1/(λ·Id)`; Q2 is the active load whose source *is* Q1's drain
+(`circuit.md`), so it carries the same drain current. One Id therefore scales both. AN1c asserts the
+consequence exactly: **`Zout` is homogeneous of degree 1 in the common factor L** (worst relative
+departure **0.0** over L = 1e−3 … 1e3), which is what makes the two limits a genuine bracket.
+
+### 148.4 Known answers (AN1) — five, all at 0.0 or machine precision
+
+| # | claim | measured | bar |
+|---|---|---|---|
+| a | a wild L-independent block cancels from the tilt CHANGE (the no-render licence, AI1c) | **0.0** | 1e−9 |
+| b | the tilt estimator recovers an injected tilt over T = 0 / −1.199 / +3 | **0.0** | 1e−9 |
+| c | `Zout` is homogeneous degree 1 in L | **0.0** | 1e−9 |
+| d | ladder `Zin` is probe-independent (1 k vs 47 k probes) | **0.0** | 1e−9 |
+| e | at L → ∞ the block **is** `Gm · Zin_ladder`, computed with no divider at all | **0.0** (−1.279893 both ways) | 1e−9 |
+
+(e) is the one worth naming: AN2's ceiling and AN3's most-favourable probe are both read at that
+limit, so a free known answer on the limit itself is what stops the ceiling being an artefact.
+
+### 148.5 THE RESULT — three refutations that INTERLOCK, so no choice of direction rescues it
+
+The mechanism is bracketed by its two limits, and each direction fails on a *different* axis:
+
+| direction | Δtilt at the vertex | reach vs AH7's budget | sign | shape (endpoint exponent) |
+|---|---|---|---|---|
+| `L → ∞` (ro rises, Id falls) | **−0.008322** dB/oct | **0.694 %** | ✅ right | −1.9193 |
+| `L → 0` (ro falls, Id rises) | **+1.275329** dB/oct | 106.4 % | ⛔ wrong, **10/10 centres** | −1.3012 |
+| full span between the limits | 1.283651 | 107.1 % | — | — |
+
+⇒ **the direction with the right SIGN reaches 0.694 % of budget**, at a limit past any physical sag;
+**the direction that REACHES has the wrong sign at every one of AL4's 10 limb centres**; and **both
+directions FALL with frequency (−1.301 at the most favourable probe) where the deficit RISES
+(+2.779)**. Gate 5 FAIL, gate 6 FAIL, gate 4 PASS (3/3, spread 6.6e−14 — free, the J201 is upstream
+of the switch), gate 3 PASS by construction (OD-only).
+
+⭐⭐ **Because both directions fail on shape, the physical direction of the Id shift cannot change
+the verdict — so the shaper-rectification measurement that would decide it is NOT owed.** That was
+the design intent of bracketing at limits rather than fitting a sag: it makes the expensive question
+unnecessary.
+
+⚠ AN3 is gated on the reading **most favourable to the candidate** (AJ2c's discipline). A first
+draft read the shape at `L → ∞` only, which a reader could fairly object is the direction that
+happens to fail; four probes are now taken (a small perturbation each way, plus both limits) and the
+verdict is decided by whichever gives the largest exponent. It is still −1.301.
+
+### 148.6 ⭐⭐⭐ AN3b — THE ROOT CAUSE, and it explains three refutations at once
+
+Measured at 2402.4 Hz on the shipped cascade:
+
+- `|Zin_ladder|` = **6.14 k**, slope **−1.755 dB/oct** — the ladder is **capacitive** at the vertex.
+- `|Zout_drain|` = **167.12 k**, slope −0.032 dB/oct — essentially flat.
+- ratio **Zout/Zin = 27.2**.
+
+Two consequences, and both are structural rather than numerical. **(i)** The drain node is *already*
+27:1 into a current-source regime, so the *raising* direction has almost no lever left — which is
+the 0.694 %, derived rather than merely observed. **(ii)** A divider perturbation scales as
+`Zin/Zout`, and `|Zin|` falls at −1.75 dB/oct, so the mechanism's tilt change **must** fall with
+frequency.
+
+⇒ **AK's route 2 (f^−1.884), AJ's moving-pole class (f^−1.9) and AN's `ro` sag (f^−1.92 at small
+perturbation) all fall with the same exponent because they share ONE cause: every one of them acts
+by perturbing the drain-node source impedance against a load that is capacitive at the vertex.**
+That is the same shape of finding as AK's own "the shelf corners a decade below the vertex" — three
+routes computed differently agreeing because one geometric fact dominates all of them.
+⚠ Stated as the structural reading it is: a shared regime measured on the shipped cascade at ONE
+feature. It is **not** a proof about unnamed mechanisms, and must not be quoted as one.
+
+### 148.7 Two defects in this session's own instrument, both found by the mutation runner
+
+1. ⚠⚠ **AN1b's first draft reported "NOT ESTABLISHED STATIC" against a model that is static** — a
+   false alarm on the gate's own load-bearing premise. It attributed each assignment to the last
+   line matching a one-line function-signature regex, and got **both** sites wrong: `setNonlinear`'s
+   signature spans two lines (`noexcept` on the second), so the regex never matched it and `ro = Ro`
+   was attributed to the preceding `prepare`; and the member **declaration**
+   `double gm = kGm, ro = kRo, …` was counted as a mutation, attributed to an enclosing `if`.
+   ⇒ **parsing C++ scope with a line regex was the defect.** Repaired by brace-matching the two
+   named non-realtime setters and excluding declaration statements. s110's *suspect the check before
+   the code*, fired on the check — and the arm that proves the repair (plant `ro = ro * 1.0001;`
+   inside `process()` in a scratch copy) is the one that exposed it.
+2. ⚠ **The AN4 arm was VACUOUS on its first run** and read as `NARRATED` against a working guard. It
+   made the drain block GRUNT-dependent via `L_LIMIT_HI * (cg/cut)` — and `1e9 × 1` and `1e9 × 60`
+   are *both* the L → ∞ limit, so all three positions landed on the identical value and the spread
+   stayed at 1e−14. Fixed by using a moderate L so the cap ratio binds. s110 again, in its
+   "a mutation on a threshold nowhere near the data does nothing" form.
+
+⚠ Neither defect touched `src/`: the AN1b arm re-points the gate's `JFET_SRC` at a patched copy in
+scratch, and `git status` confirms `src/dsp/JfetStage.h` is unmodified.
+
+### 148.8 The stale claim, corrected where it is quoted
+
+*"EVERY named carrier on both sides of the clipper is now refuted"* appears in CLAUDE.md's STATUS
+block, in two CLOSED/REFUTED rows, and in item 6's own body. It is now **true again** — but only
+because this session refuted the carrier it had missed, and it was not true when it was written. The
+correction added is the generalisable half: **the claim is about carriers that have been NAMED, not
+about the space of carriers**, and the way to test it is to look for a shipped parameter that a
+prior gate's own mechanism function accepts and never moved.
+
+### ▶ NEXT
+
+1. **Item 6's frame question is still the head item, and branch (a) is now better constrained.**
+   AN3b says any mechanism acting on the **drain-node source impedance** is spent at the vertex,
+   because the ladder is capacitive there — so a viable carrier on the pre-clipper side must act
+   somewhere that is *not* that divider. Combined with AM (no resonance at/upstream of the clipper,
+   at any component values) and gate 6 (structure needed at or above ~2.9 kHz), the pre-clipper
+   space is now very tight, which strengthens s145's branch **(b)** — a structure the schematic does
+   not draw. ⚠ (b) still needs a mechanism, not a licence.
+2. ⭐ **The audit that found this carrier is repeatable and cheap, and should be run before trusting
+   any other exhaustiveness claim**: for each gate that screened a stage, list the parameters its
+   own mechanism function ACCEPTS and diff against the ones it actually SWEPT. AK accepted
+   `(gm, ro, rq2)` and swept `gm`. Worth doing for AI (`a0`, the GRUNT caps) and AJ.
+3. **Item 5(b)** — ~14.7 dB of gain ahead of node W missing from the model — still the other
+   untested physical branch, untouched by this session.
+4. Items 2/4/8/9, AL3's non-monotonicity, the ~2724 Hz tilt zero-crossing, AB6's unowned bridged-T
+   half, AD3's 800 Hz–1 kHz clean-tilt inversion, and s144's top-octave droop decision — unchanged.
+
+⚠ **Uncommitted at this point: sessions 142, 143, 144, 145, 146, 147 and 148 together.**
+
+## SESSION 149 (2026-08-04) — GATE AO: s148's audit, mechanised — and it found a DEFECT in the shared input of three gates, not another carrier
+
+**No `src/` change, no constant, no render, no rebuild.** ctest not re-run (nothing executable
+moved). Baseline stays `analysis/reports/s146_mastertaper.json`; the release gate stays 6 rows over
+SHIP. New: `analysis/ladder_epoch_gate.py` (GATE AO), `analysis/_mutate_gate_ao.py` (**11/11**),
+`analysis/reports/s149_ladder_epoch.json`. Changed: `analysis/pre_clipper_tilt_gate.py`
+(`ladder_kwargs` / `ladder_divergence` / `ladder_zin`, plus a new **AJ1e** epoch guard). The three
+canonical reports `s139` / `s140` / `s148` were regenerated at the corrected default.
+
+### 149.1 Running s148's own `NEXT` #2, and what it turned up
+
+s148 handed forward a repeatable audit: *for each gate that screened a stage, list the parameters its
+own mechanism function ACCEPTS and diff against the ones it actually SWEPT.* AO2 **mechanises** it —
+an `ast` pass over the gate modules rather than a reading — and runs it over AI, AJ, AK and AN.
+
+Of GATE AK's `drain_db(gm, ro, rq2, zin)`, s148 covered `ro`/`rq2`. **`zin` is the fourth**, and
+tracing where it comes from is what produced this session's result: `AJ.ladder_zin` called
+
+    h0 = EQ.treble_attack_tf(f, position)          # <- no element values passed at all
+
+i.e. **`eq_reference`'s DRAWN defaults**. Sessions 99/100 re-fitted **17** treble/ATTACK constants
+and changed the topology (R8/R11 became a tap ladder the switch selects from, the C5 leg gained a
+damping resistor, `trebleC8` ships at **0** — C8 out of circuit entirely). Measured, **11 of 12
+values differ**: R7 **×8.23**, R12 ×3.99, R14 ×2.20, C5 ×0.362, C9 ×0.583, C6 **×0.063**,
+C7 **×0.0076**, C8 → 0, R8 ×1.73, R11 ×0.514, RdampC5 0 → 15.37 k. Only R13 is unchanged.
+
+⭐⭐ **GATE AM had hit exactly this trap and guarded it** — AM1a's shipped-vs-drawn divergence guard
+`_die`s if too few values differ, with a comment saying in as many words that censusing the drawn
+network while calling it shipped would be `verify-the-BASELINE-not-its-LABEL`. GATE AJ, and through
+`ladder_zin` also GATE AK and GATE AN, had no such guard.
+
+⭐⭐⭐ **WHY NOTHING CAUGHT IT, WHICH IS THE GENERALISABLE HALF.** AJ *did* have a known answer on
+`ladder_zin` — AJ1d, probe-independence, 1 k vs 47 k, passing at 3.9e−14. That check validates the
+**extraction** and is satisfied by *any* network whatsoever, because **both sides share the element
+set as INPUT**. It is s145 AM1a's lesson in a second guise: *for any known answer of the form "my
+implementation agrees with a trusted one", the shared input is precisely what the check cannot
+validate, and it needs its own guard.*
+
+### 149.2 The consequence, MEASURED both ways (s139's GRUNT-cap discipline)
+
+The fix makes the element set a parameter (`ladder_kwargs`, imported from `resonance_census` rather
+than transcribed) defaulting to **shipped**, with `drawn` kept reachable so every pre-s149 number
+stays reproducible. AO3 then runs AJ, AK and AN **twice each in isolated subprocesses**
+(`B7K_LADDER_VALS`) and diffs every numeric leaf — isolation deliberate, because a module-level flag
+mutated in-process is s133's thread-race trap.
+
+| gate | leaves moved | bit-identical | verdict |
+|---|---|---|---|
+| AJ | 8 | 97 | unchanged |
+| AK | 26 | 39 | unchanged |
+| AN | 75 | 56 | unchanged |
+
+⭐ **All three verdicts hold.** That is a measurement, not the argument that was available
+beforehand — and the reason it holds is worth recording:
+
+⭐⭐ **AJ's GRADED columns are BIT-IDENTICAL** — `aj2.reach` 0.00166351, `aj2.exponent` 2.84139 and
+the required 388.297 pF all reproduce exactly, because the reach is taken at an **absolute 10 pF
+ceiling** and the exponent bound is **analytic**. Neither ever touched `zin`. **The defect reached
+the EXPLANATORY columns only, which is exactly why it survived ten sessions: nothing that was gated
+on moved.**
+
+### 149.3 The three published numbers that are wrong
+
+| quantity | published (drawn) | correct (shipped) |
+|---|---|---|
+| `\|Zin_ladder\|` at the vertex | 6.136 k | **33.630 k** |
+| slope of `\|Zin\|` at the vertex | −1.755 dB/oct | **−0.455 dB/oct** |
+| `Zout/Zin` (AN3b's root cause) | 27.23 | **4.97** |
+| `\|A\| = gm·\|Zd\|` (AJ2's Miller premise) | 0.565 (**<1**) | **2.778 (>1)** |
+| Miller factor | 1.565 | **3.778** |
+| available Cin at 2.5× datasheet max | 4.85 pF | **8.17 pF** |
+| required/available margin | 80.1× | **47.5×** |
+
+⛔ **AJ2's stated reason is INVERTED.** *"The stage has |A| = 0.565 < 1, so the Miller factor is
+1.565 and the candidate reduces to the bare junction capacitance"* is false on the shipped ladder:
+there **is** Miller multiplication, ×3.778. The **verdict survives** — 388.3 pF required against
+8.17 pF available is still 47.5× short, and AJ2c's `≤ 2` exponent bound is analytic and untouched —
+but the sentence must be re-quoted. ⚠ AO4 imports these from AO3's own two AJ reports rather than
+recomputing them: a first draft recomputed `|A|` at AN3b's probe frequency and got **0.595/2.811**
+against AJ's **0.565/2.778** — plausible, monotone and **mislabelled**
+(`a recovered derived number can be right in value and wrong in label`, s116).
+
+⚠ **AN3b's root cause is much weaker and must be re-quoted.** The drain node is **5:1** into a
+current-source regime, not 27:1, and the ladder is only mildly capacitive at the vertex (−0.455, not
+−1.755 dB/oct). The *conclusion* stands — all three routes still FALL with frequency (AK −1.871,
+AN −1.777) against a deficit that RISES (+2.779) — but *"one geometric fact dominates all of them"*
+is a weaker claim at 5:1 than at 27:1.
+
+⭐⭐ **AND GATE AN IS STRENGTHENED.** The direction that used to reach **106.4 %** of budget now
+reaches **23.0 %**, so **neither** direction reaches and AN's size refutation no longer leans on the
+sign argument at all. The sign-admissible direction goes 0.694 % → **1.334 %**, still tiny. The
+wrong-sign-at-10/10 result and `endpoint_exp_deficit` +2.779 are unchanged.
+
+### 149.4 ⭐⭐ The audit's standing output — `zin` is KA-ONLY, on the side that is NOT spent
+
+AO2's first draft classified parameters purely textually ("≥ 2 distinct expressions ⇒ SWEPT") and
+reported `drain_db(zin)` as **SWEPT** — because AN passes `inf` for it. That `inf` occurs **only
+inside `gate_an1`, AK/AN's known-answer sub-gate** (the current-source limit). Being moved in a
+known answer is not being screened as a mechanism, and this session's headline turns on the
+difference, so the classifier now records the **enclosing function** of every call site and emits a
+fourth class, **KA-ONLY**, against a declared pattern (`^gate_[a-z]{2}1[a-z]?$`) that is printed
+every run. A second pass handles the mirror-image false positive: `h_at(a0)`/`h_at(cg)` are swept
+**through AI's `mech_db` wrapper**, so a parameter SWEPT on another audited function of the same
+module is re-tagged **SWEPT-VIA-WRAPPER**. Both classes are exercised by AO2's own synthetic known
+answer, which covers all four outcomes.
+
+⇒ `drain_db(zin)` reads **KA-ONLY**: accepted, and never moved as a mechanism by anything.
+
+⭐⭐⭐ **AND AO1c's EXACT IDENTITY SAYS THAT IS THE INTERESTING SIDE.** For `Zd = Zout ∥ Zin`,
+
+    d ln Zd / d ln Zin  =  Zout/(Zout+Zin)  =  S_zin
+    d ln Zd / d ln Zout =  Zin /(Zout+Zin)  =  S_zout,      S_zin + S_zout = 1  EXACTLY
+
+— a free known answer with no threshold, AB3's "the columns must sum to −1" in a second guise
+(measured 3.3e−16, and each matching a finite difference). At the shipped ladder it reads
+**S_zin 0.836 / S_zout 0.168 ⇒ the LOAD side carries 4.97× the lever of the SOURCE side** — and
+**every carrier screened so far acts on the SOURCE side**: AK's gm-through-`Zout`, AJ's moving-pole
+class, AN's `ro`/`rq2`. So AN3b, written as a refutation (*"any drain-node source-impedance
+perturbation is spent"*), read as a **specification** points at the one place on this side the
+spent-divider argument does not reach. ⚠ **NOT screened here** — GATE AO establishes that the lever
+exists, is unswept, and is ~5× the source-side one. It does not name a physical carrier for a
+drive-dependent ladder `Zin`, and the honest candidate list is thin (film-cap voltage coefficients
+on caps that are near-shorts at the vertex; IC2_A's input capacitance).
+
+### 149.5 Instrument
+
+11 known answers / guards, 11/11 mutation arms. AO1: the divergence guard (**11/12**, the guard whose
+absence is the finding); probe-independence at **both** element sets (3.9e−14 / 1.6e−13); the divider
+identity (3.3e−16, plus a finite-difference cross-check); the current-source limit at both sets
+(3.1e−10 / 9.8e−10). AO2 carries a synthetic known answer over all four classes. AO3 refuses on a
+**zero** diff (the two sets differ in 11 of 12 values, so a zero diff can only mean the switch never
+reached the gate — s110's vacuous-mutation lesson) and on a missing graded key. Two arms are
+computed-verdict arms (rc = 0): one forces a verdict to differ between the runs so *"every verdict
+holds"* can become *"A VERDICT CHANGED"*, the other moves AJ's graded reach so
+*"aj_graded_identical"* can become False — s128's rule that a reassurance which cannot fail is
+narration.
+
+⚠ **AJ now carries the guard too (AJ1e).** A correction is only complete once the gate that USES the
+value refuses as well; GATE AO finding it is not the same as GATE AJ being unable to regress.
+
+### ▶ NEXT
+
+1. ⭐⭐ **Item 6's pre-clipper side has one unscreened lever left, and it is now specified rather
+   than guessed: a drive-dependent treble-ladder `Zin`** (AO4). It clears the geometric objection
+   that killed the source-side carriers (4.97× the lever), and `|Zin|`'s slope at the vertex is only
+   −0.455 dB/oct, so it is not automatically shape-refuted the way the source-side routes were.
+   ⚠ But gate 5's `≤ 2` bound still applies to any **single** element drift, and AM2 established the
+   ladder is all-real-pole — so the screen should start from *"which perturbation of this network can
+   rise as f^+2.8 at all"*, not from a component list. If the answer is none, that is a **stronger**
+   result than another element refutation and it closes the pre-clipper side properly.
+2. ⭐ **Run AO2's audit over the gates it does not cover.** It currently reads AI/AJ/AK/AN; AB, AF,
+   AL and AM have mechanism functions too, and the audit is now one table entry each.
+3. **Re-quote the three numbers in 149.3 wherever they appear.** Done in CLAUDE.md and here; ⚠ the
+   `|A| = 0.565 < 1` phrasing also sits in `pre_clipper_tilt_gate.py`'s own docstring and in item 6's
+   refuted-class table — both corrected this session, but grep before quoting.
+4. **Item 5(b)** — ~14.7 dB of gain ahead of node W missing from the model — still the other
+   untested physical branch, untouched.
+5. Items 2/4/8/9, AL3's non-monotonicity, the ~2724 Hz tilt zero-crossing, AB6's unowned bridged-T
+   half, AD3's 800 Hz–1 kHz clean-tilt inversion, and s144's top-octave droop decision — unchanged.
+
+⚠ **Uncommitted at this point: sessions 142–149 together.**
