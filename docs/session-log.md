@@ -19875,3 +19875,106 @@ read-only probe (no capture, no `src/` change). `CLAUDE.md` item 11 updated with
 1. Task A — `OdToneRestore` Cut-row Q. 2-iteration cap.
 2. Task E — item 6's artificial treble-peak-slope correction. 3-session cap.
 3. Task D — LEVEL-law artificial correction. 1 fit, no release-gate expectation.
+
+---
+
+## SESSION 161 (2026-08-05) — the s160 task list opens: sessions 157–159 committed, and task A (the GRUNT-Cut shoulder section) is built, screened and REFUTED at a cost of one of its two permitted iterations
+
+**User framing.** *"OK lets start closing everything out and getting this ship ready."* Put to the
+user with the state measured first: the tree builds clean, ctest is 19/19, the release
+infrastructure (CI, three installers, signing hooks) is complete with no placeholders — and the
+**Phase-9 exit criterion is not reachable**, because the gate agreed at s89 is still **6 rows over
+SHIP** and none of the remaining work list is expected to close any of them (task D cannot by
+construction, task A's own acceptance is "gate no worse", only task E has any plausible effect).
+**User decision: do all of A + D + E, then ship.** This session: commit 157–159, start task A.
+
+### 1. Sessions 157–159 committed
+
+They were sitting uncommitted: comment-only edits to `OdToneRestore.h` and
+`measurement-discipline.md` plus six new analysis files (GATEs AU/AV/AW and their mutation
+runners). No DSP behaviour in any of it. Committed as `1e42a33`.
+
+### 2. Task A — the question, and why the obvious first answer was wrong
+
+`OdToneRestore.h` has said since s151 that the Cut row's Q residual is STRUCTURAL and that
+*"narrowing it needs a second section shaping the SHOULDERS"*; GATE AQ's AQ2 (s153) turned that
+from a stall into a measurement (one section's Q swept to 120 with the depth re-solved, pedal Q
+attainable in 21 of 26 cells, all 5 failures in Cut). s160 authorised building it, Cut only,
+2-iteration cap.
+
+**Probe 1 — reachability. The premise is right.** A second broad peaking section at the null's own
+centre lifts the attainable composite Q past the pedal's at **9 of 9** Cut cells (one section: 5 of
+9). ⚠ But every maximum sat on the search box corner (+14 dB at Q 3.0) —
+`bound-resting-means-unidentified`, and a warning that optimising the Q scalar alone drives to a
+shape with large humps the statistic cannot see.
+
+**Probe 2 — does the CURVE want one?** On `fit_rung`'s own objective a free third section buys a
+**median 0.080 dB** of fit. The 320 Hz notch term buys **1.56 dB**; s156 **rejected** the ~800 Hz
+candidate at **0.058 dB**. Its fitted gain runs +4.92 / +6.43 / +10.23 / +16.16 / +6.51 / +6.67 /
++6.59 / **−6.00** / **−6.00** — it changes sign, and two rest on a bound. Separability from the
+discarded A3 trend at the fitted Q is 0.37–0.70, between the notch term's 0.85 and the refuted peak
+term's 0.31, so it does not settle the question on its own.
+
+**Probe 3 — and here is the mistake worth recording.** Solving the pair to hit the pedal's depth
+AND Q, then reading the curve, gave **1.286 → 0.780 dB** mean rms — a decisive-looking win, and it
+was written up as one for about a minute. It is not attributable: it compares the SHIPPED tables
+against a solve that re-fits two constants *while* adding a section
+(`verify-the-BASELINE-not-its-LABEL`).
+
+**Probe 4 — the control that settles it.** Re-solving the EXISTING two-section family against the
+same two targets (GATE AQ's own `solve_gain_q`, imported) gives mean curve rms **1.167 dB**, against
+**1.257** shipped and **1.222** with the third section. ⇒ **the third section LOSES to simply
+re-fitting what is already there**, and beats it in only 3 of 9 cells. The 3 it wins are the DRIVE
+0.5 cells AQ2 named; it loses at DRIVE 1.0, where it wants a NEGATIVE broad gain.
+
+**Probe 5/6 — the shipping form, and the candidate's fairest shot.** The stage carries one entry per
+(GRUNT, DRIVE), so the graded object is one (cut, broad) pair per DRIVE rung across all three
+stimulus sweeps (AR3's distinction: the right statistic for the shipping question, the wrong one for
+a mechanism claim). With both its Q and its gain swept and the cut re-solved so the depth holds, it
+moves mean |Q error| **0.97 → 0.81, 4.09 → 3.05, 5.15 → 3.49** — real, nowhere near "below the
+reader's resolution", and it **costs** depth error at two of three rungs. The table it asks for has
+no law: gain **−13.0 / +10.0 / −13.0**, Q **4.5 / 1.5 / 9.0**.
+
+### 3. The reason no second iteration is owed
+
+AQ2b had already measured that the pedal's own null Q spans 1.29x–2.93x across stimulus at fixed
+(GRUNT, DRIVE). Stated in the units the acceptance criterion is written in, that becomes decisive:
+
+| DRIVE | pedal Q across the three sweeps | spread | shipped \|Q err\| |
+|---|---|---|---|
+| 0.00 | 6.45 / 5.75 / 4.99 | 1.46 | **0.98** |
+| 0.50 | 13.91 / 10.53 / 8.39 | 5.52 | **4.04** |
+| 1.00 | 19.89 / 12.10 / 9.69 | 10.20 | **5.19** |
+
+**The shipped error is already smaller than the target's own across-stimulus spread at 3 of 3
+rungs.** A knob-keyed entry is inside the ambiguity of the thing it is fitting, so *"closer to the
+pedal's Q"* is not well defined for any single number, whatever family produces it. That is s151
+§6's architectural limit on a **fourth** axis, after AQ2b's Q, AR6's metric residual and AU's peak
+gain — and AQ2b had already said to read it as an argument for leaving `kNotchQ` alone.
+
+⇒ per the user's own stop condition (*"ship the better of the two and close"*), the better is the
+current state: the candidate is worse on depth at two rungs and meets the Q bar at none. **Nothing
+in `src/` changes except a comment block**, so CLEAN is bit-identical trivially and the release gate
+cannot move.
+
+### 4. The gate, and a defect it found in itself
+
+Consolidated into `analysis/notch_shoulder_gate.py` (GATE AX, arms AX1–AX6) with
+`analysis/_mutate_gate_ax.py` (**9/9 arms**, six computed-verdict). ⭐ The runner earned its place on
+its first run: **AX3 printed *"it CHANGES SIGN"* unconditionally**, i.e.
+`computed-verdicts-not-narrated` committed inside a gate written to apply that rule to someone else.
+Fixed to compute the wording, and the arm that caught it re-anchored onto AX5's own distinctive
+string (the two sub-gates legitimately report sign changes of *different* quantities in one run, and
+the first draft of that arm armed on the shared phrase and duly failed against a correct gate).
+
+⚠ SCOPE, stated at the gate and at the constant: this refutes **a second peaking section at the
+null's own centre** — the family s151/s153 named and the user authorised. It does not refute every
+conceivable shoulder treatment (two off-centre sections, an asymmetric or non-biquad shape). What
+§3 bounds is the VALUE of all of them.
+
+### ▶ NEXT
+
+1. **Task D** — LEVEL-law artificial correction. 1 fit, no release-gate expectation.
+2. **Task E** — item 6's artificial treble-peak-slope correction. 3-session cap.
+3. Then Phase 10: final control sweep, version bump, README, close Phase 9 on the record with the
+   gate documented as-is, dry-run the installers, cut the release.

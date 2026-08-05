@@ -210,6 +210,41 @@ private:
     // adding a few dB at the centre cannot narrow a null that is already 14 dB deep
     // and broad. Narrowing it needs a second section shaping the SHOULDERS. Do not
     // spend more gain iterations on it.
+    // ⛔⛔ AND THAT SECOND SECTION WAS BUILT, SCREENED AND REFUTED — SESSION 161, GATE AX
+    // (`analysis/notch_shoulder_gate.py`).  User-authorised as task A with a 2-iteration cap;
+    // it cost one, and NOTHING SHIPPED.  Read this before adding any section here.
+    //   ⭐ The sentence above is CONFIRMED on the axis it was written about: with a second
+    //     section present the pedal's Q is reachable at **9 of 9** Cut cells against **5 of 9**
+    //     for one section (AX2).  So s151's "structural" claim and AQ2's measurement both stand.
+    //   ⛔ It is refuted on the four things that only appear once you ask what would SHIP:
+    //     (1) the CURVE barely wants it — a free third section buys a **median 0.080 dB** of fit
+    //         on `fit_rung`'s own objective, against the 320 Hz term's **1.56 dB**, and s156
+    //         REJECTED the ~800 Hz candidate at **0.058 dB**.  This term sits with the rejected
+    //         one.  Its fitted gain changes sign (+16.2 … −6.0) and rests on a bound in 2 of 9.
+    //     (2) LIKE-FOR-LIKE IT LOSES to simply re-fitting the two sections already here: matched
+    //         on (depth, Q), mean curve rms **shipped 1.257 / existing family re-solved 1.167 /
+    //         third section 1.222 dB**, and it beats the re-solve in only 3 of 9 cells.
+    //         ⚠ A first pass compared the third section against the SHIPPED tables (1.286 → 0.780)
+    //         and it looked decisive — but that re-solves two constants WHILE adding a section, so
+    //         the gain is not attributable (`verify-the-BASELINE-not-its-LABEL`).
+    //     (3) IN THE SHIPPABLE FORM IT FAILS TASK A's OWN ACCEPTANCE.  One (cut, broad) pair per
+    //         DRIVE rung across all three stimulus sweeps — which is what these tables can express
+    //         — given its fairest shot (both its Q and its gain swept, cut re-solved so the depth
+    //         holds) moves mean |Q error| **0.97 → 0.81, 4.09 → 3.05, 5.15 → 3.49**: real, nowhere
+    //         near "below the reader's resolution", and it COSTS depth error at two of three rungs.
+    //         The table it asks for has no law — gain **−13.0 / +10.0 / −13.0**, Q 4.5 / 1.5 / 9.0.
+    //     (4) ⭐⭐ AND THE REASON NO FURTHER ITERATION IS OWED: **the shipped Q error is already
+    //         SMALLER than the target's own across-stimulus spread at 3 of 3 rungs** (spreads
+    //         1.46 / 5.52 / 10.20 against errors 0.98 / 4.04 / 5.19).  A knob-keyed entry is
+    //         already inside the ambiguity of the thing it is fitting, so "closer to the pedal's
+    //         Q" is not well defined for ANY single number, whatever family produces it.  That is
+    //         s151 §6's architectural limit on a FOURTH axis, after AQ2b's Q, AR6's metric
+    //         residual and AU's peak gain — and AQ2b already said to read it as an argument for
+    //         leaving `kNotchQ` ALONE.
+    //   ⚠ SCOPE: this refutes A SECOND PEAKING SECTION AT THE NULL'S OWN CENTRE, which is the
+    //     family s151/s153 named and the user authorised.  It does not refute every conceivable
+    //     shoulder treatment (two off-centre sections, an asymmetric or non-biquad shape) — but
+    //     (4) bounds the VALUE of all of them: none can beat the target's own spread.
     //
     // ⭐⭐ SESSION 153 (GATE AQ, `analysis/notch_shape_gate.py`) TESTED ALL THREE OF THE
     // CLAIMS ABOVE.  The "STRUCTURAL" verdict SURVIVES and is now a measured LIMIT rather
