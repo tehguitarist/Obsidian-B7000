@@ -331,22 +331,32 @@ private:
     // S(cleanFrac): the shared, dimensionless shape of the mix dependence, pinned to 0 at
     // kMixCfRef.  Measured on the one densely-sampled axis (GRUNT cut, DRIVE noon, 18 distinct
     // clean fractions from the LEVEL ladder, the BLEND ladder and the LEVEL x BLEND grid), then
-    // reduced to these nodes and forced MONOTONE.
+    // reduced to these nodes.
     //
-    // ⚠⚠ THE FLAT SEGMENT BELOW kMixCf[1] IS A DELIBERATE CHOICE, NOT A MEASUREMENT, AND IT IS
-    // THE ONE NUMBER IN THIS FILE MOST WORTH REVISITING.  Raw, the required cut PEAKS at
-    // cleanFrac ~ 0.21 and falls 9.6 dB toward the bleed-free corner.  That corner is also the
-    // most CENSORED reading in the whole set — GATE AT's AT1d measured the pedal's null bottom
-    // sitting 0.10 dB above the deconvolution residue there (and 5.01 dB BELOW it at bleed-free
-    // DRIVE max), so its depth is a LOWER BOUND and the cut derived from it is an UNDER-estimate.
-    // Holding S flat below the peak instead of following the raw points down therefore errs DEEP
-    // at LEVEL/BLEND max, on three independent grounds: the user's explicit instruction this
-    // session ("if they need to be too deep, I'd prefer that"); the censoring; and
+    // ⚠⚠ THIS TABLE IS NON-MONOTONE ON PURPOSE: S RISES TOWARD THE BLEED-FREE CORNER (S(0) =
+    // +0.951) AFTER DIPPING TO −0.525 AT cleanFrac ≈ 0.21.  With K negative on the Cut row that
+    // makes the required cut PEAK at intermediate mix and fall toward cleanFrac → 0.  Do not
+    // "repair" it into a monotone curve — the shape is physically expected, and the fix has
+    // already been built once and reversed:
+    //
+    // ⛔⛔ THE CLAMP WAS BUILT, MEASURED AND REVERSED IN SESSION 156 — DO NOT RE-ADD ONE.
+    // Three independent arguments said to hold S flat below its peak so the law would err DEEP at
+    // LEVEL/BLEND max: the user's explicit instruction that session ("if they need to be too deep,
+    // I'd prefer that"); the CENSORING (GATE AT's AT1d measured the pedal's null bottom sitting
+    // 0.10 dB above the deconvolution residue at that corner, so its depth is a LOWER bound); and
     // `reference-sources.md` §1/§3, which make HARDWARE the authority for this null's depth and
-    // record it DEEPER than ND by +1.6 dB at GRUNT cut rising to ~26 dB at boost.
-    // ⛔ What it is NOT is a measurement that the pedal's bleed-free null is that deep — the data
-    // cannot resolve cleanFrac < 0.2.  To revert to exactly what was measured, set the gate's
-    // `S_CLAMP_CF = 0.0` and re-emit; nothing else changes.
+    // record it DEEPER than ND by +1.6 dB at GRUNT cut rising to ~26 dB at boost.  All three
+    // pointed the same way and all three were outvoted by the measurement: clamped, the composite
+    // null came out **9.6–11.6 dB TOO DEEP** at LEVEL/BLEND max while every other mix landed
+    // within 1–3 dB.  ⭐ Re-examined, the raw non-monotone shape is what the physics predicts —
+    // the required cut peaks at INTERMEDIATE mix because that is where the model's own null is
+    // diluted hardest while the pedal's target is still deep; at cleanFrac → 0 the model's own
+    // null is already close, and at → 1 both wash out together.  A middle peak follows from that
+    // with nothing to correct.
+    // ⇒ `S_CLAMP_CF = 0.0` in `analysis/od_notch_mix_law.py` IS the shipped state (one named
+    // constant, and the clamp is reproducible by setting it to 0.21 if anyone wants to re-measure
+    // it).  ⚠ The censoring itself is NOT refuted — the bleed-free corner is still the least
+    // resolvable reading in the set; what is refuted is clamping as the response to it.
     static constexpr int kMixNodes = 8;
     static constexpr double kMixCfRef = 0.441;
     static constexpr double kMixCf[kMixNodes] = { 0.000, 0.210, 0.320, 0.440, 0.560,
@@ -377,16 +387,52 @@ private:
     };
     // ✅ ZERO ON PURPOSE, AND MEASURED — DO NOT ADD PEAK BOOST HERE.  The ~450 Hz peak
     // is largely the recovery BETWEEN the two notches, so it follows the notch on its
-    // own.  Re-measured on GATE W's `mid_peak` window after the notch converged,
-    // bleed-free, mean over the three realistic sweeps: the model's peak is MORE
-    // prominent than the pedal's in **8 of 9 (GRUNT x DRIVE) cells** (deficit -0.25 to
-    // -1.20 dB; only GRUNT boost x DRIVE max runs the other way at +2.05).  ⇒ boosting
-    // here would OVERSHOOT.  The user's original "the peak isn't tall enough" was heard
-    // against a model whose 320 Hz null was absent — a contrast complaint, not a height
-    // one, and fixing the null fixed it.
-    // ⚠ What remains at that feature is a CENTRE error (~8-9 % high: model 507.6 /
-    // 453.5 / 381.9 Hz vs pedal 466.7 / 418.0 / 362.8), which this stage does not
-    // address and which GATE W has already classified as NOT a corner error.
+    // own.  The user's original "the peak isn't tall enough" was heard against a model
+    // whose 320 Hz null was absent — a contrast complaint, not a height one, and fixing
+    // the null fixed it.
+    //
+    // ⛔⛔ THE ORIGINAL REASON FOR THIS ZERO IS REFUTED — THE VALUE IS NOT.  s151 zeroed it
+    // on a BLEED-FREE reading ("the model's peak is MORE prominent than the pedal's in 8 of
+    // 9 GRUNT x DRIVE cells, so boosting would OVERSHOOT"), and s156 then proved this whole
+    // stage's bleed-free-only fit wrong at the listening condition for the NOTCH.  GATE AU
+    // (s157, `analysis/peak_identifiability_gate.py`) checked whether the peak had the same
+    // disease.  It does: measured bound-free, the requested peak gain is **+1.44 dB at the
+    // listening condition against −4.30 dB bleed-free** — it CHANGES SIGN with the mix, so
+    // the bleed-free argument above cannot carry the decision.  ⇒ do not re-quote it.
+    //
+    // ⭐⭐⭐ WHAT REPLACES IT, AND WHY THIS STILL SHIPS AS ZERO — THREE MEASUREMENTS:
+    //  (1) THE STATISTIC THAT REPORTED A DEFICIT CANNOT SEE THE PEAK'S HEIGHT.  GATE W's
+    //      `mid_peak` prominence walks are bound-terminated in **48 of 48** readings — and
+    //      that is STRUCTURAL, not a property of these captures: `locate()` takes `j` as the
+    //      argmin over the window and then breaks each walk on `dd[k] < dd[j]`, which is
+    //      unreachable by construction.  So `prom` is `min(left max-descent, right
+    //      max-descent)` inside a FIXED [358, 620] Hz window; here the curves are monotone to
+    //      both bounds, so it reduces EXACTLY to `min(d[peak]−d[358], d[peak]−d[620])` — a
+    //      two-point read of the window's own bounds, i.e. of the 320 Hz null's and the
+    //      bridged-T's flanks.  ⚠ `locate`'s `edge` flag does not catch this (it fires on the
+    //      EXTREMUM, which is interior in 24 of 24 rows).
+    //  (2) READ ANYWAY, THE DEFICIT CHANGES SIGN ACROSS DRIVE (+1.08 … −0.85 dB at the
+    //      listening condition), so it names no direction to correct.
+    //  (3) ⭐ DECISIVE — THE TERM IS NOT IDENTIFIABLE.  A peak of this shape is not separable
+    //      from the quadratic-in-log-f trend the fit deliberately discards, and THAT TREND IS
+    //      A3.  At the shipped Q = 2.2 it keeps only **31 %** of its own norm after that trend
+    //      is projected out, against the notch term's **85 %** (2.71x).  A fitted +1.3 dB
+    //      would therefore deliver ~+0.41 dB of shape the trend could not already explain; the
+    //      rest is A3 handed to a biquad — `one-knob-two-jobs-is-compensating`, and exactly how
+    //      s156 §3 rejected the 800 Hz candidate ("A3 seen as a shape").
+    //      ⭐⭐ And it is STRUCTURAL: separability rises monotonically with Q on this band and
+    //      only reaches the notch's 85 % above Q ≈ 20 — while this feature is BROAD by nature
+    //      (it is the recovery between two notches).  The shape that would be identifiable
+    //      here is not the shape the feature has.  ⇒ no (gain, Q) choice fixes this.
+    // ⚠ Corroborating, not load-bearing: 15 of 24 joint fits rest a parameter on a bound, and
+    // the requested gain spans **15.25 dB** across the three stimulus sweeps at one fixed
+    // (set, DRIVE) cell — s151 §6's architectural limit on a third axis, after AQ2b's Q and
+    // AR6's metric residual.
+    //
+    // ⚠ What remains at that feature is a CENTRE error (model/pedal median **1.093x**, 22 of
+    // 24 readings high — GATE AU's AU1b, on a wider set than s151's 507.6 / 453.5 / 381.9 Hz
+    // vs 466.7 / 418.0 / 362.8), which this stage does not address and which GATE W has
+    // already classified as NOT a corner error.
     static constexpr double kPeakGainDb[5] = { 0.0, 0.0, 0.0, 0.0, 0.0 };
 
     static constexpr double kNotchFreq = 323.0; // the PEDAL's own centre, stable across the ladder

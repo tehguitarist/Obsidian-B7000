@@ -1013,6 +1013,23 @@
     a0 ∈ [1e-2,1e3] (min normalised discriminant **5.2e-5**), and the arm that drops one term from
     `b` breaks the bound and must be caught. Do not ship a "for all values" claim whose only support
     is that you did the algebra correctly. (s145, GATE AM4)
+  - ⭐⭐ **AND THE MIRROR HAZARD, s159: A THEOREM ASSERTED WITHOUT ITS PRECONDITION REFUSES CORRECT
+    DATA — AND THE PRECONDITION IS USUALLY THE DEGENERATE CASE THE SURROUNDING CODE ALREADY
+    HANDLES BY CONVENTION.** GATE AV's instrument rests on *"`prom` is a max over a cell set and
+    widening only ADDS cells, so it is non-decreasing in window width"*. True, and AV only ever
+    measured its CONSEQUENCE (0 membership flips OUT). Asserting the theorem directly, on all
+    readings, refused against perfectly good data: **177 decreases, worst 0.516 dB.** The missing
+    clause is *provided the side is non-empty* — when the extremum rests ON a window bound one side
+    has NO cells and the walk reports its rise as the **convention 0.0**, which is not the max over
+    an empty set, so widening replaces a floor with a real (negative) maximum and the value
+    legitimately falls. ⭐ GENERAL: **before asserting an inequality over a whole population, ask
+    which members make one of its operands EMPTY, DEGENERATE or CONVENTIONAL** — a `0.0` returned
+    for "there was nothing to take a max over" is a sentinel, and every monotonicity argument
+    breaks on sentinels. ⭐⭐ And the exception is usually worth keeping rather than merely
+    excluding: here the 177 excluded readings going NEGATIVE is s126's edge-resting pathology
+    **with a sign on it** — a shipped prominence of 0.0 shown to be a floor rather than a measured
+    rise, which is strictly more informative than the boolean `edge` flag that already marked them.
+    (s159, GATE AW's AW1c)
 - ⭐⭐⭐ **A TRANSFER-FUNCTION KNOWN ANSWER VALIDATES *TOPOLOGY* AND IS STRUCTURALLY BLIND TO WHICH
   **VALUE SET** YOU FED IT — BECAUSE IT FEEDS BOTH SIDES THE SAME ONE.** Building a stamp-level
   netlist for every stage, the obvious guard is to compare each netlist's transfer against the
@@ -1548,11 +1565,24 @@
   full-send twins (same settings, 12.071 dB apart, so every nuisance cancels), the model's THD level
   term moves −1.106 dB mean / −1.039 median, 11 of 14 pairs same-signed. A population that looked
   like noise to exclude was actually the only free second operating point in the whole capture set.
-- ⚠⚠ **`aggregate-moved-check-membership-first` — ELEVEN occurrences, and this list itself had gone
+- ⚠⚠ **`aggregate-moved-check-membership-first` — TWELVE occurrences, and this list itself had gone
   stale once (it read "SEVEN" while CLAUDE.md had already logged nine — the counter is a claim with a
   date on it, same as any other).** An aggregate that fails to reproduce has usually gained or lost
   rows, not changed value. Every shared row was bit-identical each time. **Never quote a matrix
   total without its capture count.**
+  - ⭐⭐ **TWELFTH, s159, AND IT IS THE FIRST INSIDE AN *EPOCH* COMPARISON — WHERE THE BAR ITSELF IS
+    WHAT MOVED THE POPULATION.** Comparing two renders of the same 24 conditions across a shipped
+    DSP change, the pooled median centre of one feature moved **−6.66 %** and was about to be
+    written up as *"the new stage moved the 450 Hz peak"*. It did not. The stage deepens the
+    NEIGHBOURING null, which raises that peak's prominence past the admission bar and **admits 20
+    cells that the earlier epoch refused** — so the pooled median moved because the population did.
+    Matched on the cells admitted in BOTH epochs the same shift is **−0.35 %**, below the locator's
+    own resolution. ⭐ GENERAL: an epoch comparison looks immune to this because the CONDITIONS are
+    identical by construction — but a **quality bar** downstream of the change is not a condition,
+    and any change that moves the graded quantity moves who passes the bar. **Difference two epochs
+    only on the cells admitted in both, and print the pooled column beside it so the gap is
+    visible.** Same shape as the s112 entry above, with the membership drifting in TIME rather than
+    with the capture inventory. (s159, GATE AW's AW5)
   - ⭐ **Tenth, and the sharpest version yet: valid, correctly-captured data moved a gate row ACROSS
     its own bar with zero model change, in the very session that had just named this trap.** Session
     113's requested capture plus 8 unrelated hedge captures (added independently by the user for a
@@ -2644,6 +2674,21 @@
   value is entirely in its diagnosis, and a correct refusal with a wrong reason is worse than a bare
   refusal because it is actionable in the wrong direction. Same family as `a refutation has to land
   where the thing is CHOSEN` (s124), pointed at a guard rather than at an enum. (s146)
+- ⭐⭐ **A SCRATCH PROTOTYPE THAT POPULATES A CACHE HIDES A MISSING STEP IN THE TOOL WRITTEN FROM
+  IT — RUN A NEW GATE ONCE FROM A CLEANED DIRECTORY BEFORE BELIEVING IT.** GATE AW's epoch arm was
+  prototyped in the scratchpad first (right — measure before writing 800 lines of gate), and the
+  prototype rendered its 24 conditions into the private directory. The gate then written from it
+  **never rendered at all**: its collector only READS. Every number it produced was correct, and it
+  would have crashed for the next session on a clean checkout. ⭐ It was caught by the mutation
+  runner, and only because the runner redirects the mutant's render directory to a PID-unique path
+  and therefore starts from an empty one — which is worth copying for that reason alone, on top of
+  the sandboxing reason it was added for (s153). ⭐ GENERAL: a scratch probe and the tool written
+  from it share a filesystem, so **any step the probe performed as a side effect is a step the tool
+  can silently omit**. `rm -rf` the tool's own cache and run it once; the cost is one cold run and
+  the failure it catches is invisible to every warm one. ⚠ Same session, same runner, second
+  instrument defect: a guard CRASHED (`None` subscripted) where it should have REFUSED — s117's
+  rule, that a gate handing the next session a stack trace has handed them a symptom instead of a
+  reason. Both are recorded at their arms. (s159, GATE AW)
 - **`rebaseline-all-derived-artefacts`.** Changing an upstream global expires the intermediate CSVs
   and the fixed-amplitude gates too, not just the headline baseline. Three occurrences (s35, s45,
   s65). Fix: every render writes a `.args.json` stamp of its exact argv; every read checks it.
