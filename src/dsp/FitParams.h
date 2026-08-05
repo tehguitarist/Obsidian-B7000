@@ -386,7 +386,28 @@ struct FitParams
     // per pot for exactly this.
     double driveTaperExp = 1.98;  // VR3 100k C-taper, in (1-x) — 0 ohm at full CW. session-17
                                   // measured (bleed-free taper, drive_taper_curve.log; was 1.5/2.5)
-    double levelTaperExp = 2.25;  // VR2 100k A-taper — session-8 measured (36 estimates; was 1.43)
+    // ⭐⭐ SESSION 163 (task D(b)) — THE LEVEL POWER LAW IS RETIRED. `levelTaperExp` NO LONGER
+    // EXISTS; a stale `--fit levelTaperExp=` now fails loudly in offline_render rather than being
+    // silently ignored (the s115 `masterTaperExp` pattern). VR2 100k A-taper is a FOUR-SEGMENT
+    // PWL — full derivation and the shape/containment/cost checks in `LevelBlend.h`'s constants
+    // block, GATE AY (`analysis/level_taper_reshape.py`) and GATE AZ (`analysis/level_taper_fit.py`).
+    //
+    // The one-line reason: against the pedal's own LEVEL ladder the shipped exponent 2.25 was
+    // 2.844 dB rms out (worst 7.638); this curve reaches 0.340, which is the architectural floor
+    // (a free per-detent curve gets 0.344) and is inside the target's OWN across-stimulus
+    // ambiguity of 0.755 dB. ⛔ Do NOT "simplify" it back to an exponent: the best single exponent
+    // over this ladder is p = 2.002 at 2.106 dB rms, still OUTSIDE that ambiguity by 2.79x.
+    //
+    // ⚠⚠ THIS CHANGES `LevelBlend::cleanFraction()`, which `OdToneRestore`'s s156 mix law READS —
+    // worst |Δcf| = 0.1292 at LEVEL 0.875 (GATE AZ5). The notch fit is therefore stale by
+    // construction after any change here; re-run its acceptance table across all five `--set`
+    // conditions (open work item 10).
+    double levelTaperBreak1 = 0.219415;   // rotation at which the wiper reaches levelTaperFrac1
+    double levelTaperFrac1 = 0.038146;    // fraction of full resistance at that rotation
+    double levelTaperBreak2 = 0.529680;
+    double levelTaperFrac2 = 0.166340;
+    double levelTaperBreak3 = 0.857645;
+    double levelTaperFrac3 = 0.425688;
     // VR8 100k A-taper [ENG]. ** SESSION-41: 2.25 -> 1.998. ** Session 17 set 2.25 by borrowing
     // LEVEL's exponent, on the grounds that the master captures "bracket it: 2.06/2.37". They no
     // longer do — `master-1700_gain-n12_base-clean.wav` was found to be a BAD TAKE and re-recorded

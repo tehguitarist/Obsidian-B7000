@@ -628,7 +628,7 @@ def clean_fraction(caps, f):
     table), because 0.5 ** 2.25 = 0.21, not 0.5.  The exponent comes from `level_law_gate`, which
     checks it against `FitParams.h` rather than trusting the transcription."""
     st = caps[f]["settings"]
-    L = float(st["level"]) ** K.SHIPPED_LEVEL_TAPER_EXP
+    L = K.level_taper(float(st["level"]))
     od, cl = K.coef_closed(float(st["blend"]), L)
     return cl / (od + cl) if (od + cl) > 0 else 1.0
 
@@ -674,7 +674,7 @@ def gate_s6(absfr, caps, od, ladder, drops, sel, pad_model, pad_pedal, tab, matc
                  "path's own compression law cannot be read at all, only the mixed output's")
 
     print(f"   clean fraction from the SHIPPED LevelBlend closed form (GATE K2), with the LEVEL")
-    print(f"   taper (p = {K.SHIPPED_LEVEL_TAPER_EXP}) applied first -- both READ from the source, "
+    print(f"   the shipped 4-segment taper (L(0.5) = {K.level_taper(0.5):.4f}) applied first -- both READ from the source, "
           f"not assumed:\n")
     print(f"   {'clean%':>7} {'DRIVE':>6} {'stimulus':>14}  {'comp M':>7} {'comp Q':>7} {'M-Q':>7}"
           f"   capture")

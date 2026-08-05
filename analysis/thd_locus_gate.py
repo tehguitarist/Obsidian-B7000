@@ -109,7 +109,7 @@ def clean_fraction(settings):
     ⚠ `coef_closed` takes the TAPERED level.  Passing the knob value instead is session 113's
     documented defect and it returns a monotone, plausible, wrong curve."""
     b = float(settings["blend"])
-    lv = float(settings["level"]) ** LLG.SHIPPED_LEVEL_TAPER_EXP
+    lv = LLG.level_taper(float(settings["level"]))
     a, c = LLG.coef_closed(b, lv)
     return (c / (a + c)) if (a + c) > 0.0 else 1.0
 

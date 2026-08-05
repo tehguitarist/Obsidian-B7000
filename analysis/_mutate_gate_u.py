@@ -26,7 +26,7 @@ MUTATIONS = [
      "0.5: -2.05,", "0.5: -2.55,"),
     # U1a -- the taper itself.  Dropping it is the s113 defect; U1a must catch it.
     ("U1a taper actually applied",
-     "        L = L ** K.SHIPPED_LEVEL_TAPER_EXP\n    od, cl = K.coef_closed(float(settings[\"blend\"]), L)\n    if od <= 0.0:",
+     "        L = K.level_taper(L)\n    od, cl = K.coef_closed(float(settings[\"blend\"]), L)\n    if od <= 0.0:",
      "        L = L\n    od, cl = K.coef_closed(float(settings[\"blend\"]), L)\n    if od <= 0.0:"),
     # U1b -- the mutation control itself.  If `taper=False` is made a no-op, U1b must report that
     # U1a has become vacuous.

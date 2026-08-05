@@ -19978,3 +19978,406 @@ conceivable shoulder treatment (two off-centre sections, an asymmetric or non-bi
 2. **Task E** — item 6's artificial treble-peak-slope correction. 3-session cap.
 3. Then Phase 10: final control sweep, version bump, README, close Phase 9 on the record with the
    gate documented as-is, dry-run the installers, cut the release.
+
+## SESSION 162 (2026-08-05) — the re-baseline bill is paid and it moves a gate row; task D is screened by GATE AY and REFUTED on a bound over the whole taper family
+
+**Shape of the session.** Task D (open item 9's artificial LEVEL correction, authorised at s160) is
+an *absolute-level* question, and every absolute-ledger instrument in the project is only valid
+against a report rendered from the current `src/`. The standing baseline `s146_mastertaper.json`
+predates **s156**'s mix-keyed `OdToneRestore` law — a real DSP change that shipped without a matrix
+run. So the first act was to pay the ~25 min render bill that has been owed since s152 and re-armed
+by s156's several rebuilds. That render produced an unplanned finding, and the task-D screen then
+came back negative. **No constant shipped, no `src/` file touched, no build.**
+
+### 1. `analysis/reports/s162_shipped.json` — the current-epoch baseline
+
+172 attempted / **162 graded**, 0 from cache (the bill, paid in full). The 10 failures are the
+`_gain-n18` set hitting the missing `_GAIN_SESSION_MEASURED_DB[-18]` entry — open item 8, *not* a
+membership change, and exactly the gap `comprehensive_report` has reported since s111.
+
+**Membership is identical to `s146_mastertaper.json`** and that is asserted rather than assumed:
+OD 446 rows / CLEAN 188 / `gain-n12` control 44 / dropouts 2, the same two dropout cells named, and
+the same BLEND composition counts (4 / 15 / 15 / 15 / 63 captures). So the movement below is not
+`aggregate-moved-check-membership-first` — twelve prior occurrences and the check is now reflexive.
+
+### 2. ⛔⛔ THE HEADLINE ROW CROSSED ITS BAR: 6 rows over SHIP → **7**
+
+s146 → s162, like-for-like:
+
+| row | s146 | s162 | Δ |
+|---|---|---|---|
+| **OD ALL band-RMS** | **1.947 SHIP** | **2.011 over** | **+0.064 — CROSSED (bar 2.00)** |
+| OD 100 Hz–8 kHz p90 | 3.583 | 3.817 | +0.234 |
+| OD ALL p99 | 10.278 | 10.495 | +0.217 |
+| OD 100 Hz–8 kHz median | 0.475 | 0.478 | +0.003 |
+| OD 25–100 Hz p90 | 4.631 | 4.640 | +0.009 |
+| OD 25–100 Hz median | 0.930 | **0.901** | −0.029 (better) |
+| OD 8–16.3 kHz p90 | 6.374 | **6.332** | −0.042 (better) |
+| OD 8–16.3 kHz median | 0.642 | 0.654 | +0.012 |
+| THD full-send | 3.561 | 3.657 | +0.096 |
+| THD `gain-n12` | 1.665 | **1.642** | −0.023 (better) |
+| **CLEAN, all four gated rows** | — | — | **0.000, bit-identical** |
+
+⭐⭐ **The attribution is not argued, it is three free known answers, and all three held.**
+**(a)** CLEAN is bit-identical on all four gated rows *and* on band-RMS (0.451) *and* on max\|Δ\|
+(3.15 dB) — the only DSP change since s146 is `OdToneRestore`, which is OD-only by construction.
+**(b)** The **BLEND = 0.00** bucket (OD path out of circuit entirely) is bit-identical at 0.225 —
+those rows *cannot* move and they did not. **(c)** The cost is **monotone in the OD path's share of
+the output**: +0.000 / +0.003 / +0.014 / +0.030 / **+0.101** across BLEND 0 → 1, which is what a
+stage inside the OD path must do and what a membership artefact would not.
+
+⇒ **this is the first measurement of what s156's mix-keyed law costs the matrix, and s156 did not
+run one** (its acceptance came from `od_tone_restore_fit --geom`, which reads renders directly).
+s151's earlier bleed-free-only table cost +0.040 (1.947 → 1.987); the mix-keyed law costs **+0.064**
+and that is enough to cross a bar sitting 0.053 above the old value.
+
+⚠ **Quote the crossing with its size**: 2.011 against 2.00 is **0.011 dB over, 0.55 % of the bar** —
+the row is now *marginal*, not clearly failing, and it is over by ~⅙ of the change that moved it.
+⛔ **Not mine to resolve.** The stage is user-authorised, explicitly overriding schematic fidelity
+(s150/s151/s156), and it was accepted on a listening-condition depth criterion the matrix cannot
+see. Whether a ~1 dB improvement in the 320 Hz null at the listening mix is worth the headline row
+is a **USER DECISION**, put to them with the numbers rather than resolved by reverting anything.
+
+### 3. GATE AY (`analysis/level_taper_reshape.py`) — task D, screened
+
+Read-only: a re-read of `s162_shipped.json` plus closed-form evaluation of the shipped `LevelBlend`,
+importing `level_law_gate` (GATE K) and `level_taper_gate` (GATE L) rather than re-deriving them.
+Six sub-gates, all computed; `analysis/_mutate_gate_ay.py`, **12/12 arms, 4 computed-verdict**.
+
+**AY3 — GATE K's closure does NOT carry over to a segmented taper.** Objective is rms of
+(delivered − pedal) in dB over the well-defined detents, stimulus-averaged, n = 24:
+
+| family | rms dB | worst | vs the target's own ambiguity (0.755 dB rms) |
+|---|---|---|---|
+| shipped, p = 2.25 | 2.844 | 7.638 | OUTSIDE by 3.77× |
+| best single exponent, p = 2.0020 | 2.106 | 3.344 | OUTSIDE by 2.79× |
+| **free monotone curve (the solve)** | **0.344** | 0.901 | **INSIDE** |
+
+⭐ The bar is **AY2's own per-detent across-stimulus spread**, in the same units — the instrument
+that closed task A one session ago (s161 AX6), imported, not chosen here. ⇒ **the FAMILY decides it,
+not the fit**: GATE K measured the *exponent* family and *"no single exponent reaches"* is a
+different claim from *"no monotone taper reaches"* — the distinction s115/s146 were already forced
+to draw on the neighbouring MASTER pot. ⭐ Corroborated from outside the solve: the required
+half-rotation fraction is **15.37 %** against the shipped **21.02 %**, moving **toward** the
+textbook A-taper 10–15 % band that `circuit.md` says VR2 is (100k **A**). Nothing in the solve knows
+what an A taper is. The curve is monotone in the knob, exact at both endpoints, and its single
+convexity dip is **1.08 %** of a slope — inside the hand-set-knob input's own uncertainty.
+
+**AY5(c) — and yet task D as specified is REFUTED, on a bound over the whole family.** The mixed
+clean-re-OD ratio is exactly (1 − L) (GATE L's reduction), L is a pot fraction in [0, 1], and both
+endpoints are **pinned** (L(0) = 0 is the end stop; L(1) = 1 is the bleed-free anchor AY6 asserts).
+So the supremum of the interior (1 − L) span is 1.0 and the most **any** taper can buy is
+`1 / 0.7312 = ` **1.368×**. Graded against item 9's own matched-detent sensitivity ratios:
+
+| target | needs | sup / need | |
+|---|---|---|---|
+| bass notch (s125) | 1.744× | 0.784 | **1.28× SHORT** |
+| `treble_notch` (s133 AE4) | 2.670× | 0.512 | **1.95× SHORT** |
+
+**0 of 2 reach, at the family's own supremum** — s126's bass-peak argument on a second control: a
+dose-response locus that cannot *contain* the target refutes the lever, not merely its setting.
+⚠⚠ **And the two jobs pull opposite ways**: the taper that closes the LEVEL LAW wants fold
+**0.625×** (span 0.7312 → 0.4572), a *smaller* mix sweep, where the sensitivity gap needs a larger
+one — `one-knob-two-jobs-is-compensating`, so even inside the bound they are not one correction.
+⚠ Scope, printed every run: (1 − L) is a **necessary** condition on the mechanism, not the feature
+measurement; whether a feature's centre follows needs GATE W's locator on a re-render.
+
+**AY5(a) — the cost, priced before anything was built.** A taper change moves
+`LevelBlend::cleanFraction()`, which s156's shipped law *reads*, so it re-stales that fit: worst
+\|Δcf\| = **0.1365** at LEVEL 0.875.
+
+### 4. ⭐ A NEW finding, and it is not task D's subject: **at LEVEL min the model MUTES**
+
+AY2 reads **−249.96 dB** at LEVEL 0 against a pedal only **−29.77 dB** below its own max. Not
+taper-reachable in either direction — L(0) = 0 exactly at the end stop under *every* taper, so a
+solve asking for L(0) > 0 (it asks for 0.0093) is asking for a pot that does not fully attenuate.
+That is a **topology** change: an end-stop resistance, or GATE K2's BLEND-body bleed path. Filed as
+its own item; nothing in the project names it. ⚠ It is excluded from AY2's requirement and AY3's
+objective *by the same membership rule*, and the first draft's disagreement between the two
+sub-gates is what found it (AY3 excluded it from the start, AY2 did not, and AY2 duly published a
+**214.41 dB** "requirement" — `ratio-statistics-need-a-denominator-guard`, differencing against
+digital silence).
+
+### 5. Seven defects in this session's own instrument, all found before its numbers were quoted
+
+1. **AY2 vs AY3 disagreed on membership** — the mute detent above. `MUTE_DB` is now one constant.
+2. **A self-contradictory line**: the per-detent `reach` column reported a *per-sweep status set*
+   (`interp/non-monotone`) overflowing its field, immediately above *"the required curve is
+   MONOTONE"* — two different monotonicities, one word (s122: a message that could not be true is a
+   defect in the test). Refused columns are now named once, before the table.
+3. **The hottest stimulus column was `nan` in silence.** `dB_model(L)` is non-monotone at `drv_-6`
+   (GATE K3/L8: the model's H1 falls above LEVEL noon because b(L) peaks at 0.5), so it is not
+   invertible. Now a named refusal **with its consequence stated: the printed architectural floor is
+   a LOWER BOUND**, because the excluded column is the one most likely to disagree.
+4. **The objective's `n` and membership were unprinted** — three families scored over 3 of 4
+   stimulus levels with nothing saying so.
+5. **A second floor was computed and never printed.** `curve_rms` (0.344 dB of delivered level) and
+   the required-taper spread (0.0778 rms / 0.1956 worst, in units of L) are *different quantities*;
+   the prose called the first "the architectural floor" while the second sat in the JSON. Both now
+   print, with how they relate.
+6. **AY3's family comparison had no computed verdict** — three numbers, and the comparison that
+   re-opens a question closed since s103 left to the reader. `computed-verdicts-not-narrated`, sixth
+   occurrence, and the second in two sessions inside a gate written to apply that rule.
+7. **A hardcoded band centre** (`0.125`) beside a parameterised band, and **the convexity verdict
+   was a bare boolean** where a 1 % dip and a turnover have different consequences.
+
+⭐⭐ **And the mutation runner found an eighth, in a guard added earlier the same session.** The
+`isfinite` check on the known answer (added for the s106 `nan`-fails-open reason: `nan > 1e-9` is
+False, so a non-finite recovery would pass vacuously) had an escape hatch admitting `want == 0`
+regardless of status — which lets a **non-invertible** column through. Unmutated that path is
+unreachable, so the guard was correct only by accident of an upstream filter; the `ay2-mute` arm
+reaches it by declassifying the mute. ⇒ two defects stacked, and the second masked the first.
+✅ After both fixes the stored report is **byte-identical**, so neither touched a quoted number.
+
+**ctest 19/19** (68.07 s at -j 12) — no `src/` file changed and no build, so this is inherited
+state, confirmed rather than re-established.
+
+### ▶ NEXT
+
+1. ⛔⛔ **CLAUDE.md is at ~1230 lines after this session's edits, so the 1200-line re-archive
+   trigger HAS FIRED. The next session's first job is to compress it to under 800**, per the
+   documentation-discipline rule — verifying each compressed passage is present verbatim here
+   FIRST, and never touching the CLOSED/REFUTED or SHIPPED CONSTANTS tables.
+2. ✅ **DECIDED, END OF SESSION 162: ship the LEVEL-law taper.** Task D's own sensitivity target
+   (part (a)) stays refuted; the segmented-family LEVEL-law fix (part (b)) is authorised. **Build
+   it next session, before task E**: turn GATE AY's already-solved curve
+   (`analysis/reports/s162_level_taper.json`'s `ay3.required_taper` per-detent means) into a
+   shipped `levelTaper` PWL (s146's MASTER precedent — exact at L(1)=1, convex, AY4 already checked
+   this curve clears both), wire it into `LevelBlend`/`FitParams.h`, re-fit/re-check
+   `OdToneRestore`'s mix law afterward (AY5(a) priced worst |Δcf| = 0.1365, i.e. it WILL re-stale),
+   and re-render the matrix before shipping. Import GATE AY's numbers directly; don't re-derive.
+3. ⚠ **STILL OWED, NOT resolved by the above:** the headline gate-row crossing (§2) — whether
+   s156's ~1 dB listening-condition null improvement is worth the OD band-RMS row crossing to
+   `over`. Independent of item 2; the LEVEL-law taper does not move the matrix's OD grading either
+   way (item 9's own note: the per-row gain match is structurally blind to this class of error).
+4. **Task E** — item 6's artificial treble-peak-slope correction, 3-session cap. Unstarted.
+
+## SESSION 163 (2026-08-05) — CLAUDE.md re-archived on its own 1200-line trigger (fifth pass), then task D(b): the LEVEL-law taper
+
+### 1. The re-archive (the session's mandated first job)
+
+CLAUDE.md stood at **1252 lines** after s162's edits, over the 1200-line trigger the
+documentation-discipline rule sets. Compressed to **799**, following the rule's own conditions:
+every compressed passage verified present verbatim in this file FIRST, and **the CLOSED/REFUTED and
+SHIPPED CONSTANTS tables not touched at all**.
+
+**Verified mechanically rather than asserted** — both protected sections were extracted from
+`git show HEAD:CLAUDE.md` and from the compressed file and compared as line sets:
+
+| section | HEAD | after | lines LOST from HEAD | added |
+|---|---|---|---|---|
+| SHIPPED CONSTANTS | 27 | 27 | **0** | 0 |
+| CLOSED / REFUTED | 116 | 119 | **0** | 3 (exactly s162's three new rows) |
+
+**What each section cost, and what was compressed:**
+
+| section | before | after | what went |
+|---|---|---|---|
+| preamble (template) | 112 | 90 | build-sequence steps 1–8 (complete, historical) → one sentence + pointers; delegation/essential-reading tightened; the `<Pedal>_AU` placeholder corrected to the real target and a `ctest -j 12` line added |
+| Current step / doc discipline / where we are | 75 | 54 | the stale "SESSIONS 150-151 ARE UNCOMMITTED" block (they are committed, and superseded by s156's mix law) → the standing ⛔ on `OdToneRestore.h`; the s122-consolidation paragraph dropped |
+| **STATUS** | 182 | 91 | eleven per-session bullets (s129–162, each "session N changed no baseline, added GATE X, ctest 19/19") → one grouped bullet plus four named carry-forwards; the baseline bullets merged; the per-row s146→s162 delta table replaced by "run the script" (it is in §2 of the s162 block here) |
+| **Open work** | 514 | 285 | items 0/1/3/4/5/7/11 (all CLOSED) → 4–16 lines each; item 6's six-gate table → the three gates that bind an ENGINEERED correction, with 4–6 pointered; its refuted-class table → a one-line-per-class run (each already has a CLOSED/REFUTED row); item 10's sub-history → the settled list |
+| Uncommitted work | 94 | 32 | five per-session rebuild narratives → the live cache state + the two general lessons (s152's uncompiled header, s156's transcription probe) |
+| carry-forwards | 48 | 35 | the two ear-lead bullets, both now closed |
+
+⭐ **Two things the pass CORRECTED rather than compressed**, both stale-state, both the failure mode
+this file's own rules warn about:
+1. **The cache/rebuild state said the ~25 min matrix bill was owed.** s162 paid it in full (172
+   attempted / 162 graded, 0 from cache) and did not build, so the cache is **warm against the
+   current binary**. The section now says so, and says explicitly that the CLOSED/REFUTED row
+   claiming the bill is owed is s142/s144 history, not live state.
+2. **The release-gate command still named `s146_mastertaper.json`.** Re-pointed to
+   `s162_shipped.json` (`verify-the-CONSTANT-not-the-prose`, on a shell line).
+
+⭐ **New: open work item 12** — s162's LEVEL-min mute finding was filed only in a CLOSED/REFUTED
+row and in that session's narrative; it is now a numbered item, because "nothing in the project
+names it" is exactly how a finding gets lost (`closing-an-item-drops-its-successor`).
+
+### 2. Task D(b) — the LEVEL-law taper is BUILT AND SHIPPED, and it costs the matrix
+
+s162 left this authorised and unbuilt: *"ship (b) — build the LEVEL-law taper"*. Built this
+session as a **4-segment PWL**, with a new gate (**GATE AZ**, `analysis/level_taper_fit.py`) doing
+the fit so the shipped constants and the screen that chose them cannot drift.
+
+**GATE AZ1 — the known answer, and it is the licence for everything below.** GATE AY3's scorer is a
+closure, so AZ rebuilds it — and then requires the rebuild to reproduce AY3's **stored** rms *and*
+worst for all three of its families. Measured **0.00e+00** on all six numbers. Without that, a
+family comparison here is scoring an objective nobody validated.
+
+**AZ2 — the segment count is MEASURED, and s162's own hand-over guessed it wrong.** That
+hand-over said "the s146 MASTER precedent: 3-segment PWL". The precedent is a FAMILY, not a number:
+
+| family | rms dB | worst | vs the target's own 0.755 dB ambiguity | vs the 0.344 dB floor |
+|---|---|---|---|---|
+| 2-segment | 1.399 | 3.089 | OUTSIDE 1.85x | 4.07x |
+| 3-segment | 0.480 | 1.175 | INSIDE | 1.40x |
+| **4-segment** | **0.340** | **0.874** | **INSIDE** | **0.99x** |
+| 5-segment (control) | 0.340 | 0.874 | INSIDE | 0.99x |
+
+⭐⭐ **The 5-segment control is the stopping proof, and it is threshold-free:** adding a segment buys
+**−0.0000 dB**, so the family SATURATES at 4 and 4 is its LIMIT rather than the start of an
+overfitting slope. s146 could not run this control on MASTER (its richer family was a diagnostic
+against a knob-noise floor); here the requirement is a measured curve, so the control exists.
+⚠ 3 segments is *inside the ambiguity bar too* — it is rejected on the sharper test below, not on
+the bar.
+
+**AZ3 — the overfitting question, answered in the constant's own units rather than by counting
+parameters.** AY3 publishes a per-detent across-stimulus SPREAD (how well each required L is
+determined at all). The fitted curve sits INSIDE that spread at **every** detent, worst ratio
+**0.085** — a 12x margin. So "6 parameters against 8 points" is the wrong frame: the curve is
+reproducing a target measured better than it is being fitted. (3-segment, by contrast, misplaces
+the 0.875 detent by **0.19 in L** against a spread of 0.196 — right at the edge — with a
+sign-alternating residual.)
+
+**AZ4 — three properties no term of the objective asked for.** Monotone; endpoints exact to
+**0.0e+00**; segment slopes RISING (**0.174 → 0.413 → 0.791 → 4.034**, i.e. convex — a physically
+buildable resistive track); and the half-rotation fraction moves **21.02 % → 15.41 %**, TOWARD the
+textbook A-taper 10–15 % band `circuit.md` specifies for VR2 (100k **A**). ⚠ It lands just ABOVE
+the band, and the gate says so rather than rounding into it.
+⚠ The last segment is a **LOWER bound on its own steepness**: AY3 reports the LEVEL-max requirement
+as `above` (the pedal wants more than L = 1 can deliver), so it is clamped by the anchor.
+
+**AZ6 — what must not move.** L(1) = 1 exactly ⇒ the bleed-free corner is **bit-identical**, which
+is what protects GATE K7's ratio, GATE O's A3 ledger, GATE L's |rho|, `OdToneRestore`'s base row
+and GATE W/AE's membership.
+
+#### 2a. ⭐⭐⭐ THE PAYOFF: the LEVEL law is CLOSED, and the gate that measured it now REFUSES to run
+
+GATE AY re-run on the new baseline (it passes its own epoch guard now):
+
+| LEVEL | need, s162 | need, s163 | its own spread |
+|---|---|---|---|
+| 0.125 | **+7.28** | +0.09 | 1.61 |
+| 0.250 | +1.03 | −0.08 | 0.20 |
+| 0.375 | −0.62 | −0.10 | 0.37 |
+| 0.500 | −2.18 | −0.22 | 0.66 |
+| 0.625 | −2.11 | −0.27 | 1.10 |
+| 0.750 | −1.86 | −0.31 | 1.51 |
+| 0.875 | −1.12 | −0.66 | 2.65 |
+
+⇒ **AY2 now exits with `no detent has a requirement larger than its own across-stimulus spread —
+task D is not well posed and nothing below is worth reading`.** That refusal is the strongest
+available statement that the defect is closed: the instrument built to measure it says the residual
+is inside the ambiguity of the measurement at **every** detent. And it is **task A's own closing
+argument** (s161 AX6), imported rather than invented.
+
+#### 2b. ⛔⛔ AND IT COSTS THE MATRIX: 7 rows over SHIP → 8. ITEM 9's OWN PREDICTION IS REFUTED
+
+`analysis/reports/s163_leveltaper.json`, 162 captures, **membership identical** to `s162_shipped`:
+
+| row | s162 | s163 | Δ | bar |
+|---|---|---|---|---|
+| OD 100 Hz–8 kHz median | 0.478 | **0.515** | +0.037 | 0.50 — **CROSSED** |
+| OD ALL band-RMS | 2.011 | 2.068 | +0.057 | 2.00 |
+| OD ALL p99 | 10.495 | 10.852 | +0.357 | 4.00 |
+| OD 25–100 Hz median / p90 | 0.901 / 4.640 | 0.965 / 4.760 | +0.064 / +0.120 | 0.70 / 2.50 |
+| OD 8–16.3 kHz p90 | 6.332 | 6.536 | +0.204 | 2.50 |
+| **THD full-send** | 3.657 | **4.737** | **+1.080** | 3.00 |
+| OD 100 Hz–8 kHz p90 | 3.817 | **3.781** | −0.036 (better) | 2.00 |
+| **CLEAN, all four gated rows** | — | — | **0.000, bit-identical** | — |
+
+⚠⚠ **Open work item 9 said, in bold, that this correction "WILL NOT MOVE ANY RELEASE-GATE ROW"
+because the per-row gain match deletes this class of error. That prediction is REFUTED by
+measurement, and the reason is worth keeping:** the matrix is blind to a per-row **GAIN**, and a
+LEVEL taper is not one — it changes the clean/OD **MIX RATIO**, which is a shape change. GATE Z
+(s128) had already established that the gated THD row is *mostly the mix* ("2.201 = SHIP on the
+bleed-free rows, 3.763 = over with bleed; a mix difference moves THD with no change in distortion
+at all"). The new taper lowers L at every interior detent, which RAISES the clean fraction, which
+dilutes exactly as GATE Z's one-parameter law predicts. ⇒ **"the matrix cannot see a level error"
+does not imply "the matrix cannot see a taper change".**
+
+⭐⭐ **The attribution is three free known answers plus a dose-response, all held:**
+- **LEVEL = 1.0 (22 OD captures): bit-identical.** The anchor is pinned — AZ6's assertion, confirmed
+  on rendered audio.
+- **LEVEL = 0.0 (2) and BLEND = 0.0 (4): bit-identical.** The other pinned endpoint, and the rows
+  where the OD path is out of circuit entirely. 28 of 114 OD captures are bit-identical and **every
+  one sits at a pinned endpoint**.
+- **the cost is MONOTONE in LEVEL through the interior** — +0.037 / +0.221 / +0.386 / **+1.142** at
+  LEVEL 0.5 / 0.625 / 0.75 / 0.875 — tracking AZ5's predicted |Δ cleanFraction| of 0.017 / 0.036 /
+  0.075 / **0.129**. A membership artefact cannot produce that ordering.
+
+#### 2c. `OdToneRestore`'s owed re-check: the acceptance table does NOT move, and that is attributable
+
+Item 10 requires the notch fit be re-checked after any upstream OD-path change, and AZ5 priced the
+input shift at worst **|Δcf| = 0.1292**. Re-run across all five `--set` conditions, the corrections
+are **bleedfree −0.26 / −0.15 / +0.41** (inside the shipped ±0.83 bar), **listen +1.04…+1.59**
+(s156 recorded +1.0…+1.5), and blend / grunt_flat / grunt_boost unchanged. ⇒ **no re-fit is owed.**
+⚠⚠ **But state WHY, because it is not a clean bill of health:** the acceptance sets are graded at
+LEVEL max (Δcf = 0 by the anchor) and LEVEL noon (Δcf = 0.017), and **the taper's largest excursion
+is at LEVEL 0.75–0.875, which no capture in the acceptance set samples.** The stage is now
+differently conditioned there and nothing in item 10's table measures it. What DOES measure it is
+the matrix, and the matrix is where the cost showed up (§2b).
+
+#### 2d. Consumers re-pointed — the s146 trap, made mechanical
+
+`levelTaperExp` is **DELETED, not aliased**, on both sides. C++: a consumer that missed the change
+fails to COMPILE (`LevelBlend::setTaperExp` no longer exists); a stale `--fit levelTaperExp=` fails
+loudly in `offline_render`. Python: `level_law_gate.SHIPPED_LEVEL_TAPER_EXP` is gone and every
+consumer now calls `K.level_taper(x)` — one implementation, checked against the header by a K2 that
+now validates **all six** constants and REFUSES if `levelTaperExp` ever reappears. Re-pointed:
+`level_law_gate` (3 sites), `level_taper_gate` (GATE L, 6), `level_taper_reshape` (GATE AY, 8),
+`level_bleed_gate` (2), `compression_law_gate`, `thd_locus_gate`, `eq_reference.level_blend_tf`,
+`_mutate_gate_u`, `_mutate_gate_z`, `tests/LevelBlendTest.cpp`.
+⭐ `K.power_taper(p)` keeps the RETIRED curve reachable on purpose, because a stored report must be
+read with the taper it was **rendered** with — GATE AZ takes its detent→L map from GATE AY's stored
+report for exactly that reason, which is what keeps AZ reproducible now that its own output ships.
+
+⭐ `tests/LevelBlendTest.cpp` gains a **Test 0** (the s146 `MasterOutTest` pattern): exact endpoints,
+strict monotonicity, ordered breaks/fracs, rising slopes, and the half-rotation band. A
+segment-boundary off-by-one shows there and nowhere else in the suite.
+⚠ **Test 4's loading assertion was REPAIRED, not re-tuned** — it was a WINDOW (`−3 < deficit < −1`)
+chosen for the retired taper, and the new taper lands at −1.06, i.e. it would have passed by
+**0.06 dB of luck** and failed against correct code the next time the taper moved. Replaced with the
+closed-form loaded divider (`err < 1e-9`), which is taper-independent and strictly stronger. ⚠ My
+first version of that closed form carried a spurious factor of L and failed by 16 dB — the test's
+own arithmetic, caught because the stage matched the oracle exactly throughout.
+
+**ctest 19/19** after the change (68.7 s at -j 12).
+
+#### 2e. GATE AZ's mutation runner — 9 arms, and the first run scored a WORKING gate as narrated
+
+`analysis/_mutate_gate_az.py`, **9/9 arms** after the repair below. Five `expect_rc != 0` arms (the known answer, the render-epoch
+guard, monotonicity, the exact endpoints, the bleed-free anchor) and four `expect_rc == 0` arms —
+because every verdict this gate prints is now a constant in `FitParams.h`, which is the strongest
+possible reason for `computed-verdicts-not-narrated`.
+
+⭐ **The `az2-choice` arm failed on its FIRST run, and the defect was the arm's.** It restricted
+`SEG_RANGE` to `(2, 3)` intending to leave 3 segments as the richest family — but `SEG_RANGE`
+counts **BREAKPOINTS** and the family printed is `n + 1` **SEGMENTS**, so `(2, 3)` still contains
+the 4-segment family. The gate correctly shipped four and the runner scored it `NARRATED` against a
+gate that was working perfectly. Re-run at `(1, 2)` it ships **THREE** and prints the "JUDGEMENT,
+not a measured limit" caveat, i.e. the segment choice does track the measurement.
+⇒ `suspect the mutation before the guard` (s110/s114), and an off-by-one between "breakpoints" and
+"segments" is exactly the confusion a segment-count parameter invites. Recorded at the arm.
+
+### 3. What this session did NOT do
+
+- ⛔ **Nothing was reverted.** Two outstanding user decisions now have the same shape — an [ENG]
+  correction the user authorised, against a defect the ND-referenced matrix cannot see, that costs
+  a gate row: s162's `OdToneRestore` mix law (OD band-RMS) and s163's LEVEL taper (OD 100 Hz–8 kHz
+  median + THD full-send). They are independent and can be decided separately.
+- ⛔ **Task E (item 6's drive-keyed treble-slope correction, 3-session cap) is unstarted.**
+- ⚠ **The `_gain-n18` membership gap (item 8) is untouched** — still 172 attempted / 162 graded.
+
+### ▶ NEXT
+
+1. ✅✅ **BOTH USER DECISIONS TAKEN, SAME SESSION (2026-08-05): KEEP BOTH.** Put to the user with
+   the numbers — (a) s156's `OdToneRestore` mix law, ~1 dB of listening-condition null depth for OD
+   band-RMS 1.947 → 2.011 (0.011 over a 2.00 bar); (b) s163's LEVEL taper, the LEVEL law closed from
+   7.28 dB worst-detent error to 0.66 (GATE AY2 refuses to run for want of anything to fit) for OD
+   100 Hz–8 kHz median 0.478 → 0.515 and THD full-send 3.657 → 4.737 — and the user's instruction
+   was to judge each on net positive rather than defaulting to either keep or revert. Both judged
+   net positive: (a) on cost alone (0.55 % over a bar); (b) because GATE Z (s128) already diagnosed
+   the THD population that moved as **mix dilution, not added distortion** — the taper makes that
+   diagnosed artefact larger, it does not introduce a new distortion-generation defect, against a
+   real, audible, whole-travel fix to a core control. **Nothing reverted; CLAUDE.md's STATUS,
+   SHIPPED CONSTANTS and item 9 blocks all updated to record the decision.**
+   ⚠ Note the asymmetry: (a) is marginal on one row; (b) is a large THD move on an already-failing
+   row — recorded as a KEEP precisely because that population's meaning was already understood.
+2. **Task E** — item 6's artificial treble-peak-slope correction, 3-session cap, unstarted. The
+   sized target and the three binding gates are in CLAUDE.md's item 6.
+3. ⚠ **If (b) is EVER reverted later**, the revert is NOT just restoring `levelTaperExp`: the
+   retirement is deliberate and mechanical across both languages, so a revert means re-introducing
+   the constant AND re-pointing ~10 analysis modules and `LevelBlendTest` back. Cheaper to keep
+   `K.level_taper`/`LevelBlend::levelTaper` and change the six numbers to reproduce `x^2.25`
+   (a 4-segment PWL cannot do that exactly — say so rather than pretending it can).

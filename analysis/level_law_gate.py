@@ -78,10 +78,52 @@ import numpy as np
 import matrix_grade as MG
 import release_gate as RG
 
-# The LEVEL taper exponent SHIPPED in src/dsp/FitParams.h.  Transcribed, and K2 refuses to run
-# if it does not match the header -- `verify-the-CONSTANT-not-the-prose` (s35).
-SHIPPED_LEVEL_TAPER_EXP = 2.25
+# ⭐⭐ SESSION 163 -- THE LEVEL TAPER IS A FOUR-SEGMENT PWL, NOT A POWER LAW.
+#
+# `SHIPPED_LEVEL_TAPER_EXP` IS DELETED ON PURPOSE and is NOT aliased to anything.  Every consumer
+# in `analysis/` computed `x ** SHIPPED_LEVEL_TAPER_EXP` inline, and an alias would let each one
+# keep silently rebuilding the RETIRED curve while still importing cleanly -- which is exactly the
+# s146 `masterTaperBreak` failure (four consumers each reconstructing a two-segment curve from a
+# renamed parameter, all still running, all wrong).  Deleting the name makes every missed site an
+# ImportError/AttributeError at the first run instead of a plausible number.
+#
+# ⇒ CALL `level_taper(x)`.  One implementation, checked against the header by
+# `check_shipped_constant()`, so the analysis layer and the DSP cannot drift.
+SHIPPED_LEVEL_TAPER = (0.219415, 0.038146, 0.529680, 0.166340, 0.857645, 0.425688)
+LEVEL_TAPER_NAMES = ("levelTaperBreak1", "levelTaperFrac1", "levelTaperBreak2",
+                     "levelTaperFrac2", "levelTaperBreak3", "levelTaperFrac3")
+RETIRED_LEVEL_TAPER_EXP = 2.25   # what shipped up to s162 -- for reading pre-s163 reports ONLY
 FITPARAMS = "src/dsp/FitParams.h"
+
+
+def level_taper(x, params=None):
+    """The shipped LEVEL pot law: knob rotation -> L, the wiper fraction the stage uses.
+
+    Mirrors `LevelBlend::levelTaper` exactly, including both exact endpoints -- L(1) = 1 is the
+    bleed-free anchor every absolute instrument in the project reads at.  `params` exists so a tool
+    can evaluate a CANDIDATE or a RETIRED epoch's curve without the shipped set being mutable."""
+    b1, f1, b2, f2, b3, f3 = SHIPPED_LEVEL_TAPER if params is None else params
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    if x <= b1:
+        return f1 * x / b1
+    if x <= b2:
+        return f1 + (f2 - f1) * (x - b1) / (b2 - b1)
+    if x <= b3:
+        return f2 + (f3 - f2) * (x - b2) / (b3 - b2)
+    return f3 + (1.0 - f3) * (x - b3) / (1.0 - b3)
+
+
+def power_taper(p):
+    """The RETIRED power-law taper as a callable, for reading a pre-s163 report at its own epoch.
+
+    A report's levels were rendered through whatever taper shipped when it was made, so a tool
+    that maps detent -> L on a stored report must use THAT curve, not the current one.  Keeping it
+    reachable is what lets pre-s163 numbers stay reproducible (s124's rule: keep a refuted option
+    selectable, and say at the option that it is refuted)."""
+    return lambda x: (0.0 if x <= 0.0 else (1.0 if x >= 1.0 else x ** p))
 
 # Pot values from circuit.md "LEVEL, BLEND (crossfade mix)".  Only their RATIO matters to the
 # coefficients, but they are written out so the nodal solve is a real circuit, not a rescaling of
@@ -151,35 +193,54 @@ def coef_nodal(B, L):
 
 
 def check_shipped_constant():
-    """K2 precondition: the transcribed taper exponent must still be what FitParams.h ships."""
+    """K2 precondition: the transcribed taper must still be what FitParams.h ships.
+
+    ⚠ s163: this checks ALL SIX PWL constants, not one exponent, and it also refuses if the
+    RETIRED `levelTaperExp` has reappeared -- a header carrying both would mean some consumer is
+    still being fed the power law."""
     try:
         with open(FITPARAMS, encoding="utf-8") as fh:
             src = fh.read()
     except OSError:
         print(f"  K2 WARN  cannot open {FITPARAMS} (run from the repo root to check the "
-              f"constant) -- proceeding with p = {SHIPPED_LEVEL_TAPER_EXP}")
+              f"constants) -- proceeding with the transcribed taper {SHIPPED_LEVEL_TAPER}")
         return
+    found = {}
     for line in src.splitlines():
-        if "levelTaperExp" in line and "=" in line and "//" not in line.split("=")[0]:
-            val = line.split("=")[1].split(";")[0].strip()
-            if abs(float(val) - SHIPPED_LEVEL_TAPER_EXP) > 1e-12:
-                sys.exit(f"GATE K2 FAIL: {FITPARAMS} ships levelTaperExp = {val}, this tool "
-                         f"has {SHIPPED_LEVEL_TAPER_EXP} -- update the constant, do not assume")
-            print(f"  K2 OK   levelTaperExp = {val} confirmed against {FITPARAMS}")
-            return
-    sys.exit(f"GATE K2 FAIL: no levelTaperExp assignment found in {FITPARAMS}")
+        code = line.split("//")[0]
+        if "=" not in code:
+            continue
+        lhs = code.split("=")[0]
+        if "double levelTaperExp" in lhs:
+            sys.exit(f"GATE K2 FAIL: {FITPARAMS} still declares `levelTaperExp` -- it was RETIRED "
+                     f"at session 163 in favour of a 4-segment PWL. Two taper definitions in one "
+                     f"header means some consumer is reading the wrong one.")
+        for nm in LEVEL_TAPER_NAMES:
+            if f"double {nm}" in lhs:
+                found[nm] = float(code.split("=")[1].split(";")[0].strip())
+    missing = [n for n in LEVEL_TAPER_NAMES if n not in found]
+    if missing:
+        sys.exit(f"GATE K2 FAIL: {FITPARAMS} has no assignment for {', '.join(missing)} -- the "
+                 f"shipped LEVEL taper cannot be confirmed, so nothing that maps a knob position "
+                 f"to L below is licensed")
+    got = tuple(found[n] for n in LEVEL_TAPER_NAMES)
+    worst = max(abs(a - b) for a, b in zip(got, SHIPPED_LEVEL_TAPER))
+    if worst > 1e-12:
+        sys.exit(f"GATE K2 FAIL: {FITPARAMS} ships LEVEL taper {got}, this tool has "
+                 f"{SHIPPED_LEVEL_TAPER} (worst {worst:.3e}) -- update the constant, do not assume")
+    print(f"  K2 OK   4-segment LEVEL taper confirmed against {FITPARAMS} "
+          f"(L(0.5) = {level_taper(0.5):.4f})")
 
 
 def gate_k2(out):
     print("\n-- K2: the bleed premise -- is `blend = 1.0` bleed-free? --")
     check_shipped_constant()
-    p = SHIPPED_LEVEL_TAPER_EXP
     xs = [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0]
 
     worst = 0.0
     for B in (0.0, 0.25, 0.5, 0.75, 1.0):
         for x in xs:
-            L = 0.0 if x <= 0.0 else x ** p
+            L = level_taper(x)
             a, b = coef_closed(B, L)
             c, d = coef_nodal(B, L)
             worst = max(worst, abs(a - c), abs(b - d))
@@ -188,11 +249,11 @@ def gate_k2(out):
                  f"the two derivations is wrong, so neither may be quoted")
     print(f"  K2 OK   closed form == independent nodal solve to {worst:.2e} over 45 (B, LEVEL) points")
 
-    print(f"\n  Shipped LevelBlend at BLEND = 1.0 (p = {p}):")
-    print(f"    {'LEVEL':>7}{'L = x^p':>10}{'OD coef':>10}{'CLEAN coef':>12}{'clean re OD dB':>16}")
+    print(f"\n  Shipped LevelBlend at BLEND = 1.0 (4-segment LEVEL taper):")
+    print(f"    {'LEVEL':>7}{'L':>10}{'OD coef':>10}{'CLEAN coef':>12}{'clean re OD dB':>16}")
     tbl = {}
     for x in xs:
-        L = 0.0 if x <= 0.0 else x ** p
+        L = level_taper(x)
         a, b = coef_closed(1.0, L)
         r = 20.0 * math.log10(b / a) if a > 0.0 and b > 0.0 else float("-inf")
         tbl[x] = {"L": L, "od": a, "clean": b, "clean_re_od_db": r}
@@ -201,7 +262,7 @@ def gate_k2(out):
 
     # Mutation control: the test is only meaningful if the coefficient it inspects CAN be zero.
     a_max, b_max = coef_closed(1.0, 1.0)
-    a_mid, b_mid = coef_closed(1.0, NOON ** p)
+    a_mid, b_mid = coef_closed(1.0, level_taper(NOON))
     if b_max != 0.0:
         sys.exit("GATE K2 FAIL: clean coefficient is not exactly 0 at LEVEL max -- the "
                  "bleed-free reference point does not exist, so the whole comparison is void")
@@ -215,7 +276,7 @@ def gate_k2(out):
     print(f"     {tbl[0.125]['clean_re_od_db']:.2f} dB, i.e. essentially half the output.")
     print( "     GATE J's session-102 premise -- 'the clean tap is fully out of circuit' -- is")
     print( "     REFUTED, and with it the structural-impossibility argument built on it.")
-    out["k2"] = {"taper_exp": p, "agreement": worst,
+    out["k2"] = {"taper": list(SHIPPED_LEVEL_TAPER), "agreement": worst,
                  "coefs_blend_max": {str(k): v for k, v in tbl.items()}}
     return tbl
 
@@ -514,14 +575,13 @@ def gate_k5(absfr, ladder, bands, idx, sweeps, out):
 # --------------------------------------------------------------------------------------------
 def gate_k6(caps, out, tbl):
     print("\n-- K6: LEVEL vs bleed exposure inside GATE J's 'bleed-free' set --")
-    p = SHIPPED_LEVEL_TAPER_EXP
     pts = []
     for f, c in caps.items():
         s = c.get("settings", {})
         if "level" not in s or not MG.is_od(f) or s["blend"] != 1.0:
             continue
         x = s["level"]
-        L = 0.0 if x <= 0.0 else x ** p
+        L = level_taper(x)
         a, b = coef_closed(1.0, L)
         frac = b / (a + b) if (a + b) > 0 else float("nan")
         pts.append((x, frac))

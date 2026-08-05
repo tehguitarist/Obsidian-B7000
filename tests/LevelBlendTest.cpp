@@ -18,16 +18,31 @@
 #include <cstdio>
 
 // -----------------------------------------------------------------------------
-// Analytic oracle: level_blend_tf(level, blend, vo, vc, taperExp)
-// Returns Vout given Vo (OD input) and Vc (clean input), using the same
-// power-law taper for LEVEL as the C++ stage.
+// Analytic oracle: level_blend_tf(level, blend, vo, vc)
+// Returns Vout given Vo (OD input) and Vc (clean input).
+//
+// ⚠ s163: the LEVEL taper is a FOUR-SEGMENT PWL, not a power law. The oracle
+// calls `LevelBlend::levelTaper` rather than rebuilding the curve from the
+// constants — deliberately. Re-deriving it here would make this test able to
+// pass while the stage and the oracle disagree about the SHAPE, which is exactly
+// the s146 `masterTaperBreak` failure (four consumers each rebuilding a curve
+// from a renamed parameter). What the oracle independently checks is the
+// NETWORK, which is what it was written for; the taper's own shape is asserted
+// on its own terms by Test 0 below.
 // -----------------------------------------------------------------------------
+static double levelTaperShipped(double x)
+{
+    return LevelBlend::levelTaper(x, LevelBlend::kLevelTaperBreak1, LevelBlend::kLevelTaperFrac1,
+                                  LevelBlend::kLevelTaperBreak2, LevelBlend::kLevelTaperFrac2,
+                                  LevelBlend::kLevelTaperBreak3, LevelBlend::kLevelTaperFrac3);
+}
+
 static double levelBlendOracle(double level, double blend,
-                               double vo, double vc, double taperExp)
+                               double vo, double vc)
 {
     const double L = (level <= 0.0) ? 0.0
                    : (level >= 1.0) ? 1.0
-                   : std::pow(level, taperExp);
+                   : levelTaperShipped(level);
     const double B = blend;
 
     double vw;
@@ -82,8 +97,76 @@ static void check(const char* label, double measured, double expected,
 
 int main()
 {
-    constexpr double p = LevelBlend::kLevelTaperExp;
     constexpr double tol = 0.001; // ±0.001 dB (purely resistive, no freq-dep error)
+
+    // ---- Test 0: the TAPER's own shape (session 163) --------------------
+    // The MasterOutTest Test-0 pattern, for the same reason: the taper is now a
+    // multi-segment PWL, so the properties that make it a POT LAW at all are
+    // separate claims from the network the oracle checks, and none of them is
+    // implied by a good residual. A segment-boundary off-by-one, a lost
+    // ordering, or a re-fit that quietly breaks convexity shows up here and
+    // NOWHERE else in the suite.
+    // ---------------------------------------------------------------------
+    std::printf("=== Test 0: LEVEL taper shape (4-segment PWL) ===\n");
+    {
+        // (a) endpoints EXACT — L(1) = 1 is the bleed-free anchor every absolute
+        //     instrument in the project reads at (GATE AZ6).
+        const bool e0 = levelTaperShipped(0.0) == 0.0;
+        const bool e1 = levelTaperShipped(1.0) == 1.0;
+        std::printf("  %-50s %s\n", "L(0) == 0 exactly", e0 ? "PASS" : "FAIL");
+        std::printf("  %-50s %s\n", "L(1) == 1 exactly", e1 ? "PASS" : "FAIL");
+        failures += (!e0) + (!e1);
+
+        // (b) strictly monotone in the knob — a non-monotone curve is not a pot
+        //     taper whatever its residual.
+        bool mono = true;
+        double prev = -1.0;
+        for (int i = 0; i <= 2000; ++i)
+        {
+            const double v = levelTaperShipped(i / 2000.0);
+            if (v < prev - 1e-15)
+                mono = false;
+            prev = v;
+        }
+        std::printf("  %-50s %s\n", "strictly monotone over [0,1]", mono ? "PASS" : "FAIL");
+        failures += !mono;
+
+        // (c) segment slopes must RISE (convex) — what a real audio track is, and
+        //     a property no term of the fit objective asked for.
+        const double bs[5] = {0.0, LevelBlend::kLevelTaperBreak1, LevelBlend::kLevelTaperBreak2,
+                              LevelBlend::kLevelTaperBreak3, 1.0};
+        const double fs[5] = {0.0, LevelBlend::kLevelTaperFrac1, LevelBlend::kLevelTaperFrac2,
+                              LevelBlend::kLevelTaperFrac3, 1.0};
+        bool convex = true, ordered = true;
+        double lastSlope = -1.0;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (!(bs[i] < bs[i + 1]) || !(fs[i] < fs[i + 1]))
+                ordered = false;
+            const double s = (fs[i + 1] - fs[i]) / (bs[i + 1] - bs[i]);
+            std::printf("    segment %d: x %.4f->%.4f  L %.4f->%.4f  slope %.4f\n",
+                        i + 1, bs[i], bs[i + 1], fs[i], fs[i + 1], s);
+            if (s < lastSlope - 1e-12)
+                convex = false;
+            lastSlope = s;
+        }
+        std::printf("  %-50s %s\n", "breaks and fracs strictly ordered", ordered ? "PASS" : "FAIL");
+        std::printf("  %-50s %s\n", "segment slopes rise (convex)", convex ? "PASS" : "FAIL");
+        failures += (!ordered) + (!convex);
+
+        // (d) the half-rotation fraction, the way a pot taper is actually
+        //     specified. circuit.md calls VR2 a 100k A taper; the textbook band
+        //     is 10-15 %. This is the OUTSIDE corroboration (s146's for MASTER)
+        //     and is asserted only as a loose sanity bound — the fitted value is
+        //     15.41 %, just above the band, and the point is that it moved
+        //     TOWARD it from the retired power law's 21.02 %.
+        const double half = levelTaperShipped(0.5) * 100.0;
+        const bool sane = half > 8.0 && half < 18.0;
+        std::printf("  half-rotation fraction: %.2f %% (A-taper band 10-15 %%; "
+                    "retired power law: 21.02 %%)\n", half);
+        std::printf("  %-50s %s\n", "half rotation within 8-18 %", sane ? "PASS" : "FAIL");
+        failures += !sane;
+    }
 
     // ---- Test 1: LEVEL=0 → OD fully off --------------------------------
     // When LEVEL=0, LEVEL wiper is at VD — no OD contribution.
@@ -94,7 +177,7 @@ int main()
     {
         const double r = measureVout(0.0, b, 1.0, 1.0);
         // Both inputs 1V: clean=1, OD=1. Oracle: vo=1, vc=1.
-        const double exp = levelBlendOracle(0.0, b, 1.0, 1.0, p);
+        const double exp = levelBlendOracle(0.0, b, 1.0, 1.0);
         char label[64];
         std::snprintf(label, sizeof(label), "LEVEL=0 BLEND=%.1f (both 1V)", b);
         check(label, r, exp, tol);
@@ -104,7 +187,7 @@ int main()
     std::printf("\n=== Test 2: LEVEL=1, BLEND=0 (100%% clean) ===\n");
     {
         const double r = measureVout(1.0, 0.0, 1.0, 1.0);
-        const double exp = levelBlendOracle(1.0, 0.0, 1.0, 1.0, p);
+        const double exp = levelBlendOracle(1.0, 0.0, 1.0, 1.0);
         check("LEVEL=1 BLEND=0 (both 1V)", r, exp, tol);
         // At LEVEL=1/BLEND=0 the output should be pure clean (1.0).
         const bool cleanOnly = std::abs(r - 1.0) < 1e-9;
@@ -122,7 +205,7 @@ int main()
     {
         // clean=0, OD=1 → output should be OD=1 (no loading at LEVEL=1).
         const double r = measureVout(1.0, 1.0, 0.0, 1.0);
-        const double exp = levelBlendOracle(1.0, 1.0, 1.0, 0.0, p);
+        const double exp = levelBlendOracle(1.0, 1.0, 1.0, 0.0);
         check("LEVEL=1 BLEND=1 (OD only)", r, exp, tol);
         const bool odOnly = std::abs(r - 1.0) < 1e-9;
         std::printf("  %-50s %s\n", "output = OD (1.0):",
@@ -132,34 +215,51 @@ int main()
     }
 
     // ---- Test 4: Loading effect at noon/noon ---------------------------
-    // At LEVEL=0.5 (audio-tapered to L≈0.371), BLEND=0.5, the OD path
+    // At LEVEL=0.5 (tapered to L≈0.154 since s163), BLEND=0.5, the OD path
     // gain is loaded by the BLEND pot drawing current through the LEVEL
-    // divider. The loading deficit is ~1.8 dB at the power-law taper's
-    // noon (not ~3.5 dB, which was computed for an ideal linear L=0.5).
+    // divider. The deficit is smaller than the ~3.5 dB an ideal linear L=0.5
+    // would give, because a lower L means a lower wiper impedance.
     // ---------------------------------------------------------------------
     std::printf("\n=== Test 4: Loading at noon/noon ===\n");
     {
         // OD only: clean=0, OD=1.
         const double r = measureVout(0.5, 0.5, 0.0, 1.0);
-        const double exp = levelBlendOracle(0.5, 0.5, 1.0, 0.0, p);
+        const double exp = levelBlendOracle(0.5, 0.5, 1.0, 0.0);
 
-        const double L = std::pow(0.5, p);
+        const double L = levelTaperShipped(0.5);
         const double idealOdGain = L * 0.5;
         const double loadingDb = 20.0 * std::log10(r / idealOdGain);
         std::printf("  L=%.4f, B=0.5\n", L);
         std::printf("  loaded OD gain:  %.6f  (%.3f dB)\n", r, 20.0*std::log10(r));
         std::printf("  ideal OD gain:   %.6f  (%.3f dB)\n", idealOdGain, 20.0*std::log10(idealOdGain));
-        std::printf("  loading deficit: %.2f dB (expect ~ −2.0 to −1.5 dB for p=1.43)\n", loadingDb);
+        std::printf("  loading deficit: %.2f dB (an ideal linear L=0.5 would give ~ −3.5)\n", loadingDb);
 
         check("LEVEL=0.5 BLEND=0.5 (OD only)", r, exp, tol);
 
-        // Verify loading deficit is in the ~1-3 dB range (less than ideal L=0.5
-        // because the power-law taper at noon gives L≈0.371 → lower wiper Z).
-        const bool loadingPresent = loadingDb < -1.0 && loadingDb > -3.0;
-        std::printf("  %-50s %s\n", "loading deficit ~1-3 dB range:",
+        // ⚠ s163 REPAIR, and it is the s124 pattern: this assertion used to be a
+        // WINDOW (`-3 dB < deficit < -1 dB`) chosen for the taper that shipped at
+        // the time. The new taper puts noon at L≈0.154 instead of 0.210, which
+        // LOWERS the wiper impedance and therefore legitimately shrinks the
+        // deficit to −1.06 dB — inside the old window by 0.06 dB, i.e. the test
+        // would have passed by luck and would fail the next time the taper moves,
+        // against correct code. The window was never the claim.
+        //
+        // What IS the claim, and it is taper-INDEPENDENT: the BLEND pot loads the
+        // LEVEL divider, so the delivered OD gain must be strictly BELOW the
+        // unloaded divider by exactly the amount the network predicts. Asserting
+        // the closed form is strictly stronger than any window and cannot go
+        // stale — it is a property of the topology, not of the pot law.
+        // vw = (1/(1-L)) / (1/(1-L) + 1/L + 1) with the clean input grounded, and
+        // the BLEND wiper then delivers B = 0.5 of it.
+        const double predicted = (1.0 / (1.0 - L)) / (1.0 / (1.0 - L) + 1.0 / L + 1.0) * 0.5;
+        const double predErr = std::abs(20.0 * std::log10(r / predicted));
+        const bool loadingPresent = loadingDb < 0.0 && loadingDb > -3.5;
+        const bool matchesForm = predErr < 1e-9;
+        std::printf("  %-50s %s\n", "loading present and bounded (0 to -3.5 dB):",
                      loadingPresent ? "PASS" : "FAIL");
-        if (!loadingPresent)
-            ++failures;
+        std::printf("  %-50s %s (err %.2e dB)\n", "matches the closed-form loaded divider:",
+                     matchesForm ? "PASS" : "FAIL", predErr);
+        failures += (!loadingPresent) + (!matchesForm);
 
         // Clean path gain is also affected (loaded up by the BLEND network).
         const double rClean = measureVout(0.5, 0.5, 1.0, 0.0);
@@ -240,7 +340,7 @@ int main()
         // measureVout takes (cleanAmp, odAmp) = (vc, vo).
         // Oracle takes (vo, vc).
         const double r = measureVout(pt.level, pt.blend, pt.vc, pt.vo);
-        const double exp = levelBlendOracle(pt.level, pt.blend, pt.vo, pt.vc, p);
+        const double exp = levelBlendOracle(pt.level, pt.blend, pt.vo, pt.vc);
         char label[64];
         std::snprintf(label, sizeof(label), "L=%.2f B=%.2f", pt.level, pt.blend);
         check(label, r, exp, tol);

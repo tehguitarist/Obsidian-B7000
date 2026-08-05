@@ -223,7 +223,15 @@ static const FitField kFitFields[] = {
     // coreLimit()); beta>0 = expansive/in-phase H3. Supersedes jfetCeilK.
     {"jfetExpandBeta", &FitParams::jfetExpandBeta},
     {"driveTaperExp", &FitParams::driveTaperExp},
-    {"levelTaperExp", &FitParams::levelTaperExp},
+    // ⛔ `levelTaperExp` was RETIRED at session 163 (4-segment PWL, see FitParams.h). It is
+    // deliberately absent rather than aliased, so a stale `--fit levelTaperExp=` fails loudly
+    // instead of appearing to work — the s115 `masterTaperExp` pattern.
+    {"levelTaperBreak1", &FitParams::levelTaperBreak1},
+    {"levelTaperFrac1", &FitParams::levelTaperFrac1},
+    {"levelTaperBreak2", &FitParams::levelTaperBreak2},
+    {"levelTaperFrac2", &FitParams::levelTaperFrac2},
+    {"levelTaperBreak3", &FitParams::levelTaperBreak3},
+    {"levelTaperFrac3", &FitParams::levelTaperFrac3},
     {"masterTaperBreak", &FitParams::masterTaperBreak},
     {"masterTaperFrac", &FitParams::masterTaperFrac},
     {"masterTaperBreak2", &FitParams::masterTaperBreak2},

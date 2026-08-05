@@ -107,8 +107,8 @@ MUTATIONS = [
     ("shipped LEVEL taper not checked",
      None, "GATE K2 FAIL",
      "    LLG.check_shipped_constant()",
-     "    LLG.SHIPPED_LEVEL_TAPER_EXP = 9.99; LLG.check_shipped_constant()",
-     "move the transcribed taper exponent off what FitParams.h ships -- `cf` is computed through "
+     "    LLG.SHIPPED_LEVEL_TAPER = (0.9, 0.91, 0.92, 0.93, 0.94, 0.95); LLG.check_shipped_constant()",
+     "move the transcribed taper off what FitParams.h ships -- `cf` is computed through "
      "it, so an unchecked taper silently mis-bins every row (session 113's own defect)"),
 ]
 

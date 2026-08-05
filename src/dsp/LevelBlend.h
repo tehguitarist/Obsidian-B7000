@@ -29,7 +29,8 @@
 //
 // LEVEL pot (100k A) split: Rup = (1-L)*100k, Rdn = L*100k
 // BLEND pot (100k B) split: R_od = (1-B)*100k, R_cl = B*100k
-// where L = powerLawTaper(x_level, 1.0, kLevelTaperExp) ∈ [0,1]
+// where L = levelTaper(x_level, ...) ∈ [0,1]  — a 4-segment PWL since s163;
+//         ⛔ NOT a power law any more, see the constants block below
 //       B = x_blend (linear — B-taper)
 //
 // KCL at Vw (LEVEL wiper):
@@ -75,10 +76,71 @@ class LevelBlend
 public:
     LevelBlend() = default;
 
-    // Taper exponent for LEVEL's audio taper (power law, per dsp.md §tapers).
-    // p ≈ 1.43 is a reasonable starting guess for a real audio pot. Fit to
-    // captures at Phase 7.
-    static constexpr double kLevelTaperExp = 1.43;
+    // ---- LEVEL audio-taper shape — FOUR-SEGMENT PIECEWISE LINEAR -------------
+    // ⭐⭐ SESSION 163 — THE POWER LAW IS RETIRED (`kLevelTaperExp = 1.43`, then
+    // `FitParams::levelTaperExp = 2.25` from session 8). The wiper reaches
+    // `Frac_i` of full resistance at rotation `Break_i`; linear in between and
+    // either side. Both endpoints are EXACT by construction and no parameter can
+    // move them, which the topology requires:
+    //   x = 0 → 0 (wiper on VD, no OD)   x = 1 → 1 (the bleed-free anchor).
+    //
+    // ⚠⚠ THAT SECOND ENDPOINT IS LOAD-BEARING FAR BEYOND THIS STAGE. L(1) = 1
+    // makes the clean coefficient EXACTLY zero at LEVEL = BLEND = max, and that
+    // exact zero is the bleed-free corner every absolute instrument in the
+    // project anchors on (GATE K7's ratio, GATE O's A3 ledger, GATE L's |rho|,
+    // `OdToneRestore`'s base row, GATE W/AE's bleed-free membership). GATE AZ6
+    // asserts it is bit-identical across this change.
+    //
+    // WHY IT MOVED, in one line: measured against the pedal's own LEVEL ladder,
+    // the shipped power law is 2.844 dB rms out (worst 7.638) where a free
+    // monotone curve reaches 0.344 — and 0.344 is inside the target's OWN
+    // across-stimulus ambiguity of 0.755 dB. GATE K's closure (s103, "THE TAPER
+    // CANNOT FIX IT") was measured on the single-EXPONENT family, and "no single
+    // exponent reaches" is a different claim from "no monotone taper reaches" —
+    // the distinction s115/s146 were already forced to draw on the MASTER pot.
+    // Full derivation: GATE AY (`analysis/level_taper_reshape.py`, s162) and
+    // GATE AZ (`analysis/level_taper_fit.py`, s163).
+    //
+    // ⭐⭐ WHY FOUR SEGMENTS AND NOT THREE (s146's MASTER precedent is a FAMILY,
+    // not a number): 3 segments reaches only 0.480 dB rms and misplaces the
+    // 0.875 detent by 0.19 in L, with a sign-alternating residual; 4 reaches
+    // 0.340 — the architectural floor — and a 5-segment control returns the
+    // 4-segment answer to the digit, so the family SATURATES at 4. That is the
+    // stopping proof, not a parameter-count argument. And the fitted curve sits
+    // INSIDE the requirement's own per-detent spread at EVERY detent (worst
+    // 0.085 of it), which is the overfitting test in the constant's own units.
+    //
+    // ⭐ Outside corroboration no term of the objective knew about: the segment
+    // slopes RISE monotonically (0.174 → 0.413 → 0.791 → 4.034, i.e. convex — a
+    // physically buildable resistive track), and the half-rotation fraction goes
+    // 21.02 % → 15.41 %, TOWARD the textbook A-taper 10–15 % band that
+    // circuit.md specifies for VR2 (100k A). `LevelBlendTest` Test 0 asserts the
+    // shape and FAILS if convexity, monotonicity or an endpoint is lost.
+    //
+    // ⚠ The last segment is a LOWER bound on its own steepness: GATE AY3 reports
+    // the LEVEL-max requirement as `above` (the pedal wants more than L = 1 can
+    // deliver), so it is clamped by the anchor rather than met.
+    static constexpr double kLevelTaperBreak1 = 0.219415;
+    static constexpr double kLevelTaperFrac1 = 0.038146;
+    static constexpr double kLevelTaperBreak2 = 0.529680;
+    static constexpr double kLevelTaperFrac2 = 0.166340;
+    static constexpr double kLevelTaperBreak3 = 0.857645;
+    static constexpr double kLevelTaperFrac3 = 0.425688;
+
+    // The taper itself, as a free function so tests, the oracle and any future
+    // consumer read ONE implementation rather than rebuilding the curve from the
+    // constants — the s146 `masterTaperBreak` trap, where four consumers would
+    // each have silently rebuilt a two-segment curve from a renamed parameter.
+    static constexpr double levelTaper(double x, double b1, double f1, double b2, double f2,
+                                       double b3, double f3) noexcept
+    {
+        return (x <= 0.0)  ? 0.0
+             : (x >= 1.0)  ? 1.0
+             : (x <= b1)   ? (f1 * x / b1)
+             : (x <= b2)   ? (f1 + (f2 - f1) * (x - b1) / (b2 - b1))
+             : (x <= b3)   ? (f2 + (f3 - f2) * (x - b2) / (b3 - b2))
+                           : (f3 + (1.0 - f3) * (x - b3) / (1.0 - b3));
+    }
 
     void prepare(double /*sampleRate*/) noexcept {}
 
@@ -86,17 +148,26 @@ public:
 
     void setLevel(double x) noexcept
     {
-        // x ∈ [0,1], audio taper via power law: L = x^p.
-        // L = 0 → wiper at VD (min OD), L = 1 → wiper at OD input (max OD).
+        // x ∈ [0,1]. L = 0 → wiper at VD (min OD), L = 1 → wiper at OD input.
         knob = x;
-        L = pedal::taper::powerLawTaper(x, 1.0, levelTaperExp);
+        // Fall back to the compiled defaults unless the WHOLE set is ordered and
+        // in range — a partially-valid set would silently produce a curve that is
+        // not monotone, i.e. not a pot law at all (MasterOut::setMaster's guard,
+        // which exists for the same reason).
+        const bool ok = tb1 > 1.0e-9 && tb1 < tb2 && tb2 < tb3 && tb3 < 1.0
+                        && tf1 > 0.0 && tf1 < tf2 && tf2 < tf3 && tf3 < 1.0;
+        L = ok ? levelTaper(x, tb1, tf1, tb2, tf2, tb3, tf3)
+               : levelTaper(x, kLevelTaperBreak1, kLevelTaperFrac1, kLevelTaperBreak2,
+                            kLevelTaperFrac2, kLevelTaperBreak3, kLevelTaperFrac3);
     }
 
-    // Phase-7 capture fit (FitParams.h): re-applies the CURRENT knob position
-    // through the new curve, so a taper refit doesn't leave a stale L behind.
-    void setTaperExp(double p) noexcept
+    // Capture fit (FitParams.h): re-applies the CURRENT knob position through the
+    // new curve, so a taper refit doesn't leave a stale L behind.
+    void setTaper(double b1, double f1, double b2, double f2, double b3, double f3) noexcept
     {
-        levelTaperExp = p;
+        tb1 = b1; tf1 = f1;
+        tb2 = b2; tf2 = f2;
+        tb3 = b3; tf3 = f3;
         setLevel(knob);
     }
 
@@ -177,8 +248,12 @@ private:
     double L = 1.0; // LEVEL taper-mapped position [0,1] (default = max OD)
     double B = 0.0; // BLEND position [0,1] (default = 100% clean)
     bool distEngage = true; // true = normal BLEND behaviour
-    // Phase-7 capture-fit taper shape + the knob position it was applied to.
-    double levelTaperExp = kLevelTaperExp;
+    // Capture-fit taper shape + the knob position it was applied to. Defaults are
+    // the fitted s163 values, so a default-constructed LevelBlend matches the
+    // shipped FitParams.
+    double tb1 = kLevelTaperBreak1, tf1 = kLevelTaperFrac1;
+    double tb2 = kLevelTaperBreak2, tf2 = kLevelTaperFrac2;
+    double tb3 = kLevelTaperBreak3, tf3 = kLevelTaperFrac3;
     double knob = 1.0;
 
     LevelBlend(const LevelBlend&) = delete;

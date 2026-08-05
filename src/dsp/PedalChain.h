@@ -295,7 +295,12 @@ public:
         odCoupling.setC(f.clipC15);                // session-36: A3 step-3b, C15 coupling into IC2_B
 
         drive.setTaperExp(f.driveTaperExp);
-        levelBlend.setTaperExp(f.levelTaperExp);
+        // ⚠ s163: LEVEL is a 4-segment PWL, not an exponent. `setTaperExp` no longer exists on
+        // LevelBlend, so a consumer that missed the change fails to COMPILE rather than silently
+        // rebuilding the retired power law (the s146 `masterTaperBreak` lesson, made mechanical).
+        levelBlend.setTaper(f.levelTaperBreak1, f.levelTaperFrac1,
+                            f.levelTaperBreak2, f.levelTaperFrac2,
+                            f.levelTaperBreak3, f.levelTaperFrac3);
         syncOdToneMix();   // the LEVEL taper moves the clean fraction — see applyParams()
         masterOut.setTaper(f.masterTaperBreak, f.masterTaperFrac,
                            f.masterTaperBreak2, f.masterTaperFrac2);

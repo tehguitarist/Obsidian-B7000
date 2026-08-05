@@ -269,20 +269,30 @@ def sallen_key_lpf_tf(f, R1, R2, C1, C2):
     s = 2j * np.pi * f
     return 1.0 / (1.0 + s * C2 * (R1 + R2) + s * s * R1 * R2 * C1 * C2)
 
-def level_blend_tf(level, blend, vo=1.0, vc=0.0, p=1.43):
+def level_blend_tf(level, blend, vo=1.0, vc=0.0, p=None):
     """LEVEL (VR2) + BLEND (VR1) — loaded resistive network, DC transfer.
 
     A 1-node KCL solve for the loaded LEVEL/BLEND pot pair (see LevelBlend.h
     for full circuit topology). Returns Vout for a given OD (vo) and clean (vc)
-    input, with the LEVEL taper exponent p (power law: L = level^p).
+    input.
 
-    At Phase 7, p is fit to the blend-0700/1200 captures; this default matches
-    kLevelTaperExp = 1.43 in the C++ stage (dsp.md §tapers recommended start).
+    ⚠⚠ SESSION 163 — `p` NO LONGER DEFAULTS TO A POWER-LAW EXPONENT. The shipped
+    LEVEL taper is a 4-segment PWL, so `p=None` (the default) maps the knob
+    through `level_law_gate.level_taper`, which is checked against FitParams.h.
+    Passing a float still evaluates the RETIRED power law, and that is kept
+    reachable ON PURPOSE so a pre-s163 report can be read at its own epoch — but
+    it is no longer what "the taper" means. A caller that silently relied on the
+    old default would otherwise have kept rebuilding the retired curve while
+    importing cleanly, which is the s146 `masterTaperBreak` failure.
 
     Referenced by tests/LevelBlendTest.cpp as the analytic oracle.
     """
-    # LEVEL taper (power law).
-    L = 0.0 if level <= 0.0 else (1.0 if level >= 1.0 else level ** p)
+    # LEVEL taper: the shipped PWL unless an explicit power-law exponent is given.
+    if p is None:
+        import level_law_gate as _K
+        L = _K.level_taper(float(level))
+    else:
+        L = 0.0 if level <= 0.0 else (1.0 if level >= 1.0 else level ** p)
     B = np.clip(blend, 0.0, 1.0)  # B-taper = linear
 
     # LEVEL wiper voltage (loaded by the 100k BLEND pot).

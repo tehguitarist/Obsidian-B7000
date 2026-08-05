@@ -141,7 +141,7 @@ def clean_fraction(settings, taper=True):
     U3 can reproduce what session 112 actually computed."""
     L = float(settings["level"])
     if taper:
-        L = L ** K.SHIPPED_LEVEL_TAPER_EXP
+        L = K.level_taper(L)
     od, cl = K.coef_closed(float(settings["blend"]), L)
     if od + cl <= 0.0:
         return float("nan")             # LEVEL 0 at BLEND max: the model mutes (GATE L7)
@@ -152,7 +152,7 @@ def clean_re_od_db(settings, taper=True):
     """The clean coefficient relative to the OD coefficient, in dB -- GATE K2's own quantity."""
     L = float(settings["level"])
     if taper:
-        L = L ** K.SHIPPED_LEVEL_TAPER_EXP
+        L = K.level_taper(L)
     od, cl = K.coef_closed(float(settings["blend"]), L)
     if od <= 0.0:
         return float("nan")
@@ -752,7 +752,7 @@ def main():
     print(f"    FR read: {used}   graded {MG.GRADE_LO:g}-{MG.GRADE_HI:g} Hz   "
           f"OD rows {len(od_rows)}   ex-HF bands {len(non_hf)} of {len(idx)}")
     print(f"    dropouts excluded: {len(drops)}   LEVEL taper exponent "
-          f"{K.SHIPPED_LEVEL_TAPER_EXP}\n")
+          f"the shipped 4-segment PWL, L(0.5) = {K.level_taper(0.5):.4f}\n")
 
     out = {"report": args.report, "method": used, "n_od_rows": len(od_rows),
            "bleed_tol": BLEED_TOL, "min_dlevel": MIN_DLEVEL}

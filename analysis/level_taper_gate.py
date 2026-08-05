@@ -84,7 +84,12 @@ import matrix_grade as MG
 import level_law_gate as K
 
 NOON = 0.5
-SHIPPED_P = K.SHIPPED_LEVEL_TAPER_EXP          # 2.25, and K2 checks it against FitParams.h
+# ⚠ s163: the shipped LEVEL taper is a 4-segment PWL, not an exponent.  `SHIPPED_TAPER` is the
+# CALLABLE knob -> L, imported from GATE K so the two cannot drift; K2 checks it against the
+# header.  ⛔ A stored report from before s163 was rendered through the RETIRED power law and
+# must be read with `K.power_taper(K.RETIRED_LEVEL_TAPER_EXP)` instead -- the epoch is part of
+# the report, not of this module.
+SHIPPED_TAPER = K.level_taper
 SWEEPS = ["sweep_clean", "sweep_drv_-18", "sweep_drv_-12", "sweep_drv_-6"]
 
 # Settings that must be identical between the ladder and the two endpoint captures.  `level` and
@@ -134,10 +139,10 @@ def gate_l1(out):
     if b_of(1.0) != 0.0:
         sys.exit("GATE L1 FAIL: b is not exactly 0 at LEVEL max -- the pure-OD endpoint that "
                  "|rho| is measured against does not exist")
-    if b_of(NOON ** SHIPPED_P) <= 0.0:
+    if b_of(SHIPPED_TAPER(NOON)) <= 0.0:
         sys.exit("GATE L1 FAIL: b is 0 at noon too -- there is no bleed to identify and this "
                  "gate is testing nothing (empty-gate-must-fail)")
-    print(f"  MUTATION OK  b = 0 exactly at LEVEL max and {b_of(NOON ** SHIPPED_P):.4f} at noon, "
+    print(f"  MUTATION OK  b = 0 exactly at LEVEL max and {b_of(SHIPPED_TAPER(NOON)):.4f} at noon, "
           f"so the endpoint\n               is real and the bleed term is not identically zero.")
     out["l1"] = {"worst": worst}
 
@@ -268,16 +273,16 @@ def gate_l3(absfr, lad, fc, fo, nonhf, out):
     sw = "sweep_clean"
     Lm, rms, n_eq, n_par, spread, sols = invert(absfr, lad, fc, fo, sw, 0, nonhf)
     xs = sorted(lad)
-    err = {x: Lm[x] - x ** SHIPPED_P for x in xs if 0.0 < x < 1.0}
+    err = {x: Lm[x] - SHIPPED_TAPER(x) for x in xs if 0.0 < x < 1.0}
     worst = max(abs(v) for v in err.values())
     print(f"    {len(sols)} starts spanning p = 0.5 .. 4.0 plus 3 random monotone vectors")
     print(f"    {n_eq} equations, {n_par} free parameters, fit rms {rms:.4f} dB")
-    print(f"    {'x':>7}{'L recovered':>14}{'x^2.25':>10}{'error':>11}")
+    print(f"    {'x':>7}{'L recovered':>14}{'L shipped':>10}{'error':>11}")
     for x in xs:
-        e = f"{Lm[x] - x ** SHIPPED_P:+.6f}" if 0.0 < x < 1.0 else "  (uninformative)"
-        print(f"    {x:7.3f}{Lm[x]:14.6f}{x ** SHIPPED_P:10.6f}{e:>11}")
+        e = f"{Lm[x] - SHIPPED_TAPER(x):+.6f}" if 0.0 < x < 1.0 else "  (uninformative)"
+        print(f"    {x:7.3f}{Lm[x]:14.6f}{SHIPPED_TAPER(x):10.6f}{e:>11}")
     if worst > KA_TOL:
-        sys.exit(f"GATE L3 FAIL: the inverse does not recover L = x^{SHIPPED_P} on the model "
+        sys.exit(f"GATE L3 FAIL: the inverse does not recover the SHIPPED taper on the model "
                  f"(worst {worst:.2e} > {KA_TOL:.0e}) -- it is measuring something else, so the "
                  f"pedal recovery below is not interpretable")
     if spread > IDENT_TOL:
@@ -447,7 +452,7 @@ def gate_l8(absfr, lad, fc, fo, nonhf, out):
         meas = float(np.mean(pb(lad[1.0], which) - pb(lad[0.875], which)))
         # the network's own prediction at the SHIPPED taper, per band, c = 0 (the fitted value)
         def amp(x):
-            L = x ** SHIPPED_P
+            L = SHIPPED_TAPER(x)
             return a_of(L) * np.sqrt(1.0 + ((1.0 - L) * rho) ** 2)
         pred = float(np.mean(20.0 * np.log10(amp(1.0) / amp(0.875))))
         rows[side] = (meas, pred)
