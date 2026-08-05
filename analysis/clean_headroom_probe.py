@@ -50,7 +50,14 @@ MARGIN = 0.95
 
 # GainStaging.h, mirrored here so the printed volts are honest. Kept as a literal on purpose:
 # the point of the probe is to test this number, so it must not be read from the thing under test.
-K_INPUT_REF_SHIPPED = 3.377
+# ⚠⚠ CORRECTED s160 (item 4): this read 3.377 — the SESSION-17 value — for ~120 sessions, while
+# GainStaging.h shipped 1.2596 from s44 and 0.90 from s109. So every volt this probe printed was
+# 3.75x too high, and its `kInputRef <=` bound was being compared against a number the plugin had
+# not carried since session 44. The bound's METHOD is unaffected (it derives an onset in volts from
+# the render and divides by K); only the printed volts and the headroom verdict move.
+# ⛔ Being a deliberate literal is what let this rot — a literal must still be re-checked against
+# the source when the source ships a new value (`verify-the-CONSTANT-not-the-prose`).
+K_INPUT_REF_SHIPPED = 0.90
 
 # The pedal's own hottest ladder rung. gen_test_signal.py::LEVEL_STEPS_DB tops out at -3 dBFS,
 # and the pedal is at its floor there (session 39) — so this is the level the bound is taken at.
@@ -64,7 +71,15 @@ CASES = [
     ("treble-1700_gain-n12_base-clean.wav", "TREBLE boost max"),
     ("lomid-1700_gain-n12_base-clean.wav", "LO-MID boost max"),
     ("himid-1700_gain-n12_base-clean.wav", "HI-MID boost max"),
-    ("master-1700_gain-n12_base-clean.wav", "MASTER max"),
+    # ⛔ ("master-1700_gain-n12_base-clean.wav", "MASTER max") was here and is EXCLUDED BY NAME
+    # (s160, item 4). Two independent defects, either one fatal to a HEADROOM probe:
+    #   * GATE T: the file is a duplicated / mis-dialled knob position reading 4.447 dB LOW, and is
+    #     neither top detent — so it understates how hard the chain is actually driven.
+    #   * s142: its `lvl_-3` rung is the one segment s115 measured PINNED, i.e. that tone is a
+    #     capture-side ceiling. An onset probe reads a ceiling as "the chain broke up here".
+    # MASTER is a post-EQ attenuator at unity when max, so it adds no gain the boost cases above
+    # do not already cover — nothing is lost by dropping it. Corrected levels for a duplicated
+    # detent come from `master_anchor_gate.detent_corrections()`; do NOT re-add this file raw.
 ]
 
 # THD threshold for "the chain has started to break up". The pedal reads 0.0000% at every rung and

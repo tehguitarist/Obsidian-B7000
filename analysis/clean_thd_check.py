@@ -38,7 +38,13 @@ CANDIDATES = [
     "treble-1700_gain-n12_base-clean.wav",
     "lomid-1700_gain-n12_base-clean.wav",
     "himid-1700_gain-n12_base-clean.wav",
-    "master-1700_gain-n12_base-clean.wav",
+    # ⛔ `master-1700_gain-n12_base-clean.wav` was here and is EXCLUDED BY NAME (s160, item 4).
+    # It is unusable twice over: GATE T proved it is a duplicated / mis-dialled knob position
+    # reading 4.447 dB LOW (it is not either top detent), and s142 found its `lvl_-3` rung is the
+    # one segment s115 measured PINNED — so its hottest tone is a capture-side ceiling, which is
+    # precisely what a clean-THD probe would misread as the pedal breaking up.
+    # Anyone needing a corrected absolute level for a duplicated detent: use
+    # `master_anchor_gate.detent_corrections()` — do NOT re-add this file raw.
     "bass-0930_base-clean.wav",
     "treble-0930_base-clean.wav",
 ]

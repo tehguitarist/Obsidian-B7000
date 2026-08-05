@@ -19106,3 +19106,736 @@ that would move it is A3 (the OD path's absolute quietness), not this stage's ga
 4. Everything from s155's own `▶ NEXT` is unchanged and still open.
 
 ⚠ **Uncommitted at this point: sessions 150–156 together.**
+
+## SESSION 157
+
+Picked up session 156's own `▶ NEXT` #1 — *"`kPeakGainDb` may now be worth revisiting: at the
+listening condition the ~450 Hz peak is 0.3–1.1 dB LESS prominent than the pedal's at low/mid
+drive; it was zeroed against bleed-free data where the opposite held."* That is a well-motivated
+item, because s156 had just proved this stage's bleed-free-only fit wrong at the listening
+condition for the NOTCH, and the obvious inference is that the peak has the same disease.
+
+**It does have the same disease — and `kPeakGainDb` still ships as zero, for a completely different
+reason than the one written at the constant.** New gate: `analysis/peak_identifiability_gate.py`
+(GATE AU) + `analysis/_mutate_gate_au.py` (**9/9 arms**, five computed-verdict). Report:
+`analysis/reports/s157_peak_identifiability.json`. No constant changed.
+
+### 1. ⭐⭐⭐ THE STATISTIC THAT REPORTED THE DEFICIT CANNOT SEE THE PEAK'S HEIGHT — AND IT IS STRUCTURAL
+
+s156 §4 read the deficit off GATE W's `mid_peak` prominence. That window is a FIXED
+**[358, 620] Hz** band and the 320 Hz null sits *below* it. Census over 24 (set × drive × sweep)
+readings: **48 of 48 prominence walks terminate at a window BOUND**; not one turns back.
+
+⭐⭐ And it is not a property of this capture set. `locate()` sets `dd = d[m]` (min) or `-d[m]`
+(max), takes `j = argmin(dd)`, then breaks each walk on `dd[k] < dd[j]` — **but `j` IS the argmin
+over the whole window, so `dd[k] >= dd[j]` for every `k` and the break is unreachable**, for every
+feature, every curve, min and max alike. Asserted on 20 000 adversarial random windows (0 breaks),
+not merely argued (s145's AM4 discipline).
+
+⇒ `prom` has never been a topographic prominence anywhere in this project. It is
+`min(left max-descent, right max-descent)` inside a fixed window, so a wider window can only
+enlarge it for the identical feature. Here both curves fall **monotonically** from the peak to both
+bounds (max-descent minus drop-to-bound: worst **0.000e+00 dB** over 48 walks), so it reduces
+EXACTLY to `min(d[peak] − d[358], d[peak] − d[620])` — a two-point read of the window's own bounds,
+i.e. of the **320 Hz null's and the bridged-T's flanks**, not of the peak.
+
+⚠ `locate`'s own `edge` flag does **not** catch this: it fires on the EXTREMUM, which is interior
+in 24 of 24 readings, so the flag reads clean throughout.
+
+⚠⚠ **SCOPE — what this does and does not touch.** As a **DETECTOR** the statistic is unharmed: a
+real feature does descend on both sides, and GATE AE's *"no interior extremum in 9 of 9"* is
+threshold-free and untouched. What it cannot be is a **HEIGHT**, or a comparison between two sides
+whose extrema sit at different places in the window. That is s126's and s151's finding with the
+**mechanism proven** instead of observed — and it is the fourth instance of
+`a-statistic-can-be-a-fine-DETECTOR-and-a-catastrophic-OBJECTIVE` on this one stage (depth s151,
+Q s153, now the peak).
+
+### 2. ⚠ READ ANYWAY, THE DEFICIT CHANGES SIGN
+
+Printed with **both operands and the binding side** (`difference-statistics-hide-common-mode`), the
+pedal-minus-model prominence runs **+1.083 … −0.854 dB** at the listening condition (10 positive,
+5 negative of 15) and **+1.350 … −2.984 dB** bleed-free (3 positive, 6 negative of 9). s156's
+"0.3–1.1 dB less prominent" describes the low/mid-drive rungs only. A constant cannot move a
+quantity that crosses zero inside the population it is fitted over (s128's GATE Z, third axis).
+
+⚠ The binding operand also flips (`RR` → `LR` → `LL` across the ladder), so at several rungs the
+"deficit" differences two different physical quantities.
+
+### 3. ⭐⭐ THE BOUND-FREE FIT: s151's STATED REASON IS REFUTED
+
+The honest estimator is the joint (notch + peak + discarded quadratic trend) fit's own peak gain —
+what `kPeakGainDb` would actually be set from. Bound-resting flagged at a **relative** tolerance
+(0.1 % of each parameter's range; a first draft used an absolute 1e−6 and under-reported).
+
+Unpegged fits: **+1.44 dB mean at the listening condition (n=7, +1.00…+1.94) against −4.30 dB
+bleed-free (n=2, −5.60…−2.99)**. ⇒ the requested gain **changes sign with the mix**, exactly as
+s156 found for the notch, so s151's *"the model's peak is MORE prominent in 8 of 9 cells, boosting
+would overshoot"* rests on the wrong set and must not be re-quoted.
+
+⚠ Corroborating rather than load-bearing: **15 of 24** fits rest a parameter on a bound
+(`bound-resting-means-unidentified`), and the requested gain spans **15.25 dB** across the three
+stimulus sweeps at one fixed (set, DRIVE) cell — s151 §6's architectural limit on a third axis,
+after AQ2b's Q and AR6's metric residual.
+
+### 4. ⭐⭐⭐ DECISIVE — THE PEAK TERM IS NOT SEPARABLE FROM A3
+
+`od_tone_restore_fit`'s own `FIT_BAND` block states that the quadratic-in-log-f trend the fit
+discards **is A3**. So a peak term that trend can already reproduce is A3 wearing a biquad. Measured
+as `keep` — the fraction of a candidate's own norm surviving projection onto the trend basis over
+250–850 Hz:
+
+| term | keep |
+|---|---|
+| shipped peak, f0 405 Hz **Q 2.20** | **0.313** |
+| shipped notch, f0 323 Hz, Q 3.05–18.19 (all 15 cells) | 0.420–0.864, **median 0.848** |
+
+⇒ the notch term — the one this stage has already accepted as identified (s156 measured it buying
+**1.56 dB** of fit against the 800 Hz candidate's 0.058) — is **2.71×** more separable from A3 than
+the peak term is. A fitted **+1.3 dB** peak gain therefore delivers only **+0.41 dB** of shape the
+trend could not already have explained; the rest is `one-knob-two-jobs-is-compensating`, and is
+exactly how s156 §3 rejected the 800 Hz candidate ("A3 seen as a shape").
+
+⭐⭐ **And it is structural, not a tuning miss.** Separability is **monotone in Q** on this band —
+0.011 / 0.087 / 0.187 / **0.313** / 0.423 / 0.594 / 0.721 / 0.803 / 0.877 at Q = 0.5 / 1 / 1.5 /
+**2.2** / 3 / 5 / 8 / 12 / 20 — so a section only reaches the notch's 85 % above **Q ≈ 20**, while
+this feature is BROAD by nature (it is the recovery *between* two notches). **The shape that would
+be identifiable here is not the shape the feature has**, so no (gain, Q) choice fixes it.
+
+⚠ NOT claimed: that the device has no ~450 Hz peak, or that the model matches it. `keep` is a
+property of this trend basis over this band, and AU1b independently re-reads the CENTRE error
+(model/pedal median **1.093×**, 22 of 24 readings high) — which `kPeakGainDb` does not address and
+GATE W has already classified as NOT a corner error.
+
+### 5. ⚠ TWO INSTRUMENT DEFECTS IN THIS GATE'S OWN FIRST DRAFT, BOTH CAUGHT BY THE MUTATION RUNNER
+
+**(a) A known answer that demanded more than the conclusion needs.** AU1 first asserted that a
+bound-terminated walk's rise EQUALS the drop to that bound. True on the real curves (0.000e+00) and
+false in general — the walk reports the MAXIMUM descent, which equals the drop to the bound only if
+the curve is monotone along the way. The arm that injected a non-monotone curve duly died on the
+gate's own guard rather than exercising the verdict. Replaced with the **inequality** (which is the
+general fact) plus the gap reported as a measured column, whose being zero is then a *finding*
+about the curves rather than an assumption. s152's rule, second occurrence.
+
+**(b) AU4's verdict was NARRATED.** The first draft printed the "mostly A3" paragraph
+unconditionally, so it would have survived any mutation of the data — `computed-verdicts-not-
+narrated`, inside the one sub-gate the gate's conclusion rests on. It now branches on the measured
+`notch_keep / peak_keep` ratio against the **notch term measured in the same run**, not a number
+chosen here, and arm `au4-separable` drives it to the opposite branch. **Writing the runner is what
+exposed it** — which is the argument for writing one at all.
+
+### 6. ⛔⛔ A STALE `src/` BLOCK CORRECTED: THE MIX-SHAPE CLAMP WAS DESCRIBED AS SHIPPED AND IS NOT
+
+`OdToneRestore.h`'s `kMixS` block still read *"THE FLAT SEGMENT BELOW kMixCf[1] IS A DELIBERATE
+CHOICE…"*, said the table was *"forced MONOTONE"*, and told a future reader that to get the raw
+measured law they should *"set `S_CLAMP_CF = 0.0` and re-emit"*. All three are wrong about the
+shipped state: s156 **built the clamp, measured the composite null 9.6–11.6 dB too deep at
+LEVEL/BLEND max, and reverted it** — `S_CLAMP_CF` is already `0.0`, and the shipped
+`kMixS = {0.951, −0.525, −0.195, 0.000, 0.017, 0.177, 0.224, 0.252}` is the raw **non-monotone**
+shape (verified: `S(0) = +0.951` against `S(0.21) = −0.525`).
+
+The refutation had landed in s156's session log and in CLAUDE.md's CLOSED/REFUTED table but **not
+at the constant**, which is where a session choosing a value reads — `a-refutation-has-to-land-
+where-the-thing-is-CHOSEN` (s124), and the block would have positively invited re-adding the clamp.
+Rewritten to describe what ships, including *why* the non-monotone shape is physically expected
+(the required cut peaks at intermediate mix because that is where the model's own null is diluted
+hardest while the pedal's target is still deep). ⚠ The **censoring itself is not refuted** — the
+bleed-free corner is still the least resolvable reading in the set; what is refuted is clamping as
+the response to it.
+
+### 7. ✅ BUILD / TEST STATE
+
+Both `src/` edits are **comments only** (`OdToneRestore.h`: the `kMixS` block and the
+`kPeakGainDb` block). Rebuilt **once**, after the last edit, with `pgrep` run first and no render
+in flight (s124's check, s152's lesson that a closing prose pass re-arms the staleness it just
+documented). ✅ **Verified by measurement, not asserted: GATE AU's stored report is BYTE-IDENTICAL
+across the rebuild** (`json.dumps(sort_keys=True)` equality) — s154's pattern. **ctest 19/19**
+(68.1 s at `-j 12`).
+
+⚠ The matrix render cache stays cold — this rebuild does not compound the ~25 min already owed
+since s156; it merely confirms it.
+
+### ▶ NEXT
+
+1. ⭐ **The `locate()` finding in §1 is project-wide and only its `mid_peak` instance has been
+   worked.** `prom` is used as a presence/validity bar in GATE W, AA, AD, AE and in
+   `od_tone_restore_fit`. Nothing there is known to be wrong — as a detector it is sound, and
+   AE's headline is threshold-free — but any *quantitative* prominence comparison in those gates
+   is a window-bounded max-descent, and whether any of them leans on it as a height has not been
+   audited. That audit is a `grep` for `prom` plus a read, and is the cheapest way to find out.
+2. The ~450 Hz **CENTRE** error (model/pedal 1.093× median, 22/24 high) is untouched and is item
+   6's territory, not this stage's.
+3. s156's `▶ NEXT` #2 (the 800 Hz bowl as A3-seen-as-a-shape, with its GRUNT sign flip) and #3
+   (GRUNT boost DRIVE ≥ 0.75 having no readable bleed-free null) are unchanged and still open.
+4. Everything from s155's own `▶ NEXT` is unchanged and still open.
+
+## SESSION 158 (2026-08-05) — GATE AV: the project-wide `prom` audit. The defect is one estimator of eight, its HEIGHT use is already refuted, and its DETECTOR role costs the published classifications nothing and the published percentages a lot
+
+Picked up session 157's own `▶ NEXT` #1 — *"the `locate()` finding is project-wide and only its
+`mid_peak` instance has been worked … that audit is a `grep` for `prom` plus a read."*
+
+It is a grep plus a read, and the read produces two things a grep cannot: **which of the project's
+prominence numbers are actually produced by the defective estimator**, and **what the defect costs
+the conclusions that rest on it.** New gate: `analysis/prominence_audit_gate.py` (GATE AV) +
+`analysis/_mutate_gate_av.py` (**14/14 arms**, six computed-verdict). Report:
+`analysis/reports/s158_prominence_audit.json`. **No `src/` file touched, no build, no render** —
+the whole gate runs on captures and closed-form synthetics.
+
+### 1. ⭐⭐ THE CENSUS: EIGHT PROMINENCE ESTIMATORS, AND ONLY ONE HAS THE DEFECT
+
+An AST scan of every `analysis/*.py` finds 21 modules that define, call or subscript a prominence.
+Classified by which estimator produces the value and what the value is USED for:
+
+| est | what it is | walk? |
+|---|---|---|
+| **E1** | `feature_locus_gate.locate` — walk from the window ARGMIN | ⛔ break UNREACHABLE (AU1) |
+| E2 | `bass_peak_locus._best_interior` — same walk from a CHOSEN interior index | ✅ break reachable |
+| E3 | `null_locus_gate.notch` — NAMED-shoulder 1/6-oct power-integrated depth | no walk |
+| E4 | `hw_trend_gate.<local locate>` — FIXED 3-band shoulder depth, 1/3-oct grid | no walk |
+| E5 | `bt_pair_shape_gate.locate` — own walk, REFUSES a bound-resting extremum | own |
+| E6 | `od_tone_restore_fit.notch_geometry` — CORE/SHOULDER windows (s151's repair) | no walk |
+| E7 | `hf_artefact_gate.prominence` — symmetric ANNULUS reference | no walk |
+| E8 | `compression_law_gate.prom` — NAMED-shoulder mean minus the null band | no walk |
+
+⭐⭐⭐ **THE RESULT, AND IT IS THE REASSURING ONE: E1 is read as a HEIGHT by exactly ONE module —
+`od_tone_restore_fit.prom_table` — and GATE AU already refuted the one claim drawn from it (s157).
+Every OTHER quantitative depth in the project is on a shoulder-, area- or annulus-referred
+estimator that never walks**, so AU's defect cannot reach it: GATE R's and GATE V's null depths
+(E3), GATE AD's depth-axis dose-responses (E4), GATE S7's compression prominences (E8), GATE I's
+G3 fold test (E7), and GATE AP/AQ/AR's notch geometry (E6). ⇒ **none of the CLOSED/REFUTED table's
+depth findings is exposed.** That was not knowable before this session; s157 could only say
+"nothing there is known to be wrong".
+
+✅ **The census REFUSES rather than rots**: a module that touches a prominence and is not in the
+declared table fails the gate, and so does a declared module that no longer touches one. That is
+the durable half — s149's lesson is that a guard written in one gate does not protect the others,
+and E1's defect survived 35 sessions precisely because no site had ever been classified. ⭐ It
+earned this immediately: the first run **refused on the audit gate itself**.
+
+⚠ **What the census cannot do, stated at the table**: a mutation can prove the table's COVERAGE is
+complete; nothing mechanical can check that `hw_trend_gate.py` really is E4 rather than E1. That
+came from reading the source.
+
+### 2. ✅ AV1: THE TRANSCRIPTION IS ASSERTED, AND IT RE-PROVES AU1 SIX FEATURES WIDER
+
+The audit has to re-parameterise `locate`'s walk (to widen the domain with the extremum held), and
+`locate` couples the walk to its own argmin, so the walk had to be transcribed. Asserted rather
+than trusted: over **672 readings** (24 captures × 4 sweeps × 7 features) the re-implementation
+reproduces `W.locate`'s `prom` to **0.000e+00 dB**.
+
+⭐ Free by-product: **1283 of 1344 walk sides (95.5 %) are bound-terminated**, at all seven named
+features — AU1's structural claim, measured at seven features instead of one.
+
+### 3. ⭐⭐ AV2: THE STRUCTURE, IN BOTH DIRECTIONS
+
+- **E1**: 4000 adversarial curves, **0 breaks** — AU1's claim re-verified generally.
+- **E2**: the SAME walk from a chosen interior index **does** break, so s126's repair is real and
+  not a rename. ⚠ **But its winner IS the window argmin in 22.6 % of curves, and there the walk
+  cannot break either** — so `_best_interior` removes s126's identically-zero-at-an-edge pathology
+  and does NOT make every reading a topographic prominence. ⭐ **GATE AE already says so itself**
+  (*"recovered prominence is a LOWER bound by construction"*) — recorded, not discovered here.
+- **E3**: the discriminating known answer. Perturb the curve **at the window's own edges and
+  nowhere else**: E3's reference points are NAMED (202/508 Hz, both outside the window) so it must
+  be bit-identical (**0.00e+00**), while E1's reference points ARE the edges so it must move (it
+  does, by the full perturbation). Same curve, same question, opposite required answers.
+  ⚠⚠ **A first draft asked this by WIDENING `R.NOTCH_WIN`, and that was a broken test**: `R.notch`
+  branches on `win == NOTCH_WIN` and falls back to window-edge shoulders for any other window, so
+  widening deliberately switches it into the very mode under audit. It duly "failed". **A guard
+  must ask for what the estimator promises, not for what a similar-looking call does.**
+
+### 4. ⭐⭐⭐ AV3: THE INSTRUMENT — PINNED WIDENING, AND IT IS THRESHOLD-FREE
+
+A max-ascent terminated at a window bound **grows** when the window is widened; one terminated at a
+real interior shoulder does **not**. So: pin the extremum where the shipped window put it, widen
+only the walk domain, re-read. ⚠ Pinning is what stops this being s151's feature-jump, and it is
+**asserted, not asserted-by-comment** — see §5.
+
+On GATE W3's own admitted pedal-side readings:
+
+| feature | n valid | both-shoulder | 1 bound | 2 bounds | median prom | Δ at ×2.0 | verdict |
+|---|---|---|---|---|---|---|---|
+| bass_notch | 41 | 0 | 0 | 41 | 2.441 | 1.145 | ⚠ LOWER BOUND |
+| bass_peak | 61 | 1 | 1 | 59 | 2.267 | 5.164 | ⛔ WINDOW-DOMINATED |
+| mid_notch | 90 | 0 | 8 | 82 | 6.681 | 2.016 | ⚠ LOWER BOUND |
+| mid_peak | 80 | 0 | 3 | 77 | 1.383 | 1.177 | ⚠ LOWER BOUND |
+| bt_notch | 93 | 1 | 0 | 92 | 0.644 | 2.832 | ⛔ WINDOW-DOMINATED |
+| treble_peak | 93 | 0 | 2 | 91 | 1.166 | 4.469 | ⛔ WINDOW-DOMINATED |
+| treble_notch | 69 | 0 | 9 | 60 | 4.239 | 0.902 | ⚠ LOWER BOUND |
+
+⇒ **0 of 7 features give a window-free depth; 3 are window-DOMINATED** (the cut moves the number by
+more than its own median value). ⚠⚠ **The widened number is NOT a better depth** — a ×2 window is a
+second arbitrary window and it reaches the neighbouring features, so its value is the ascent to
+THEIR bottoms. It is a sensitivity probe only, and the gate prints that before the table.
+
+### 5. ⭐ AV4: A FREE KNOWN ANSWER THAT IS A THEOREM, AND THE MEMBERSHIP RESULT
+
+Each side's max ascent is a maximum over a set of cells, and widening can only ADD cells, so `prom`
+is **non-decreasing in window width** and a flip OUT is impossible. Measured **0 at every bar** —
+and if one ever appears, the widening is not pinned and AV3's whole table is measuring a moved
+reader instead of the window. That is what certifies §4's instrument, and it is the arm the
+mutation runner exercises (`av4-unpinned`).
+
+The membership result, on W3-valid readings:
+
+| bar | n valid | over (shipped) | over (×2.0) | flips IN | flips OUT | unstable |
+|---|---|---|---|---|---|---|
+| 0.5 | 527 | 460 | 523 | 63 | 0 | 12.0 % |
+| **1.0** | 527 | **366** | 500 | **134** | 0 | **25.4 %** |
+| 2.0 | 527 | 226 | 451 | 225 | 0 | 42.7 % |
+| 4.0 | 527 | 118 | 356 | 238 | 0 | 45.2 % |
+
+⇒ **25 % of W3-valid readings change verdict at the shipped 1.0 dB bar when the window's log width
+doubles.** ⛔ **A flip is NOT a rejected feature** — the wide window admits the neighbours' flanks
+too. What this measures is that a presence verdict from this statistic is only as firm as the
+window.
+
+### 6. ⭐⭐ AV5: THE DETECTOR CLAIM, MEASURED — AND THE FAILURE IS *CONTEXTUAL*
+
+AU's scope sentence (*"as a DETECTOR the statistic is unharmed"*) is an argument. Here it is a
+dose-response against a curve where the feature is INJECTED at a known depth, in two arms — the
+window flanked by neighbouring features (what every shipped window actually is) and the same
+feature ALONE on a bare tilt. PRESENT rate over 300 curves per rung, bar = 1.0 dB:
+
+| injected dB | 0.00 | 0.25 | 0.50 | 1.00 | 2.00 | 4.00 | 8.00 |
+|---|---|---|---|---|---|---|---|
+| WITH neighbours | **161** | 186 | 176 | 210 | 259 | 296 | 300 |
+| ALONE | **0** | 0 | 0 | 3 | 169 | 274 | 300 |
+
+⇒ **on a bare background E1 invents nothing (0 of 300 at depth 0) and responds monotonically to
+depth; put the SAME window between two other features and 54 % of feature-free windows read
+PRESENT**, because the walk is climbing the neighbours' flanks. Injecting a feature *at* the bar
+adds only **+16 points** over that baseline.
+
+⭐ ⇒ **AU's scope sentence survives only where the window is NOT flanked — and every one of GATE W's
+seven windows is flanked by construction, since they tile the band between consecutive named
+features.** ⚠ The isolated arm does not reach 300/300 until 8 dB: on a background tilted by up to
+±8 dB a 4 dB feature's down-slope ascent can stay under the bar. That is the false-negative
+direction, real, bounded, and the estimator being conservative rather than wrong.
+
+⚠⚠ **THE VERDICT HAS THREE OUTCOMES, NOT TWO** (s129): "bad everywhere", "bad only in a flanked
+window", and "neither arm showed a failure" are different findings, and collapsing the third into
+either of the others is how a guard comes to assert something its data never showed. The branch
+conditions compare two MEASURED arms, not a threshold this gate invented.
+
+### 7. ⭐⭐⭐ AV6: THE PRICE — THE CLASSIFICATIONS SURVIVE, THE PERCENTAGES DO NOT
+
+A defect found is not a defect priced (s149). The E1 DETECTOR consumers (GATE W, AH, Y) publish
+**CENTRES**, never the prominence itself, so the question with a consequence in it is whether the
+bar's window-dependence reaches the centres.
+
+⚠⚠ **AND THE FIRST DRAFT PRICED THE WRONG STATISTIC.** It invented its own rule — "captures
+resolving at all four rungs, first-vs-last" — and reported a 3.48 % movement in a quantity **GATE
+W6 does not compute**. W6's actual rule, read out of `gate_w6` rather than guessed, is: ENDPOINT
+captures only, per-CELL exclusion (a capture may contribute at one rung and not another), the
+MEDIAN f0 per sweep, and `span = max/min − 1`. Rebuilt that way — and certified by a **cross-gate
+known answer: it reproduces GATE W's STORED w6 pedal spans to 0.000e+00 at all seven features**,
+which is available only because the pedal side is binary-independent.
+
+| feature | span shipped | stored W6 | span wide | Δ | cells s/w | W6 verdict |
+|---|---|---|---|---|---|---|
+| bass_notch | 0.73 % | 0.73 % ✅ | 0.60 % | 0.13 % | 8/12 | FIXED → FIXED |
+| bass_peak | 7.82 % | 7.82 % ✅ | **36.21 %** | **28.40 %** | 24/31 | DRIVE-DEP → DRIVE-DEP |
+| mid_notch | 1.56 % | 1.56 % ✅ | 1.56 % | 0.00 % | 62/62 | FIXED → FIXED |
+| mid_peak | 7.95 % | 7.95 % ✅ | 9.62 % | 1.66 % | 38/48 | DRIVE-DEP → DRIVE-DEP |
+| bt_notch | 7.15 % | 7.15 % ✅ | 7.81 % | 0.66 % | 17/64 | DRIVE-DEP → DRIVE-DEP |
+| treble_peak | 7.92 % | 7.92 % ✅ | 9.76 % | 1.84 % | 51/64 | DRIVE-DEP → DRIVE-DEP |
+| treble_notch | 45.27 % | 45.27 % ✅ | 45.27 % | 0.00 % | 34/36 | DRIVE-DEP → DRIVE-DEP |
+
+⭐⭐ **0 of 7 FIXED / DRIVE-DEPENDENT verdicts flip.** So every argument that quotes W6's
+CLASSIFICATION — open item 6's whole frame, AA6's dose-responses, AD — **stands**. ⛔ But the SIZES
+move by up to **28.40 %** against a locator resolution of **0.48 %** (W's own `GRID_STEP_FRAC/3`,
+imported), so **a quoted percentage from this family carries a membership dependence nobody has
+been quoting with it. Quote them as "~7–10 %, DRIVE-DEPENDENT", not to two decimals.**
+
+⚠ `bt_notch` is the sharpest instance of the membership sensitivity even though its span barely
+moves: the admitted cell count goes **17 → 64**, i.e. GATE W6's bridged-T row rests on a quarter of
+the readings a wider window would admit, and it lands on nearly the same number anyway.
+
+### 8. ⚠ TWO MUTATION ARMS WERE WRONG BEFORE THE GATE WAS — `suspect the mutation before the guard`
+
+Both AV5 arms failed against a gate that was working, and both for reasons worth recording:
+- zeroing the neighbours by patching the first term of `neigh` left the **second** exponential
+  intact, so the window still had one flank — s110's vacuity case exactly;
+- making the background a steep TILT does **not** make E1 fire: a monotone window puts the extremum
+  ON a bound, one walk side is empty, and `prom` is **0.0 by construction** (s126). Forcing the
+  INTRINSIC branch needs **curvature**, not slope.
+
+Both are recorded at their arms rather than silently fixed.
+
+### 9. ✅ BUILD / TEST STATE
+
+**No `src/` file was touched and nothing was built** — so s158 does not re-arm the render-cache
+bill, and the ~25 min stays owed from s156 rather than being owed again. **ctest 19/19.** New files:
+`analysis/prominence_audit_gate.py`, `analysis/_mutate_gate_av.py`,
+`analysis/reports/s158_prominence_audit.json`. ✅ The stored reports it READS
+(`s122_feature_locus.json`, `s120_newton.json`) are opened read-only and are unmodified.
+
+### ▶ NEXT
+
+1. ⚠ **The MODEL side of AV3/AV4/AV6 is now genuinely owed, and s158 made it conditional on
+   exactly the finding that fired.** The gate ran pedal-side deliberately (binary-independent, and
+   it is the side W6's reference row is built from, which is what makes AV6's known answer
+   possible) — but AV4 found 25 % membership instability, so whether the MODEL's readings are
+   equally window-bound is open. ⚠ It costs ~25 renders into a **private** directory (never
+   `build/s122_feature_locus/`, which is GATE W's own cache) and the renders will be s156-epoch,
+   so the model numbers will not match `s122_feature_locus.json` — that is a re-baseline question,
+   not an estimator one, and the two must not be conflated.
+2. ⭐ **The cheapest real repair, if one is ever wanted, is now specified rather than vague:** E1
+   needs its per-side ascent to be reported with a flag for whether it was attained at an interior
+   shoulder or at the bound (AV3 computes exactly that), so a consumer can refuse a bound-limited
+   reading the way GATE AB's `locate` already does (E5). ⛔ Do NOT "fix" E1 by widening its
+   windows — AV3 shows that only relocates the problem, and s151 shows a wider window lets the
+   reader track a different feature.
+3. The ~450 Hz **CENTRE** error and s156/s155's open items are unchanged — see s157's `▶ NEXT`
+   #2–4, all still open.
+
+## SESSION 159 (2026-08-05) — GATE AW: the MODEL side of the prominence audit. Item 6's contrast survives at BOTH ends, the estimator arm needed no render at all, and the epoch arm's headline was a membership artefact
+
+Picked up session 158's own `▶ NEXT` #1 — the model side of AV3/AV4/AV6, which s158 made
+conditional on exactly the finding that fired (25 % membership instability on the pedal side).
+New gate: `analysis/model_prominence_gate.py` (GATE AW) + `analysis/_mutate_gate_aw.py`
+(**14/14 arms**, five computed-verdict). Report: `analysis/reports/s159_model_prominence.json`.
+**No `src/` file touched and no build** — so the render-cache bill is not re-armed and the ~25 min
+still stands owed from s156. **ctest 19/19** (68.1 s at -j 12).
+
+### 0. ⭐⭐ WHY THE MODEL SIDE IS THE HALF THAT MATTERS
+
+GATE W6 classifies each side separately, and the two carry opposite KINDS of claim:
+
+    PEDAL   DRIVE-DEPENDENT — a POSITIVE result.  A conservative, window-limited estimator can
+                              only ever UNDER-report it.
+    MODEL   FIXED           — a NEGATIVE result, and a negative result is exactly what a
+                              window-bounded estimator can MANUFACTURE.
+
+Open item 6's whole frame is the CONTRAST ("ours is pinned to 0.2 %, theirs walks 7.9 %"), and
+GATE AV priced only the half that cannot be manufactured. That is the asymmetry s158's `NEXT`
+recorded as an open question and it is what this session answers.
+
+### 1. ⭐⭐⭐ THE ESTIMATOR ARM COSTS NO RENDER — GATE W's PUBLISHED ARTEFACTS ARE STILL ON DISK
+
+s158 assumed the model arm needed fresh renders at a new epoch, and that assumption is what made
+it look expensive. It is false: `build/s122_feature_locus/` still holds the 25 renders GATE W
+published from. **AW1b asserts they are those artefacts by reproducing GATE W's STORED w6 MODEL
+medians AND spans to `0.000e+00` at all seven features.**
+
+⚠⚠ That is not bookkeeping, and the reason is worth keeping: **16 of the 24 renders carry a BINARY
+STAMP that POSTDATES the stored report** (the report was written 13:54:31; those files are stamped
+15:36:01, and the cache carries two distinct stamps in all). Read off the stamps alone the cache is
+a *different epoch wearing the right filenames*. The reproduction is the only thing that settles it
+— so AW0 PRINTS the hazard first and AW1b is a hard exit rather than a note. (What happened is
+benign and now measured: the relink between them was DSP-neutral for these conditions, which is
+consistent with s123 having added ADAA code that ships disabled.)
+
+⇒ the estimator question is asked on the very curves the published numbers came from, which is the
+correct scope, because the claim under audit is GATE W's *published* claim.
+
+⛔ The whole gate is READ-ONLY over that cache and says so mechanically: every file is
+fingerprinted `(size, mtime_ns)` before and after the run and the gate REFUSES on any change.
+Renders go only to `build/s159_model_prom`, and AW0 asserts the two paths differ — because
+`W.render` re-renders anything whose binary stamp is stale, so a single run pointed at GATE W's
+cache would overwrite the artefacts and AW1b could never detect it again.
+
+### 2. ⚠⚠ AW1c: THE WIDENING THEOREM HAS A PRECONDITION, AND THIS GATE'S FIRST DRAFT OMITTED IT
+
+GATE AV's instrument rests on: *`prom` is a max over a cell set and widening only ADDS cells, so it
+is non-decreasing in window width.* AV measured the consequence (0 flips OUT at every bar); AW
+asserted the theorem directly, and it **refused against correct data — 177 decreases, worst
+0.516 dB.**
+
+Suspect the statement before the data. Each side's rise is a max over that side's cells and
+widening only adds cells — **provided the side is non-empty to begin with.** When the extremum
+rests ON a window bound one side has NO cells and `sides_at` reports its rise as the CONVENTION
+`0.0`, which is not the max over an empty set; widening then replaces that convention with a real
+maximum, and outside the old window the curve keeps falling, so the value legitimately goes
+NEGATIVE. Those readings are exactly the ones GATE W3 refuses.
+
+Restated with the precondition: **0 decreases over 1416 adjacent widen pairs on interior readings.**
+⭐ And the exception is not noise — it is **s126's edge-resting pathology with a SIGN on it**: of
+the 200 excluded readings, **177 go negative under widening (worst −0.516 dB)**, i.e. their shipped
+`prom` of 0.0 was a floor rather than a measured rise. That is a sharper statement of the same
+thing `locate`'s `edge` flag records.
+
+### 3. AW1a / AW2 / AW3 — the model side, measured
+
+- **AW1a**: the pinned walk reproduces `W.locate`'s `prom` to **0.000e+00** over 672 model
+  readings. Free by-product, AU1's structural claim on the model side: **1259 of 1344 walk sides
+  (93.7 %) bound-terminated** (pedal side, s158: 95.5 %).
+- **AW2** (W3-valid model readings, pedal column IMPORTED from s158's stored report):
+
+  | feature | n | both-sh | 1bnd | 2bnd | med prom | Δ@×2.0 | PEDAL Δ@×2 | verdict (model) |
+  |---|---|---|---|---|---|---|---|---|
+  | bass_notch | 29 | 1 | 0 | 28 | 3.633 | 0.008 | 1.145 | ✅ DEPTH — window-free |
+  | bass_peak | 52 | 0 | 0 | 52 | 1.171 | 5.005 | 5.164 | ⛔ WINDOW-DOMINATED |
+  | mid_notch | 93 | 0 | 11 | 82 | 2.923 | 0.900 | 2.016 | ⚠ LOWER BOUND |
+  | mid_peak | 81 | 0 | 0 | 81 | 0.561 | 1.291 | 1.177 | ⛔ WINDOW-DOMINATED |
+  | bt_notch | 92 | 0 | 0 | 92 | 1.263 | 3.533 | 2.832 | ⛔ WINDOW-DOMINATED |
+  | treble_peak | 96 | 0 | 4 | 92 | 1.307 | 5.270 | 4.469 | ⛔ WINDOW-DOMINATED |
+  | treble_notch | 28 | 0 | 15 | 13 | 3.532 | 0.109 | 0.902 | ⚠ LOWER BOUND |
+
+  ⇒ **1 of 7 model features gives a window-free depth against the pedal's 0 of 7, and 4 are
+  window-DOMINATED against the pedal's 3.** The two sides are alike, which is the point: **the
+  limitation is a property of the WINDOWS, which both sides share, not of either signal.**
+- **AW3**: **21.7 %** of W3-valid MODEL readings change presence verdict at the shipped 1.0 dB bar
+  when the window's log width doubles (pedal side, s158: 25.4 %). **Flips OUT: 0 at every bar**, as
+  §2's theorem requires — which is what certifies the widening is pinned rather than re-located.
+
+### 4. ⭐⭐⭐ AW4, THE PRICE: 0 OF 4 RESOLVED MODEL VERDICTS FLIP — ITEM 6's CONTRAST SURVIVES AT BOTH ENDS
+
+GATE W6's own statistic, on GATE W6's own membership rule, with the bar applied to the widened
+reading — and certified by the same cross-gate known answer as AW1b (`✅` column = stored span
+reproduced to 0.000e+00):
+
+| feature | span ship | stored | KA | span wide | Δ | cells s/w | MODEL verdict ship → wide |
+|---|---|---|---|---|---|---|---|
+| bass_notch | nan | nan | ✅ | nan | — | 0/0 | UNRESOLVED → UNRESOLVED |
+| bass_peak | nan | nan | ✅ | **5.49 %** | — | 0/24 | UNRESOLVED → **DRIVE-DEP** |
+| mid_notch | 0.59 % | 0.59 % | ✅ | 0.59 % | 0.00 % | 58/58 | FIXED → FIXED |
+| mid_peak | 8.98 % | 8.98 % | ✅ | 17.70 % | 8.72 % | 26/46 | DRIVE-DEP → DRIVE-DEP |
+| bt_notch | 0.15 % | 0.15 % | ✅ | 0.43 % | 0.28 % | 51/57 | FIXED → FIXED |
+| treble_peak | 0.21 % | 0.21 % | ✅ | 0.21 % | 0.00 % | 64/64 | FIXED → FIXED |
+| treble_notch | nan | nan | ✅ | nan | — | 0/0 | UNRESOLVED → UNRESOLVED |
+
+⭐⭐ **0 of 4 RESOLVED model rows flip.** The model's FIXED verdicts are **not** a window artefact,
+so open item 6's contrast survives at BOTH ends — the pedal's DRIVE-DEPENDENT rows survive widening
+(s158, 0 of 7) and the model's FIXED rows survive it too. ⛔ The SIZES still move by up to **8.72 %**
+against a **0.48 %** locator resolution, so s158's "quote ~7–10 %, never two decimals" stands and
+now applies to the model column as well.
+
+⭐ **Separately, `bass_peak` moves out of UNRESOLVED (→ 5.49 %, DRIVE-DEP) — a MEMBERSHIP recovery,
+not a verdict inversion.** CLAUDE.md already records that W6 reports that row UNRESOLVED *for a
+membership reason* (s126: it is a mix cancellation with no bleed-free reading), and this is that
+reason relaxed. ⭐⭐ It **independently corroborates GATE Y's Y6** — s126 measured the model's bass
+peak walking **163.9 → 151.1 Hz (−7.8 %)** on a capture that has a mix, from a completely different
+construction; both are over W6's own 5 % bar. ⛔ NOT a licence to quote 5.49 % as a measurement: the
+widened window reaches the neighbours.
+
+### 5. ⭐⭐ AW5, THE EPOCH ARM — AND ITS HEADLINE WAS A MEMBERSHIP ARTEFACT
+
+A separate question, and s158 warned specifically against fusing it with §4. Three DSP changes have
+landed since GATE W published: **s124** (ADAA + `clipK` 2.0), **s146** (the 3-segment MASTER taper)
+and **s150–156** (`OdToneRestore`) — and the last is a peaking biquad at **323 Hz**, i.e. inside
+`mid_notch`'s own window. Non-vacuity is asserted first (the current binary is not among the
+cache's stamps), then the same 24 conditions are re-rendered into the private directory.
+
+⚠⚠ **`aggregate-moved-check-membership-first`, TWELFTH occurrence, committed by this session's own
+first draft and caught by its own next read.** Pooled, `mid_peak`'s centre moves **−6.66 %** and it
+would have been written up as *"`OdToneRestore` moved the ~450 Hz peak"*. It does not. The stage
+deepens the neighbouring 320 Hz null, which raises `mid_peak`'s prominence past the 1.0 dB bar and
+**ADMITS 20 cells that were refused at s122** — so the pooled median moved because the POPULATION
+did. Matched on the cells admitted in BOTH epochs the same shift is **−0.35 %**, below the
+locator's 0.48 % resolution. The matched column is therefore the graded one and the pooled column
+is printed beside it deliberately.
+
+| feature | span s122 | span s156 | f0 s122 | f0 s156 | Δf0 pooled | **Δf0 MATCHED** | cells |
+|---|---|---|---|---|---|---|---|
+| mid_notch | 0.59 % | 0.05 % | 328.31 | 323.23 | −1.55 % | **−1.52 %** | 58 |
+| mid_peak | 8.98 % | 10.30 % | 453.04 | 422.87 | **−6.66 %** | **−0.35 %** | 26 |
+| bt_notch | 0.15 % | 0.22 % | 716.51 | 715.53 | −0.14 % | −0.14 % | 51 |
+| treble_peak | 0.21 % | 0.23 % | 2978.75 | 2979.61 | +0.03 % | **+0.03 %** | 64 |
+
+⇒ **3 of 4 resolved MODEL rows are UNMOVED by everything shipped since s122** (|Δf0| under GATE W's
+own resolution), and **0 of 4 classifications change, so no GATE W6 verdict is stale.** ⭐ The one
+row that moved is `mid_notch`, and it is attributable by construction rather than by inference —
+`OdToneRestore`'s own centre is 323 Hz, inside that window. ⭐ Note where it moved **to**: the
+model's null centre goes **328.31 → 323.23 Hz** against the pedal's stored W6 medians of
+**327.21 → 322.19 Hz**, i.e. the model−pedal gap closes from ~+1.7 % to ~+0.1 % **on an axis the
+stage was never fitted against** (it was fitted on DEPTH).
+
+⛔ **What IS stale is any quoted model-side PROMINENCE at `mid_notch`: 4.48 → 19.91 dB** (pedal, same
+cells, 13.69). Every other feature's model prominence is unmoved (`treble_peak` 1.317 → 1.317,
+`bt_notch` 1.534 → 1.491, and `bass_notch`/`bass_peak`/`treble_notch` identically 0.000).
+
+### 6. ⭐ AW6 — E1 vs THE STAGE'S OWN E6, AND THE "OVERSHOOT" READING IS REFUTED
+
+§5 says the model's 320 Hz null got much deeper. Whether that is RIGHT is the restore stage's own
+acceptance question and is settled on the stage's own estimator, not on GATE W's. Read on the SAME
+cells (`SETS["bleedfree"]`, taken from `od_tone_restore_fit`'s own table rather than typed):
+
+| capture | drv | E1 mod s122 | E1 mod s156 | E1 pedal | E1 m−p | E6 mod | E6 ped | E6 m−p | Q mod | Q ped |
+|---|---|---|---|---|---|---|---|---|---|---|
+| drive-0700_level-1700 | 0.00 | 5.081 | 3.438 | 4.292 | −0.854 | 8.845 | 8.586 | +0.259 | 5.28 | 5.21 |
+| level-1700 | 0.50 | 5.032 | 7.588 | 11.220 | −3.632 | 14.075 | 13.922 | +0.153 | 6.24 | 8.65 |
+| drive-1700_level-1700 | 1.00 | 1.755 | 17.349 | 18.749 | −1.401 | 18.665 | 19.076 | −0.411 | 13.75 | 11.54 |
+
+⛔ **The pooled E1 reading that suggested a 6.2 dB bleed-free OVERSHOOT is REFUTED** — it was a
+median over 16 endpoints × 4 sweeps (mixed DRIVE/ATTACK/GRUNT/MASTER) read as though it were these
+three rungs. On the stage's own estimator the shipped bleed-free null is within **0.41 dB** of the
+pedal at all three, which reproduces s151's fit residual. That is the second membership catch of
+the session and it is the same discipline as §5.
+
+⭐⭐ **The attribution is a THEOREM, not a correlation.** A first draft reported
+`corr(Q_pedal/Q_model, E1gap − E6gap) = −0.975` — **at n = 3**, where any three points give a large
+|r| and two of the three are in fact ordered the wrong way. The mechanism needs no fit:
+
+    E1's shoulders are the FIXED window edges (285, 358) Hz.
+    E6's shoulders are the curve's own local maxima inside (210, 520) Hz — a SUPERSET.
+    A max over a superset is >= a max over a subset, so  E1 <= E6  IDENTICALLY, on any curve.
+    (asserted: 0 violations of 6)
+
+⇒ the deficit **`E6 − E1` is exactly "how far the curve is still rising at 285/358 Hz", i.e. a WIDTH
+statistic**, and comparing the two sides' deficits is a Q comparison with no threshold and no
+regression in it. Measured: model **5.407 / 6.487 / 1.316** against pedal **4.294 / 2.702 / 0.327**
+⇒ **the model's null is BROADER at 3 of 3 rungs**, which is this stage's already-known Q defect
+(open item 1 on `OdToneRestore`; s153 AQ2 found Cut × DRIVE 0.50 unreachable at any Q).
+
+⇒ **GATE AV's whole point, restated on a second pair of estimators: E1 is a fixed-shoulder depth and
+therefore mixes DEPTH with WIDTH.** ⛔ Do not read an E1 prominence as a depth, and do not adjudicate
+this stage on one.
+
+### 7. ⚠ TWO DEFECTS IN THIS GATE'S OWN INSTRUMENT, BOTH FOUND BY ITS MUTATION RUNNER
+
+- ⛔⛔ **AW5 never actually rendered.** `collect()` only READS; the epoch arm relied on the private
+  directory already being populated — which it was, by a scratch prototype run earlier in the
+  session. Every number in §5 was correct, and the gate would have crashed for the next session on
+  a clean checkout. Found because the mutation runner starts from an empty directory. Fixed with an
+  explicit `_render_cell` pass, kept deliberately separate from `_model_cell` so **the estimator
+  arm cannot render at all**. ⭐ GENERAL: *a scratch prototype that populates a cache hides a
+  missing step in the tool written from it* — run a new gate once from a cleaned directory before
+  believing it.
+- **AW1a crashed instead of refusing** when a mutation pushed the pinned cell outside its own
+  window (`None` subscripted). s117's rule — a gate should REFUSE where it would otherwise crash,
+  because a stack trace hands the next session a symptom instead of a reason.
+
+⚠ The runner also records what it CANNOT arm: the end-of-run read-only fingerprint is armed only
+indirectly (any mutation that fires it for the real reason would destroy the artefacts the gate
+exists to audit — the *path* half is armed properly), AW5's attribution to `OdToneRestore` is an
+argument from where the stage sits and not a measurement, and AW6's n = 3 cannot be turned into a
+statistical claim.
+
+### 8. ✅ BUILD / TEST STATE
+
+**No `src/` file touched, no build** — the render-cache bill is not re-armed and the ~25 min stays
+owed from s156. **ctest 19/19** (68.1 s at -j 12). New files: `analysis/model_prominence_gate.py`,
+`analysis/_mutate_gate_aw.py`, `analysis/reports/s159_model_prominence.json`, and the private
+render directory `build/s159_model_prom/` (gitignored). ✅ The stored reports it reads
+(`s122_feature_locus.json`, `s120_newton.json`, `s158_prominence_audit.json`) are unmodified, and
+GATE W's render cache is byte-identical after the run (50 files, asserted).
+
+### ▶ NEXT
+
+1. ⭐ **`mid_notch`'s model-side row in GATE W is the one thing s159 leaves stale, and it is
+   cheap to retire**: the prominence moved 4.48 → 19.91 dB and the centre −1.52 %, both attributable
+   to `OdToneRestore`. Nothing quotes that prominence today (AV0's census puts E1's only HEIGHT
+   consumer in `od_tone_restore_fit.prom_table`, already refuted by GATE AU), so this is a
+   documentation correction rather than a re-baseline — but a session that re-runs GATE W for any
+   other reason should expect that row to move and should not read it as a regression.
+2. ⛔ **Do NOT re-open "is the model pinned?"** — it is now measured three ways: pinned at s122
+   (GATE W), still pinned after a pinned-widening sensitivity probe (AW4), and unmoved by three
+   shipped DSP changes (AW5). Item 6's frame is safe at both ends.
+3. The ~450 Hz **CENTRE** error, s156/s155's open items and s158's `NEXT` #2 (E1 should report a
+   per-side `at_bound` flag so a consumer can refuse a bound-limited reading) are unchanged and
+   still open.
+
+## SESSION 160 (2026-08-05) — user-directed review of all open work across 150+ sessions; four scoping decisions taken; item 4's hygiene closed
+
+### 0. Why this session is different
+
+Every prior session added measurement. This one added none — the user asked for a plain-language
+audit of what's actually open, what each item's goal is, and what it would cost to finish, then
+made scoping decisions on the spot rather than deferring them to "the next session that gets to
+it." The output is decisions recorded at each item in `CLAUDE.md`, not new data. This log entry
+exists only to keep the per-session narrative discipline (`CLAUDE.md`'s own rule: narrative here,
+not there) — read `CLAUDE.md`'s edited items 4/5/6/9/10/11 for the load-bearing content.
+
+### 1. The audit
+
+Walked `CLAUDE.md`'s numbered "Open work" list (items 0–10) plus the release gate's 6 failing rows
+and reported, in plain terms: what each item's goal is, what's actually still actionable vs.
+already closed, and what the ramifications of each decision are. Two items needed deeper context
+before the user could decide:
+
+- **Item 5** (clipper ceiling 5.4× below the derived physical rail) — explained where the 5.636 V
+  derived rail comes from (R19 dropper + finite two-MOSFET solve, gated on the five spare CD4049
+  sections' grounded inputs, verified twice at 600 DPI), why raising `kInputRef` to close the gap
+  is supply-forbidden (needs 4.898 V/FS against an absolute ceiling of 2.777 V/FS — 1.76× short at
+  the LIMIT, not merely difficult), and the two untested branches: (a) accept it as a standing fact,
+  (b) hunt for ~14.7 dB of missing pre-clipper gain. Ramification stated plainly: branch (a) is
+  free and moves nothing; branch (b) is a fresh, unscoped carrier search with no candidate in hand.
+- **Item 9** (LEVEL law — topology mismatch vs. missing downstream stage) — explained GATE K's
+  9.3 dB absolute-level defect, why the release-gate matrix structurally cannot see it (per-row
+  gain match deletes any pure level error), the two measurements (bass notch 2×, treble notch 2.7×
+  LEVEL-sensitivity gap) that agree on size but don't discriminate mechanism, and the ramification
+  that **neither branch, once resolved, would move a release-gate row** — this is a correctness
+  question, not a ship-blocker.
+
+A third question came from the user directly: an observed "ND capture at DRIVE 1.00 sounds like
+the plugin at DRIVE 0.8" — traced to the session-120 "DRIVE/distortion" ear-matched listening lead
+in the carry-forwards section, which cited a dead pointer ("open work item 11") into a numbering
+scheme this project abandoned around session 60–66. Confirmed via `grep` that no live item 11
+existed anywhere in the current numbered list — the lead had been orphaned for ~40 sessions with
+its own follow-up pointing at nothing.
+
+### 2. Decisions taken (by the user, recorded at each item in `CLAUDE.md`)
+
+- **Item 5 (C): CLOSED.** Branch (a) accepted — the clipper's low ceiling is a standing fact, not a
+  fixable defect. Branch (b) explicitly not pursued (no candidate, no measured link to A3).
+- **Item 6: physical-carrier search CLOSED**, converted to a capped [ENG] artificial correction
+  (task E) — same architecture as `OdToneRestore`, targeting only the sized treble-peak slope
+  (AF6/AH7: ~1.2 dB/oct at 2935 Hz). Explicitly does not need to satisfy the six physical-carrier
+  gates (those test component plausibility; an engineered fit only needs to match the curve).
+  Scoped OUT: the bridged-T depth collapse, bass-peak walk, missing 4.5–6 kHz null — separate sized
+  symptoms, not bundled in. **Hard cap: 3 sessions.**
+- **Item 9 (D): redirected from topology-discrimination to a direct artificial correction** of the
+  measured LEVEL-sensitivity gap, with the explicit, stated-up-front caveat that it cannot move any
+  release-gate row.
+- **Item 10's Cut-row Q (task A): given a 2-fit-iteration stop condition** — ship the better of two
+  and close, rather than open-ended re-fitting, given the architectural Q-span ceiling already
+  measured (s151 §6: the pedal's own Q spans 1.29–2.93× at fixed GRUNT/DRIVE).
+- **New item 11 (task F): the DRIVE 0.8≈1.0 ear-lead**, given a real number and a one-measurement
+  stop condition, reclaiming the dead "open work item 11" pointer.
+- **Agreed order:** F → A → E → D, on the reasoning that F is read-only and might close a real
+  defect for free, A has a known fix shape, E is the largest but now bounded, D is cosmetic to the
+  gate but real to the ear.
+
+### 3. Task B — MASTER-anchor hygiene consumers, executed this session
+
+Item 4 flagged three consumers of the corrupted `master-1700_gain-n12_base-clean.wav` capture
+(GATE T: duplicated/mis-dialled knob position, reading 4.447 dB low) as unchecked since session
+142. Re-pointed all three:
+
+- `analysis/clean_thd_check.py` — bad capture **removed** from `CANDIDATES`, annotated with both
+  defects (the mis-dial AND s142's finding that its `lvl_-3` rung is PINNED — the second matters
+  more here, since a clean-THD probe would misread a capture-side ceiling as the pedal breaking up).
+- `analysis/clean_headroom_probe.py` — bad capture **removed** from `CASES`, same reasoning, plus a
+  note that MASTER-at-max is a unity-gain attenuator so nothing is lost (the boost cases already
+  cover the same territory).
+- `analysis/captures.py` — capture **kept** in `CAPTURE_MATRIX_TIER1` (verified by grep that this
+  list is consumed ONLY by the filename-parse self-test, never by graded membership, which globs
+  the capture directory) but annotated not to be trusted for absolute level.
+
+**Found in passing, both stale for a long time and unrelated to each other:**
+
+- `clean_headroom_probe.py`'s `K_INPUT_REF_SHIPPED = 3.377` was the **session-17** value; the
+  plugin has shipped 1.2596 since s44 and **0.90 since s109** — every volt this probe printed was
+  3.75× too high. Corrected to 0.90.
+- `master_anchor_gate.py` (GATE T)'s `SHIPPED_MAKEUP = 2.599` / `SHIPPED_TAPER_EXP = 1.998` were
+  pre-s115/pre-s146 relics still labelled "shipped" (the real values are 4.3297, and the exponent
+  no longer exists — the taper is a 3-segment PWL since s146). **Renamed** to `PRE_S115_MAKEUP` /
+  `RETIRED_TAPER_EXP` with the arithmetic deliberately untouched, since GATE T is the published
+  derivation of record for session 115's correction and must keep reproducing it exactly.
+
+**Verification:** GATE T re-run, all guards pass; its stored report (`s115_master_anchor.json`)
+diffed against the pre-edit version — **8/8 values numerically identical**, only two JSON key names
+changed, and nothing else in the tree reads those keys (grepped). `detent_corrections()` — the
+function GATE O imports, so it cannot drift — returns 4.4468 dB for the 1700 detent, matching the
+published 4.447. All four edited files parse; `captures.py`'s matrix self-test still resolves
+51/51 filenames (31 tier-1 + 20 tier-2), unchanged from before. Zero `src/` touched, so **no
+rebuild and no re-render owed** — this session does not re-arm the render-cache bill.
+
+### Where it stands
+
+`CLAUDE.md` updated: STATUS gained a session-160 summary bullet; items 4 (closed), 5 (closed), 6
+(redirected + capped), 9 (redirected), 10 (Cut-row Q capped), and a new item 11 (task F) with the
+dead pointer at "Project-specific carry-forwards" fixed to point at it. File is 1155 lines — under
+the 1200 re-archive trigger, no compression owed yet. No `src/` change; no `analysis/` behaviour
+change beyond the four files above.
+
+### ▶ NEXT
+
+1. Task F — render current build at DRIVE 0.8/1.0, compare against ND's DRIVE-max capture. One
+   measurement, answers the ear-lead's open question. Also worth checking against s128's corrected
+   THD-crossing finding, which points the opposite direction — resolve or explain the disagreement.
+2. Task A — `OdToneRestore` Cut-row Q, second shoulder-shaping section, GRUNT-Cut only. 2-iteration
+   cap.
+3. Task E — item 6's artificial treble-peak-slope correction. 3-session cap, scoped to the one
+   sized target only.
+4. Task D — LEVEL-law artificial correction. 1 fit, no release-gate expectation.

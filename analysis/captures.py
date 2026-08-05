@@ -259,6 +259,13 @@ CAPTURE_MATRIX_TIER1 = [
     "himidfreq-750_himid-1700_gain-n12_base-clean.wav", "himidfreq-3k_himid-1700_gain-n12_base-clean.wav",
     "blend-0700_base-od.wav", "blend-1200_base-od.wav",
     "level-0700_gain-n12_base-od.wav", "level-1700_gain-n12_base-od.wav",
+    # ⛔ `master-1700_gain-n12_base-clean.wav` is a DEFECTIVE capture and is named here only because
+    # this list is the canonical INVENTORY of the matrix (it is consumed solely by `selftest()`'s
+    # filename-parse check below — it does NOT drive graded membership, which comes from a glob over
+    # the capture directory). GATE T proved it is a duplicated / mis-dialled knob position reading
+    # 4.447 dB LOW, and s142 found its `lvl_-3` rung PINNED. It is harmless to the graded matrix,
+    # which gain-matches per row and therefore deletes a pure level error — but it must NOT be used
+    # for any ABSOLUTE-level reading. Corrections: `master_anchor_gate.detent_corrections()`.
     "master-0700_base-clean.wav", "master-1700_gain-n12_base-clean.wav",
 ]
 CAPTURE_MATRIX_TIER2 = [

@@ -39,6 +39,17 @@ It does NOT propose shipping 4.337.  A one-parameter taper cannot fit the correc
 and that is Phase 10 C (MASTER taper), which the user explicitly scheduled LAST in session 106.
 This gate exists so the next session inherits the measurement rather than the refuted story.
 
+✅ STATUS UPDATE (s160) — BOTH HALVES OF THAT ARE NOW DONE, so read this gate as a HISTORICAL
+derivation, not as pending work:
+  * s115 shipped `kOutputMakeup = 4.3297` on T5's derivation below (T5 computes 4.337 from the
+    pre-s115 2.599; the shipped value came from a render-based re-derivation that agreed to
+    0.005 dB).  GainStaging.h is the live value — this file's `PRE_S115_MAKEUP` is history.
+  * The taper was re-derived twice: a 2-segment PWL at s115, then the shipped 3-SEGMENT PWL at
+    s146 (masterTaperBreak/Frac + Break2/Frac2).  `masterTaperExp` no longer exists as a shipped
+    constant, so T6's "no single exponent fits" is CONFIRMED by what actually shipped.
+  * ⇒ nothing here is a pending action.  What IS still load-bearing is `detent_corrections()`,
+    which GATE O imports; that is why this gate must keep running and keep its arithmetic intact.
+
 No render.  Reads the capture wavs only.
 Run:  /opt/homebrew/bin/python3.11 analysis/master_anchor_gate.py
 """
@@ -64,8 +75,17 @@ PURE_GAIN_SPAN_TOL   = 0.010        # dB.  A pure gain is flat in frequency AND 
 DUP_IDENTITY_DBFS    = -60.0        # two takes of one output differ far below this
 DETENT_STEP_MIN_DB   = 0.50         # a real detent must move the output by at least this
 
-SHIPPED_MAKEUP     = 2.599          # src/dsp/GainStaging.h  kOutputMakeupNominal
-SHIPPED_TAPER_EXP  = 1.998          # src/dsp/FitParams.h    masterTaperExp
+# ⚠⚠ THESE TWO ARE HISTORICAL, NOT SHIPPED — RELABELLED s160 (item 4), math deliberately unchanged.
+# GATE T is the derivation OF RECORD for session 115's correction, so its arithmetic must keep
+# reproducing that derivation: T5 computes `corrected = PRE_S115_MAKEUP * 10^(err/20)` = 4.337, which
+# is what s115 then shipped (4.3297). Changing these values would silently rewrite a published
+# derivation; changing their NAMES stops a reader taking them for current constants.
+#   * kOutputMakeup   shipped 4.3297 since s115 (was 2.599)      — src/dsp/GainStaging.h
+#   * masterTaperExp  RETIRED at s115 and again at s146; the taper is now a 3-SEGMENT PWL
+#     (masterTaperBreak/Frac + Break2/Frac2), so no single exponent exists to compare against.
+#     T6's job is precisely to show no power law fits, so it prints this as the retired incumbent.
+PRE_S115_MAKEUP    = 2.599          # historical: kOutputMakeupNominal BEFORE session 115
+RETIRED_TAPER_EXP  = 1.998          # historical: masterTaperExp, retired s115/s146 (now 3-seg PWL)
 
 _TIMES = G.segment_times()
 _fail = []
@@ -315,8 +335,9 @@ def t5_anchor(L):
     print(f"    file reads  {bad:+8.3f} dBFS on sweep_clean  (UNPINNED -- see T3)")
     print(f"    TRUE 1700   {true_abs:+8.3f} dBFS")
     print(f"  => anchor is LOW by {err:.3f} dB")
-    corrected = SHIPPED_MAKEUP * 10 ** (err / 20)
-    print(f"  kOutputMakeup  shipped {SHIPPED_MAKEUP:.3f}  ->  {corrected:.3f}   ({err:+.2f} dB)")
+    corrected = PRE_S115_MAKEUP * 10 ** (err / 20)
+    print(f"  kOutputMakeup  pre-s115 {PRE_S115_MAKEUP:.3f}  ->  {corrected:.3f}   ({err:+.2f} dB)")
+    print(f"     (s115 SHIPPED 4.3297 on this derivation; GainStaging.h is the live value)")
     if err < 1.0:
         fail("T5", f"anchor error {err:.3f} dB is too small to be the reported defect")
     return err, corrected
@@ -337,7 +358,8 @@ def t6_no_power_law(L):
     num = sum((-20 * math.log10(k)) * (-(L[k] - L[1.0])) for k in fitpts)
     den = sum((20 * math.log10(k)) ** 2 for k in fitpts)
     p_ls = num / den
-    print(f"  LS p over m=0.25/0.50/0.75 : {p_ls:.3f}   (shipped masterTaperExp = {SHIPPED_TAPER_EXP})")
+    print(f"  LS p over m=0.25/0.50/0.75 : {p_ls:.3f}   (RETIRED masterTaperExp = {RETIRED_TAPER_EXP};")
+    print(f"     the taper is a 3-SEGMENT PWL since s146 — no single exponent ships)")
     print(f"  per-point p spans {lo:.2f}..{hi:.2f}  (ratio {hi/lo:.2f}x)")
     if hi / lo < 1.25:
         fail("T6", "per-point exponents agree -- a power law WOULD fit, contradicting the write-up")
@@ -389,9 +411,9 @@ def main():
     os.makedirs(os.path.dirname(a.json), exist_ok=True)
     with open(a.json, "w") as fh:
         json.dump({"pad_db": pad, "anchor_error_db": err,
-                   "kOutputMakeup_shipped": SHIPPED_MAKEUP,
+                   "kOutputMakeup_pre_s115": PRE_S115_MAKEUP,
                    "kOutputMakeup_corrected": corrected,
-                   "masterTaperExp_shipped": SHIPPED_TAPER_EXP,
+                   "masterTaperExp_retired": RETIRED_TAPER_EXP,
                    "masterTaperExp_ls_corrected": p_ls,
                    "ladder_re_noon": {str(k): L[k] for k in sorted(L)},
                    "failures": _fail}, fh, indent=2)
