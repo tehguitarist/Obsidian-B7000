@@ -20531,3 +20531,118 @@ unaffected because it bounds only `dgamma`.
    (+0.513 dB/oct at the vertex) and explicitly forbids reading it as `P'`.
 3. ⚠ `build/s164_task_e/` holds 138 MB of private renders. Regenerable, gitignored; delete it if
    disk matters.
+
+## SESSION 165 (2026-08-06) — route (i) screened and REFUTED on size consistency, at the user's direction; the sign hypothesis the gate opened with was WRONG
+
+User instruction: *"Lets screen route I, and then if that fails, implement route ii"*. This is task
+E's **second** capped session. Nothing shipped, no `src/` edit.
+
+### 1. GATE BB (`analysis/preclip_preemph_gate.py`, `_mutate_gate_bb.py`, **9/9 arms**)
+
+Route (i) = a **FIXED** linear section at or upstream of the clipper. It works only through the
+clipper's own nonlinearity: `drive-tilt = P'·[γ(hot) − γ(quiet)]`, so a fixed section supplies a
+fixed `ΔP'` and the chain converts it at a rate set by the clipper's operating point.
+
+⭐⭐ **WHY LADDER PROBES GENERALISE TO "ANY SECTION" — the design's load-bearing part.** An [ENG]
+pre-clipper section multiplies `P` by `H(f)`; changing a treble-ladder element ALSO multiplies `P`
+by a fixed factor, because IC2_A(+) draws no current so V(Q) is a clean stage boundary and
+everything downstream is common-mode. So `Δlog P` is EXACTLY the ladder's own change, and the
+transfer coefficient should be a property of the CHAIN. **BB4 tests that rather than assuming it.**
+
+Six probes spanning `ΔP'` **+0.638 … −0.102 dB/oct**, five conditions (DRIVE min/noon/max, GRUNT
+flat/boost), all bleed-free, **36 renders**.
+
+#### 1a. ⛔ THE HYPOTHESIS THE GATE WAS BUILT ON FAILED, and that is recorded rather than dropped
+
+BB was designed around a SIGN argument: a fixed `ΔP'` delivers `ΔP'·Δγ`, and `Δγ` looked like it
+reverses across the DRIVE knob (BA3's model tilt runs −0.346 / −0.013 / **+0.038**) while the
+required correction does not (**−0.839 / −1.172 / −1.224**, same-signed). Measured: **only 2 of 6
+probes flip**, and both flips are at DRIVE max where the delivered correction is ~0 rather than
+robustly positive. ⇒ **sign does NOT refute route (i).** The `bb3-sign` arm exists precisely
+because the real data does not take that branch — without it a dead branch and a true negative are
+the same output.
+
+#### 1b. ⭐⭐ WHAT DOES REFUTE IT: THE COEFFICIENT COLLAPSES WITH THE DRIVE KNOB
+
+| condition | coefficient (median, 5 slope probes) | required `ΔP'` |
+|---|---|---|
+| DRIVE min | −0.9091 | **+0.923** dB/oct |
+| DRIVE noon | −0.4807 | **+2.438** |
+| DRIVE max | **−0.0267** | **+45.815** |
+| GRUNT flat | −0.1837 | +7.829 |
+| GRUNT boost | −0.1746 | +8.248 |
+
+⇒ **the required fixed `ΔP'` spans a factor of 50, and a fixed section has ONE.** Stated with no
+bar in it, which is the form to quote:
+
+- a section sized to **close DRIVE min delivers 2.0 %** of the requirement at DRIVE max;
+- one sized to **close DRIVE max overshoots DRIVE min by 50×**.
+
+⇒ **a dose-response locus that cannot CONTAIN the target refutes the lever, not its setting** —
+s38's C12 argument and s126's bass peak, the same shape a third time.
+⭐ **The mechanism is physically coherent and worth keeping:** as the DRIVE knob comes up the
+clipper is already limiting at BOTH stimulus rungs, so changing what it is fed cannot change the
+DIFFERENCE between them — `Δγ → 0`. The lever dies exactly where the requirement is largest.
+⚠ And the SMALLEST required `ΔP'` (**0.923 dB/oct**) already exceeds the whole shipped ladder's own
+slope at the vertex (**+0.513**).
+
+#### 1c. The generalisation, and a confound that had to be handled first
+
+⚠⚠ **`R12 ×4.0` is NOT a slope probe.** It moves the pre-clipper LEVEL by **+4.985 dB** against a
+slope change of −0.102, i.e. `|ΔLevel/ΔP'| = 49.1` where every other probe is **0.65–0.71** — a 70×
+outlier. Since `γ` depends on level, that probe measures `P'·Δ(Δγ|level)`, a different term. The
+screen is a **property of the probe computable before any render**, so classifying on it is not
+outcome-selection, and the bar is a multiple of the population's own median. Excluded **by name**.
+Over the five remaining probes the coefficient agrees in sign at **4 of 5** conditions, ranges
+**0.2–0.4× the median** at every condition except DRIVE max — where the exception is the collapse
+itself, at `|median| = 0.0267`.
+⚠ A first draft printed *"DISAGREES in sign at every condition"* off an `all(...)` that is False if
+ANY condition disagrees — a message that misdescribed its own computation, on the line the whole
+generalisation rests on. Now reported per condition.
+
+#### 1d. Collateral — GATE Y reproduced on a second set of constants
+
+At DRIVE noon, through GATE W's own locator: **6 of 6 probes more than halve a named feature's
+prominence.** `mid_peak` goes **2.27 → 0.00 dB** in 4 of 6 (the feature ceases to exist) and the
+320 Hz null goes **7.63 → 1.0–1.9 dB**. ⚠ These are PROBES, not proposals — a shipped section would
+be shaped to minimise this — but it prices what moving `P'` near the vertex costs at all.
+
+#### 1e. Known answers, all four held
+
+(a) injected tilt recovered to **1.8e−15**; (b) ⭐ the baseline reproduces GATE BA's **stored**
+per-condition drive-tilts at **0.00e+00** (s77's SHIP_RECORD — a baseline that had silently moved
+would make every comparison a fiction); (c) the denominator floor is **IMPORTED from BA5's refused
+ATTACK span**, not invented, and the smallest probe clears it at 3.2×; (d) ⭐ the INERT control
+(`trebleC8`, out of circuit at ATTACK flat, so `ΔP' = 0` by TOPOLOGY not by smallness) renders
+**bit-identical, 0.000e+00** — non-vacuity in both directions.
+⭐ BB0 asserts the **eq_reference kwarg ↔ FitParams constant correspondence** for every probe before
+anything renders. That is the s149 defect class exactly — a gate writing one constant while its
+closed form scales another runs fine and prints plausible, monotone nonsense — and `bb0-correspond`
+proves the guard fires.
+
+### 2. Instrument defect in this session's own mutation runner
+
+⚠ `bb5-collateral`'s first version was `lost = [] or <original>`, which is a **no-op** (an empty
+list is falsy, so `or` falls straight through) and scored a working gate as NARRATED. Mutating the
+COMPARISON instead makes the condition unsatisfiable. `suspect the mutation before the guard`.
+
+### 3. Where task E stands
+
+- **Session 1 (s164):** the scoped architecture (post-clipper) refuted — contributes exactly zero.
+- **Session 2 (s165):** route (i) (fixed pre-clipper pre-emphasis) refuted — cannot serve the
+  DRIVE knob's two ends at once, and destroys the mid peak on the way.
+- **Session 3:** route (ii), a genuinely LEVEL-DEPENDENT section, per the user's standing
+  instruction. It is the only route left and it is a NEW architecture for this project.
+
+### ▶ NEXT
+
+1. **Implement route (ii)** — a level-dependent (envelope-driven) tilt in the OD path. What the
+   two refutations have already established about it, and it is a real specification:
+   - it must sit where it can see LEVEL, and its effect must NOT cancel between stimulus rungs —
+     so it cannot be a fixed linear stage anywhere (BA2), and it cannot work purely by feeding the
+     clipper differently (BB4);
+   - it must deliver ~**−1.19 dB/oct** of drive-tilt at 2935 Hz, **frequency-dependent** (gate 1:
+     the deficit steepens −0.39/−0.78/−1.44 at 1613/2032/2560 Hz), capped by gate 2's position
+     ceiling, with **CLEAN bit-identical** (gate 3);
+   - ⚠ and it must do it at DRIVE max, where BB4 measured every fixed lever dying.
+2. ⚠ `build/s165_preclip/` holds the 36 probe renders. Regenerable, gitignored.
