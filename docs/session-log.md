@@ -17742,3 +17742,1367 @@ value refuses as well; GATE AO finding it is not the same as GATE AJ being unabl
    half, AD3's 800 Hz–1 kHz clean-tilt inversion, and s144's top-octave droop decision — unchanged.
 
 ⚠ **Uncommitted at this point: sessions 142–149 together.**
+
+## SESSION 150 (2026-08-04) — IN PROGRESS / HANDOVER, NOT WORKING YET
+
+⛔⛔ **STOP: this session did NOT complete. Read this whole block before touching
+`src/dsp/OdToneRestore.h` or `PedalChain.h` — the stage as it currently sits on disk builds and
+runs but does NOT hit its targets. Do not assume "it compiles and ctest is green" means it works;
+ctest was never re-run this session (task 5 never started).**
+
+### What triggered this
+
+The user, listening directly against `analysis/captures/ref-od.wav` and the `drive-*_base-od.wav`
+ladder at the **sweep_drv_-12** stimulus (their stated "realistic playing level" — they separately
+noted CLEAN is accurate and this is an OD-path-only issue), identified THREE connected features in
+the 250-900 Hz region that don't match the pedal closely enough:
+
+1. **320 Hz notch** — not deep enough, and (their words) "non-existent" in `drive-1700_base-od.wav`
+   as well as at drive noon.
+2. **~450-500 Hz peak** (between the two notches) — not tall enough.
+3. **~800 Hz notch** — this one is OK (small gap already).
+
+The user was explicit and did not want this treated as another item-6 mechanism investigation:
+*"I don't care how we fix this, artificial, extra components — this is NOT to be discarded for any
+reason except for fixing it. It is a core part of the tone."* And: *"the 320hz notch, as it gets
+deeper, it also gets a bit sharper in the real hardware too"* — i.e. Q should rise with depth, not
+just gain. And: *"make sure we don't lose the peak when we increase the notch"* (the two biquads
+cascade and can interact).
+
+⚠ This is a **deliberate departure from `reference-sources.md` rule 5**'s general preference for
+schematic-fitted corrections — the user has explicitly authorised a non-physical, non-schematic
+shaping stage here. Do not read this as licence to do the same elsewhere without asking; it was
+scoped to this specific tone complex.
+
+### What was MEASURED (this part is solid — reuse it, don't re-derive)
+
+These three features are `feature_locus_gate.py`'s (GATE W) own named features: `mid_notch` (window
+285-358 Hz, "320 Hz null / GAP #2"), `mid_peak` (window 358-620 Hz), `bt_notch` (window 620-1000 Hz,
+"recovery bridged-T"). All measurements below use GATE W's own `locate()`/`smooth()` (log-f,
+1/48-oct power-averaged, parabola-interpolated vertex + prominence) directly — NOT a hand-rolled
+extremum finder — so they are apples-to-apples with every prior GATE W/AD reading.
+
+Fresh renders of the DRIVE ladder (`drive-0700/0930/1430/1700_base-od.wav` + `ref-od.wav` for
+DRIVE=noon), sweep_drv_-12, **on the baseline** (`s146_mastertaper.json`'s shipped constants, before
+any change this session):
+
+| DRIVE (knob 0..1) | | mid_notch prom | mid_peak prom | bt_notch prom |
+|---|---|---|---|
+| 0.00 | PEDAL / MODEL | 0.529 / 0.000 | 0.340 / 0.072 | 0.328 / 0.353 |
+| 0.25 | PEDAL / MODEL | 0.816 / 0.000 | 0.574 / 0.169 | 0.487 / 0.401 |
+| 0.50 | PEDAL / MODEL | 1.742 / 0.021 | 1.096 / 0.535 | 0.563 / 0.431 |
+| 0.75 | PEDAL / MODEL | 2.667 / 0.227 | 0.617 / 0.635 | 0.519 / 0.439 |
+| 1.00 | PEDAL / MODEL | 3.239 / 0.187 | 0.456 / 0.012 | 0.557 / 0.421 |
+
+⇒ confirms the user's ear exactly: `mid_notch` is essentially flat/absent in the model across the
+WHOLE ladder while the pedal's rises smoothly and monotonically to 3.24 dB; `mid_peak` is weak
+everywhere and collapses hardest right at DRIVE max (pedal still 0.46, model 0.01); `bt_notch` is
+already close (gap ≤ 0.14 dB throughout) — matches the user's "800 Hz one is OK", confirmed, DO NOT
+TOUCH IT.
+
+Also worth knowing (from the raw un-windowed curve, `analysis/check_notches.py`-style script — not
+saved as a repo file, see "artefacts" below): on `ref-od.wav` at DRIVE=noon the pedal's actual local
+extrema in this region are notch@318.7 Hz, peak@426.9 Hz, notch@806.1 Hz; the model's (pre-fix) are
+notch@348.1, peak@488.1, notch@803.4. The model's own peak/notch centres drift further from the
+pedal's than GATE W's coarser 3-band reads suggested.
+
+### What was ATTEMPTED (built, wired, does NOT hit targets yet)
+
+New file `src/dsp/OdToneRestore.h` — two RBJ (Audio EQ Cookbook) peaking biquads (double precision,
+direct-form I), gain/Q driven by a 5-point piecewise-linear breakpoint table keyed on the DRIVE knob
+(0/.25/.5/.75/1.0), NOT an envelope follower (deliberately — tracks the DRIVE CONTROL, not
+instantaneous signal level, per the user's "must track drive" meaning "when I turn the knob").
+Wired into `PedalChain.h`: new member `odToneRestore`, `#include`d, `prepare()`d/`reset()`d
+alongside `recovery`, called in `runOdSample()` and `runOdSampleTapped()` **between `recovery` and
+`skB`** (OD-path only — never touches the clean tap, so CLEAN gate rows are structurally
+unaffected), and `setDrive(p.drive)` added to `applyParams()`. This wiring is sound and should NOT
+need to change; **build succeeds cleanly** (`cmake --build build --target OfflineRender`).
+
+⛔⛔ **THE FILTER TUNING DOES NOT WORK YET — this is the actual unfinished problem.** Symptom,
+measured after wiring + several tuning iterations (final on-disk state: `kNotchFreq=310`,
+`kNotchQ={10,13,18,24,32}`, `kNotchGainDb={0.53,0.82,1.72,2.44,3.05}`, `kPeakFreq=410`, `kPeakQ=2.2`,
+`kPeakGainDb={0.27,0.40,0.56,0.00,0.45}`):
+
+| DRIVE | | mid_notch MODEL (target) | mid_peak MODEL (target) |
+|---|---|---|---|
+| 0.00 | | 0.000 (want 0.529) | 0.074 (want 0.340) |
+| 0.25 | | 0.002 (want 0.816) | 0.187 (want 0.574) |
+| 0.75 | | 0.234 (want 2.667) | 0.679 (want 0.617, overshot ok) |
+| 1.00 | | 0.818 (want 3.239) | 0.024 (want 0.456) |
+
+Barely moved from the pre-fix baseline at low/mid drive, and still far short at DRIVE max.
+
+**ROOT CAUSE, DIAGNOSED (this is the useful part — don't re-derive it, fix it):**
+`GATE W`'s `mid_notch` window is a FIXED [285, 358] Hz band. Printing the model's raw smoothed curve
+in that band at DRIVE=0 (see `/tmp/dbg2.py` in the transcript — not saved to disk, recreate from
+`analyze.transfer_h1` + `feature_locus_gate.smooth`) shows the model's PRE-EXISTING curve there is
+**monotonically declining across the ENTIRE window with no local minimum at all** — it's the tail of
+a broader unrelated slope, not a notch shape. `locate()`'s prominence algorithm walks outward from
+the argmin **only within the window bounds**; if the true recovery (a real local max / shoulder)
+sits outside the window, the algorithm credits only whatever partial recovery happens to occur
+before the window edge. At DRIVE=0 the located minimum landed right at the window's OWN right edge
+(357 Hz) — i.e. `edge≈true`, essentially no room to recover, so prominence reads ~0 REGARDLESS of
+how much cut the biquad applies at 310 Hz, because the recovery back up the right flank needs to
+happen and complete within ~48 Hz (358−310) and the underlying downward slope is fighting that
+recovery the entire way. Raising Q (this session tried 6→10→13→18→24→32 across the ladder) helped
+some at DRIVE=0.75/1.0 but nowhere near enough, and did nothing at DRIVE=0/0.25.
+
+**What was NOT yet tried, and is the recommended next move:**
+- **Overshoot the gain substantially** beyond the naive "pedal-minus-model deficit" — the additive
+  assumption (add exactly the deficit in dB) is wrong precisely because the window truncates
+  recovery; a bigger cut is needed to fight the ambient slope AND still show adequate recovery by
+  the edge. A quick sanity probe (kNotchGainDb[0] temporarily set to 10 dB, at DRIVE=0 only) was
+  queued to test this but the session ended before it ran — **this is the single fastest next
+  experiment**: if a 10 dB cut at DRIVE=0 still reads ~0 prominence, the bug is structural (wiring,
+  wrong sample rate reaching the biquad, etc.) and needs debugging before any further tuning; if it
+  reads a large prominence, the fix is "overshoot the gain table a lot, iterate down."
+- **Consider moving the notch centre EVEN closer to the window's left edge** (e.g. 295-300 Hz
+  instead of 310) to leave more room (~60 Hz instead of ~48) for the right-flank recovery to
+  complete before 358 Hz — trades off against the pedal's own measured centre (~318-320 Hz at
+  DRIVE=0.5) but the *locate()*-reported centre doesn't have to be exactly the analytic biquad
+  centre once the ambient slope is added in.
+- **Consider whether a plain 2nd-order peaking EQ is even the right filter shape.** Its "recovery"
+  is asymptotic (never truly flat, keeps a gentle skirt indefinitely) — a filter with a sharper
+  transition (e.g. two cascaded narrower peaking sections at the same centre, or an elliptic/notch
+  proper with steeper skirts) might reach near-unity gain faster and read far better against a
+  hard window edge.
+- **Re-verify the sample rate reaching `OdToneRestore::prepare()`** as a real bug candidate, not
+  just a tuning issue — `prepareOd(osRate)` calls `odToneRestore.prepare(osRate)` before the trailing
+  `applyParams(cur)` call, which looks correct by inspection, but this was NOT verified by an
+  isolated unit test or a printed coefficient dump. Cheap to check: a tiny standalone probe
+  (`c++ -O0 -g` against just `OdToneRestore.h`, no JUCE, no WDF) printing `notch.B0/B1/B2/A1/A2` at
+  a known `(fs, f0, Q, gainDb)` and comparing against a hand-computed RBJ result would settle
+  whether the math itself is right before spending more time on breakpoint tuning.
+- Once `mid_notch`/`mid_peak` are hitting targets **at every DRIVE rung**, re-check `bt_notch` has
+  NOT moved (it sits right next to `mid_peak`'s window and this stage's `peak` biquad at 410 Hz
+  could bleed into it) — it was still close (≤0.14 dB gap) after this session's changes, but
+  re-verify after any further retuning.
+
+### Artefacts / how to resume
+
+- **On disk, uncommitted:** `src/dsp/OdToneRestore.h` (new, current state matches the "attempted"
+  table above — the `kNotchGainDb[0]=10.0` debug probe was reverted back to `0.53` before this
+  handover was written), `src/dsp/PedalChain.h` (wiring diff, `git diff` shows +9/−2 lines — sound,
+  keep it).
+- **Not saved to disk, recreate if needed:** the diagnostic scripts lived in the scratchpad
+  (`/private/tmp/claude-501/.../scratchpad/check_notches.py`, `check_notches2.py`, `check_ladder.py`)
+  and `/tmp/dbg2.py` — none survive between sessions. They were short (< 60 lines each): load
+  `analysis/analyze.py` + `analysis/feature_locus_gate.py` + `analysis/captures.py`, render via
+  `build/OfflineRender_artefacts/Release/OfflineRender` with `captures.render_args(captures.parse_capture(fname))`,
+  then call `feature_locus_gate.smooth()` + `.locate()` on `analyze.transfer_h1()`'s output. Trivial
+  to recreate in five minutes; the numbers in the tables above are the thing worth keeping, not the
+  scripts.
+- **ctest was NEVER re-run this session** (task 5 pending) — do that before trusting anything else
+  still passes. **`release_gate.py` was never re-run either.**
+- **Tasks 3-6 from this session's own tracker are still open**: implement (in progress, not done),
+  build+verify against ladder (in progress, failing), ctest+release_gate regression check (not
+  started), doc updates (not started — this session-log entry is the doc update, but CLAUDE.md's
+  SHIPPED CONSTANTS table has NOT been touched, and it should NOT be touched until the stage
+  actually hits its targets).
+- **Do not commit anything from this session as-is** — the stage does not work yet.
+
+## SESSION 151 (2026-08-04) — session 150's stall DIAGNOSED and the stage re-fitted; GRUNT turns out to be the largest axis of the defect
+
+Continuation of session 150's user-authorised, non-schematic notch/peak restore. Session 150 ended
+with the stage built, wired, building cleanly, and **not hitting its targets**; it handed forward a
+root-cause hypothesis (GATE W's fixed prominence window truncating the recovery) and a list of
+untried experiments. This session ran them, found the hypothesis was *half* the story, re-fitted the
+stage against a corrected target, and then — at the user's prompting — found that the GRUNT axis
+carries a far larger defect than the one the session started on.
+
+### 1. Session 150's "structural bug" branch is CLOSED
+
+s150 flagged the biquad math and the sample rate reaching `OdToneRestore::prepare()` as untested and
+a live bug candidate. Settled with a standalone probe (`scratchpad/odprobe.cpp`, ~30 lines, no JUCE,
+no WDF): impulse → DFT at 16 named frequencies, compared against an **independent** RBJ
+implementation written in Python from the Audio EQ Cookbook.
+
+**Worst disagreement over 200-1000 Hz: 4.0e-6 dB.** So the coefficients, the direct-form I
+recursion, and the oversampled sample rate are all correct — the whole shortfall was the target, not
+the filter. ⭐ Note this is a real known answer, not a restatement: the two implementations share no
+code, and the C++ side was driven through its own `prepare()`/`setDrive()` path.
+
+⚠ Also caught here: the binary on disk (17:34) was **older than `OdToneRestore.h` (17:36)**, i.e.
+s150's final "revert the 10 dB debug probe" edit was never compiled. Anything read off that binary
+was reading the probe, not the shipped table. Checked mtimes before trusting the artefact.
+
+### 2. WHY s150 STALLED — two defects, and the one it named was the smaller
+
+**(a) THE FIT SET WAS DILUTED (this is the bigger half, and s150 never suspected it).** s150 measured
+against `drive-*_base-od.wav` / `ref-od.wav`, which sit at **LEVEL = 0.5**. GATE K2 established that
+bleed vanishes only where BOTH LEVEL and BLEND are max, and s113 measured LEVEL-noon/BLEND-max output
+at **~44 % clean signal**. The restore stage is in the OD path, so roughly half of everything it did
+was diluted away before the analysis read it. Measured bleed-free, the deficits are **3-5x larger**
+than the numbers s150 built its table from — its DRIVE-max entry was 3.05 dB against a true 16.3 dB.
+⇒ **fit bleed-free (LEVEL = BLEND = max), then CHECK across LEVEL and BLEND.**
+
+**(b) THE STATISTIC WAS A PROMINENCE, WHICH IS A DETECTOR AND NOT AN OBJECTIVE.** s150's diagnosis was
+correct as far as it went: GATE W `locate()`'s `mid_notch` window is a fixed [285, 358] Hz band and
+its prominence is `min(rise-to-left-edge, rise-to-right-edge)`, so where the model's curve declines
+across the whole window the argmin sits ON the right edge, the right-hand walk is empty, and the
+statistic reads ~0 for ANY notch depth. `measurement-discipline.md` already carries this exact trap
+(s126, "A PROMINENCE MEASURED AT A WINDOW EDGE IS IDENTICALLY ZERO BY CONSTRUCTION"). Chasing it drove
+s150's Q to **32** (a ~10 Hz needle) and its centre down to **310 Hz**, both purely to buy window room
+against a metric artefact — the pedal's own centre is 322.8 Hz and its Q is 5-12.
+
+⛔ **The tempting fix — widen GATE W's window — does NOT work either, and that is worth recording.**
+At DRIVE max the model's curve falls monotonically from ~370 Hz all the way into the bridged-T notch,
+so a window wide enough to contain the null's right shoulder puts the GLOBAL minimum at ~550 Hz and
+the reader silently tracks a different feature (measured: f0 550.8, depth 0.000, edge=1).
+⇒ **the argmin search and the shoulder search must be DECOUPLED**: CORE (285-372 Hz) bounds where the
+null itself demonstrably sits on both sides; SHOULDER (210-520 Hz) bounds where its flanks recover.
+Both are asserted, and the reader REFUSES when the minimum rests on a CORE bound rather than
+reporting a bound as a measurement.
+
+### 3. The instrument — `analysis/od_tone_restore_fit.py` (NEW, saved to the repo)
+
+s150's diagnostics lived in the scratchpad and did not survive the session. This one is a repo file
+with six modes, and it imports GATE W's own `smooth()`/`locate()`/`GRID` rather than re-deriving them,
+so every number is apples-to-apples with prior GATE W / AD readings:
+
+  --geom     null depth/Q/centre on both sides, per capture set
+  --matrix   the same across STIMULUS LEVEL x DRIVE (the confound matrix)
+  --fit      least-squares biquad solve, with a quadratic-in-log-f trend fitted JOINTLY and discarded
+  --stage-off  subtract the stage's OWN response analytically (exact; no rebuild, no second render)
+  --set      bleedfree | listen | blend | blend_hot | grunt_flat | grunt_boost | grunt_hot | grunt_cold
+  --core     override the window (required at GRUNT boost)
+
+⭐ `--stage-off` is the load-bearing one and it cost nothing: the stage is linear and in series, so
+its response can be subtracted from the rendered curve exactly. That is the ONLY way to tell "the
+model never had a null here" apart from "our own correction filled the null in" — which look
+identical in the rendered curve, and which is precisely how this session found the GRUNT regression.
+
+⚠ `--fit`'s first draft estimated the broadband trend on shoulders at 195-275 and 1050-1500 Hz and
+subtracted it. Wrong, and the tell was visible in the residual: a smooth ~3 dB bowl centred ~500 Hz at
+two of three rungs. That is **A3**, which lives right across the 275-1050 gap and therefore cannot be
+captured by a trend estimated outside it — fitting it there hands A3 to the notch/peak biquads, which
+is `one-knob-two-jobs-is-compensating` exactly. Fitted jointly, the quadratic is identifiable against
+two narrow biquads and is thrown away. (The free fit still rests on bounds at two rungs; the geometric
+reader in `--geom` is what the shipped tables were actually derived from.)
+
+### 4. What the defect actually is (bleed-free, `sweep_drv_-12`, stage subtracted)
+
+| DRIVE | pedal depth | model depth | correction | pedal Q | model Q |
+|---|---|---|---|---|---|
+| 0.00 | 8.59 dB | 14.32 | **-5.74** | 5.21 | 4.26 |
+| 0.50 | 13.92 | (n/a, mid-fit) | **+2.12** | 8.65 | 5.28 |
+| 1.00 | 19.08 | 1.97 | **+17.10** | 11.54 | 7.42 |
+
+**The pedal's null DEEPENS monotonically with drive (8.6 -> 13.9 -> 19.1 dB) and SHARPENS as it does
+(Q 5.2 -> 8.7 -> 11.5); the model's washes out (14.3 -> ~12 -> 2.0).** That is GATE R/V's documented
+"the model's OD path saturates too early, so its null washes out where the pedal's deepens", read at
+one frequency and on a different instrument. ⭐ The user identified the sharpening by ear before any
+of it was measured, and the measurement reproduces it.
+
+⭐⭐ **AND THIS REFUTES THE OBVIOUS ALTERNATIVE, which the user asked about explicitly: "could we just
+exaggerate whatever already creates the notch, tracking the same elements?"** No — **the correction
+CHANGES SIGN across the ladder** (-5.74 dB at DRIVE 0, +17.10 at DRIVE max). The null is a
+cancellation in the linear pre-clipper treble/ATTACK ladder (GATE R's R2: it moves 329.7 -> 164.2 Hz
+with the ladder caps and ignores the bridged-T), so any static element change adds the SAME amount at
+every rung and cannot be -5.7 at one end and +17.1 at the other. Making such an element
+drive-dependent IS open item 6, where every named carrier is refuted. And GATE Y (s126) separately
+measured that the ladder constants which DO move this region dissolve the 320 Hz null and the mid peak
+outright (prominence 7.27 -> 0.00). Refuted on both routes, with no render.
+
+### 5. GRUNT — the axis nobody had looked at, and it is the largest one
+
+The user asked whether there were ND-vs-hardware notes about the null deepening with GRUNT. There are:
+`reference-sources.md` §3 records hardware's ~305-320 Hz null deeper than ND's in **all six** measured
+conditions, **+1.6 dB at grunt cut rising to ~26 dB at grunt boost**, and §1 makes **HARDWARE, not ND,
+the authority for this null's DEPTH**. ⛔ Those are PNG reads — §5 rule 3, sign and rough size only,
+never a fit target — but they say the ND-matched answer is a LOWER BOUND on what hardware wants.
+
+⚠⚠ **Every capture without a `grunt-` token is GRUNT = CUT** (`captures.py` defaults
+`gruntIdx=_GRUNT_IDX["cut"]`). So this session's fit, and all of s150, sat at the ONE switch position
+where the two references agree best. Measured bleed-free at the other two, stage subtracted:
+
+| GRUNT | DRIVE 0 | DRIVE 0.5 | DRIVE 1.0 |
+|---|---|---|---|
+| Cut | -5.74 | +2.12 | +17.10 |
+| Flat | **+13.99** | **+16.56** | **+21.88** |
+| Boost | **+11.79** | **+12.58** | **+9.65** |
+
+(means over the three realistic sweeps -18/-12/-6; the model has **NO null at all** in several
+DRIVE-max Flat/Boost cells.) ⇒ **at Cut the model's null is roughly the right size; at Flat/Boost it
+is 10-25 dB short.** GRUNT is not a refinement of this defect, it is the bulk of it.
+
+⛔⛔ **AND THE ONE-ROW STAGE WAS A REGRESSION AT TWO OF THREE POSITIONS.** The Cut-fitted DRIVE-0 entry
+is a 6.4 dB BOOST (the model's null is genuinely too deep there), and it was being applied unchanged at
+Flat/Boost where the null is already 15-19 dB too shallow — measured, it made those two positions
+**4.5 dB WORSE than leaving the stage out**. Found only via `--stage-off`. Fixed by making the tables
+GRUNT-rowed (`[3][5]`) and keying them on the PHYSICAL position via `PedalChain::gruntEnum()` (the
+APVTS order is {Boost, Cut, Flat}, which is NOT the enum's order — passing `p.gruntIdx` raw would
+silently permute the rows).
+
+⭐ **A migration claim was nearly promoted from ONE CELL.** An intermediate reading had the pedal's
+null at GRUNT boost x DRIVE max migrating to 238.3 Hz, and that was written up as "the centre must
+track (grunt, drive)". Read at all four stimulus levels it is **322.8 / 327.5 / 238.3 / 322.8** — one
+anomalous cell out of four. 322.8 Hz serves every GRUNT position and the centre needs no tracking at
+all. `an-endpoint-pair-is-not-a-ladder`, on the sweep axis: read every rung before calling anything a
+migration.
+
+⚠ `check-for-unread-data-first`, 8th occurrence, and it nearly cost a capture request against a
+CLOSING capture window: `level-1700_grunt-flat_base-od.wav` and `level-1700_grunt-boost_base-od.wav`
+are bleed-free DRIVE-noon captures and were already on disk. An earlier filter in this session hid
+them behind an unrelated `attackIdx` condition and the mid-drive rung was briefly believed missing.
+
+**CONVERGED, two iterations, at the user's direction ("we CANNOT ignore it").** Same loop the Cut row
+went through — apply the mean residual, rebuild, re-measure. Mean depth residual over the three
+realistic sweeps, and the composite-vs-pedal Q ratio:
+
+| GRUNT | DRIVE 0.00 | DRIVE 0.50 | DRIVE 1.00 | Q ratio (0 / .5 / 1) |
+|---|---|---|---|---|
+| Cut | -0.51 dB | +0.30 | -0.49 | 1.35 / 1.51 / 0.91 |
+| Flat | +0.09 | +0.14 | +0.83 | 1.22 / 1.03 / 1.03 |
+| Boost | +0.14 | +0.03 | +0.15 | 1.18 / 1.02 / 1.01 |
+
+⇒ depth is within **±0.83 dB everywhere**, from a starting point of 10-25 dB short at Flat/Boost.
+⭐ Note the Q columns split the two regimes cleanly and for a reason: at **Flat/Boost the model has
+almost no null of its own**, so the composite IS this biquad and its Q lands within 1.03-1.22; at
+**Cut the model's own broad null (Q ~4-7) dominates** and a small-gain biquad cannot narrow it, which
+is why Cut stays 1.35-1.51 too broad at low/mid drive. That residual is a structural limit of a
+single peaking section, not a tuning miss — narrowing it needs a shoulder-shaping section as well.
+⚠ The per-SWEEP residuals behind those means remain large (±5-12 dB); the means are what the user's
+"fit a compromise" decision selected, and the stimulus-level spread is the architectural limit
+recorded in §6.
+
+### 6. The confounds, measured
+
+**STIMULUS LEVEL — the architectural limit, and it is real.** The pedal's null depth at DRIVE noon
+spans **27.7 -> 8.5 dB** across the four sweeps; the model's spans only 16.6 -> 9.2. A DRIVE-KNOB-keyed
+filter is static in stimulus level by construction, so it can only be right where it was fitted.
+⇒ user's decision: **"knob-keyed, fit a compromise"** — each drive rung shifted by the MEAN of its
+errors over the three realistic sweeps (-18/-12/-6) rather than nailing -12. Depth-error rms per rung,
+nail--12 vs compromise: **0.71/3.29/2.55 -> 0.87/2.90/2.00**. It costs ~1 dB at -12 to buy ~1 dB at
+-18/-6. ⚠ At `sweep_clean` the errors remain ~10 dB; that rung is outside the realistic range and is
+deliberately not fitted.
+
+**LEVEL and BLEND — this is A3, not the notch.** At LEVEL noon the null is still +1.10 to +1.75 dB
+shallower than the pedal's at all five drive rungs, and the model's centre runs 352/352/347/337/305 Hz
+against the pedal's stable 318-323. Since the OD path itself is now correct to ±0.3 dB at the same
+drive settings, the residual is in the MIX by elimination — and it checks out quantitatively:
+propagating GATE O's independently measured **4.38 dB** OD-path deficit through the LEVEL-noon clean
+fraction predicts a **1.61 dB** shortfall against the **1.75 dB** measured. ⚠ SUFFICIENCY, not
+identification — the coherent-sum model gets the DIFFERENCE right (0.14 dB) but not the absolute
+depths, which need phase. On the BLEND axis the model's null dilutes ~2x faster than the pedal's, same
+mechanism. ⇒ user's decision: **fix A3's mix balance as its own session**, leave the OD path correct.
+
+### 6b. ⚠⚠ THE CAVEAT THAT LANDED LAST, AND IT IS THE MOST IMPORTANT ONE ON THIS STAGE
+
+Checked at the end of the session, after the fit had converged: **most of the PEDAL's deep null
+readings have their bottom AT or BELOW the deconvolution residue.** Margins (null bottom minus
+`feature_locus_gate.floor_db`) run **−27.7 to +14.0 dB**, negative or near-zero in the large
+majority of cells, and worst exactly where the readings are deepest.
+
+⛔ **This is NOT a licence to drop those cells, and the project has paid for that mistake twice** —
+GATE R's second floor guard and GATE W's first draft both used this residue as an exclusion, and
+`floor_db`'s own docstring records the outcome: it is **signal-PROPORTIONAL regularisation residue,
+not a noise floor** (GATE R measured it tracking the stimulus almost 1:1), and excluding on it
+deletes precisely the deep-notch cells a notch audit exists to measure. Nothing was excluded here.
+
+✅ **But the same docstring is equally explicit about what it DOES mean** — *"a notch bottom at or
+below the residue means the DEPTH is not resolved... report the depth as unresolved and keep the
+centre"* — and **DEPTH is exactly what this session fitted.** So:
+
+- **The deep pedal depths are LOWER BOUNDS, not measurements.** Where the margin is negative the
+  true null is at least as deep as recorded and may be deeper.
+- ⭐ **This explains the scatter that prompted the check.** The pedal's depth at GRUNT flat, DRIVE
+  0.5 runs **17.04 / 13.72 / 26.40 / 19.23 dB** across the four sweeps — non-monotone, which a
+  cancellation null has no physical reason to be. Reading it as (true depth) censored at a
+  stimulus-proportional residue accounts for it: the numbers are partly tracking the residue.
+- ⚠ **Direction of the resulting error, which is the useful part:** the MODEL's null before
+  correction was shallow (1-9 dB) and comfortably above the residue, so it was NOT censored. The
+  fitted correction is `pedal − model` with only the first term censored ⇒ **the shipped
+  corrections are UNDER-estimates, i.e. conservative.** That is the safer direction, and it is
+  consistent with `reference-sources.md` §3 independently making the ND-matched answer a lower
+  bound against hardware.
+- ⛔ **NOT censored, and therefore real:** the over-notch cells at quiet stimulus. GRUNT flat ×
+  DRIVE max × `sweep_clean` reads pedal **6.63 dB with a +7.46 dB margin** — resolved — against a
+  composite of **23.75 dB, i.e. +17.11 dB of over-notch.** That is a genuine cost of the knob-keyed
+  compromise, not an artefact.
+
+⇒ **the ±0.83 dB headline is a true statement about the fit's residual against its targets, and the
+TARGETS at flat/boost carry this caveat.** Treat the GRUNT flat/boost rows as provisional. Resolving
+them properly needs a depth estimator that does not bottom out — an area/power-integrated deficit
+over the null's own width, which is exactly what GATE R switched to for the same reason (s110 R4,
+*"stop depending on the fragile quantity"*) — not more iterations of the present one.
+
+### 7. Where it stands
+
+`ctest` **19/19 pass** (69.7 s at -j 12) — s150 never ran it. Matrix re-render to
+`analysis/reports/s151_odtone.json` and `release_gate.py` were run at the end of the session; see the
+STATUS block in `CLAUDE.md` for the outcome.
+
+`release_gate.py`: **6 rows over SHIP on both `s146_mastertaper.json` and the new
+`s151_odtone.json` — no change in gate status.** Membership identical (162 captures, 636 shared
+(file, sweep) cells), so the comparison is like-for-like. ✅ **CLEAN is BIT-IDENTICAL (0.451 →
+0.451)** — a free known answer confirming the stage is OD-path only, exactly as wired. OD band-RMS
+moved **1.947 → 1.987 (+0.040)**, and the cost is attributable rather than diffuse:
+
+| GRUNT | n cells | mean Δ OD band-RMS | worst |
+|---|---|---|---|
+| cut | 364 | **+0.010** (neutral; best cell −0.292) | +0.425 |
+| boost | 48 | +0.148 | +0.478 |
+| flat | 36 | +0.194 | +1.045 |
+
+⇒ **the entire matrix cost sits on the GRUNT flat/boost rows at the quiet stimulus levels the
+compromise deliberately excluded** (every worst cell is `sweep_clean` or `sweep_drv_-18`). The
+position the model is graded at most heavily — GRUNT cut, 364 of 448 cells — is unmoved.
+
+**What is still open on this stage**, in order:
+0. ⚠⚠ **The GRUNT flat/boost targets are partly UNRESOLVED (§6b) — treat those two rows as
+   provisional.** This outranks everything below it: it is a defect in the TARGET, not the fit.
+   Fixing it needs an area/power-integrated depth estimator (GATE R's own remedy, s110 R4), not
+   another iteration.
+1. ⚠ **The Cut row's Q at low/mid drive (1.35-1.51 too broad).** Structural — see §5. Needs a second
+   biquad shaping the null's shoulders, not another gain iteration.
+2. ⚠ **The Boost DRIVE-max entry rests on TWO valid cells, not three** — at `sweep_drv_-12` both
+   sides read "no null" in 285-372 Hz, which is an unreadable cell and NOT a correction of zero. It
+   is the weakest number in the table.
+3. ✅ **CLOSED — `kPeakGainDb` must STAY all zeros, and that is now measured, not assumed.** The
+   ~450 Hz peak was held at zero deliberately (change one thing at a time) on the reasoning that it
+   is largely the recovery BETWEEN the two notches and should follow the notch. Re-checked after the
+   notch converged, on GATE W's own `mid_peak` window, bleed-free, mean over the three realistic
+   sweeps: the model's peak is **MORE prominent than the pedal's in 8 of 9 (GRUNT × DRIVE) cells**
+   — deficit **−0.25 to −1.20 dB** (only GRUNT boost × DRIVE max runs the other way, +2.05).
+   ⇒ **adding peak boost would overshoot.** ⭐ And this explains the user's original report
+   ("the ~450–500 Hz peak isn't tall enough") without contradicting it: they heard it at LEVEL noon
+   against a model whose 320 Hz null was absent, so the peak had nothing to stand against. Fixing
+   the null fixed the perceived peak — a height complaint that was really a contrast complaint.
+   ⚠ **What DOES remain there is a CENTRE error, ~8–9 % high** (model 507.6 / 453.5 / 381.9 Hz
+   against the pedal's 466.7 / 418.0 / 362.8 at GRUNT cut). Not addressed, and note GATE W's
+   standing verdict that none of the flagged centres is a corner error — do not point an optimiser
+   at a capacitor for it.
+4. ⚠ **A3's mix balance** — the user's own decision was to take it as its own session (§6).
+5. ⛔ **The stimulus-level limit is not closed and cannot be by this architecture** (§6). If it ever
+   matters more than the knob-keyed simplicity, the surface to key a 2-D version on is exactly the
+   `--matrix` output this session's tool already produces.
+
+## SESSION 152 (2026-08-05) — GATE AP: the censoring is real, it does NOT move the table the way s151 predicted, and the two depth metrics disagree for a different reason entirely
+
+Session 151 put one item at the head of its own open list, above every tuning item, because it is a
+defect in the TARGET rather than in the fit: **most of the PEDAL's deep null readings bottom out at
+or below the deconvolution residue**, so the depths the two new GRUNT rows were fitted against are
+LOWER BOUNDS. This session built the estimator s151 named as the remedy (GATE R's own,
+`stop depending on the fragile quantity`, s110 R4) and answered the item.
+
+### 1. ⚠⚠ FIRST, A PRECONDITION — THE SHIPPED HEADER WAS UNCOMPILED, AND s151 CAUGHT THE SAME TRAP
+
+`OfflineRender` on disk was built at **18:37**; `src/dsp/OdToneRestore.h` was last edited at
+**19:10**; the s151 matrix report was written at **19:23**. So every artefact s151 quotes was
+rendered from a binary that predates the header it ships. That is exactly the trap s151 itself
+caught one session earlier (its §1: *"the binary on disk was OLDER than `OdToneRestore.h` … check
+mtimes before trusting a rendered artefact"*) — re-armed by that session's own final documentation
+pass.
+
+✅ **Settled by measurement, not by inspection.** Rebuilt, then re-rendered four cells spanning both
+GRUNT extremes and both DRIVE ends and compared bytes against the preserved pre-rebuild renders:
+**bit-identical at 4/4** (`drive-1700_level-1700_grunt-flat`, `drive-0700_level-1700`,
+`drive-1700_level-1700_grunt-boost`, `level-1700`). ⇒ the 19:10 edit was comment-only and **every
+s151 number stands** — the tables, the ±0.83 dB, `s151_odtone.json`, the release-gate comparison.
+
+⚠ **Cost, and it is the documented one:** the relink moved the `(size, mtime_ns)` signature
+`_cache_key` hashes, so this tool's 38 renders and the matrix's 162 entries went cold. Paid for the
+handful this session needed; **the next matrix run still owes ~25 min.** ⛔ Do not "fix" it by
+re-stamping the artefacts — bit-identity was proven at 4 cells, not 38.
+
+⭐ GENERAL: *a comment-only pass at the end of a session re-arms the very staleness that session
+just documented.* The cheap habit is to rebuild after the last `src/` edit even when that edit is
+prose, or to record explicitly that the binary is stale.
+
+### 2. The instrument
+
+`analysis/od_tone_restore_fit.py` gains the reader; `analysis/null_depth_censor_gate.py` (GATE AP)
+is the gate; `analysis/_mutate_gate_ap.py` is its mutation runner (**9/9 arms**).
+
+- `band_db_grid()` — GATE R's `band_db` definition (1/6-octave POWER average) evaluated on GATE W's
+  1/48-oct grid. **Imported semantics, asserted equivalence** — not re-derived.
+- `notch_geometry(..., depth="point"|"area")` — **BOTH depths are always returned**, so no caller
+  can quote one believing it read the other. Bottom and shoulders are read the SAME way in either
+  mode, which is GATE R's own requirement for the two to be comparable.
+- `Q` is deliberately **always the point-curve width**: a power-integrated depth has no width, and
+  Q is a property of the FLANKS, which are not censored.
+- `curves(meta=True)` returns each side's residue floor in the same normalised dB as the curves.
+
+### 3. ⚠⚠ THE DESIGN POINT THE WHOLE GATE TURNS ON — THE TWO DEPTHS ARE NOT ONE QUANTITY
+
+A point depth and a 1/6-octave area depth are **different quantities, not two measurements of one**:
+a genuinely deep, narrow null has a small area deficit whatever the residue is doing. So
+*"the area numbers are smaller, therefore the shipped table over-corrects"* is `difference-
+statistics-hide-common-mode` with the two operands in **different units**, and it is the reading a
+session would reach for.
+
+⇒ GATE AP **never compares the two depths.** It converts each into the shipped table's own unit —
+the biquad's centre gain in dB — by solving per cell for the gain at which the composite's depth
+equals the pedal's, **under each metric separately**. That solve is exact and needs no rebuild
+(the stage is linear and in series — the same argument that licenses `--stage-off`).
+
+⭐ And it comes with a known answer that already exists: **solving in the POINT metric must return
+the SHIPPED table**, because that table was fitted in the point metric by an entirely different
+rebuild-and-re-measure loop. Measured: **rms 0.57 dB, worst 1.25 dB** (AP3a). Without it, a
+disagreement between the two columns is equally consistent with the solve being broken.
+
+### 4. The known answers
+
+| arm | what it establishes | result |
+|---|---|---|
+| AP1a | `band_db_grid` IS GATE R's `band_db` | worst **0.177 dB** on a real curve; flat-curve control **exactly 0** |
+| AP1b | the area depth really is censor-robust | point slope **−1.000 dB per dB** of censoring, area **−0.242** ⇒ **4.1× less sensitive**; at the most-censored cells the area slope is **−0.001** (Boost 0.00) |
+| AP1c | the solve recovers a KNOWN injected gain, **under both metrics** | ≤ **2e-4 dB** at G* = 3/8/16/26; flat-curve control REFUSES |
+
+⭐⭐ **AP1c is the load-bearing one and it does double duty.** It establishes that the two AP3
+columns are one unit — and its converse is sharper: the two metrics agree there *because the
+synthetic pedal null has exactly the biquad's own (f0, Q)*. So on real data **any disagreement
+between the columns is a SHAPE mismatch, not the censoring.**
+
+⚠ AP1c's first draft asserted that the point depth of an injected notch equals the injected gain.
+It does not (0.3–1.2 dB short, growing with gain) and the estimator is fine — an RBJ peaking
+section is not at 0 dB at the shoulder frequencies, so a shoulder-referred depth is legitimately
+less than the centre gain. Asserting the closed form of that instead would be circular: it is the
+reader's own algorithm re-typed. The round trip is the non-circular replacement.
+
+### 5. AP2 — the censoring, confirmed
+
+**16 of 26** bleed-free pedal readings have their null bottom **at or below** the residue
+(margins −27.7 … +6.96 dB). `corr(floor margin, point−area gap) = −0.668` — the two estimators
+diverge where the bottom is censored, which is the mechanism, measured rather than asserted.
+⛔ Nothing was excluded on this. The residue is signal-PROPORTIONAL regularisation residue, not a
+noise floor, and GATE R and GATE W have each deleted their own headline cells with it once.
+
+### 6. AP3 — the answer, in the shipped table's own unit
+
+| GRUNT | DRIVE | shipped | solve POINT (n) | solve AREA (n) | area − shipped |
+|---|---|---|---|---|---|
+| Cut | 0.00 | −6.50 | −7.36 (3) | −7.50 (3) | **−1.00** |
+| Cut | 0.50 | +4.41 | +4.63 (3) | −0.34 (3) | **−4.75** |
+| Cut | 1.00 | +17.74 | +17.24 (3) | +18.82 (3) | **+1.08** |
+| Flat | 0.00 | +15.31 | +15.39 (3) | +13.06 (3) | **−2.25** |
+| Flat | 0.50 | +18.37 | +18.73 (3) | +17.70 (3) | −0.67 |
+| Flat | 1.00 | +25.31 | +26.56 (3) | +21.62 (3) | **−3.69** |
+| Boost | 0.00 | +12.91 | +13.09 (3) | +7.99 (3) | **−4.92** |
+| Boost | 0.50 | +13.84 | +14.06 (3) | +10.18 (3) | **−3.66** |
+| Boost | 1.00 | +11.13 | +11.42 (2) | +8.88 (2) | **−2.25** |
+
+**8 of 9 entries move by more than the fit's own ±0.83 dB residual, and 7 of the 9 move DOWN.**
+
+⛔⛔ **THAT REFUTES THE DIRECTION s151 §6b PREDICTED, AND THE REFUTATION NEEDS ITS SCOPE STATED.**
+§6b argued: the pedal's depth is censored ⇒ under-read ⇒ `pedal − model` is under-read ⇒
+**"the shipped corrections are UNDER-estimates, i.e. conservative."** *Within the point metric that
+logic is still sound.* What does not survive is the conclusion drawn from it, because the point
+metric is precisely the one whose unreliability motivated the item: on the metric censoring cannot
+reach, the same cells ask for **LESS** gain at 7 of 9. ⇒ **"the shipped table is conservative" is
+not a safe reading** — the two estimators disagree about the SIGN of the owed correction almost
+everywhere.
+
+### 7. AP6 — and the disagreement is NOT the censoring
+
+The tempting attribution is *"the area column differs, therefore the censoring moved the table"*.
+Tested rather than assumed:
+
+- `corr(mean floor margin, area−point gap) = **+0.196**` — essentially nothing, and the *wrong sign*
+  for a censoring story.
+- `corr(pedal/composite Q ratio, gap) = **−0.314**`.
+- and AP1c's round trip is the decisive control: with the pedal's null shaped exactly like the
+  biquad, the two metrics agree to 2e-4 dB.
+
+⇒ **the censoring is what makes the POINT reading untrustworthy; the SHAPE mismatch between the
+pedal's null and the shipped (f0, Q) is what makes the two columns differ.** Those are two separate
+facts and the item conflated them. ⭐ This is open item 1 (the Cut row's Q is 1.35–1.51 too broad)
+seen on a second instrument — the same defect, and it now has a second measurement.
+
+### 8. AP5 — the trade, and why the table is only weakly determined
+
+`score-what-you-emit` (s97): each table wins on its own metric by construction, so the
+decision-relevant number is the off-diagonal. Mean |error| over the three realistic sweeps, pooled:
+
+| candidate table | POINT err | AREA err |
+|---|---|---|
+| shipped | **4.03 dB** | 2.06 dB |
+| area-solved | 4.54 dB | **1.54 dB** |
+
+⇒ **switching costs +0.51 dB on one metric and buys −0.52 dB on the other — a wash.** Note what that
+means: table entries move by up to **4.92 dB** while the achieved error moves by **half a dB**,
+because the mean is over sweeps whose individual residuals are ±5–12 dB. **The objective is shallow
+and the table entry is weakly identified** — which is s151 §6's stimulus-level architectural limit,
+priced for the first time in the units of the constant itself.
+
+### 9. AP4 — a separate finding: the DRIVE-max entries' membership
+
+s151's header flags Boost's DRIVE-max as *"a mean over TWO valid cells, not three"*. Counted against
+the shipped build with the stage subtracted, on the difference method's own membership (BOTH sides
+readable):
+
+| cell | −18 | −12 | −6 | n |
+|---|---|---|---|---|
+| Flat × DRIVE max | model NO NULL | model NO NULL | ok | **1/3** |
+| Boost × DRIVE max | model NO NULL | both NO NULL | ok | **1/3** |
+
+⇒ **Boost's DRIVE-max rests on ONE cell, not two — and Flat's DRIVE-max also rests on one and is
+not flagged anywhere.** ⭐ AP3's solve does better: it needs only the PEDAL side (it *creates* the
+composite's null with the candidate gain), so it recovers those cells and reads Flat at n=3 and
+Boost at n=2. A model-side refusal is not missing data about the target; it is the model having no
+feature, which the solve handles and the difference method cannot.
+
+### 10. Instrument defects found in this session's own work
+
+- ⚠ AP1a's first draft passed dB into `R.band_db`, which expects **linear magnitude** (it squares
+  its input), and the gate duly refused at 3.25 dB — correctly, for a reason entirely in the TEST.
+  `a-shipped-stage's-closed-form-takes-the-STAGE's-input` (s113) one level over: check what DOMAIN
+  an imported function's argument is in, not just its name.
+- ⚠ The solve's uniqueness guard first demanded **monotonicity** of depth-vs-gain over −12…+60 dB
+  and flagged 5 cells. Traced on one of them, depth is perfectly monotone through the whole
+  solution region (gain 0→30 dB: area depth 3.88→14.92, no reversal) — the wobble is far outside it,
+  where the biquad's skirts start dragging the shoulder readings. **Monotonicity everywhere is not
+  needed and is not true; ONE sign change is what root uniqueness requires.** A guard that demands
+  more than the conclusion needs fails on correct code.
+- ⭐⭐ **AP3a is INVARIANT to a uniform shift of the shipped table** — found by its own mutation arm,
+  which added 5 dB to every `kNotchGainDb` entry and **passed unchanged**. The same table is used
+  BOTH to subtract the stage out of the rendered curve AND as the reference being compared against,
+  so the shift cancels exactly. ⇒ AP3a certifies **the solve**, not that the shipped constants are
+  right. Recorded in its own docstring; the arm now corrupts the reference alone.
+- ⚠ Three mutation arms misfired as crashes in an EARLIER sub-gate rather than refusals in the one
+  they named (a global `np.maximum` patch broke `W.smooth`'s array indexing; a never-refuse patch
+  made `np.polyfit`'s lstsq degenerate; a hump patch broke AP1c before reaching AP3). All three were
+  defects in the TEST and all three were narrowed. `suspect the mutation before the guard` (s110),
+  three times in one session.
+
+### 11. Where it stands — NOTHING SHIPPED
+
+⛔ **No constant changed.** The gate's verdict is explicitly a **USER DECISION**, and the reasons not
+to ship unilaterally are on record: the trade is a wash (§8), the two metrics disagree about what
+"depth" means, **which one the ear follows is established by nothing here**, and this stage exists
+only because the user authorised an artificial correction and scoped that authorisation.
+
+`ctest` **19/19** (69.2 s at -j 12). Report: `analysis/reports/s152_null_depth_censor.json`.
+
+**Open item 0 is ANSWERED but not closed** — what it asked (are the flat/boost targets trustworthy?)
+now has a measurement, and the answer splits into three separate facts:
+1. ✅ The censoring is real (16/26) and the area estimator is 4.1× less sensitive to it.
+2. ⛔ §6b's "the shipped table is conservative" does not survive as a practical reading.
+3. ⭐ The residual disagreement is a **shape** defect (open item 1), not a censoring one.
+
+**▶ NEXT**
+1. **Take §6/§8 to the user.** The question is not "which number is right" but "do you want the
+   notch matched by its BOTTOM or by its AREA?" — they are audibly different things and the fit
+   cannot choose between them. ⚠ Note `reference-sources.md` §1 makes HARDWARE the authority for
+   this null's depth and §3 records hardware DEEPER than ND, so the area-solved (smaller) table
+   moves further from hardware, not closer.
+2. **Open item 1 (the Cut row's Q) is now the head technical item and it has a second
+   measurement** (AP6). It was already known to be structural — a single peaking section cannot
+   narrow a null the model's own broad one dominates — so the move is a shoulder-shaping section,
+   and AP3's analytic solve extends to a (gain, Q) 2-D solve with no rebuild.
+3. ⚠ **Amend the header's membership note**: Boost's DRIVE-max is n=1 and not n=2, and Flat's
+   DRIVE-max is n=1 and unflagged. Not done here — it is a `src/` edit and the render cache is
+   already owed ~25 min; batch it with the next real change (`build.md`'s rule).
+
+## SESSION 153 (2026-08-05) — GATE AQ: the Q reader was quantised to the size of the defect; the "structural" claim survives at Cut only; and matching the shape does NOT dissolve GATE AP's user decision
+
+Session 152 closed with two items — a USER DECISION (match the notch by its BOTTOM or by its AREA?)
+and a head technical item (the Cut row's Q, 1.35–1.51 too broad) — and noted they might be the same
+item, because AP6 attributed the metric disagreement to a SHAPE mismatch. This session tested that,
+and found something upstream of both first.
+
+### 1. The instrument
+
+`analysis/notch_shape_gate.py` (GATE AQ), `analysis/_mutate_gate_aq.py` (**10/10 arms**, two of them
+computed-verdict). `analysis/od_tone_restore_fit.py` gains one **additive** key, `q_interp`.
+
+⭐ The 2-D solve is not merely GATE AP's solve with an axis freed — it is a **TEST OF AP6's
+ATTRIBUTION that can fail**, and it did.
+
+### 2. ⛔⛔ FIRST: THE Q READER COULD NOT SUPPORT THE QUESTION — IT IS QUANTISED TO THE SIZE OF THE
+### EFFECT IT WAS MEASURING
+
+`notch_geometry`'s `q` snaps BOTH half-depth crossings to whole 1/48-oct grid cells, so the width is
+an integer number of cells and `q` can only return `1/(2^(m/48) − 2^(−n/48))` for integer (m, n).
+Measured on synthetic sections of KNOWN Q (AQ1c) — the closed form is asserted, not observed, and
+every reading came back an exact symmetric pair (10,10), (8,8), (7,7), (6,6), (5,5), (4,4), (3,3),
+(2,2):
+
+| true Q | 3 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 14 | 16 | 18 | 20 | 24 | 30 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `q` reads | 3.45 | 4.94 | 6.92 | **6.92** | 8.65 | **8.65** | **8.65** | 11.54 | **11.54** | **11.54** | 17.31 | **17.31** | **17.31** | **17.31** |
+
+⇒ **8 distinct values over 16 true Qs, worst error −42.3 %, and the steps are 20–50 % wide.**
+⛔ `OdToneRestore.h`'s *"the Cut row stalls at 1.35–1.51 too broad"* is **ONE TO TWO STEPS of this
+reader**, and its *"EXACTLY on the pedal's 11.54 at DRIVE max"* is a **quantisation coincidence**
+(11.538 is one of the eight attainable values).
+
+✅ **The fix is one line and it is additive:** `q_interp` interpolates each crossing linearly in
+log-f between the two straddling cells. Same definition, same windows, same shoulders. Strictly
+monotone in the true Q with no plateaus; `q` is **UNTOUCHED**, and GATE AP's stored report is
+**byte-identical** after the change (a free known answer, run before anything was read).
+⚠ Neither reader is unbiased at low Q — the SHOULDER window truncates a broad notch, so the
+shoulder-referred depth is less than the section's centre gain (AP1c documents the same effect on
+the depth). `q_interp` runs +22 % at true Q=3 falling to +1 % by Q=11. **That bias cancels in every
+pedal-vs-composite comparison here**, which is why AQ1c gates on MONOTONICITY and AQ1d on
+round-trip recovery, never on absolute accuracy.
+
+⭐⭐ This is `a-statistic-can-be-a-fine-DETECTOR-and-a-catastrophic-OBJECTIVE` (s151) **a second time
+on this same stage** — s151 caught it on the depth axis, and the Q axis had the same disease in a
+different form and went unexamined for two sessions.
+
+### 3. The known answers
+
+| arm | what it establishes | result |
+|---|---|---|
+| AQ1a | this gate's inner solve IS GATE AP's, with Q promoted to an argument | **0.00e+00 dB** over n=16 cells, both metrics |
+| AQ1c | `q` is on the cell lattice; `q_interp` is strictly monotone | exact (m,n) at 16/16; 8 collisions; monotone |
+| AQ1d | the 2-D solve recovers an injected (G\*, Q\*) | **−0.000 dB / ±0.003 %** at 4 pairs, both metrics; flat-curve control REFUSES |
+
+⭐ **AQ1d is exact rather than approximate, and that is what makes its bars tight:** the synthetic
+pedal IS `composite(G*, Q*)` on a flat background, so both solver equations hold EXACTLY at the
+injected pair and every reader bias appears identically on both sides. ⇒ the only thing that can
+break recovery is the reader failing to be **injective** — which is precisely what `q` does. A first
+draft of this arm failed at 3 of 4 pairs against a solver that was fine, and the bar was the defect:
+1 % on a quantity the reader resolves to 13–26 %.
+
+### 4. AQ2 — the "STRUCTURAL" claim, tested as REACHABILITY
+
+`OdToneRestore.h` says the Cut residual is structural and *"do not spend more gain iterations on
+it"*, on the evidence of an iteration that stalled. **A stall is not a bound.** Sweeping the
+section's Q to 120 with the DEPTH re-solved at every rung (so a high-Q section cannot "narrow" the
+composite by simply doing less), the pedal's Q is either inside the attained set or it is not — a
+containment question with no threshold.
+
+**Reachable in 21 of 26 cells. All 5 failures are in the CUT row**, and Cut × DRIVE 0.50 fails at
+**all three** sweeps (pedal Q 13.91 against an attainable 3.50–9.46), so that entry has no
+shape-matched solution at any Q.
+
+⇒ **the claim SURVIVES and is now a measured LIMIT rather than a stalled iteration — but it is
+scoped to CUT.** Flat and Boost reach at every cell; do not generalise it to them.
+
+### 5. ⚠⚠ AQ2b — BUT "THE PEDAL'S Q AT THIS ENTRY" IS NOT ONE NUMBER
+
+The header quotes the Q defect as a single figure per (GRUNT, DRIVE) entry, which presupposes the
+pedal's Q there IS a single figure. Every rung printed (`an-endpoint-pair-is-not-a-ladder`):
+
+| GRUNT | DRIVE | −18 | −12 | −6 | spread | monotone? |
+|---|---|---|---|---|---|---|
+| Cut | 0.00 | 6.45 | 5.75 | 4.99 | 1.29x | yes |
+| Cut | 0.50 | 13.91 | 10.53 | 8.39 | 1.66x | yes |
+| Cut | 1.00 | 19.89 | 12.10 | 9.69 | 2.05x | yes |
+| Flat | 0.00 | 19.60 | 15.64 | 7.70 | 2.55x | yes |
+| Flat | 0.50 | 16.77 | 21.60 | 9.48 | 2.28x | **NO** |
+| Flat | 1.00 | 17.00 | 22.08 | 15.24 | 1.45x | **NO** |
+| Boost | 0.00 | 18.83 | 24.13 | 8.24 | 2.93x | **NO** |
+| Boost | 0.50 | 21.44 | 21.04 | 7.61 | 2.82x | yes |
+| Boost | 1.00 | 19.19 | — | 13.81 | 1.39x | yes |
+
+⇒ **the pedal's own Q spans 1.29x–2.93x across stimulus at FIXED (GRUNT, DRIVE) — as large as the
+defect being chased, and larger in 8 of 9 cells.** That is s151 §6's architectural limit (a
+knob-keyed stage cannot track a stimulus-dependent feature) **measured for the first time on the Q
+axis**, and it bounds what any (gain, Q) table here can achieve.
+
+### 6. AQ3/AQ4 — THE HEADLINE: matching the shape does NOT collapse the metric gap
+
+|area − point| solved gain, at the SHIPPED Q (GATE AP) vs with Q FREE:
+
+| GRUNT | DRIVE | gap @ship Q | gap @free Q | change |
+|---|---|---|---|---|
+| Cut | 0.00 | 0.13 | 1.95 | +1.82 |
+| Cut | 0.50 | — | unreachable | (excluded) |
+| Cut | 1.00 | 1.58 | 2.11 | +0.52 |
+| Flat | 0.00 | 2.33 | 0.65 | −1.68 |
+| Flat | 0.50 | 1.03 | 1.49 | +0.47 |
+| Flat | 1.00 | 4.94 | 4.44 | −0.50 |
+| Boost | 0.00 | 5.10 | 1.43 | −3.67 |
+| Boost | 0.50 | 3.88 | 2.62 | −1.26 |
+| Boost | 1.00 | 2.54 | 2.59 | +0.05 |
+
+**MEAN 2.69 dB → 2.16 dB, i.e. −20 %, against a bar of ±0.83 dB (the fit's own residual, imported).**
+
+⛔⛔ **VERDICT: SURVIVED.** ⇒ **AP6's "shape mismatch" does not survive as THE explanation.** Matching
+Q — the obvious shape coordinate, and the only one AP6 correlated against — removes a fifth of the
+disagreement and leaves four fifths. AP1c/AQ1d remain true (with the shape matched *exactly*, the
+two metrics agree to 2e-4 dB), so what is left is a shape coordinate the (f0, Q, gain) family does
+not span: the **centre offset** and the **skirt/asymmetry** of the pedal's null against a composite
+that is the model's own broad null PLUS a section. The area metric integrates over 1/6 octave and is
+sensitive to skirts; the point metric is not.
+⚠ ⇒ **GATE AP's user decision is NOT dissolved.** "Match the notch by its BOTTOM or by its AREA"
+remains a real, open choice, and s152's framing of it stands unchanged.
+
+### 7. Defects found in this session's own work
+
+- ⚠ **AQ1c's first structural predicate was my own algebra, linearised.** It asserted
+  `width = k*df` with `df` the FORWARD grid step — the linear approximation to a geometric grid,
+  which undershoots by ~0.07 cells — and duly refused against perfectly correct code (k came back
+  19.93, 15.92, 13.92 …). The right predicate reads off the grid the reader actually walks:
+  `1/q = 2^(m/48) − 2^(−n/48)`. `rebuild-targets-dont-transcribe`, applied to one's own derivation.
+- ⚠ **AQ3's first draft let UNREACHABLE cells vote in the mean** — `defective-rows-must-not-vote`.
+  An unreachable cell returns the closest attainable point, which at Cut × DRIVE 0.50 is the Q
+  ladder's own **ceiling (120)**; averaging that with two genuine solves produced a "mean Q" of
+  120.00 that is a property of my ladder, not of the pedal. Fixed: unreachable cells are counted and
+  named, never averaged, and AQ4 excludes them explicitly rather than silently.
+- ⚠ **AQ2b had no else-branch**, so its conclusion could not state its own negation —
+  `computed-verdicts-not-narrated`, caught while writing the mutation arm that needed to reach it.
+- ⭐⭐ **THE MUTATION RUNNERS WERE OVERWRITING THE GATES' OWN REPORTS.** A mutant runs `main()`, and
+  `main()` writes the report — so the LAST arm's output was left on disk under the real gate's
+  filename. It cost a false *"the rebuild changed the numbers"* alarm: the file being compared
+  against turned out to be the AQ2b-verdict arm's own forced-flat output (`q_span [1.0, 1.0]` is
+  exactly that arm). Fixed in **both** `_mutate_gate_aq.py` and `_mutate_gate_ap.py` — the mutant's
+  report path is redirected to a PID-unique name, the redirect REFUSES if it cannot apply, the
+  control run is redirected too, and the stray is cleaned up. ✅ Verified: AP's report is now
+  byte-identical after its own 9-arm run.
+
+### 8. `src/` — comment-only, batched, rebuilt
+
+`OdToneRestore.h` amended in four places (the GATE AQ block, the kNotchQ "exactly 11.54" note, and
+the DRIVE-max membership note s152 left owed — Boost's entry rests on **n=1**, not the "two valid
+cells" it claimed, and **Flat's is also n=1** and was unflagged). No constant changed.
+
+✅ **Built once, after the last `src/` edit** (s152's own lesson: *a comment-only pass at the end of
+a session re-arms the staleness that session just documented*), with `pgrep` run first to confirm no
+matrix render was in flight (s124). ✅ **Verified bit-identical:** the gate's full output before and
+after the rebuild differs only by the harness's own "rendered at a DIFFERENT BINARY — re-rendering"
+notices; every measured number is unchanged.
+
+`ctest` **19/19** (67.5 s at -j 12). Report: `analysis/reports/s153_notch_shape.json`.
+
+**▶ NEXT**
+
+1. **GATE AP's user decision is still open and is unchanged by this session** — take §6/§8 of
+   SESSION 152 to the user. ⚠ AQ4 removes the hope that fixing the shape would answer it for free.
+2. **Before any (gain, Q) table work, weigh AQ2b.** The pedal's Q is 1.29x–2.93x stimulus-dependent
+   at fixed (GRUNT, DRIVE), so a drive-keyed Q entry is fitting a mean over a quantity that moves
+   more than the defect. That is an argument for leaving `kNotchQ` alone, not for refining it.
+3. **If the Cut row is worked anyway, AQ2 says where:** a second, shoulder-shaping section is owed
+   at **CUT ONLY** (Flat/Boost reach at every cell), and Cut × DRIVE 0.50 is the entry with no
+   single-section solution at any Q.
+4. ⭐ **The residual metric gap is a SKIRT/centre defect, not a Q defect** (AQ4). Anyone re-opening
+   it should free the centre frequency, not the Q — `notch_geometry` already returns `f0` per cell
+   and AP3's solve extends to it the same way it extended to Q.
+
+### 9. ✅ THE USER DECISION WAS TAKEN — THE TABLE STAYS AS SHIPPED
+
+GATE AP's open question (*"match the notch by its BOTTOM or by its AREA?"*), carried from s152 and
+put to the user at the end of this session, is **CLOSED: leave `kNotchGainDb` as shipped.** The
+area-solved alternative is NOT adopted. Three grounds, all measured rather than argued:
+
+1. **The trade is a wash.** Pooled mean |error|: shipped **4.03 point / 2.06 area** against
+   area-solved **4.54 / 1.54**. Entries move by up to **4.92 dB** while achieved error moves about
+   **half a dB** ⇒ the constant is **weakly identified**, which is s151 §6's stimulus-level limit
+   priced in the constant's own units.
+2. **Hardware is the authority for this feature and is DEEPER than ND** (`reference-sources.md` §1
+   and §3: +1.6 dB at GRUNT cut rising to ~26 dB at boost), so the smaller area-solved table moves
+   **away** from the governing reference.
+3. **Which metric the ear follows is established by nothing measured so far.**
+
+⚠ **What is NOT refuted by this decision:** the censoring is real (16 of 26 pedal readings bottom at
+or below the residue) and the area estimator is **4.1x** less sensitive to it. The decision is about
+which target to fit, **not** about whether the censoring exists.
+
+⛔ Recorded at the constants themselves (`OdToneRestore.h`'s `kNotchGainDb` block), not only here —
+`a-refutation-has-to-land-where-the-thing-is-CHOSEN` (s124). That was a comment-only edit, batched,
+rebuilt, and verified: the gate's report is **byte-identical** across it.
+
+---
+
+## SESSION 154 (2026-08-05) — GATE AR: AQ4's residual audited before anything was freed. Its 2.69 → 2.16 is an unpaired statistic; paired, shape-matching closes 69 % not 20 %, and every candidate s153 named for the remainder is refuted or inverted
+
+Session 153 closed by naming a successor: *"the residual is a SKIRT/centre defect, not a Q defect;
+anyone re-opening it should free the CENTRE frequency"*. That is a **claim, not a task**
+(`a-backlog-item's-proposed-REPAIR-is-a-claim`, s142), and so is the −20 % that motivated it. This
+session audited both before a single coordinate was freed. Both fell.
+
+### 1. The instrument
+
+`analysis/notch_residual_gate.py` (GATE AR), `analysis/_mutate_gate_ar.py` (**11/11 arms**, four of
+them computed-verdict). `od_tone_restore_fit.notch_geometry` gains two **additive** keys — the two
+interpolated half-depth crossings `xlo_f` / `xhi_f`, which nothing existing reads and which are what
+makes an ASYMMETRY reading possible at all (`q`/`q_interp` are WIDTHS, and a width cannot express
+asymmetry). GATE AP's and GATE AQ's stored reports are unchanged across the addition — the s153
+`q_interp` pattern, applied a second time.
+
+Three known answers, all holding:
+
+- **AR1a — an IDENTITY, not a fit.** On any curve, exactly,
+  `depth_point − depth_area == S − B`, where `S` is the shoulder term and `B` the bottom term.
+  Measured worst **3.55e-15 dB over 26 curve readings** ⇒ the shoulders and the bottom are the ONLY
+  two places the metric disagreement can live, and AR4's decomposition is arithmetic rather than
+  judgement.
+- **AR1b — a CROSS-GATE known answer.** Re-aggregating this gate's per-sweep records per cell
+  reproduces GATE AP's and GATE AQ's **stored** per-cell numbers to **0.00e+00 dB** (n = 9 and
+  n = 8). ⭐ This is the load-bearing one: it makes AR2/AR3 a **RE-AGGREGATION of the very numbers
+  AQ4 averaged**, so any difference between the two is the ORDER OF OPERATIONS and nothing else.
+  Without it, "the paired form disagrees with AQ4" would be equally consistent with my solver simply
+  being a different solver. ⚠ Its blindness is stated in its own docstring rather than left to be
+  found: both sides share the element set as input (s145 AM1a / s149 AO).
+- **AR1c — a SYNTHETIC control that can fail in both directions.** With `pedal := composite(G*, Q*)`
+  every residual must vanish; measured **≤ 1.2e-04** against the solvers' own `xtol` of 1e-3.
+
+### 2. ⛔⛔ AQ4's GAP IS A DIFFERENCE OF MEANS OVER AN AXIS ON WHICH THE QUANTITY CHANGES SIGN
+
+AQ3/AP3 average each metric's solved gain over the three stimulus sweeps **separately**, then
+difference the two columns. Per sweep, on the paired set (both designs solving, so the two rows are
+over identical membership — the first draft compared a 26-cell row against a 21-cell one, which is
+the same defect one level up, and it was repaired before anything was read):
+
+| design | `drv_-18` | `drv_-12` | `drv_-6` | pooled |
+|---|---|---|---|---|
+| 1-D (shipped Q) | −6.85 (7/7 neg) | −6.56 (6/7) | **+5.94 (0/7)** | −2.49 (13/21) |
+| 2-D (Q free)    | −2.26 (7/7)     | −3.30 (5/7)  | −0.58 (6/7)      | −2.05 (18/21) |
+
+**The 1-D gap changes sign across the stimulus ladder and the 2-D gap does not.** So averaging over
+sweeps before differencing cancels the 1-D arm heavily and the 2-D arm barely, and the RATIO between
+them — which is AQ4's entire verdict — is not readable as a property of shape-matching.
+
+⚠ A second, smaller instance rides along and is **named rather than estimated**: AQ3 drops
+unreachable cells PER METRIC, so one cell of eight pairs a mean over sweeps {a,b} against a mean over
+{a} alone.
+
+### 3. ⭐⭐ PAIRED, SHAPE-MATCHING CLOSES 69 % — AND THE TWO FORMS AGREE ON THE *AFTER* VALUE
+
+Over the 21 (GRUNT, DRIVE, sweep) cells solving under **both** designs (5 named-excluded, all Cut,
+all "unreachable at free Q" — AQ2's own finding):
+
+    |gap| mean:  6.83 dB at the shipped Q  →  2.13 dB with Q free   (−69 %)   ⇒ SHRANK
+    AQ4 pooled:  2.69 dB                   →  2.16 dB               (−20 %)   ⇒ SURVIVED
+
+⭐ **The two agree on the AFTER value (2.13 vs 2.16) and disagree entirely on the BEFORE one (6.83
+vs 2.69)** — i.e. what the pooled form mis-states is its **baseline**, not the shape-matched arm.
+That is exactly §2's sign change cancelling under the mean.
+
+⚠⚠ **BOTH FORMS ARE REAL AND THEY ANSWER DIFFERENT QUESTIONS — this is NOT "AQ4 was wrong", and the
+gate prints the distinction every run.** The shipped table has ONE entry per (GRUNT, DRIVE), so a
+mean over sweeps is exactly what WOULD be shipped ⇒ **AQ4's pooled gap is the right statistic for
+the SHIPPING question GATE AP's user decision turned on, and that decision is untouched.** What a
+pooled form cannot support is a **mechanism** claim: *"does shape-matching close the disagreement"*
+is about the two metrics as MEASUREMENTS, and there the axis has to stay intact. ⇒ **the correction
+is to the INFERENCE AQ4 drew, not to the number it shipped.**
+
+⇒ **AP6's shape attribution is largely rehabilitated** (the shape mismatch is the LARGER part of the
+disagreement, not a fifth of it), **and GATE AP's user decision still stands**, because 2.13 dB still
+exceeds the fit's own ±0.83 dB residual — imported from AP, not transcribed.
+
+⛔ AQ4's own pair of numbers is now **read from its stored report** rather than transcribed into a
+print string. It reproduces the previously-hardcoded 2.69 → 2.16 / SURVIVED exactly — a free known
+answer that the import reads the right field — and it cannot go stale the next time GATE AQ is run.
+
+### 4. ⭐ THE DECOMPOSITION — IT IS THE BOTTOM TERM, AND THAT IS A SHARPNESS STATEMENT
+
+Read at the point-matched 1-D solve, where the two curves' point depths agree by construction, so
+`D = (S−B)_pedal − (S−B)_composite` is exactly the residual depth disagreement forcing the two solves
+apart (n = 26):
+
+| term | mean | share of |D| | corr with D | same-sign |
+|---|---|---|---|---|
+| `dS` (shoulders) | +0.162 | 0.16 | +0.320 | 15/26 |
+| `dB` (bottom)    | −0.854 | **0.84** | **−0.991** | 17/26 |
+
+⇒ the disagreement is a difference in how much the 1/6-octave band averages the notch **BOTTOM**
+away — a **sharpness difference INSIDE the half-depth width**, which is a shape coordinate that
+neither the depth nor the Q pins. Both the share and the correlation are printed because a term can
+carry the MEAN without carrying the VARIATION.
+
+### 5. ⛔ ALL THREE NAMED CANDIDATES FOR THE REMAINDER ARE REFUTED OR INVERTED
+
+**(a) THE CENTRE OFFSET — s153's own `NEXT` #4, REFUTED.** Measured in the reader's own resolution
+(1/48-oct cells, derived from the grid rather than chosen): **|offset| ≤ 1 cell in 21 of 26 cells**,
+mean −0.09 cells, and all five exceptions are in the Cut row. ⇒ **freeing f0 has almost nothing to
+move; do NOT build the 3-D solve on this basis.** The successor s153 handed forward was the first
+thing this gate killed.
+
+**(b) THE CENSORING — REFUTED as the carrier, and the first draft of this screen was gated on a
+number I invented.** ⛔⛔ It read `|r| < 0.3`, and at the measured **r = −0.437** the entire verdict
+rested on that 0.3 (`a-threshold-you-guessed-is-not-a-guard`, s109). Replaced by two statements that
+each answer a question the invented bar was conflating:
+
+- *is it distinguishable from zero at all?* — a **permutation test** (20 000 shuffles of the margin
+  against the same residuals, no distributional assumption): **p = 0.0523**.
+- *can it BE the carrier?* — **r² = 0.191**, i.e. censoring accounts for 19 % of the residual's
+  variance and 81 % is something else. 0.5 is definitional here ("the carrier" means more than
+  everything else combined), not chosen.
+
+⚠⚠ **p lands ON the 0.05 convention, and the gate says so out loud rather than quoting the branch
+label as the finding** — replacing one invented bar with a conventional one the data sits on top of
+would have been the same mistake in a lab coat. **Both branches conclude "not the carrier"**, and the
+bar-free half is r². ⇒ corroborates AP6 from a second quantity, on real data.
+
+**(c) THE ASYMMETRY — the candidate is INVERTED, and the size sits at the reader's resolution.**
+s153 named this as *"the PEDAL's null is asymmetric and a symmetric section cannot match it"*.
+Measured (log-f skew about each null's own bottom, 0 = symmetric, n = 26):
+
+    pedal      mean +0.028   range −0.238..+0.442
+    composite  mean +0.152   range −0.025..+0.287
+
+⭐⭐ **The more asymmetric side is the COMPOSITE, not the pedal** — and since an RBJ peaking section
+is symmetric in log-f **by construction**, any composite asymmetry is the **MODEL's own underlying
+null**, not the correction sitting on top of it. AR1c is the control that licenses the comparison:
+with `pedal := composite` the two skews agree exactly, so the reader has no side-preference.
+
+The size question and the direction question are then separated, because the first draft conflated
+them into one knife-edge verdict (**|mean| 0.208 against a derived one-cell bar of 0.211 — the
+verdict flipped on 1.4 %**):
+
+- **DIRECTION:** 20 of 26 one way, exact two-sided **sign test p = 0.0094** ⇒ **not noise.**
+- **SIZE:** swept over the bar (s137's BAR-SENSITIVE pattern) — OVER at 0.5× the cell, **under at
+  1.0× and 2.0×**.
+
+⇒ **ONE-SIGNED, AT THE READER'S RESOLUTION.** An asymmetry difference genuinely exists and it is the
+model's null that carries it; its size is within a factor of ~2 of one grid cell, so this reader
+cannot say it is worth chasing. **Neither a licence to build nor a refutation** — it needs an
+estimator that resolves skew better than the 1/48-oct locator does.
+
+### 6. ⛔⛔ AND WHAT SURVIVES SHAPE-MATCHING IS NOT A SHAPE DEFECT AT ALL
+
+| rung | n | mean D | D > 0 | pedal Q | composite Q | ped−comp |
+|---|---|---|---|---|---|---|
+| `sweep_drv_-18` | 9 | **+2.63** | 9/9 | 17.01 | 11.99 | +5.02 |
+| `sweep_drv_-12` | 8 | **+2.20** | 7/8 | 16.61 | 13.54 | +3.07 |
+| `sweep_drv_-6`  | 9 | **−1.65** | 1/9 |  9.46 | 13.03 | −3.57 |
+
+**The residual changes sign across the stimulus ladder**, so no single (gain, Q) entry can be right
+at all three rungs **whatever shape coordinate is freed** — and the shipped Q's own error crosses
+zero on the same axis (too broad at one end, too narrow at the other), so no single Q entry is
+"closer" either; it is a slope error with a crossing, not an offset.
+
+⇒ what is left after shape-matching is **s151 §6's architectural limit** — a knob-keyed stage cannot
+track a stimulus-dependent feature — now measured on a **third axis**: the DEPTH (s151), the Q
+(AQ2b), and now the metric residual itself.
+
+### 7. ▶ NEXT
+
+1. ⛔ **Do NOT free the centre**, and do not build the 3-D solve — AR5a refutes the successor s153
+   named, and AR6 says the remainder is not a shape coordinate in the first place.
+2. ⛔ **Do NOT re-open GATE AP's user decision on the strength of §3.** The pooled statistic AQ4
+   shipped is the correct one for the shipping question; only the mechanism inference moved.
+3. ⚠ The one live thread is **AR5c's direction**: our own null is measurably more asymmetric than
+   the pedal's, one-signed at p = 0.0094, at a size this locator cannot resolve. If anyone wants it,
+   the first move is an **estimator** question (resolve skew below one 1/48-oct cell), not a DSP one
+   — and §6 bounds what any answer could buy.
+4. ⚠ **The `q`/`q_interp`/`skew` family now has three readers on one geometry.** All three are
+   width-or-position statistics on the same grid; a future addition should be checked against s153's
+   quantisation finding before it is trusted (`a-statistic-can-be-a-fine-DETECTOR-and-a-catastrophic-
+   OBJECTIVE`).
+
+## SESSION 155 (2026-08-05) — GATE AS: the last unscreened pre-clipper lever is screened. Its geometric lever is real, its shape is not, and the class is decided on a THIRD axis the first draft did not have
+
+Session 149's `▶ NEXT` #1 named one genuinely unscreened lever on the pre-clipper side — a
+**drive-dependent treble-ladder `Zin`** — and gave the screen its brief in the same sentence:
+*"start from **which perturbation of this network can rise as f^+2.8 at all**, not from a component
+list."* This session built that screen. The class falls, and it falls differently from its three
+predecessors.
+
+### 1. The instrument
+
+`analysis/ladder_zin_tilt_gate.py` (GATE AS), `analysis/_mutate_gate_as.py` (**12/12 arms**, five of
+them computed-verdict). Read-only: no `src/` edit, no render, no constant, no baseline. It imports
+its target rather than transcribing it — AL4's limb centres and deficits, AH7's budget, AG's vertex,
+AK's `drain_db`, AJ's `ladder_zin`/`ladder_kwargs`/divergence guard, AI's `tilt_fine`/`FINE`/
+`grunt_caps`.
+
+**Six known answers, all holding:**
+
+| # | known answer | measured |
+|---|---|---|
+| AS1a | the LICENCE — a wild fixed block cancels from the tilt CHANGE (AI1c, re-asserted on this gate's block) | **3.20e-14** dB/oct |
+| AS1b | the windowed-subset evaluation is **BIT-IDENTICAL** to the full grid | **0.000e+00**, 1308 of 6001 points, 4.59x cheaper |
+| AS1c | shipped vs drawn ladder DIVERGE (AM1a; the guard AJ/AK/AN lacked for ten sessions) | **11 of 12** values |
+| AS1d | `ladder_zin` is probe-independent (1k vs 47k) | **1.57e-13** rel — ⚠ validates the EXTRACTION, not the value set |
+| AS1e | the estimator returns an **injected KNOWN exponent** | single pole **+1.9924** (true 2), f^3 **+3.0000** |
+| AS1f | AL4's endpoint exponent reproduces from AL4's own stored centres | **+2.779331** vs stored **+2.779331** |
+
+⭐ AS1b is the one that made the search affordable and it is worth copying: `tilt_fine` masks
+`AI.FINE` to its own windows, so every index outside the union of those windows is **never read** —
+which makes computing the ladder there not merely wasteful but *exactly* wasteful. Asserting
+bit-identity (bar **0.0**, not a tolerance) turns a 3.7x speedup into a measurement rather than an
+optimisation nobody checked.
+
+### 2. ⚠⚠ THE TRAP THIS GATE HAD TO AVOID, AND IT FIRED ON THE FIRST DRAFT
+
+Read on the endpoint exponent alone, the top of the table is:
+
+| throw | element(s) | size | exponent | reach | 1-signed | rising |
+|---|---|---|---|---|---|---|
+| flat | C9+R8 | x0.1 x0.001 | **+5.335** | 57.0 % | 9/10 | 7/9 |
+| cut | R7 | x0.5 | **+4.140** | 1.4 % | **9/10** | 4/9 |
+| flat | RdampC5+C9 | x1.05 x0.1 | +3.962 | 44.8 % | 10/10 | 6/9 |
+| flat | C5+C9 | x1.05 x0.1 | +3.813 | 45.3 % | 9/10 | 6/9 |
+| cut | R14+C9 | x0.001 x0.3 | +3.667 | 308.1 % | 10/10 | 9/9 |
+
+**4 of the top 5 fail a validity column.** `cut/R7 x0.5` reads **+0.00017** at 1348 Hz and is
+negative everywhere above — its tilt change CROSSES ZERO inside the limb, so the endpoint ratio is
+divided by a number passing through zero. That is exactly the artefact **AL3 guarded the deficit
+against** (*"single-signed at 12/12, so no log below is a zero-crossing artefact"*) and the guard had
+never been pointed at a **MECHANISM**. Every exponent in this gate therefore carries two validity
+columns:
+
+* **SINGLE-SIGNEDNESS** across the limb — AL3's guard, without which the endpoint ratio is an artefact;
+* **MONOTONICITY** of |dT| — AL4 splits the deficit at the argmin of |D| and grades the **RISING**
+  limb (the deficit is 9/9), so a mechanism that turns over inside that limb is not tracking it
+  whatever its endpoints say.
+
+**241 of 7140 probes** carry both; all 241 also carry the deficit's sign at the vertex.
+
+### 3. ⭐⭐ SIZE — THE LEVER IS REAL, AND THAT MAKES THIS THE FIRST PRE-CLIPPER CLASS NOT REFUTED ON IT
+
+AO1c's identity, recomputed at the shipped ladder: **S_zin 0.8364 / S_zout 0.1663 ⇒ the load side
+carries 5.03x the source side's lever.** AO4 was right about the lever, and it shows:
+
+| element | value | dT/d ln(elem) | reach @1 % drift | reach @limits |
+|---|---|---|---|---|
+| C5 | 7.96 nF | +0.4715 | 0.393 % | 22.1 % |
+| RdampC5 | 15.37 k | +0.2593 | 0.216 % | 53.4 % |
+| R14 | 48.5 k | +0.1603 | 0.134 % | **147.3 %** |
+| R12 | 27.1 k | +0.1160 | 0.097 % | 53.7 % |
+| C9 | 12.82 nF | +0.0566 | 0.047 % | 12.2 % |
+
+and in the pair search a validated, sign-admissible probe reaches **477 %** of AH7's budget, against
+**AK 2.46 % / AJ 0.17 % / AN 1.33 %** at *their* limits.
+
+⚠⚠ **BUT THE TWO NUMBERS MUST BE QUOTED TOGETHER.** At a **1 % drift** of the best element the reach
+is **0.3932 %** — i.e. the *geometric* lever is real and a *physical* drift still lands in the same
+order as the classes already refuted. Quoting either alone mis-states the class.
+
+### 4. ⛔⛔ THE CLASS IS DECIDED ON A THIRD AXIS — THE SIZE OF THE ELEMENT CHANGE
+
+The first draft graded exponent against reach, found a joint point, and would have published *"this
+class is NOT refuted"*. The joint points ask for `cut/C5+R14` at **x0.1 x0.001** — R14 from 48.5 k to
+**48.5 ohm**. That is not a drift, it is a different circuit. So the drift ceiling is a **graded
+axis**, measured as a FOLD change (`max(fr, 1/fr)`; `|fr-1|` saturates at 1.0 for every shrinking
+element and reads x0.1 and x0.001 as the same perturbation, three decades apart):
+
+| max element FOLD change | exp>=2.00 | exp>=2.53 | exp>=2.78 |
+|---|---|---|---|
+| <= 1.001x (film cap V-coefficient, 0.1 %) | none | none | none |
+| <= 1.01x (metal-film resistor self-heating, 1 %) | none | none | none |
+| <= 1.5x (X7R ceramic, 50 % — deliberately generous) | none | none | none |
+| <= 2x (past ANY drift) | none | none | none |
+| <= 10x | 350.9 % | none | none |
+| unbounded (a different circuit) | 350.9 % | 338.3 % | 338.3 % |
+
+⭐ **AND THE THRESHOLD-FREE FORM OF THE SAME RESULT, WHICH IS THE ONE TO QUOTE: of the 1050 probes
+at a fold change <= 1.5x, ZERO have a tilt change that even RISES monotonically across the limb** —
+against the deficit's 9/9. A mechanism that falls where the deficit rises is strongest where the
+deficit is weakest (AN3's own wording), and that reading needs no exponent bar at all.
+
+⚠ And the best *unbounded* joint probe does not match the shape anyway: best-scaled onto the deficit
+it leaves a **37.0 %** relative residual (too big at the bottom of the limb, too small at the top).
+
+### 5. ⭐⭐ WHY — AND IT IS AK's ROOT CAUSE IN A THIRD GUISE
+
+The Jacobian of the tilt change with respect to all 11 non-zero ladder elements, on AL4's limb:
+
+    sigma1 3.685    sigma2/sigma1 5.641e-03    sigma3/sigma1 2.693e-05
+
+⇒ **the reachable set of tilt-change SHAPES is effectively ONE-dimensional**: to 99.9968 % of its
+energy, every small perturbation of this ladder — any element, any combination — makes the **same
+curve up to scale**, and that curve's endpoint exponent is **−1.5915** against the deficit's
+**+2.7793**. (The Jacobian is itself a known answer against a finite-difference *combined* drift:
+relative error **1.2e-06**.)
+
+The root cause is measurable directly. |Zin|'s log-slope:
+
+| f | 100 Hz | 500 | 1000 | 1348 | **2935** | 3812 | 10 k | 20 k |
+|---|---|---|---|---|---|---|---|---|
+| d ln\|Zin\|/d ln f (dB/oct) | −5.556 | −3.735 | −1.894 | −1.228 | **−0.312** | −0.189 | −0.028 | −0.007 |
+
+The ladder's caps are already near-shorts at the vertex, so **Zin is asymptotically CONSTANT there**
+— and a perturbation of a frequency-flat impedance changes the drain transfer by a pure **GAIN**,
+which has zero tilt. ⇒ **AK's root cause (its shelf corners at 219/292 Hz, a decade below the
+vertex), AJ's moving-pole class and AN's `ro`/`rq2` are the same fact as this**, and item 6's gate 6
+stated positively: *a viable carrier needs STRUCTURE AT OR ABOVE ~2.9 kHz*.
+
+### 6. ⛔ THE ADDED-ELEMENT BRANCH — a perturbation of a network need not be a drift of one of its parts
+
+`trebleC8` ships at **0** (s99/s100 took C8 out of circuit), so C8 is an element **APPEARING**, and
+the ATTACK switch supplies two topologies for free: a shunt at node P (`cut`) and a bridge across R8
+(`boost`). Swept over eight decades, **no rung survives the validity columns with the right sign**.
+
+⭐ And the branch closes **analytically**, so the sweep is a check rather than the argument. For any
+passive RC block added to this network:
+
+* corners **BELOW** the band ⇒ asymptotically a constant there, so its contribution to the tilt
+  change decays — §5's mechanism, exponent < 0;
+* corners **ABOVE** the band ⇒ `log|H| = c0 + c1 f^2 + O(f^4)`, so the tilt change is proportional to
+  f² and the endpoint exponent approaches **2 FROM BELOW** — which is gate 5, and AS1e measures the
+  estimator returning exactly it.
+
+Either way an added element is bounded by **2.000** against the deficit's **+2.779**.
+
+### 7. ⭐⭐ AND THE METHODOLOGICAL RESULT, FOR THE SECOND TIME
+
+The ladder is upstream of the GRUNT switch and the tilt operator is linear on log-magnitude, so the
+GRUNT bank cancels **exactly** from the tilt change — asserted at **2.5e-13 dB/oct** across all three
+caps. ⇒ this carrier **PASSES item 6's gate 4 at 3 of 3 positions and is still refuted**. GATE AK
+said it of the J201's shaper; **sign-admissibility is NECESSARY, NOT SUFFICIENT**, and a screen built
+on the GRUNT sign alone would have passed this class too.
+
+### 8. ⚠ WHAT THIS GATE DOES NOT CLAIM
+
+* AS3's frontier is a **SEARCH** over 7140 probes (11 elements x 20 sizes x 3 ATTACK throws, plus all
+  pairs of the six highest-lever elements on a 12x12 grid), **not a theorem**. AS4 covers the
+  small-perturbation directions a finite grid cannot enumerate and AS6 covers added elements, but a
+  large, many-element, finely-tuned drift outside the grid is not excluded by measurement.
+* It screens the **reachable set**; it names no physical carrier for a drive-dependent ladder `Zin`,
+  and AO4's own candidate list for one was thin.
+* Nothing is graded against hardware, nothing renders, no constant moves, no baseline is touched.
+
+### ▶ NEXT
+
+1. ⭐⭐⭐ **The pre-clipper side is now screened to exhaustion in the way AO asked for — by CLASS
+   rather than by component — and it is empty.** Item 6's carrier is not at or upstream of the
+   clipper, is not a resonance anywhere (AM), and is not any post-clipper corner mechanism (AF).
+   ⇒ the honest next move is the **frame** question s145 left open: *is the carrier a structure the
+   model OMITS entirely?* Nothing in AM2's census covers a mechanism the netlist does not contain.
+2. ⚠ **Do NOT re-screen the ladder from a component list.** AS3/AS4 cover every element and every
+   small combination; a new candidate must clear the FOLD-change frontier in §4, and the entry price
+   is a mechanism that supplies a >2x element change with drive.
+3. ⚠ **Item 5(b)** — ~14.7 dB of gain ahead of node W missing from the model — is still the other
+   untested physical branch, untouched since s142 named it.
+4. **Items 2/4/8/9**, AL3's non-monotonicity, the ~2724 Hz tilt zero-crossing, AB6's unowned
+   bridged-T half, AD3's 800 Hz–1 kHz clean-tilt inversion, s144's top-octave droop decision, and
+   AR5c's skew-estimator question — all unchanged.
+
+⚠ **Uncommitted at this point: sessions 150–155 together.**
+
+## SESSION 156
+
+User-directed, continuing the s150/151 `OdToneRestore` line: the user checked `ref-od.wav` (the
+listening condition — LEVEL noon, GRUNT cut, DRIVE 0.5) directly against captures and reported both
+the 320 Hz and ~800 Hz notches still shallow, worse at low drive than high, and asked that any error
+lean DEEP rather than shallow. Also flagged a specific regression risk: don't let deepening the 320
+notch pull the ~450 Hz peak between the two notches down with it.
+
+### 1. ⭐⭐⭐ THE ROOT CAUSE: THE STAGE IS KEYED ON (GRUNT, DRIVE) AND CANNOT SEE THE MIX
+
+`OdToneRestore` sits in the OD path, upstream of LEVEL and BLEND. Its s151 table was fitted
+**bleed-free** (LEVEL = BLEND = max) and shipped as-is. Measured at the listening condition with the
+stage subtracted (`--stage-off`, exact — the stage is linear and in series), the required cut at
+GRUNT cut / DRIVE 0 is **+1.16 dB**; the bleed-free-fitted table was shipping **−6.50 dB** there (a
+BOOST). At LEVEL noon the whole ladder needs **6–13 dB more cut** than bleed-free gives it — a
+`one-knob-two-jobs-is-compensating` situation the stage's own key cannot resolve, because LEVEL and
+BLEND are set by knobs downstream of it.
+
+### 2. ⭐⭐⭐ ONE SCALAR IS PROVABLY SUFFICIENT — THE MIX COLLAPSE (GATE AT, AT2)
+
+Because LEVEL and BLEND are both downstream, the required cut cannot depend on them separately —
+only on the single clean fraction they jointly produce (`LevelBlend::cleanFraction()`, added this
+session: derived by evaluating the shipped `process()` with unit inputs via superposition, so it
+cannot drift from the stage it reports on). That is a falsifiable prediction, not an assumption:
+captures reaching the same clean fraction by different (LEVEL, BLEND) routes must agree. Tested on
+three independent pairs — worst disagreement **0.05 dB**. ⭐ Free known answer alongside it: eight
+EQ-swept captures (bass/lomid/himid/treble, both extremes) share one clean fraction — the EQ is
+downstream of the mix, so they must return the same required cut, and they do to **0.13 dB**. ⇒ one
+law `cut(grunt, drive, cleanFrac) = base[g][d] + K[g][d] * S(cleanFrac)` covers every LEVEL/BLEND
+combination, including uncaptured ones — which is what the user asked for ("all, not just noon and
+max").
+
+### 3. ⭐⭐ THE 800 Hz READING IS NOT A NOTCH DEFECT
+
+Per the user's own choice this session ("measure it further first" over "add it" or "leave it"),
+fitted a second biquad at 800 Hz jointly with the 320 Hz one (so it cannot leak into the term being
+fitted) and measured its own identifiability by comparing fit rms with and without it: median
+**0.058 dB**, max 0.163 — at the 1/48-oct grid's own cell-to-cell scatter, against the 320 Hz term's
+median **1.56 dB** (27x). What is there is a broad ~1.5-octave bowl centred near 800 Hz (the model
+sits ~0.9 dB above the pedal across 460–1550 Hz at GRUNT cut) — A3 seen as a shape, not a notch. ⭐
+And its sign **flips with GRUNT**: +1.26 dB at cut, −1.8…−3.5 dB at flat/boost — a fixed correction
+would be wrong at two of three switch positions. Left untouched; not `kPeakGainDb`'s or this stage's
+job. `analysis/notch_shape_gate.py`/`notch_residual_gate.py`-adjacent reading, unarchived as its own
+gate — see `analysis/od_notch_mix_law.py`'s docstring for the numbers.
+
+### 4. ✅ THE PEAK GUARD (user's explicit ask)
+
+Applied the candidate law analytically to the raw (stage-off) model curve and re-read GATE W's
+`mid_peak` prominence with and without it, across all five listen-condition drive rungs and all three
+realistic sweeps: worst change **−0.145 dB** (most cells −0.02…−0.05), and at DRIVE ≥ 0.75 the peak
+gets MORE prominent, not less. No regression.
+
+### 5. ⛔⛔ THE CLAMP: BUILT, MEASURED, AND REVERSED — READ THIS BEFORE RE-ADDING ONE
+
+Raw, the fitted mix-shape `S(cleanFrac)` is non-monotone: the required cut peaks near cleanFrac ~0.21
+and falls ~9.6 dB toward the bleed-free corner. That corner is also the most CENSORED reading in the
+whole set (AT1d, below) — three independent reasons (the user's stated preference to err deep, the
+censoring, and `reference-sources.md` §1/§3 making hardware the authority and recording it deeper
+than ND) argued for holding the shape flat below its peak rather than following it down.
+
+Built and **measured against the acceptance table**, that overshot badly: the composite null came
+out **9.6–11.6 dB too deep** at LEVEL/BLEND max while every other mix landed within 1–3 dB — not
+"tracking across all settings", the opposite. ⭐ Re-examined, the raw non-monotone shape turns out to
+be **physically expected, not artefactual**: the required cut peaks at INTERMEDIATE mix because
+that's where the model's own null is diluted hardest while the pedal's target is still deep; at
+cleanFrac → 0 the model's own OD null is already close to the pedal's target, and at cleanFrac → 1
+both wash out together. A peak in the middle falls straight out of that. The clamp was removed
+(`S_CLAMP_CF = 0.0` in `analysis/od_notch_mix_law.py`, one named constant, reversible).
+
+### 6. ⭐⭐⭐ THE DEPTH CEILING (found chasing why the shape re-fit didn't move the acceptance table)
+
+Removing the clamp initially left the requirement's overall SCALE inflated (a saturation feedback in
+how the shape nodes were derived — the first re-fit attempt's `base` row at DRIVE 0 came back +2.75
+where an earlier, non-monotone-tolerant fit gave +1.16). Rather than iterate the fit blindly, ran a
+deliberate **40 dB** saturation probe on the Cut row at the listening condition. Result: a 40 dB
+OD-path cut produces a **0.472 dB** composite null — SHALLOWER than the shipped 12.34 dB cut's
+**1.600 dB** — because at that depth the RBJ section becomes narrower than the 1/48-oct analysis (and
+the ear) resolves, so the extra depth is averaged away rather than heard. ⇒ there is a real ceiling;
+more OD-path cut past it does not help and can hurt. Confirmed a second way: +1.20 dB added to the
+whole Cut row moved the listening-condition depth **0.03 dB** while moving the bleed-free error
+**1.11 dB** — tried, reverted (see `setCleanFraction()`'s block in `OdToneRestore.h`).
+
+### 7. ⭐ K[g][d] SOLVED CLOSED-LOOP, NOT FITTED
+
+Given the ceiling, iterating a curve fit against the acceptance table risked the same overshoot as
+§5. Instead `kNotchMixK` (the row controlling the cleanFrac → 0 end; `S` is pinned to 0 at the
+reference cleanFrac, so `K` cannot touch the listening condition by construction) was solved directly
+from the residual measured AT cleanFrac = 0 with the stage running — closed-loop on the quantity
+actually being judged. GRUNT boost DRIVE 0.75/1.0 has no readable bleed-free null at all (the pedal's
+sits past the reader's CORE bound there) and carries the DRIVE-0.5 value forward — the weakest
+entries in the table, flagged in the header.
+
+### 8. ✅ ACCEPTANCE — remaining depth error, `correction` (+ = still shallow), all mixes:
+
+| set | DRIVE 0 → max |
+|---|---|
+| bleed-free (LEVEL=BLEND=max) | −0.26 / −0.15 / +0.41 |
+| **listen (LEVEL noon, the user's condition)** | **+1.00 / +1.15 / +1.49 / +1.42 / +1.04** |
+| BLEND swept at LEVEL max | −0.15 / +2.67 / +1.09 / +0.21 |
+| GRUNT flat, bleed-free | +0.32 / +2.01 / +2.64 |
+| GRUNT boost, bleed-free | +1.07 / +2.16 / (DRIVE max unreadable both sides) |
+
+Down from the pre-session state where the listening condition ran ~+8 dB short and DRIVE 0 had the
+wrong SIGN. The residual ~1.0–1.5 dB at the listening condition is the ceiling (§6) plus A3 (the
+model's OD path is ~4.4 dB quiet, GATE O) diluting the model's null harder than the pedal's at the
+same knob settings — not reachable from this stage, recorded at `setCleanFraction()`.
+
+### 9. ✅ TRANSCRIPTION CERTIFIED TWICE
+
+The law is computed in two places (the shipped C++ `recompute()`/`mixShape()` and
+`od_tone_restore_fit.current_response()`/`mix_shape()`), and every prior analysis gate's
+`--stage-off` reading depends on them agreeing. A standalone impulse→DFT probe
+(`/private/tmp/.../scratch_odprobe.cpp`, no JUCE, no WDF, header-only) swept 600 combinations of
+(grunt, drive, cleanFrac, frequency) against the Python mirror: worst disagreement **5.0e-09 dB**. Run
+twice — before and after the final table edits — both times clean.
+
+### 10. ⚠ TWO PRE-EXISTING DEFECTS FOUND AND FIXED IN THE INSTRUMENT ITSELF
+
+`do_matrix`'s `--stage-off` flag was parsed but never applied — a run asking to see "the requirement
+with our own correction subtracted" silently got the raw model instead. Fixed; every quantitative
+table in this session used the explicit subtraction path directly, so nothing already reported was
+affected, but a future `--matrix --stage-off` call would have been silently wrong. Also: every
+`current_response()` call site across `notch_shape_gate.py`, `notch_residual_gate.py`,
+`null_depth_censor_gate.py`, `_mutate_gate_ap.py`, `_mutate_gate_aq.py` and `od_tone_restore_fit.py`
+itself now passes the capture's own clean fraction — before the mix key existed they implicitly read
+the stage at its (then-only) bleed-free-equivalent point, which is now `kMixCfRef`'s value, not
+necessarily the capture's actual mix. The parser (`shipped_tables()`) refuses if `kNotchMixK` is
+missing from the header, rather than falling back to the old two-table shape (`masterTaperBreak`'s
+lesson: a name surviving a meaning change silently rebuilds the wrong thing).
+
+### ⚠⚠ NEW FINDING NOT PREVIOUSLY ON RECORD: THE 320 Hz NULL HAS A DEPTH CEILING AROUND 1.5–2 dB AT THE LISTENING MIX
+
+Independent of everything else this session did — §6's 40 dB probe is a standing fact about the
+composite null at this operating point, not an artefact of the fit. Any future work on this notch
+should check the ceiling before spending a fit iteration chasing more depth at LEVEL noon; the lever
+that would move it is A3 (the OD path's absolute quietness), not this stage's gain.
+
+### ▶ NEXT
+
+1. `kPeakGainDb` may now be worth revisiting — at the listening condition the ~450 Hz peak is
+   0.3–1.1 dB LESS prominent than the pedal's at low/mid drive (measured in passing at §4; it was
+   zeroed against bleed-free data where the opposite held). Not touched this session.
+2. The 800 Hz bowl (§3) is A3 seen as a shape and its GRUNT sign flip is now measured — worth folding
+   into open item 6/A3's frame question rather than treated as this stage's scope.
+3. GRUNT boost DRIVE ≥0.75 bleed-free has no readable null on either side (reader refusal, not a
+   data gap) — the weakest corner of `kNotchMixK`'s boost row.
+4. Everything from s155's own `▶ NEXT` is unchanged and still open.
+
+⚠ **Uncommitted at this point: sessions 150–156 together.**

@@ -539,6 +539,26 @@
     curvature, which moves 1.005× over fit windows and 0.04 % over bars, so the BAR-SENSITIVE verdict
     was explicitly stated **not to reach it**. ⚠ Say that out loud at the consumer, or a caveat
     attached to one number gets read as a caveat on everything printed near it. (s137, GATE AH4b/AH7)
+  - ⭐⭐⭐ **A VERDICT THAT FLIPS ON ~1 % OF ITS OWN BAR IS NOT A VERDICT — AND THE FIX IS NOT A
+    BETTER BAR, IT IS NOTICING THAT ONE VERDICT WAS CARRYING TWO QUESTIONS.** Two screens in one
+    gate landed on knife edges and both were repaired the same way. **(a)** An asymmetry screen
+    compared `|mean difference| = 0.208` against a *derived* one-cell resolution bar of **0.211** —
+    1.4 % of margin, on which the entire ⛔/⭐ verdict rested. **(b)** A censoring screen was gated
+    on `|r| < 0.3`, **a number I invented**, against a measured **r = −0.437**. ⭐ The repair for
+    both is to split the single verdict into the two questions it was conflating, each of which has
+    a threshold-free or definitional answer: *is it real?* — an exact **sign test** (20/26,
+    p = 0.0094) or a **permutation test** (p = 0.0523), neither needing a bar; and *is it big enough
+    to matter?* — a **swept** bar reporting BAR-SENSITIVE where it is (s137's pattern), or an **r²**,
+    which is a SHARE and needs no threshold to read (0.191 ⇒ 81 % unexplained ⇒ cannot be "the
+    carrier" under any branch). The honest outcome was a **third** verdict neither original branch
+    could express — *one-signed, at the reader's resolution* — which is both findings stated
+    separately and is neither a licence to build nor a refutation.
+    ⚠⚠ **The trap while repairing it: replacing an invented bar with a CONVENTIONAL one the data
+    sits on top of is the same mistake in a lab coat.** The permutation p came out **0.0523**, i.e.
+    on the 0.05 line — so the gate now prints that it is on the line, and points at the bar-free
+    statistic instead. ⭐ Check whether the branches even disagree about anything consequential
+    before worrying: here both concluded "not the carrier" and only the wording differed, which is
+    the thing to say out loud. (s154, GATE AR's AR5)
   - ⭐⭐ **A SHAPE PARAMETER FITTED OVER A WINDOW IS WINDOW-DEPENDENT — SWEEP THE WINDOW, GATE THE
     VERDICT ON THE RANGE, AND READ THE ASYMMETRY.** A vertex's curvature on a non-parabolic background
     has no single value; that is a property of the quantity, not a defect. AH2 swept the fit
@@ -1081,7 +1101,97 @@
   (it did, 329.5 → 329.5 and 416.0 → 416.0), because **a silent estimator and an absent feature
   are indistinguishable** until you show the estimator finds the feature when it is there. Same
   family as s119's O6b (a check an earlier guard already guarantees is not a check). (s126)
-- ⭐⭐⭐ **A LEVER MEASURED AT ONE STIMULUS RUNG IS A CLAIM ABOUT THAT RUNG —
+  - ⭐⭐⭐ **AND THE SEQUEL THAT COST A WHOLE SESSION, s150→s151: A STATISTIC CAN BE A FINE
+    **DETECTOR** AND A CATASTROPHIC **OBJECTIVE**, AND POINTING AN OPTIMISER AT ONE DEFORMS THE
+    THING BEING BUILT UNTIL IT FITS THE ARTEFACT.** GATE W's prominence is a good detector — it is
+    how this project finds features at all. Session 150 tuned a new DSP stage against it, iteration
+    after iteration, and the stage barely moved: `mid_notch`'s window is a FIXED [285, 358] Hz band
+    and its prominence is `min(rise-to-left, rise-to-right)`, so where the model's curve declines
+    across the whole window the argmin sits ON the right edge, the right walk is empty, and the
+    number reads **~0 for ANY notch depth**. ⭐⭐ **The damage is not the wasted iterations, it is
+    that the DSP absorbed the artefact:** chasing window room drove the filter's Q to **32** (a
+    ~10 Hz needle) and its centre to **310 Hz**, against a reference whose Q is 5–12 and whose
+    centre is **322.8 Hz**. Both constants were wrong *because the metric was*, and both looked like
+    tuning decisions. ⛔ **The obvious repair — widen the window — is also wrong**, and that is the
+    part worth carrying: at high drive the model's curve falls monotonically from ~370 Hz into the
+    NEXT notch, so a window wide enough to contain the right shoulder puts the global minimum
+    ~200 Hz away and the reader silently tracks a different feature (measured: f0 550.8, depth
+    0.000, edge=1). ⇒ **DECOUPLE THE TWO SEARCHES.** One window bounds where the feature *sits*
+    (asserted, and a minimum resting on it is a REFUSAL, not a reading); a second, wider one bounds
+    where its *flanks recover*. ⭐ GENERAL: before optimising against any summary statistic, ask
+    what it does when the feature is ABSENT or is against a bound — if the answer is "returns a
+    number that looks like a small feature", it can rank candidates but must never be a fit target.
+    (s151)
+  - ⭐⭐⭐ **THE THIRD OCCURRENCE, s153, ON THE SAME STAGE AND THE NEXT AXIS OVER — AND THIS ONE IS
+    THE CHEAPEST TO MISS, BECAUSE THE STATISTIC IS *CORRECT*, JUST QUANTISED TO THE SIZE OF THE
+    EFFECT.** s151 fixed the depth statistic; nobody looked at the Q statistic beside it. A notch's
+    Q was read as `f0 / (hi − lo)` with `hi` and `lo` the first GRID CELLS at/above half depth — so
+    the width is an integer number of cells and Q can only take the values
+    `1/(2^(m/48) − 2^(−n/48))` for integer (m, n). Measured on synthetic sections of KNOWN Q:
+    **8 distinct values over 16 true Qs; above Q≈8 the attainable readings are {8.65, 11.54, 17.31}
+    and nothing between, so true Q of 8, 10 and 11 ALL read 8.651 and 18/20/24/30 all read 17.310 —
+    errors to −42 %, with steps 20–50 % wide.** Two shipped claims were one to two steps of the
+    reader: a defect quoted as *"1.35–1.51 too broad"*, and a convergence quoted as *"EXACTLY on the
+    pedal's 11.54"* — where 11.538 is simply one of the eight values the reader can emit.
+    ⭐ **The tell is free and general: a reader built on "the first sample past a threshold" is
+    quantised by the grid, and the quantisation is a FIXED FRACTION of the answer** (here ~1 cell of
+    a width that is only 2–10 cells wide). Before quoting any width, Q, bandwidth or crossing
+    frequency, run the estimator on a synthetic of KNOWN value and **print the attainable set**; if
+    it has plateaus, the statistic can DETECT but cannot RANK, and no fit against it converges to
+    anything but a step edge. ⭐⭐ The repair is one line — interpolate the crossing between the two
+    straddling cells — and it should be **ADDITIVE** (a new key beside the old), so every prior
+    number stays reproducible; here the neighbouring gate's stored report came back **byte-identical**
+    after the change, which is what made the fix safe to land mid-item.
+    ⚠ And gate the repaired reader on **MONOTONICITY and round-trip recovery, not on absolute
+    accuracy** — it was still biased +22 % at low Q for an unrelated and legitimate reason (the
+    shoulder window truncates a broad notch), and that bias CANCELS in every comparison the gate
+    makes. Asserting accuracy would have failed correct code; asserting injectivity is what the
+    downstream solve actually needs. (s153, GATE AQ)
+  - ⭐⭐⭐ **A "ROBUST" REPLACEMENT STATISTIC IS A DIFFERENT QUANTITY, NOT A REPAIRED VERSION OF THE
+  OLD ONE — CONVERT BOTH INTO THE UNIT OF THE THING YOU WILL ACTUALLY CHANGE BEFORE DIFFERENCING
+  THEM.** A shipped stage's depth targets were known to be censored (the pedal's null bottoms sat at
+  or below the deconvolution residue), and the documented remedy was GATE R's 1/6-octave
+  POWER-INTEGRATED depth, which the bottom cannot move. Built and run, the area depths came out far
+  smaller than the point depths — and the obvious reading, *"so the shipped table over-corrects"*, is
+  **`difference-statistics-hide-common-mode` with the two operands in different units**: a genuinely
+  deep, NARROW null has a small area deficit whatever the residue is doing, so the two numbers were
+  never measuring one thing. ⭐ The move that makes them comparable is to convert each into the unit
+  of the CONSTANT — here, solve per cell for the biquad gain at which the composite's depth equals
+  the pedal's, **under each metric separately**. Those two gains are commensurable and their
+  difference is the answer. ⭐⭐ **And the conversion carries its own known answer for free: solving
+  in the OLD metric must return the SHIPPED table**, because that table was fitted in the old metric
+  — measured, 0.57 dB rms against a fit whose own residual is ±0.83 dB. Without it, a disagreement
+  between the two columns is equally consistent with the solve being broken. ⚠ It also needs a
+  UNIQUENESS check, not a monotonicity one: a root-finder returns *a* root, and a first draft here
+  demanded the depth be monotone in gain across the whole search range, flagged 5 cells, and was
+  wrong — depth is monotone through the entire solution region and only wobbles far outside it.
+  **A guard that demands more than the conclusion needs fails on correct code.** ⭐ Where the two
+  metrics still disagree, that is a finding and not noise: a synthetic round trip in which the
+  reference feature has EXACTLY the model's own shape makes the two metrics agree to 2e-4 dB, so any
+  residual disagreement on real data is a SHAPE mismatch — which localised the defect onto a
+  different open item entirely. (s152, GATE AP)
+- ⭐⭐ **A KNOWN ANSWER CAN BE INVARIANT TO THE VERY CONSTANT IT APPEARS TO CERTIFY, WHEN THAT
+  CONSTANT ENTERS BOTH SIDES — AND THE WAY TO FIND OUT IS TO MUTATE IT.** A check asserted that an
+  analytic solve reproduces the shipped table, which is what licensed reading everything below it.
+  Its own mutation arm added 5 dB to every shipped entry and the check **passed unchanged**: the same
+  table is used BOTH to subtract the stage's response out of the rendered curve AND as the reference
+  being compared against, so a uniform shift cancels exactly. ⇒ the check certifies **the solve**,
+  and is blind to whether the constants are right. That is not a defect — it is the check's actual
+  scope, and it had to be written down at the check or the next reader would quote it as evidence the
+  table is correct. ⭐ GENERAL: this is
+  `a-transfer-function-known-answer-validates-TOPOLOGY-and-is-blind-to-the-VALUE-SET` (s145/s149) in
+  a third guise — **list what both sides of any known answer share, and if the quantity you want
+  assurance about is on that list, the check cannot supply it.** The mutation arm is what turns that
+  from a thing you might notice into a thing you did. (s152, GATE AP's AP3a)
+- ⭐⭐ **A LINEAR STAGE'S OWN RESPONSE CAN BE SUBTRACTED ANALYTICALLY, AND THAT IS THE ONLY WAY TO
+    TELL "IT NEVER HAD THE FEATURE" FROM "MY OWN CORRECTION FILLED IT IN".** The two are
+    *identical* in the rendered curve, and the second is how a correction fitted at one operating
+    point quietly becomes a regression at another. Costs nothing — the stage is linear and in
+    series, so its dB response subtracts exactly, with no rebuild and no second render. Measured
+    this way, a correction fitted at one switch position turned out to be making two other
+    positions **4.5 dB WORSE than leaving the stage out**, which the rendered curve alone could
+    never have shown. ⇒ **any tool that grades a model carrying your own in-progress correction
+    needs a `--stage-off` mode**, and it should be built at the same time as the stage. (s151)
   `gate-domain-must-cover-candidate-reach` HAS A STIMULUS-AXIS FORM, AND IT IS EASIER TO MISS THAN
   THE FREQUENCY-AXIS ONE BECAUSE THE CONDITION WAS CHOSEN CORRECTLY.** A reachability gate read its
   feature at `sweep_clean` — the right choice, it is the condition the stored locus was measured at,
@@ -1131,6 +1241,35 @@
   the coincidence was flagged as needing a test *in the same sentence it was written*
   (`an-implausible-coincidence-is-a-bug-report`, applied to one's own claim), so it cost five
   minutes of arithmetic instead of a prototype. **Write the falsifier next to the hypothesis.** (s125)
+
+- ⭐⭐⭐ **A VALIDITY GUARD BUILT FOR THE *REFERENCE* SIDE IS NOT AUTOMATICALLY POINTED AT THE
+  *MECHANISM* SIDE — AND THE ONE PLACE THAT MATTERS IS EXACTLY WHERE A GATE PUBLISHES ITS
+  HEADLINE.** AL3 established that the deficit's endpoint exponent is only readable because the
+  deficit is **single-signed** across the limb ("12/12, so no log below is a zero-crossing
+  artefact"). That guard was written about the measured defect and never applied to a *candidate*.
+  Screening a mechanism class on the same statistic, the top of the exponent table read
+  **+5.335 / +4.140 / +3.962 / +3.813** — which would have been published as "the class is
+  SHAPE-ADMISSIBLE" — and **4 of the top 5 fail a validity column**: the +4.140 probe reads
+  **+0.00017** at the bottom of the limb and is negative everywhere above, so its endpoint ratio is
+  divided by a number passing through zero. ⭐ GENERAL: **when a gate grades a candidate on the same
+  statistic it grades the target with, every validity condition the target had to satisfy is a
+  condition the candidate must satisfy too — grep the source gate for its own guards before
+  quoting the statistic about anything else.** ⭐⭐ And a second column was owed and had never been
+  named anywhere: the target's limb is the *rising* limb **by construction** (it is split at the
+  argmin of |D|), so a mechanism whose |dT| **turns over inside that limb** is not tracking it
+  whatever its endpoints say. Monotonicity is not a refinement of single-signedness — one probe
+  here is single-signed 10/10 and rises only 6 of 9 steps. (s155, GATE AS3)
+
+- ⭐⭐ **A MASK MAKES THE COMPUTATION OUTSIDE IT *EXACTLY* WASTED, NOT MERELY MOSTLY — SO ASSERT
+  BIT-IDENTITY AND TAKE THE SPEEDUP AS A MEASUREMENT.** A tilt estimator reads only the points
+  inside its own ±half-octave window, so evaluating an expensive per-frequency network on the other
+  4693 of 6001 grid points changes nothing. Computing only the union of the windows and scattering
+  into a full-length array is **3.7x cheaper and bit-identical (0.000e+00)** — and the bar has to be
+  bit-identity rather than a tolerance, because anything looser would hide a window that had
+  drifted by one index. ⭐ That one known answer is what made a 7140-probe search affordable at all;
+  without it the same gate is a ten-minute run and the pair search does not get written. **Before
+  optimising an inner loop, ask what the consumer actually READS — and when the answer is "a mask",
+  the optimisation comes with its own free known answer.** (s155, GATE AS1b)
 
 ## 2. Aggregates, membership and range
 
@@ -1266,6 +1405,61 @@
   pinning first**; the ends are exactly where a capture chain runs out of headroom, and exactly where
   anchors are conventionally placed. Same family as `defective-rows-must-not-vote`, but the defect is
   invisible because it is *quiet and self-consistent* rather than wild. (s112)
+- ⭐⭐⭐ **EVERY CAPTURE WITHOUT A TOKEN IN ITS NAME SITS AT THAT CONTROL'S **DEFAULT**, SO A FIT SET
+  ASSEMBLED BY VARYING ONE KNOB HOLDS EVERY OTHER SWITCH PINNED — ENUMERATE WHAT IS PINNED BEFORE
+  CALLING A FIT DONE.** Two sessions fitted a new DSP stage across the whole DRIVE ladder, at four
+  stimulus levels, at two LEVEL settings and four BLEND settings — a genuinely careful sweep — and
+  every single capture in it was **GRUNT = cut**, because `captures.py` defaults
+  `gruntIdx=_GRUNT_IDX["cut"]` and no filename said otherwise. Measured at the other two positions,
+  the correction the fit had converged on was **wrong-signed**, and the defect there was **10–25 dB**
+  against the 2–17 dB the fit had been working on. ⇒ **the pinned axis was larger than the axis
+  being fitted.** ⭐ GENERAL: a capture-set's filename convention encodes the varied axes and hides
+  the fixed ones. Before trusting a fit, print the FULL settings dict of its members and look for a
+  column with one distinct value — then ask whether the physics has any reason to be flat along it.
+  ⚠ Here it plainly did not: GRUNT switches the capacitor feeding the clipper, and the feature being
+  fitted is a cancellation *in the network that cap sits in*. ⚠⚠ And note which reference governs
+  before assuming the ND-matched answer is the target: `reference-sources.md` §1 makes HARDWARE the
+  authority for this feature's depth and §3 records hardware deeper than ND by **+1.6 dB at the
+  fitted position rising to ~26 dB at the unfitted one** — so the pinned axis was also the axis
+  along which the two references diverge most. (s151)
+- ⭐⭐ **"BOTH SIDES MUST BE READABLE" IS THE MEMBERSHIP OF *ONE* METHOD, NOT OF THE QUESTION — AND
+  A MODEL-SIDE REFUSAL IS USUALLY NOT MISSING DATA ABOUT THE TARGET.** A stage's table was fitted as
+  `reference depth − model depth` per cell, so a cell where the MODEL has no readable feature was
+  dropped: two of nine entries turned out to rest on **1 of 3** stimulus cells, one of them flagged
+  nowhere. But the model having no null there is not an absence of information — it is the defect
+  itself, at its largest. ⭐ Re-posed as a SOLVE (*"what correction makes the composite match the
+  reference?"*) the method needs only the REFERENCE side, because the candidate correction is what
+  creates the composite's feature — and the same cells come back: n=1 → n=3 and n=2. ⇒ **before
+  accepting a thin `n`, ask whether the missing side is missing DATA or is the thing being
+  measured**, and whether re-posing the estimator recovers it. ⚠ Corollary in the other direction:
+  the refusal itself must stay real (`a silent estimator and an absent feature are
+  indistinguishable`, s126/s133) — recovering the cell is a change of METHOD, never a loosened
+  reader. (s152, GATE AP's AP4)
+- ⭐⭐⭐ **A POOLED STATISTIC CAN BE THE *RIGHT* ONE FOR THE SHIPPING QUESTION AND THE *WRONG* ONE
+  FOR THE MECHANISM QUESTION — AND IT IS THE SAME NUMBER, SO IT GETS QUOTED FOR BOTH.** A gate
+  averaged each of two metrics' solved gain over the three stimulus sweeps and then differenced the
+  two columns, reporting the disagreement went **2.69 → 2.16 dB (−20 %)** when a shape coordinate
+  was freed — and concluded from it that shape-matching does NOT explain the disagreement, which
+  became a CLOSED/REFUTED row, an open item's framing, and a proposed successor. The **per-sweep**
+  gap **changes sign across the stimulus ladder** (−6.85 / −6.56 / **+5.94** dB), so the mean cancels
+  it; paired, the SAME numbers read **6.83 → 2.13 dB (−69 %)** and the conclusion inverts.
+  ⭐⭐ **But the pooled form was not simply wrong, and this is the part worth carrying: the shipped
+  table has ONE entry per (GRUNT, DRIVE), so a mean over sweeps is exactly what WOULD be shipped.**
+  For *"how far apart are the two metrics' shipped entries?"* the pooled figure is correct, and the
+  user decision resting on it is untouched. For *"does matching the shape close the disagreement?"* —
+  a claim about the two metrics as **measurements** — the axis has to stay intact. ⇒ **ask which of
+  the two questions a statistic is being quoted for, every time; a number that is right for a
+  decision can be wrong for the mechanism story told beside it.**
+  ⭐⭐ **The diagnostic that localises the damage in one line: the two forms AGREED on the AFTER
+  value (2.13 vs 2.16 dB) and disagreed entirely on the BEFORE one (6.83 vs 2.69).** So the
+  cancellation is in the *baseline* arm, not the treated arm — which is checkable, points straight
+  at the sign change, and is invisible if only the ratio is quoted. **Print both operands of any
+  before/after ratio.** ⚠ What licenses calling this an ORDER-OF-OPERATIONS defect rather than a
+  second measurement is a cross-gate known answer: re-aggregating the per-sweep records must
+  reproduce the **stored** per-cell numbers of both prior gates (measured, 0.00e+00 dB). Without it,
+  "the paired form disagrees" is equally consistent with your solver simply being different.
+  (s154, GATE AR's AR2/AR3; the sharpest form of `a-pooled-statistic-cannot-answer-about-its-own-
+  axis` (s105) and `difference-statistics-hide-common-mode`)
 - ⭐⭐ **A CONSTANT MEASURED FROM ONE PAIR IS A CONSTANT MEASURED FROM ONE PAIR, AND THE PAIR IT CAME
   FROM IS THE LEAST LIKELY TO CONTRADICT IT.** `captures.py` pads every `gain-n12` render by
   **12.071 dB**, annotated "measured 2026-07-22, ref-clean.wav vs ref-clean_gain-n12.wav" — a single
@@ -1898,6 +2092,22 @@
     change a curve's curvature, so the squared term cancels exactly from the injected-tilt check
     while leaking into the fixed-block check. An arm that trips both guards has only proved they
     are not the same guard's second copy. (s138, `_mutate_gate_ai.py` arm 3)
+- ⭐⭐⭐ **A MUTATION RUNNER WHOSE MUTANTS RUN `main()` WILL WRITE THE GATE'S OWN REPORT — SO THE
+  LAST ARM'S OUTPUT IS LEFT ON DISK WEARING THE REAL GATE'S FILENAME.** The mutant has to be a
+  faithful copy of the gate or the arms test nothing (s110), and a faithful copy writes the same
+  artefact to the same path. Nothing errors, nothing looks wrong, and the file that remains is
+  whichever arm ran last — here the computed-verdict arm, whose whole job is to produce a
+  DELIBERATELY FALSIFIED result. It cost this session a false *"the rebuild changed my numbers"*
+  alarm (the "before" file being compared against turned out to be that arm's own forced-flat
+  output), and the same defect was sitting unnoticed in the neighbouring gate's runner, where it
+  would have silently replaced an artefact `CLAUDE.md` cites by name. ⭐ Fix: **redirect the
+  mutant's output path to a PID-unique name, and make the redirect REFUSE if its pattern does not
+  apply** (a redirect that silently no-ops restores the exact bug it was added to prevent);
+  **redirect the CONTROL run too**, so it exercises the same path as the arms; delete the stray at
+  the end. ⚠ GENERAL beyond mutation testing: **any harness that runs a faithful copy of a tool
+  inherits that tool's side effects** — before running one, ask what the copy WRITES, not only what
+  it returns. Same family as `rebaseline-all-derived-artefacts`, with the corruption arriving from
+  the test rather than from a stale source. (s153)
   ⭐⭐ **AND A VACUOUS MUTATION CAN BE WORTH KEEPING AS A MEASUREMENT.** GATE W needed a mutation
   meaning "the locator reports a biased centre", and two successive attempts were inert and both
   read as GUARD DEAD (`suspect the mutation before the guard`, twice in one session): **(i)** a
@@ -2167,6 +2377,35 @@
   0.34** — 0.1 % of a width, against a statistic whose own recovery error is 0.94 % and whose
   transfer to the render is ±5–10 % — and the winner wanted R7 ×28.6, C6 ×200, C7 ×0.023 where the
   loser wanted at most ×10. An unquantised tail term is a lottery with a plausible face. (s94)
+
+- ⭐⭐⭐ **A TWO-AXIS FRONTIER CAN HIDE THE AXIS THAT ACTUALLY DECIDES THE CLASS — AND THE FIRST
+  DRAFT WILL REPORT "A JOINT POINT EXISTS", WHICH IS THE OPPOSITE VERDICT.** Screening a mechanism
+  class, the two obvious axes were SHAPE (does its frequency dependence match the defect's?) and
+  SIZE (does it move the graded quantity far enough?). Graded on those two, a joint point exists:
+  a probe that is shape-admissible **and** reaches 338 % of the budget, so the class is "not
+  refuted". Looking at what the probe actually asks for: a resistor moved from **48.5 k to 48.5 Ω**
+  and a capacitor to a tenth. That is not a drift, it is a different circuit — and a *drive-dependent*
+  mechanism can only move an element by a bounded amount. Adding the **size of the perturbation** as
+  a graded third axis inverts the verdict: at any fold change a real mechanism could supply, **0 of
+  241** validated probes clear even the weakest shape bar. ⭐ GENERAL: **list what a candidate must
+  satisfy *including the constraints on the candidate itself*, not only the ones the defect
+  imposes** — a screen that grades only "does it match?" and "is it big enough?" is missing "could
+  it happen?", and that is usually the cheapest of the three to evaluate and the most decisive.
+  ⚠ Measure the perturbation as a **FOLD change** (`max(fr, 1/fr)`), never as `|fr − 1|`: the latter
+  saturates at 1.0 for every shrinking element, so it reads ×0.1 and ×0.001 as the same
+  perturbation when they are three decades apart — a scale on which every interesting probe lives.
+  ⭐⭐ And the honest by-product is a *positive* statement rather than a bare veto: **steepness on
+  this network is bought by cancellation between two large element moves, and the cancellation is
+  what needs the moves to be large** — i.e. the three requirements are in tension, which is a
+  structural fact about the class and not a threshold. (s155, GATE AS3/AS8)
+
+- ⭐⭐ **AND WHERE THE THREE AXES ALL BITE, LOOK FOR THE THRESHOLD-FREE FORM — IT IS USUALLY A
+  COUNT, AND IT IS WHAT SURVIVES A READER WHO DISTRUSTS EVERY BAR.** The same result states as:
+  *"of the 1050 probes at a physically-supplyable fold change, ZERO have a tilt change that even
+  RISES across the limb, against the defect's 9/9."* No exponent bar, no reach bar, no fold ceiling
+  argued over — just a direction the defect has and the whole physically-bounded candidate set does
+  not. **Print the bar-free form beside the frontier, not instead of it**: the frontier is what
+  makes the count interpretable, and the count is what makes the verdict quotable. (s155, GATE AS3)
 
 ## 4. Fits, searches and degeneracy
 

@@ -109,6 +109,29 @@ public:
 
     void setDistEngage(bool engage) noexcept { distEngage = engage; }
 
+    // Fraction of the OUTPUT that is clean-tap signal, in [0,1].
+    //
+    // ⭐ Derived by EVALUATING `process` itself with unit inputs rather than by re-deriving the
+    // divider algebra.  `process` is linear in (cleanIn, odIn) — it is a weighted sum — so
+    // superposition gives its two coefficients exactly, and this accessor therefore CANNOT drift
+    // from what the stage actually does, including at the analytic endpoints and under
+    // dist-disengage (which correctly reports 1.0, i.e. all clean).  Re-deriving it instead
+    // would be the s113 trap (a shipped stage's closed form takes the STAGE's input, not the
+    // knob) plus a second copy of the network to keep in sync.
+    //
+    // `OdToneRestore` reads this: it sits in the OD path, upstream of here, so how much cut its
+    // 320 Hz notch must apply to land the COMPOSITE null on the pedal's depends entirely on how
+    // much clean signal is about to be summed on top of it.  GATE AT measured that dependence
+    // and showed it collapses onto this single scalar (many LEVEL/BLEND routes to the same value
+    // agree to 0.03-0.05 dB), which is what makes one number sufficient here.
+    double cleanFraction() const noexcept
+    {
+        const double od = process(0.0, 1.0);
+        const double cl = process(1.0, 0.0);
+        const double sum = od + cl;
+        return sum > 0.0 ? cl / sum : 1.0;
+    }
+
     // Process one sample: return mixed output.
     // cleanIn = signal from IC1_A clean tap (VD-referenced AC voltage).
     // odIn    = signal from IC4_A Sallen-Key output (VD-referenced AC voltage).

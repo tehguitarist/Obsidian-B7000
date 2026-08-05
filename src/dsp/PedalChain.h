@@ -10,6 +10,7 @@
 #include "DriveStage.h"
 #include "Clipper.h"
 #include "RecoveryBridgedT.h"
+#include "OdToneRestore.h"
 #include "SallenKeyLPF.h"
 #include "LevelBlend.h"
 #include "EqPreGain.h"
@@ -159,6 +160,7 @@ public:
         clipper.prepare(osRate);
         odCoupling.prepare(osRate);
         recovery.prepare(osRate);
+        odToneRestore.prepare(osRate);
         skB.configure(SallenKeyLPF::kIC4B);
         skB.prepare(osRate);
         skA.configure(SallenKeyLPF::kIC4A);
@@ -179,6 +181,7 @@ public:
         clipper.reset();
         odCoupling.reset();
         recovery.reset();
+        odToneRestore.reset();
         skB.reset();
         skA.reset();
         levelBlend.reset();
@@ -197,12 +200,24 @@ public:
         cur = p;
 
         drive.setDrive(p.drive);
+        odToneRestore.setDrive(p.drive);
+        // ⚠ odToneRestore's MIX key is NOT set here — it depends on levelBlend's state, which is
+        // configured further down, and on the LEVEL taper, which applyFitParams() can move
+        // independently.  Resolved once in syncOdToneMix() below, called from BOTH, so it cannot
+        // depend on which setter ran last (s124: order-dependence between two setters is
+        // invisible at each setter and lives only in the callers).
+        // Keyed on the PHYSICAL GRUNT position, via the same gruntEnum() the clipper uses, so the
+        // stage's table and the captures index the switch the same way (Cut < Flat < Boost).
+        // Passing p.gruntIdx raw here would silently permute the rows — APVTS order is
+        // {Boost, Cut, Flat}, which is NOT the enum's order.
+        odToneRestore.setGrunt(static_cast<int>(gruntEnum(p.gruntIdx)));
         clipper.setGrunt(gruntEnum(p.gruntIdx));
         treble.setAttack(attackEnum(p.attackIdx));
 
         levelBlend.setLevel(p.level);
         levelBlend.setBlend(p.blend);
         levelBlend.setDistEngage(p.distEngage);
+        syncOdToneMix();
 
         baxandall.setBass(p.lo);
         baxandall.setTreble(p.hi);
@@ -281,6 +296,7 @@ public:
 
         drive.setTaperExp(f.driveTaperExp);
         levelBlend.setTaperExp(f.levelTaperExp);
+        syncOdToneMix();   // the LEVEL taper moves the clean fraction — see applyParams()
         masterOut.setTaper(f.masterTaperBreak, f.masterTaperFrac,
                            f.masterTaperBreak2, f.masterTaperFrac2);
 
@@ -339,6 +355,7 @@ public:
         s = clipper.process(s);
         s = odCoupling.process(s);
         s = recovery.process(s);
+        s = odToneRestore.process(s);
         s = skB.process(s);
         s = skA.process(s);
         return s;
@@ -348,7 +365,7 @@ public:
     // the identical stage order as runOdSample() but records each boundary output,
     // so a probe can localise WHICH OD stage shapes a given band. Not used by the
     // plugin or OfflineRender; state advances exactly like runOdSample().
-    struct OdTaps { double jfet, treble, drive, clipper, odCoupling, recovery, skB, skA; };
+    struct OdTaps { double jfet, treble, drive, clipper, odCoupling, recovery, odToneRestore, skB, skA; };
     inline OdTaps runOdSampleTapped(double buf) noexcept
     {
         OdTaps t;
@@ -358,7 +375,8 @@ public:
         t.clipper = clipper.process(t.drive);
         t.odCoupling = odCoupling.process(t.clipper);
         t.recovery = recovery.process(t.odCoupling);
-        t.skB = skB.process(t.recovery);
+        t.odToneRestore = odToneRestore.process(t.recovery);
+        t.skB = skB.process(t.odToneRestore);
         t.skA = skA.process(t.skB);
         return t;
     }
@@ -541,6 +559,16 @@ private:
             default: return TrebleAttack::Attack::Flat;
         }
     }
+    // Push the mix key into the OD-path tone-restore stage.  Called from BOTH applyParams() and
+    // applyFitParams(), because the clean fraction depends on LEVEL, BLEND, dist-engage AND the
+    // fitted LEVEL taper — four inputs set by two different entry points in caller-dependent
+    // order.  Resolving it from levelBlend's own stored state, in one place, is what makes the
+    // result independent of that order.
+    void syncOdToneMix() noexcept
+    {
+        odToneRestore.setCleanFraction(levelBlend.cleanFraction());
+    }
+
     static Clipper::Grunt gruntEnum(int idx) noexcept
     {
         // APVTS {Boost, Cut, Flat} → enum {Cut, Flat, Boost}
@@ -584,6 +612,7 @@ private:
     Clipper clipper;           // 5  IC3 + GRUNT │ region
     OdCoupling odCoupling;     // 5b C15/R20/R21 │ (session-36, A3 step 3b)
     RecoveryBridgedT recovery; // 6  IC2_B       │
+    OdToneRestore odToneRestore; // 6b [ENG, non-schematic] session 150 notch/peak restore
     SallenKeyLPF skB;          // 7a IC4_B 10.7k │
     SallenKeyLPF skA;          // 7b IC4_A 3.3k  ┘
     LevelBlend levelBlend;     // 8/9 LEVEL + BLEND (base rate)
