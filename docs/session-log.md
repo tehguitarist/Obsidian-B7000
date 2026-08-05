@@ -20381,3 +20381,153 @@ not a measured limit" caveat, i.e. the segment choice does track the measurement
    the constant AND re-pointing ~10 analysis modules and `LevelBlendTest` back. Cheaper to keep
    `K.level_taper`/`LevelBlend::levelTaper` and change the six numbers to reproduce `x^2.25`
    (a 4-segment PWL cannot do that exactly — say so rather than pretending it can).
+
+## SESSION 164 (2026-08-06) — task E opens, and GATE BA refutes the architecture it was scoped to reuse before a line of DSP is written
+
+Sessions 162–163 committed first (`289976e`). Task E is next on the session-160 order (A → D → E →
+ship) and carries a **hard cap of 3 sessions**; this is the first.
+
+### 1. The target re-verified on the CURRENT epoch, and the change attributed
+
+Item 6's sizing (AF6/AG5, AH7) dates from s135/s137, and **three DSP changes have landed since**
+(s150/151/156's `OdToneRestore`, s163's LEVEL taper). `verify-the-PREMISE-not-the-prior-session's-
+framing-of-it` says re-measure before fitting against it. GATE AG re-run on
+`s163_leveltaper.json` and diffed leaf-by-leaf against its stored `s135_drive_tilt.json`:
+
+- ✅ **The PEDAL side is bit-identical at all 23 centres (0.00e+00)** — a free known answer: the
+  captures did not change, so membership and instrument are confirmed identical.
+- ⭐ **The MODEL side moved ONLY at 160–640 Hz** — worst **+0.211 dB/oct at 403 Hz**, then
+  −0.201 at 254, +0.148 at 508, −0.088 at 201, −0.057 at 320. Everything at and above 1280 Hz
+  moves by **≤ 0.0004 dB/oct**. That band is exactly where `OdToneRestore` sits (323 Hz) and it is
+  the only OD-path filter change in the interval ⇒ **attributed, not merely bounded**.
+- ✅ **At the vertex the requirement is intact**: model tilt +0.09427 → +0.09428, P−M
+  **−2.038 dB/oct**, ratio **1.72×**, all unchanged. `s164_drive_tilt_current.json`.
+
+The LEVEL taper cannot appear here by construction — these are `level-1700` captures and s163
+measured LEVEL = 1.0 bit-identical.
+
+### 2. GATE BA (`analysis/task_e_placement_gate.py`, `_mutate_gate_ba.py`, **11/11 arms**)
+
+Task E was scoped as *"same architecture as `OdToneRestore`"* — a drive-keyed tilt/shelf section.
+Before fitting anything, BA asks the question the conversion skipped: **can a section in that
+architecture carry this target at all?**
+
+**THE DECOMPOSITION.** A Farina sweep presents ONE frequency at a time, so along the OD path
+`H1(f, A) = P(f)·g(A|P(f)|)·Q(f)` — pre-clipper response, compression law, post-clipper linear
+response. In dB, with `gamma = dlog g/dlog x`:
+
+    slope(f, A)   = P'(f)·(1 + gamma(A|P|)) + Q'(f)
+    drive-tilt(f) = P'(f)·[gamma(hot) − gamma(quiet)]
+
+#### 2a. ⭐⭐ THE HEADLINE — `Q` DROPS OUT EXACTLY (BA2)
+
+A fixed linear stage adds the SAME log-magnitude to every rung and the drive-tilt is a DIFFERENCE
+between rungs, so a post-clipper section must cancel identically. **Measured, not argued**: a
+deliberately wild probe (a 4 dB/oct tilt + a 6 dB shelf + a **9 dB peak ON the vertex**) added to
+every rung moves the drive-tilt by **2.04e−14 dB/oct worst over 9 conditions**, against a
+machine-precision bar of 1e−11.
+
+⇒ **A LINEAR SECTION DOWNSTREAM OF THE CLIPPER CONTRIBUTES EXACTLY ZERO TO THE DRIVE-TILT — at any
+gain, any Q, any centre, keyed on any knob.** `OdToneRestore` sits at stage 6b, *post*-clipper, so
+its slot cannot carry task E. This is what AF6's *"at or UPSTREAM of the clipper"* was actually
+saying; it had been read as a statement about physical carriers.
+
+⚠⚠ **The vacuity guard is the load-bearing part and it has its own arm.** An INERT probe passes
+BA2 trivially and the gate would print "EXACTLY ZERO" having measured nothing — so BA1b requires
+the probe to move a PER-RUNG slope by ≥1 dB/oct (measured **4.139**), and `ba1b-inert` proves BA1b
+fires. `empty-gate-must-fail` in the one place it would be invisible.
+
+#### 2b. ⭐ The model is NOT "pinned" — it is crossing zero AT the vertex (BA3)
+
+On the 1/48-oct locator grid at the current epoch, the model's own drive-tilt (ATTACK flat, DRIVE
+noon) runs **−1.983 dB/oct at 1450 Hz to −0.013 at 2935 Hz** across AG4's interpretable band,
+crossing zero right where AG3 reads it. This **reproduces GATE AL's AL3 (s141) on a different
+instrument and a later epoch** — AL3 read it on the 1/3-oct band surface.
+
+⭐⭐ **And it reframes item 6 from MAGNITUDE to PLACEMENT.** At 1450 Hz the model already carries
+**more** drive-tilt than the requirement asks for at the vertex (−1.98 against a needed −1.185).
+Model vs pedal across the band (model = BA3 fine grid, pedal = AG4):
+
+| f (Hz) | model | pedal |
+|---|---|---|
+| 1016 | −2.17 | −4.20 |
+| 1450 | **−1.98** | ~−1.6 |
+| 2100 | −0.64 | −1.17 |
+| 2935 | **−0.01** | **−1.94** |
+| 4064 | +0.53 | −4.93 |
+
+⇒ the model's drive-tilt mechanism **exists and is strong; it rolls off with frequency and dies at
+the vertex, while the pedal's turns around and grows.** ⛔ "the model has no drive-dependent
+mechanism" is therefore the wrong sentence — quote the SHAPE, not a magnitude.
+
+#### 2c. The pre-clipper route, sized (BA4)
+
+- **(a) THE PREMISE, VERIFIED not assumed.** For a compressive non-expanding map
+  `gamma ∈ [−1, 0]`, so `|dgamma| ≤ 1`. Checked on the shipped model over **1377 cells**: the
+  measured rung-to-rung step lies in `[0, dL]` at all three pairs.
+  ⚠⚠ **THIS GATE'S OWN FIRST DRAFT GOT THE FRAME BACKWARDS AND REPORTED +10.6 dB OF
+  "EXPANSION".** `transfer_h1` normalises EVERY rung against the SAME `sweep_clean` reference
+  segment, so the curve carries the stimulus step itself; and the ladder is **−30/−18/−12/−6 dBFS,
+  i.e. 12/6/6 dB apart, not 6/6/6**. The draft checked `[−6, 0]`. **12 dB of stimulus read as
+  physics** — s115's *"a round dB number in a discrepancy is a PAD"*, fourth occurrence. Levels are
+  now IMPORTED from `gen_test_signal`, never transcribed. ⭐ The frame cannot reach the TARGET: a
+  stimulus offset is constant in frequency and cancels identically from any slope, which is why
+  the error was confined to this one premise check and AG's statistic is immune.
+- **(b) THE BOUND.** `|P'| ≥ 1.1852 dB/oct at the vertex is NECESSARY` — whatever the nonlinearity
+  does, no fit and no threshold.
+- **(c) HOW FAR SHORT, model-free.** The model's own drive-tilt IS the product `P'·dgamma`, so the
+  shortfall needs neither operand separately: **median 18× over 9 conditions** (3.2× at the best,
+  88× at ATTACK flat / DRIVE noon), and **4 of 9 conditions have the WRONG SIGN** — they need a
+  sign change, not a scaling, and a factor is not defined there.
+
+#### 2d. The ATTACK switch REFUSED as a dose-response (BA5)
+
+ATTACK is a real pre-clipper HF control with three physical positions, so it looks like a free
+dose-response. It is not: on the SHIPPED ladder the whole switch moves the pre-clipper slope at the
+vertex by **0.0042 dB/oct**, because **`trebleC8` ships at 0** (s99/s100 took C8 out of circuit) and
+C8 is the element ATTACK reroutes at HF. The rendered drive-tilt meanwhile moves up to **0.3096**
+across the switch — a ~10:1 numerator-to-denominator ratio, and the nine coefficients **do not even
+share a sign**. ⛔ `ratio-statistics-need-a-denominator-guard`; **no coefficient is quoted and none
+may be**.
+⭐ The refusal is the useful half: the drive-tilt moves across ATTACK **without** the ladder's slope
+moving ⇒ it is not a function of the local pre-clipper slope alone. In the decomposition that is
+expected — `gamma` depends on the pre-clipper LEVEL `|P|`, so a position that changes `|P|` moves
+the product through `dgamma` rather than through `P'`. Both operands are live; BA4's bound is
+unaffected because it bounds only `dgamma`.
+
+### 3. Instrument defects found in this session's own gate
+
+- ⚠ **`computed-verdicts-not-narrated`, committed twice in a gate written to apply the rule** —
+  s161 AX3's exact defect, again. BA5's "REFUSED" and BA6's closing paragraph were both
+  unconditional `print`s. BA5 now computes its verdict from whether the nine coefficients share a
+  SIGN (a test with no invented bar), and BA6's paragraph inverts with `cancels`. Both have arms
+  (`ba5-refusal`, `ba6-verdict`) and both fire.
+- ⚠ **`ba2-verdict`'s first version scored a WORKING gate as GUARD DEAD** by expecting `rc == 0`.
+  BA2 is BOTH a computed verdict and a validity gate: if the cancellation fails, the decomposition
+  does not describe the build and BA4's bound is unfounded, so everything below is meaningless —
+  which is exactly s108's test for when a gate may exit. The arm now requires the refusal AND the
+  opposite verdict string, which is the stronger form. `suspect the mutation before the guard`.
+
+### 4. What this session did NOT do
+
+- ⛔ **Nothing shipped, nothing built, no `src/` edit, no constant proposed.** The render cache is
+  still warm against the s163 binary.
+- ⛔ **The pre-clipper route is SIZED, not screened.** BA4's bound is NECESSARY, never sufficient.
+- ⛔ **AF6's requirement is not re-tested** — BA imports it; §1 re-verified it on the current epoch.
+
+### ▶ NEXT
+
+1. ⚠⚠ **A USER DECISION IS OWED, AND IT IS A SCOPING ONE.** Task E was authorised as a
+   `OdToneRestore`-style knob-keyed section under a 3-session cap; BA2 refutes that architecture
+   outright. The two routes that survive are both materially bigger than what was scoped:
+   **(i)** a section at or UPSTREAM of the clipper — a fixed linear pre-emphasis, which must clear
+   `|P'| ≥ 1.19 dB/oct` and would move the STATIC response everywhere (so it owes a full matrix
+   re-baseline and would touch every gate row); or **(ii)** a genuinely LEVEL-DEPENDENT (dynamic)
+   section — a frequency-dependent compressor, which is a new architecture for this project.
+   Option **(iii)** is to close item 6 permanently on the cap's own terms.
+2. If (i) is chosen, the first measurement is the one BA deliberately did not make: **the full
+   pre-clipper response `P(f)`**, which needs either an `OfflineRender` tap dump or a validated
+   closed-form assembly of JFET → ladder → IC2_A → GRUNT/R16. BA4d quotes the LADDER ALONE
+   (+0.513 dB/oct at the vertex) and explicitly forbids reading it as `P'`.
+3. ⚠ `build/s164_task_e/` holds 138 MB of private renders. Regenerable, gitignored; delete it if
+   disk matters.
