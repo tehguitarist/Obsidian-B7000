@@ -114,6 +114,10 @@ add_executable(LevelBlendTest tests/LevelBlendTest.cpp)
 target_compile_options(LevelBlendTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME LevelBlendTest COMMAND LevelBlendTest)
 
+add_executable(OdDriveTiltTest tests/OdDriveTiltTest.cpp)
+target_compile_options(OdDriveTiltTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME OdDriveTiltTest COMMAND OdDriveTiltTest)
+
 add_executable(MidBandTest tests/MidBandTest.cpp)
 target_compile_options(MidBandTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME MidBandTest COMMAND MidBandTest)

@@ -274,6 +274,13 @@ static const FitField kFitFields[] = {
     {"midCapRatioLo", &FitParams::midCapRatioLo},
     {"midCapRatioHi", &FitParams::midCapRatioHi},
     {"trebleWiperR", &FitParams::trebleWiperR},
+    // [ENG] level-dependent treble tilt (session 166) — see src/dsp/OdDriveTilt.h
+    {"odTiltF0", &FitParams::odTiltF0},
+    {"odTiltS", &FitParams::odTiltS},
+    {"odTiltDbPerDb", &FitParams::odTiltDbPerDb},
+    {"odTiltRefDbv", &FitParams::odTiltRefDbv},
+    {"odTiltMaxCutDb", &FitParams::odTiltMaxCutDb},
+    {"odTiltTimeMs", &FitParams::odTiltTimeMs},
 };
 
 static void applyFitAssignment(FitParams& fit, const std::string& assignment)
@@ -320,6 +327,16 @@ static void applyFitAssignment(FitParams& fit, const std::string& assignment)
         if (m != 0 && m != 1 && m != 2 && m != 4 && m != 8)
             fail("--fit clipAdaaMaxOs must be 0, 1, 2, 4 or 8, got '" + value + "'");
         fit.clipAdaaMaxOs = m;
+        return;
+    }
+
+    if (key == "odtiltenabled")
+    {
+        // Session 166.  An on/off gate, not a double — and the ONE `--fit` this stage
+        // must expose, because every gate that measures what the tilt BUYS has to be
+        // able to turn it off and re-render the same condition.  ⛔ A gate that reads
+        // the difference between two builds instead is measuring a rebuild.
+        fit.odTiltEnabled = parseBool("--fit odTiltEnabled", value) ? 1 : 0;
         return;
     }
 

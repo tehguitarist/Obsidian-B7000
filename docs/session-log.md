@@ -20646,3 +20646,195 @@ COMPARISON instead makes the condition unsatisfiable. `suspect the mutation befo
      ceiling, with **CLEAN bit-identical** (gate 3);
    - ⚠ and it must do it at DRIVE max, where BB4 measured every fixed lever dying.
 2. ⚠ `build/s165_preclip/` holds the 36 probe renders. Regenerable, gitignored.
+
+## SESSION 166 (2026-08-06) — task E's third and final capped session: route (ii) BUILT, and it meets all three of item 6's gates
+
+User's standing instruction from s165: *"if that fails, implement route ii"*. Route (i) failed
+(GATE BB), so this session builds the level-dependent section. **`src/dsp/OdDriveTilt.h` is the
+first DSP change of task E** — sessions 1 and 2 built nothing, by design.
+
+### 1. Why the architecture is what it is — the two refutations ARE the design
+
+    H1(f, A) = P(f) * g(A|P(f)|) * Q(f)      (a Farina sweep presents one frequency at a time)
+    drive-tilt(f) = P'(f) * [ gamma(hot) - gamma(quiet) ]
+
+- **GATE BA (s164):** `Q` drops out **exactly** — a fixed linear stage adds the same
+  log-magnitude to every stimulus rung and the drive-tilt is a DIFFERENCE between rungs.
+  ⇒ nothing static, anywhere downstream, can carry this.
+- **GATE BB (s165):** a fixed PRE-clipper `P'` is converted at a rate that **collapses** with the
+  DRIVE knob (−0.909 / −0.481 / −0.027), so the required `ΔP'` spans a factor of 50.
+  ⇒ nothing static upstream either.
+
+⇒ the section's coefficients must move with signal level. **That is not a design preference; it is
+what is left after two measurements.** Both are quoted in the stage's own header, because the
+obvious future "simplification" — swap the envelope for a DRIVE-knob table like `OdToneRestore` —
+would compile, sound plausible, and **measure as exactly zero**.
+
+### 2. The stage
+
+One RBJ high-shelf whose gain is driven by an envelope follower: louder in ⇒ more HF cut ⇒ the OD
+path's top tilts down with level.
+
+⭐ **The shape is FITTED, not chosen.** Item 6's gate 1 refutes a CONSTANT drive-dependent tilt
+outright (the deficit STEEPENS: −0.39/−0.78/−1.44 dB/oct at 1613/2032/2560 Hz). Fitted against
+that profile scaled to gate 2's position ceiling:
+
+| family | rms error vs the required profile |
+|---|---|
+| CONSTANT tilt (gate 1's refuted class) | 0.627 dB/oct |
+| two cascaded 1st-order shelves | 0.093 |
+| one 1st-order shelf | 0.109 |
+| **RBJ 2nd-order high shelf (SHIPPED)** | **0.0051** |
+
+⇒ `odTiltF0 = 5388 Hz`, `odTiltS = 0.85`, `odTiltDbPerDb = 0.203` (a −4.87 dB swing across the
+ladder's 24 dB). A gentle tilt, not a compressor.
+
+⚠⚠ **THE ENVELOPE TAP IS THE DESIGN DECISION, and two candidates were rejected for reasons that
+will otherwise be re-discovered:**
+- the **clipper's input** moves with the DRIVE knob as well as with stimulus, so the operating
+  point would slide ~24 dB across the knob and clamp at one end — losing the differential action
+  exactly at DRIVE max, which GATE BB identified as the hardest condition;
+- the **treble ladder's output** is not flat in frequency (+0.51 dB/oct at the vertex, far more
+  across the band), so during a sweep the envelope would track the LADDER'S SHAPE rather than the
+  stimulus level, injecting a frequency dependence comparable in size to the whole correction.
+
+⇒ the tap is the **OD region's input**: flat by construction, 1:1 with stimulus at every DRIVE
+setting. ⭐ **That is why the delivery is UNIFORM — spread 0.0000 dB/oct across all five
+conditions**, which is precisely what GATE BB found a fixed section could not do.
+
+⚠ **The follower is SYMMETRIC (one time constant), and that was a REPAIR.** The first version had
+5 ms attack / 50 ms release, which rides **+2.11 dB above the true RMS** on a sine (the
+instant-attack limit is +3.01). It does NOT change the level DIFFERENCE the correction depends on —
+both rungs are biased identically, which is why the first render was already correct — but it means
+`odTiltRefDbv` stops naming the level at which the shelf is flat. Caught by `OdDriveTiltTest`
+Test 1 (a consistent −0.429 dB offset). The law is calibrated in absolute dBV, so a well-defined
+reading is worth more than compressor-style envelope behaviour.
+
+### 3. GATE BC (`analysis/od_drive_tilt_gate.py`, `_mutate_gate_bc.py`) — ALL THREE GATES PASS
+
+⭐ **What makes the gate possible is `--fit odTiltEnabled`**: ON and OFF are two renders of the
+SAME BINARY. A gate comparing two BUILDS would be measuring a rebuild.
+
+| item 6 gate | result |
+|---|---|
+| **1** frequency-dependent, not a constant tilt | **PASS** — rms **0.0077** vs the constant class's **0.6274**, i.e. **81×** |
+| **2** position ceiling respected, no overshoot | **PASS** — delivered **0.99× the requirement at all 5 conditions**; peak walk **+0.13 % → −6.07 %** (DRIVE noon) and **−0.54 % → −5.71 %** (DRIVE max) against the pedal's **−7.34 %** |
+| **3** CLEAN bit-identical | **PASS** — **0.0e+00** |
+| collateral | **0 of 4** non-target features moved |
+
+⭐⭐ **GATE W6 has classified the model's treble peak FIXED (0.2 %) since s122. It now walks
+−6.07 %, 83 % of the pedal's, without overshooting. This is the first time in the project it has
+moved with drive at all** — and item 6's whole frame is the contrast between a pedal whose HF
+features move and a model whose do not.
+
+⚠ Gate 2 is a **CEILING**, so the pedal's −7.34 % is a COMPARAND and never a bar; what must not
+happen is overshoot, and BC4 measures the walk with GATE W's own locator rather than trusting the
+vertex law (GATE AH showed that law cannot even be tested on our side).
+
+⚠ Collateral is the sharpest contrast with route (i): GATE BB's probes destroyed `mid_peak`
+(2.27 → 0.00 dB) in 4 of 6. Here `mid_notch` reads **325.4/7.63 → 325.4/7.63** and `mid_peak`
+**495.6/2.27 → 495.6/2.27** — unchanged. The shelf sits at 5388 Hz and only cuts above it.
+
+### 4. Tests
+
+`tests/OdDriveTiltTest.cpp`, the **20th** ctest, 5 tests, **ctest 20/20**. ⛔ **Test 3 is the one
+that matters and it is not a numerical check**: it asserts the stage's transfer DIFFERS between two
+input levels by the amount the law asks for. A fixed stage would give exactly 0, and both
+refutations say that is the whole ballgame. Test 0 certifies the hand-transcribed RBJ high-shelf
+against an independent transcription of the Cookbook formulae (the s156 pattern, worst 0.0096 dB);
+Test 2 asserts `enabled = false` is EXACTLY a bypass, which is what makes GATE BC's `--fit` gate
+trustworthy.
+
+### 5. What this session did NOT do
+
+- ⛔ **The matrix cost is a USER DECISION, not this session's call** — the stage moves the OD
+  path's treble at level, so it WILL move release-gate rows, exactly as s162's and s163's changes
+  did. `comprehensive_report.py` prices it.
+- ⛔ **Item 6's other symptoms are untouched** (the bridged-T depth collapse, the bass-peak walk,
+  the missing HF null) — item 6's own scope note confines task E to the treble slope.
+- ⚠ **`OdToneRestore` is unaffected** — different band (323 Hz vs 5388 Hz), and BC5 measures
+  `mid_notch` unchanged to 4 significant figures. No re-fit is owed.
+
+### 6. The matrix priced, the cost verified, and the USER DECISION taken (same session, extended)
+
+The user asked to spend the rest of the session verifying before deciding. `comprehensive_report.py`
+rendered `s166_odtilt.json` (162/172, same pre-existing `_gain-n18` membership gap as every prior
+report, 0 new render errors) and `analysis/_mutate_gate_bc.py` was corrected and re-run.
+
+⚠ **Five of GATE BC's OWN mutation arms were wrong, not the gate** — `suspect-the-mutation-before-
+the-guard`, and it is s161 `ba2-verdict`'s exact lesson recurring in this session's own sibling
+gate. `bc1c-clean`, `bc2-ceiling`, `bc3-gate1`, `bc4-overshoot` all expected `rc == 0` for a
+legitimate ACCEPTANCE FAILURE — but BC's `note()` correctly exits `rc = 1` when the shipped stage
+fails one of item 6's own three gates, which is exactly the carve-out GATE BA's `ba2-verdict`
+needed (a gate whose PURPOSE is acceptance must be able to refuse). `bc1d-vacuous`'s mutated
+threshold (`< -1.0`) sat on the same side of the real `d_od` (~4.7 dB) as the original (`< 0.1`),
+so neither ever fired — a genuinely vacuous mutation, fixed by raising the bar ABOVE the real value
+instead of lowering it further. All five corrected; **GATE BC is now 10/10.**
+
+**`release_gate.py` on `s166_odtilt.json` vs `s163_leveltaper.json`:**
+
+| row | s163 | s166 | Δ | crossed? |
+|---|---|---|---|---|
+| CLEAN (all 4 rows) | — | — | 0.000 | bit-identical |
+| OD 100Hz–8kHz median | 0.515 | 0.545 | +0.030 | already over |
+| OD 100Hz–8kHz p90 | 3.781 | 3.799 | +0.018 | already over |
+| OD 25–100Hz median | 0.965 | 0.960 | −0.005 | already over |
+| OD 25–100Hz p90 | 4.760 | 4.768 | +0.008 | already over |
+| **OD 8–16.3kHz median** | 0.669 | **0.724** | **+0.055** | **NEW — SHIP → over (3.4 % over the 0.70 bar)** |
+| OD 8–16.3kHz p90 | 6.536 | 6.658 | +0.122 | already over |
+| OD ALL p99 | 10.852 | 11.192 | +0.340 | already over |
+| OD ALL band-RMS | 2.068 | 2.172 | +0.104 | already over |
+| THD full-send | 4.737 | 5.501 | +0.764 | already over |
+
+⇒ **rows over SHIP: 8 → 9.** The one new crossing is small and every other over-bar row was
+already over before this session.
+
+⭐⭐ **A free known-answer sweep across the FULL matrix (not just BC's 5-condition probe), matching
+162 captures by filename between the two reports:**
+- **CLEAN: 0 of 192 (file, sweep) rows moved** — gate 3 confirmed on the whole matrix, not a
+  5-file sample.
+- **OD @ BLEND = 0: 0 of 16 rows moved** — the OD path is out of circuit there (LevelBlend), so
+  this is a free structural check, and it held.
+- OD-only movement is confined to conditions where the OD path is actually in the mix, and grows
+  with the DRIVEN rungs as expected (mean max|Δ| 0.009 dB at `sweep_clean`, 1.26–1.46 dB at the
+  three driven rungs).
+
+⚠⚠ **A report-diff artefact was caught and resolved before being reported as a defect.** A
+per-band max|Δ| scan across all driven OD rows read a near-uniform **+0.74 dB at EVERY band down
+to 25 Hz** — which would mean the shelf was leaking into the bass, contradicting `OdDriveTiltTest`
+Test 4 (≤0.01 dB below 500 Hz in isolation). Traced to source: `comprehensive_report.py`'s stored
+`plugin_db` is **not raw model output** — `fr_at_bands()` adds a per-(capture,sweep) **null gain**
+(`A.null_depth`, fitted to best match the reference's overall shape) to every band before storing
+it. A stage that changes spectral SHAPE moves that fitted scalar, and the shift lands on every
+band uniformly, including ones the stage never touches — precisely
+`⭐⭐ THE 162-CAPTURE MATRIX IS BLIND TO ANY PURE LEVEL ERROR` (this file's own standing rule),
+encountered here from the diff side rather than the fit side. **Confirmed by a controlled
+same-binary A/B render read through the matrix's own `h1band` instrument, WITHOUT the null-gain
+fit**: tilt ON vs OFF at 50 Hz reads **−1.302 dB, identical to 3 decimals**, against
+**−11.751 → −16.449 dB at 16 kHz** (the real, HF-only, ~4.7 dB change). Rail-clamp interaction was
+also ruled out directly (`railEnabled` on/off gives identical readings either way). ⇒ **no LF leak;
+the diff tool, not the DSP, needed the null gain subtracted out before it could be read.**
+
+⭐⭐ **The THD full-send row's cost (+0.764 dB, the largest absolute movement) is FULLY MECHANISM-
+ATTRIBUTED, not just measured** — the standard this project holds every ship decision to (s162,
+s163 both had GATE Z's prior diagnosis imported; this one is diagnosed fresh, in the same session
+it is decided). Split by row and correlated against the two obvious axes over the 289 full-send OD
+rows: correlation with the **DRIVE knob is −0.10** (essentially none), correlation with **sweep
+LOUDNESS rank is −0.88**. That is the signature of an ENVELOPE-driven correction — it cuts hardest
+at the loudest stimulus rung regardless of DRIVE knob position, exactly as designed. And the
+loudest rung (`sweep_drv_-6`) is precisely where **GATE Z (s128) already diagnosed the model as
+UNDER-distorting relative to the reference** (mean `level_signed` runs −0.48 / −0.86 / −1.15 dB
+across quiet→loud rungs, all negative, deepening with loudness). ⇒ **the correction amplifies an
+already-diagnosed population; it does not introduce a new distortion-generation mechanism** — the
+same shape of finding as s163's LEVEL taper (GATE Z, "a mix difference moves THD with no change in
+distortion", generalised here to "a treble cut at hot conditions removes some of the model's own
+harmonic energy, worsening an under-distortion GATE Z already measured").
+
+✅✅ **USER DECISION TAKEN (2026-08-06): KEEP.** Put to the user with the full cost table, the full
+matrix known-answers, and the THD mechanism above (not left as an open caveat). Judged net
+positive on the same grounds as s162/s163: the gain is large and closes the project's oldest
+standing open item (item 6, ~20+ sessions) — the treble peak goes from GATE W6's `FIXED, 0.2 %`
+classification to **walking 83 % of the pedal's amount**, with clean margins on all three of item
+6's own gates and zero measured collateral; the one new gate-row crossing is marginal (3.4 % over);
+and the THD cost is now understood as amplifying an already-diagnosed population rather than a new
+mechanism. Nothing reverted.

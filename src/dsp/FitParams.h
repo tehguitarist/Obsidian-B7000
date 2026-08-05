@@ -1206,4 +1206,36 @@ struct FitParams
     // across the whole band, where a wrong topology would leave a frequency-dependent
     // shape residual. See docs/phase9-validation.md §4 "A2c-1". **
     double trebleWiperR = 4.7e3;  // fit ~4.86k, E12-rounded (was nominal 3.3k)
+
+    // ---- OdDriveTilt [ENG, NON-SCHEMATIC] — the LEVEL-DEPENDENT treble tilt ----------
+    // Session 166, open work item 6's treble half.  ⛔⛔ READ `src/dsp/OdDriveTilt.h`
+    // BEFORE TOUCHING ANY OF THESE — two ARCHITECTURES were refuted by measurement
+    // before this one was built, and both refutations are about WHERE the correction
+    // can live, not about these numbers:
+    //   * a fixed linear section DOWNSTREAM of the clipper contributes EXACTLY ZERO
+    //     drive-tilt (GATE BA, 2.04e-14 dB/oct against a wild probe) — so this stage
+    //     MUST stay level-dependent; making it a static drive-keyed table, which is
+    //     the obvious "simplification", measures as zero;
+    //   * a fixed PRE-CLIPPER pre-emphasis needs a P' spanning a factor of 50 across
+    //     the DRIVE knob (GATE BB) — one sized to close DRIVE min delivers 2.0 % at
+    //     DRIVE max — so the correction cannot be moved upstream either.
+    // ⚠ `odTiltF0`/`odTiltS` are FITTED to item 6's gate-1 profile (the deficit
+    // STEEPENS: -0.39/-0.78/-1.44 dB/oct at 1613/2032/2560 Hz), scaled so the vertex
+    // lands on gate 2's POSITION ceiling.  A CONSTANT tilt scores 0.627 dB/oct rms on
+    // that profile and this family scores 0.0051 — 124x — which is why it is a 2nd-order
+    // shelf and not a tilt knob.
+    int odTiltEnabled = 1;
+    double odTiltF0 = 5388.0;        // Hz, RBJ high-shelf corner
+    double odTiltS = 0.85;           // RBJ shelf slope parameter
+    double odTiltDbPerDb = 0.203;    // dB of shelf gain per dB of envelope (-4.87 dB / 24 dB)
+    // Envelope level (dBV, RMS at the OD region's input) at which the shelf is FLAT.
+    // -33.9 dBV is the quietest analysis rung (-30 dBFS x kInputRef), so the law is
+    // one-sided: it only ever CUTS.  A boost below the reference would lift the top end
+    // at low level, which the reference does not do.
+    double odTiltRefDbv = -33.9;
+    double odTiltMaxCutDb = 6.0;     // clamp; the fitted swing across the ladder is 4.87
+    // ⚠ ONE time constant: the follower is SYMMETRIC so `odTiltRefDbv` names a true
+    // RMS level.  See OdDriveTilt.h — an asymmetric follower biases the reading by
+    // up to +3 dB without changing the level DIFFERENCE the correction depends on.
+    double odTiltTimeMs = 50.0;
 };

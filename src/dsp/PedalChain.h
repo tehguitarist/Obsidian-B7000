@@ -11,6 +11,7 @@
 #include "Clipper.h"
 #include "RecoveryBridgedT.h"
 #include "OdToneRestore.h"
+#include "OdDriveTilt.h"
 #include "SallenKeyLPF.h"
 #include "LevelBlend.h"
 #include "EqPreGain.h"
@@ -161,6 +162,7 @@ public:
         odCoupling.prepare(osRate);
         recovery.prepare(osRate);
         odToneRestore.prepare(osRate);
+        odDriveTilt.prepare(osRate);
         skB.configure(SallenKeyLPF::kIC4B);
         skB.prepare(osRate);
         skA.configure(SallenKeyLPF::kIC4A);
@@ -182,6 +184,7 @@ public:
         odCoupling.reset();
         recovery.reset();
         odToneRestore.reset();
+        odDriveTilt.reset();
         skB.reset();
         skA.reset();
         levelBlend.reset();
@@ -302,6 +305,12 @@ public:
                             f.levelTaperBreak2, f.levelTaperFrac2,
                             f.levelTaperBreak3, f.levelTaperFrac3);
         syncOdToneMix();   // the LEVEL taper moves the clean fraction — see applyParams()
+
+        // [ENG] level-dependent treble tilt — see OdDriveTilt.h before changing anything.
+        odDriveTilt.setEnabled(f.odTiltEnabled != 0);
+        odDriveTilt.setTime(f.odTiltTimeMs);
+        odDriveTilt.setLaw(f.odTiltF0, f.odTiltS, f.odTiltDbPerDb, f.odTiltRefDbv,
+                           f.odTiltMaxCutDb);
         masterOut.setTaper(f.masterTaperBreak, f.masterTaperFrac,
                            f.masterTaperBreak2, f.masterTaperFrac2);
 
@@ -354,6 +363,12 @@ public:
     // sample (or per base sample at 1×). The chain's aliasing lives here.
     inline double runOdSample(double buf) noexcept
     {
+        // ⚠ The envelope is taken on the OD REGION'S INPUT, not on this stage's own
+        // input.  `OdDriveTilt.h` records why both local taps were rejected: the
+        // clipper's input slides ~24 dB with the DRIVE knob, and the treble ladder's
+        // output is not flat in frequency, so during a sweep it would track the
+        // LADDER'S SHAPE instead of the stimulus level.
+        odDriveTilt.observe(buf);
         double s = jfet.process(buf);
         s = treble.process(s);
         s = drive.process(s);
@@ -361,6 +376,7 @@ public:
         s = odCoupling.process(s);
         s = recovery.process(s);
         s = odToneRestore.process(s);
+        s = odDriveTilt.process(s);
         s = skB.process(s);
         s = skA.process(s);
         return s;
@@ -380,7 +396,8 @@ public:
         t.clipper = clipper.process(t.drive);
         t.odCoupling = odCoupling.process(t.clipper);
         t.recovery = recovery.process(t.odCoupling);
-        t.odToneRestore = odToneRestore.process(t.recovery);
+        odDriveTilt.observe(buf);
+        t.odToneRestore = odDriveTilt.process(odToneRestore.process(t.recovery));
         t.skB = skB.process(t.odToneRestore);
         t.skA = skA.process(t.skB);
         return t;
@@ -618,6 +635,7 @@ private:
     OdCoupling odCoupling;     // 5b C15/R20/R21 │ (session-36, A3 step 3b)
     RecoveryBridgedT recovery; // 6  IC2_B       │
     OdToneRestore odToneRestore; // 6b [ENG, non-schematic] session 150 notch/peak restore
+    OdDriveTilt odDriveTilt;   // 6c [ENG, non-schematic] session 166 level-dependent treble tilt
     SallenKeyLPF skB;          // 7a IC4_B 10.7k │
     SallenKeyLPF skA;          // 7b IC4_A 3.3k  ┘
     LevelBlend levelBlend;     // 8/9 LEVEL + BLEND (base rate)

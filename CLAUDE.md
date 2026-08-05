@@ -133,6 +133,29 @@ nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were
 
 #### STATUS
 
+- ✅✅ **SESSION 166 = TASK E SHIPPED — item 6's treble-peak slope is CLOSED, USER DECISION KEEP
+  (2026-08-06).** Sessions 164/165 refuted two architectures with NOTHING built (see below);
+  session 166 built the third, `src/dsp/OdDriveTilt.h` — a level-dependent RBJ high-shelf (f0
+  5388 Hz, S 0.85) driven by an envelope follower on the OD region's own input, 0.203 dB of shelf
+  cut per dB of stimulus. Its acceptance gate, `analysis/od_drive_tilt_gate.py` (GATE BC,
+  `_mutate_gate_bc.py`, **10/10 arms**), passes **all three of item 6's own gates**: gate 1
+  (frequency-dependent, not a constant tilt) rms **0.0077** vs the refuted constant class's
+  **0.627** — 81×; gate 2 (position ceiling, no overshoot) delivers **0.99× the requirement at
+  every one of 5 conditions**, spread **0.0000**; gate 3 (CLEAN bit-identical) **0.0e+00** over
+  the FULL matrix (192 rows). ⭐⭐ **GATE W6 has classified the model's treble peak `FIXED` (0.2 %
+  across the 24 dB ladder) since s122 — it now WALKS −6.07 %, 83 % of the pedal's −7.34 %, with NO
+  overshoot.** The first time in the project this feature has moved with drive at all.
+  ⚠⚠ **`ctest 20/20`** (`tests/OdDriveTiltTest.cpp`, 5 tests — Test 3 asserts the property BOTH
+  refutations below demand: the stage's transfer must DIFFER between two input levels, because a
+  fixed stage would give exactly 0). **Cost, `s166_odtilt.json` (162/172, clean): rows over SHIP
+  8 → 9** (new: OD 8–16.3 kHz median, 3.4 % over) **and THD full-send +0.764 dB** — both priced
+  and FULLY MECHANISM-ATTRIBUTED before the decision (correlation with sweep LOUDNESS −0.88 vs
+  DRIVE knob −0.10 ⇒ the correction amplifies GATE Z's already-diagnosed under-distortion at hot
+  stimulus, it does not add a new mechanism). A report-diff artefact (an apparent +0.74 dB "leak"
+  down to 25 Hz) was traced to `comprehensive_report.py`'s per-row null-gain fit and REFUTED by a
+  controlled same-binary A/B without it (50 Hz identical to 3 decimals, tilt on/off). Full matrix
+  known answers: **CLEAN 0/192 moved, OD@BLEND=0 0/16 moved.** Narrative:
+  `docs/session-log.md` SESSION 166 §1–6.
 - ⛔⛔ **SESSION 164 = TASK E OPENED AND ITS ARCHITECTURE REFUTED BEFORE ANY DSP WAS WRITTEN — 1 of
   the 3 capped sessions spent, NOTHING built, no `src/` edit, no constant proposed.** GATE BA
   (`analysis/task_e_placement_gate.py` + `_mutate_gate_ba.py`, **11/11 arms**) measures that a
@@ -292,6 +315,7 @@ lives in the named source file's own comment block — **not duplicated here**.
 | `masterTaperBreak2` / `masterTaperFrac2` | *(new)* → 0.659183 / 0.177468 | 146 | second break; segment slopes 0.172→0.368→2.413, convex, asserted by `MasterOutTest` Test 0 | `FitParams.h`, `MasterOut.h` |
 | `OdToneRestore` stage | *(new)* → one RBJ peaking biquad at 323 Hz, gain+Q on a GRUNT×DRIVE table | 150/151 | ⚠ **[ENG], NON-SCHEMATIC, user-authorised and scoped to this one tone complex** — restores the 320 Hz null's DEPTH and Q, which the model loses with drive at GRUNT cut and loses almost entirely at flat/boost. Depth now within ±0.83 dB at all 3 GRUNT positions across the ladder — ⚠⚠ **SUPERSEDED s156, row below** | `OdToneRestore.h`, `PedalChain.h` |
 | LEVEL taper | power law `levelTaperExp = 2.25` → **4-segment PWL** (`levelTaperBreak1..3`/`Frac1..3` = 0.219415/0.038146, 0.529680/0.166340, 0.857645/0.425688) | 163 | ⛔ **`levelTaperExp` IS DELETED, not aliased** — C++ consumers fail to COMPILE, `--fit levelTaperExp=` fails loudly, and `analysis/` must call `level_law_gate.level_taper(x)`. Closes the LEVEL LAW: worst detent error **7.28 → 0.66 dB**, and GATE AY2 now REFUSES to run (*"no detent has a requirement larger than its own across-stimulus spread"*). ⚠⚠ **COSTS THE MATRIX: 7 rows over SHIP → 8** (OD 100 Hz–8 kHz median crossed 0.478 → 0.515, THD full-send 3.657 → 4.737) — a taper is not a gain, it moves the clean/OD MIX, which GATE Z says the THD row mostly is. ✅✅ **USER DECISION TAKEN (2026-08-05): KEEP, net positive** — the THD move is a further dilution of an already-diagnosed mix artefact (GATE Z, s128), not new distortion generation | `LevelBlend.h` constants block; `analysis/level_taper_fit.py` (GATE AZ) |
+| `OdDriveTilt` stage | *(new)* → RBJ high-shelf, envelope-driven, `f0=5388 Hz S=0.85 dbPerDb=0.203 refDbv=-33.9 maxCut=6.0 timeMs=50` | 166 | ⚠⚠ **[ENG], NON-SCHEMATIC, session-160-authorised task E, THIRD architecture tried** — the first two (a post-clipper section reusing `OdToneRestore`'s slot; a fixed pre-clipper pre-emphasis) were REFUTED BY MEASUREMENT with nothing built (GATE BA/BB). This one's coefficients move with the OD region's own input LEVEL, which is what both refutations showed is structurally required. Closes item 6's treble-peak-slope target: GATE W6's `FIXED, 0.2 %` classification → the peak now **WALKS −6.07 %, 83 % of the pedal's −7.34 %**, no overshoot (gate 2), gate 1 shape rms **0.0077 vs 0.627** (81× the refused constant-tilt class), gate 3 CLEAN bit-identical over the full matrix. ⚠⚠ **COSTS THE MATRIX: 8 rows over SHIP → 9** (new: OD 8–16.3 kHz median 0.669 → 0.724) **and THD full-send 4.737 → 5.501** — MECHANISM-ATTRIBUTED before shipping: correlates with sweep LOUDNESS (−0.88) not the DRIVE knob (−0.10), i.e. it amplifies GATE Z's already-diagnosed under-distortion at hot stimulus, not a new mechanism. ✅✅ **USER DECISION TAKEN (2026-08-06): KEEP** | `OdDriveTilt.h`, `PedalChain.h`, `FitParams.h`; `analysis/task_e_placement_gate.py` (GATE BA), `analysis/preclip_preemph_gate.py` (GATE BB), `analysis/od_drive_tilt_gate.py` (GATE BC) |
 | `OdToneRestore` stage | bleed-free-fitted table → **MIX-KEYED**: `cut = kNotchGainDb[g][d] + kNotchMixK[g][d]*S(cleanFrac)` | 156 | ⚠⚠ **kNotchGainDb CHANGED MEANING** — it is now the cut at `kMixCfRef` (LEVEL noon/BLEND max), not the bleed-free cut. The stage sits upstream of LEVEL/BLEND and cannot see the mix directly, so `LevelBlend::cleanFraction()` (new, superposition on the shipped `process()`) is read into it every `applyParams()`/`applyFitParams()` via `PedalChain::syncOdToneMix()`. One scalar is provably sufficient — captures reaching the same clean fraction by different LEVEL/BLEND routes agree to 0.05 dB (GATE AT's AT2). Listening-condition depth error down from ~+8 dB to +1.0…+1.5 dB; DRIVE-0 sign corrected (was boosting where a cut was needed). ⚠ A measured DEPTH CEILING (~1.5–2 dB composite at the listening mix, a 40 dB probe gives 0.47 dB — shallower than the shipped 12.34 dB cut's 1.60) means the residual is not closable from this stage; the lever is A3 | `OdToneRestore.h`, `LevelBlend.h`, `PedalChain.h`; `analysis/od_notch_mix_law.py` (GATE AT) |
 
 #### CLOSED / REFUTED — do not re-open without reading the pointer
@@ -417,6 +441,8 @@ table in this file.
 | item 6's *"the model has NO resolved drive-dependent feature anywhere"* (s129) read as a statement about MAGNITUDE | ⭐⭐ **IT IS A *PLACEMENT* PROBLEM, NOT A MAGNITUDE ONE, s164** | 164 | On the 1/48-oct locator at the current epoch the model's own drive-tilt runs **−1.983 dB/oct at 1450 Hz to −0.013 at 2935 Hz** and crosses zero AT the vertex — so **at 1450 Hz the model already carries MORE drive-tilt than the requirement asks for at the vertex** (−1.98 vs a needed −1.185). Model vs pedal: 1016 Hz −2.17/−4.20 · 1450 **−1.98**/~−1.6 · 2100 −0.64/−1.17 · 2935 **−0.01**/**−1.94** · 4064 +0.53/−4.93. ⇒ **the model's mechanism EXISTS and is strong; it rolls off with frequency and dies at the vertex, where the pedal's turns around and GROWS.** Reproduces GATE AL's AL3 (s141) on a different instrument (1/48-oct locator, not the 1/3-oct band surface) and a later epoch. ⛔ Do not write *"the model has no drive-dependent mechanism"* again — quote the SHAPE. | `analysis/task_e_placement_gate.py` (GATE BA) BA3 |
 | the PRE-CLIPPER route for task E (the only placement BA2 leaves) | ⚠ **SIZED, NOT SCREENED — and it carries a hard NECESSARY condition, s164** | 164 | From `drive-tilt = P'·Δγ` and `γ ∈ [−1, 0]` for any compressive non-expanding map, `|Δγ| ≤ 1` ⇒ **`|P'| ≥ 1.185 dB/oct` at the vertex is NECESSARY, whatever the nonlinearity does** — no fit, no threshold. ⭐ The premise is VERIFIED not assumed: over **1377 cells** the measured rung-to-rung step lies inside `[0, ΔL]`. ⭐ And the shortfall is **model-free**, because the model's own drive-tilt IS the product: **median 18× over 9 conditions** (best 3.2×, worst 88×), with **4 of 9 the WRONG SIGN** — needing a sign change, not a scaling. ⚠⚠ **BA4d's +0.513 dB/oct is the LADDER ALONE and must NOT be read as `P'`** (the JFET boundary, IC2_A and the GRUNT/R16 divider are not in it). ⚠ NECESSARY is never sufficient. | `analysis/task_e_placement_gate.py` (GATE BA) BA4 |
 | the ATTACK switch as a free pre-clipper dose-response for the drive-tilt | ⛔ **REFUSED — DENOMINATOR AT ITS FLOOR, s164** | 164 | On the SHIPPED ladder the WHOLE switch moves the pre-clipper slope at the vertex by **0.0042 dB/oct**, because **`trebleC8` ships at 0** (s99/s100 took C8 out of circuit) and C8 is what ATTACK reroutes at HF. The rendered drive-tilt moves up to **0.3096** across the same switch — ~10:1 — and the nine (pair × DRIVE) coefficients **do not share a sign**. ⛔ `ratio-statistics-need-a-denominator-guard`: **no coefficient is quoted and none may be.** ⭐ The refusal is the useful half — the drive-tilt moves across ATTACK *without* the ladder's slope moving, so it is **not a function of the local pre-clipper slope alone**; `γ` depends on the pre-clipper LEVEL `|P|`, so a position that changes `|P|` moves the product through `Δγ`. Both operands are live; BA4's bound is unaffected (it bounds only `Δγ`). | `analysis/task_e_placement_gate.py` (GATE BA) BA5 |
+| **TASK E's own route (i)** — a FIXED pre-clipper pre-emphasis, sized by GATE BA4's necessary bound | ⛔⛔ **REFUTED ON SIZE CONSISTENCY, s165 — a fixed section needs a `ΔP'` spanning a 50× range across the DRIVE knob** | 165 | GATE BB (`_mutate_gate_bb.py`, 9/9 arms, 36 renders): the transfer coefficient `d(drive-tilt)/dP'` **COLLAPSES with the DRIVE knob** (median −0.909 at DRIVE min → **−0.027 at DRIVE max**), because the clipper is already limiting at BOTH stimulus rungs at high drive so changing what it is fed cannot change the DIFFERENCE between them (`Δγ → 0` exactly where the requirement is largest). ⇒ **a section sized to close DRIVE min delivers 2.0 % of the requirement at DRIVE max; one sized to close DRIVE max overshoots DRIVE min by 50×.** ⛔⛔ The SIGN hypothesis GATE BB was BUILT ON **failed** (only 2 of 6 probes flip; both at the collapse itself) — it falls on the LOCUS, s38's C12 argument a third time, not on sign. ⚠ Collateral: 6 of 6 probes more than HALVE a named feature's prominence, `mid_peak` 2.27 → **0.00 dB** in 4 of 6 (GATE Y reproduced on a second constant set). `R12 ×4.0` excluded BY NAME as level-dominated (`|ΔLevel/ΔP'| = 49.1` vs 0.65–0.71 for every real slope probe). | `analysis/preclip_preemph_gate.py` (GATE BB) |
+| **TASK E** — session 3, route (ii): a LEVEL-DEPENDENT section, the only route BB left | ✅✅ **BUILT AND SHIPPED, s166 — MEETS ALL THREE OF ITEM 6's OWN GATES, USER DECISION KEEP** | 166 | `src/dsp/OdDriveTilt.h`: one RBJ high-shelf (f0 5388 Hz, S 0.85) whose gain is driven by an envelope follower on the **OD region's own input** (flat, moves 1:1 with stimulus at every DRIVE setting — the tap that makes the delivery UNIFORM, spread **0.0000 dB/oct across 5 conditions**, exactly what BB's fixed section could not do). Shape **fitted, not chosen**: item 6's gate 1 refutes a constant tilt outright (the deficit steepens); scored against that profile the shipped RBJ 2nd-order shelf reaches **rms 0.0051**, **124× better** than a constant tilt's 0.627. GATE BC (`analysis/od_drive_tilt_gate.py`, `_mutate_gate_bc.py`, **10/10 arms**): gate 1 rms **0.0077 vs 0.627 (81×)**; gate 2 delivers **0.99× the requirement at all 5 conditions**, no overshoot, peak walk **−6.07 % (83 % of the pedal's −7.34 %)** — GATE W6 had classified this peak `FIXED` (0.2 %) since s122, **the first time in the project it has moved with drive at all**; gate 3 CLEAN **0.0e+00** over the full 192-row matrix. ⚠ **`ctest 20/20`**, `tests/OdDriveTiltTest.cpp` Test 3 asserts the property both refutations demand — the transfer must DIFFER between two input levels, or the stage is the refuted architecture again. ⚠⚠ **COST, fully mechanism-attributed before shipping**: rows over SHIP **8 → 9** (new: OD 8–16.3 kHz median, 3.4 % over); THD full-send **4.737 → 5.501**, correlated against sweep LOUDNESS (**−0.88**) not the DRIVE knob (**−0.10**) ⇒ amplifies GATE Z's already-diagnosed under-distortion at hot stimulus, not a new mechanism. A report-diff artefact (apparent +0.74 dB "leak" to 25 Hz) was traced to `comprehensive_report.py`'s per-row null-gain fit and refuted by a controlled A/B without it. Full-matrix known answers: **CLEAN 0/192 moved, OD@BLEND=0 0/16 moved.** | `OdDriveTilt.h`; `analysis/od_drive_tilt_gate.py` (GATE BC) |
 | **TASK D** — *"reshape the LEVEL taper/mix law directly against the measured ~2–3× LEVEL-sensitivity gap"* (open item 9, user-authorised s160) | ⛔⛔ **REFUTED ON A BOUND OVER THE WHOLE TAPER FAMILY, s162 — nothing shipped** | 162 | The mixed clean-re-OD ratio is exactly **(1 − L)** (GATE L's reduction), L is a pot fraction in [0, 1], and **both endpoints are PINNED** (L(0) = 0 is the end stop; L(1) = 1 is the bleed-free anchor AY6 asserts and every absolute instrument in the project reads at). ⇒ the supremum of the interior span is 1.0 and the most **any** taper can buy is `1 / 0.7312 = ` **1.368×** — the shipped taper already spends **73.1 %** of a ratio bounded by 1. Against item 9's own matched-detent ratios: bass notch (s125) needs **1.744×** (1.28× short), `treble_notch` (s133 AE4) needs **2.670×** (1.95× short) ⇒ **0 of 2 REACH at the family's own supremum.** s126's bass-peak argument on a second control: a dose-response locus that cannot *contain* the target refutes the lever, not its setting. ⚠⚠ **And the two jobs pull OPPOSITE ways** — the taper that closes the LEVEL LAW wants fold **0.625×** (span 0.7312 → 0.4572), a *smaller* mix sweep, where the sensitivity gap needs a larger one (`one-knob-two-jobs-is-compensating`). ⚠ SCOPE, printed every run: (1 − L) is a **necessary** condition on the mechanism, **not** the feature measurement — whether a centre follows needs GATE W's locator on a re-render. | `analysis/level_taper_reshape.py` (GATE AY) AY5 |
 | GATE K's closure — *"THE TAPER CANNOT FIX IT … the best exponent reaches only rms 1.85 dB and lands 3.8 dB short at LEVEL max"* (s103), carried as the reason item 9 was a topology question | ⭐⭐ **REFUTED FOR THE *SEGMENTED* FAMILY, s162 — the LEVEL LAW *is* closable, to inside its own ambiguity** | 162 | GATE K fitted a single power-law **EXPONENT**, and *"no single exponent reaches"* is a different claim from *"no monotone taper reaches"* — the distinction s115/s146 were already forced to draw on the neighbouring MASTER pot. Re-asked on the current epoch, objective rms of (delivered − pedal) in dB, n = 24: **shipped p = 2.25 → 2.844** (worst 7.638), **best single exponent p = 2.0020 → 2.106** (3.344), **free monotone curve → 0.344** (0.901). ⭐ Graded against **AY2's own per-detent across-stimulus spread (0.755 dB rms)** — the bar that closed task A one session ago (s161 AX6), imported not chosen: the free curve is **INSIDE**, both exponent families **OUTSIDE by 3.77× / 2.79×**. ⭐ Outside corroboration nothing in the solve knows: required half-rotation **15.37 %** vs shipped **21.02 %**, moving **toward** the textbook A-taper 10–15 % band `circuit.md` says VR2 is (100k **A**); curve monotone in the knob, exact at both endpoints, single convexity dip **1.08 %** of a slope. ⚠ Floors, two and they are different quantities: solve residual **0.344 dB** of delivered level, required-taper spread **0.0778 rms / 0.1956 worst** in units of L — and both are **LOWER bounds**, because `dB_model(L)` is non-monotone at the hottest stimulus (GATE K3/L8) so that column is refused. ⚠ COST, priced first: worst \|Δ cleanFraction\| **0.1365**, which re-stales s156's mix law (it *reads* `cleanFraction()`). ⛔ Not a proposal — see task D's row above; the two targets pull opposite ways. | `analysis/level_taper_reshape.py` (GATE AY) AY3/AY4 |
 | ⭐ **NEW, and named nowhere in the project: at LEVEL MIN the model MUTES** | ⭐⭐ **MEASURED s162 — a real defect, NOT taper-reachable, and NOT task D's subject** | 162 | AY2 reads the model at **−249.96 dB** against a pedal only **−29.77 dB** below its own max. A taper cannot reach it in either direction — **L(0) = 0 exactly at the end stop under EVERY taper** — so a solve asking for L(0) > 0 (it asks for 0.0093) is asking for a pot that does not fully attenuate: a **TOPOLOGY** change (an end-stop resistance, or GATE K2's BLEND-body bleed path). ⚠ Excluded from AY2's requirement and AY3's objective by the SAME membership rule, and **the first draft's disagreement between the two sub-gates is what found it** — AY3 excluded it from the start, AY2 did not, and AY2 duly published a **214.41 dB** "requirement" (`ratio-statistics-need-a-denominator-guard`, differencing against digital silence). ⛔ Do not fold this into item 9's sensitivity question; it is a separate, unowned finding. | `analysis/level_taper_reshape.py` (GATE AY) AY2 |
@@ -428,7 +454,7 @@ Percentiles are over band values, OD ex `gain-n12` unless noted. **The gate is a
 transcribed table — `analysis/release_gate.py`.** Run it; do not transcribe its output here:
 
 ```bash
-/opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s163_leveltaper.json
+/opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s166_odtilt.json
 ```
 
 It exits non-zero while any gated row is over, prints `n` beside every statistic, breaks the
@@ -436,13 +462,14 @@ reference dropouts and the `gain-n12` group out as printed subsets (never hidden
 `--method csd|h1|h1band` / `--compare` to re-grade from the same renders, plus `--ex-gain-n12` to
 reproduce the pre-session-111 membership.
 
-**8 rows over SHIP as of session 163** — OD 100 Hz–8 kHz p90 AND median, OD 25–100 Hz
-median/p90, OD 8–16.3 kHz p90, OD p99, THD level (full-send), and OD band-RMS (the headline).
-⚠⚠ **The last two crossed for a REASON WORTH KNOWING, and it is the same reason twice: both are the
-measured price of an [ENG] correction the user authorised against a defect this ND-referenced
-matrix cannot see.** OD band-RMS 1.947 → 2.011 (s162, `OdToneRestore`'s mix law); OD 100 Hz–8 kHz
-median 0.478 → 0.515 (s163, the LEVEL taper). ⛔ Neither was reverted; both are outstanding user
-decisions.
+**9 rows over SHIP as of session 166** — OD 100 Hz–8 kHz p90 AND median, OD 25–100 Hz
+median/p90, OD 8–16.3 kHz median AND p90, OD p99, THD level (full-send), and OD band-RMS (the
+headline). ⚠⚠ **Three crossed for a REASON WORTH KNOWING, and it is the same reason three times:
+each is the measured price of an [ENG] correction the user authorised against a defect this
+ND-referenced matrix cannot see.** OD band-RMS 1.947 → 2.011 (s162, `OdToneRestore`'s mix law); OD
+100 Hz–8 kHz median 0.478 → 0.515 (s163, the LEVEL taper); OD 8–16.3 kHz median 0.669 → 0.724
+(s166, `OdDriveTilt`, mechanism-attributed to GATE Z's already-diagnosed under-distortion — see
+that row's SHIPPED CONSTANTS entry). ⛔ None was reverted; all three are decided, KEEP.
 
 ⚠ **The OD headline is membership-weighted** — it moves with the capture inventory's BLEND
 composition, not only with the model (`release_gate.blend_composition()` prints this every run;
@@ -468,9 +495,11 @@ these bands is a **USER DECISION**, and open-work item 6 carries the live hypoth
 ### Open work, in order
 
 ⚠ **The numbering is historical and is NOT the priority order** — every rules file, gate docstring
-and CLOSED/REFUTED row cites these numbers, so they are kept. The live ordering is the **session-160
-task list, agreed with the user: A → D → E → ship** (A done and refuted, s161; D screened s162 with
-part (b) authorised and NOT YET BUILT; E unstarted).
+and CLOSED/REFUTED row cites these numbers, so they are kept. The live ordering was the **session-160
+task list, agreed with the user: A → D → E → ship** — ✅✅ **ALL THREE NOW DONE (2026-08-06): A
+refuted s161; D(a) refuted s162, D(b) shipped s163 (the LEVEL taper); E shipped s166
+(`OdDriveTilt`, three sessions, two architectures refuted before the third was built).** Next per
+that list: **ship**.
 
 0. ✅ **DONE, SESSION 126 — the bass peak is LOCALISED and the single-constant route is REFUTED**
    (`analysis/bass_peak_locus.py`, GATE Y; two CLOSED/REFUTED rows carry it). ⛔ Do NOT re-open
@@ -581,6 +610,21 @@ part (b) authorised and NOT YET BUILT; E unstarted).
    The model's own drive-tilt reaches **−1.98 dB/oct at 1450 Hz** — larger than the −1.185 the
    requirement asks for — and rolls off to −0.01 at the vertex where the pedal's is −1.94. ⛔ Do not
    write *"the model has no drive-dependent mechanism"* again; quote the shape.
+   ✅✅✅ **TASK E SHIPPED, SESSION 166 (all 3 capped sessions spent: 2 refuting architectures with
+   nothing built, 1 building the third) — ITEM 6's TREBLE-PEAK-SLOPE TARGET IS CLOSED, USER
+   DECISION KEEP.** Route (ii) — `src/dsp/OdDriveTilt.h`, an envelope-driven RBJ high-shelf on the
+   OD region's own input — meets all three of item 6's own gates (GATE BC, `_mutate_gate_bc.py`,
+   10/10): gate 1 shape rms **0.0077 vs the refused constant class's 0.627 (81×)**; gate 2 delivers
+   **0.99× the requirement at every condition, no overshoot**, and the treble peak — `FIXED` at
+   0.2 % by GATE W6 since s122 — now **WALKS −6.07 %, 83 % of the pedal's −7.34 %**; gate 3 CLEAN
+   **bit-identical over the full 192-row matrix**. Cost **fully mechanism-attributed before
+   shipping**: rows over SHIP 8 → 9 (one new, marginal), THD full-send +0.764 dB correlated with
+   sweep LOUDNESS not the DRIVE knob ⇒ amplifies GATE Z's already-diagnosed under-distortion, not a
+   new mechanism. Its own SHIPPED CONSTANTS row and `docs/session-log.md` SESSION 166 carry the
+   full derivation. ⛔ **SCOPE UNCHANGED — the bridged-T notch-depth collapse, the bass-peak walk
+   and the missing HF null are still open and still NOT addressed by this stage.** They were never
+   part of task E and remain exactly where this item's HISTORICAL RECORD above leaves them: no
+   physical carrier, no candidate, no session scoped against them.
 
    ⭐⭐⭐ **THE TARGET, IN THE RIGHT UNITS (AF6, sized by AG3/AG5, re-derived by AH7): a
    drive-dependent SLOPE change near 2935 Hz, worth ~−1.2 dB/oct, that STEEPENS with frequency, at
