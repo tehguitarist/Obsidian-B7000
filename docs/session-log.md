@@ -19839,3 +19839,39 @@ change beyond the four files above.
 3. Task E — item 6's artificial treble-peak-slope correction. 3-session cap, scoped to the one
    sized target only.
 4. Task D — LEVEL-law artificial correction. 1 fit, no release-gate expectation.
+
+### 4. Task F — the DRIVE ear-lead, measured and closed (same session, continued)
+
+Built `analysis/drive_ear_lead_check.py`: renders the current build at DRIVE 1.0 (control, matching
+`drive-1700_base-od.wav`'s own settings — BLEND=1.0 bleed-free, everything else nominal) and DRIVE
+0.8 (the ear's claim), compares per-tone THD% against the ND capture at all 8 embedded discrete
+tones (`gen_test_signal.TONE_FREQS`, 82.41–8000 Hz), same harmonic estimator as
+`clean_thd_check.py`/`clean_headroom_probe.py`. No new capture needed — there is no ND capture AT
+drive=0.8, so the question answerable is "which model render sits closer to the ND drive=1.0
+capture", which is exactly what the ear-lead itself claims.
+
+**Result: DRIVE=1.0 closer on 5/8 tones (82.41, 220, 440, 1000, 4000 Hz); DRIVE=0.8 closer on 3/8
+(110, 2000, 8000 Hz), by small margins.** The majority result, and the mechanism behind it, both
+point the same way: at DRIVE=1.0 the model already reads LOWER raw THD% than the ND capture at most
+tones — the model under-distorts relative to the reference, matching s128's corrected GATE Z
+finding exactly. Dropping to DRIVE=0.8 does not close that gap at most tones; it widens it (moves
+further under). The three tones where 0.8 "wins" do so by crossing from slightly-over to
+slightly-under, not by closing a real deficit.
+
+⇒ **The lead is stale, not open.** The ear was hearing something real in session 120; sessions 118
+(D1/D2 clamp-window fix) and 124 (ADAA enable) both changed drive-max clipper behaviour after that
+test, and this measurement shows the model has since moved past the mismatch point rather than
+still sitting at it. Closed in `CLAUDE.md` item 11 — not carried forward, and not re-openable
+without a fresh listening test on the CURRENT build (a stale ear-lead is not evidence against a
+fresh one).
+
+### Where it stands (updated)
+
+Task F done and closed same session. `analysis/drive_ear_lead_check.py` is a new, permanent
+read-only probe (no capture, no `src/` change). `CLAUDE.md` item 11 updated with the answer.
+
+### ▶ NEXT (updated)
+
+1. Task A — `OdToneRestore` Cut-row Q. 2-iteration cap.
+2. Task E — item 6's artificial treble-peak-slope correction. 3-session cap.
+3. Task D — LEVEL-law artificial correction. 1 fit, no release-gate expectation.

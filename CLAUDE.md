@@ -945,6 +945,18 @@ docstring and CLOSED/REFUTED row cites them.
     the opposite direction from "needs less drive to match". Either the two are measuring different
     things (perceived saturation character vs. THD%) or the ear-lead is stale; do not assume either
     without rendering. **Stop condition: one measurement.** It answers yes/still-open/no either way.
+    ✅✅ **ANSWERED AND CLOSED, SAME SESSION (`analysis/drive_ear_lead_check.py`) — THE LEAD IS
+    STALE, SUPERSEDED BY SESSIONS 118/124.** Rendered the current build at DRIVE 1.0 (a control,
+    matching `drive-1700_base-od.wav`'s own settings) and DRIVE 0.8, compared per-tone THD% against
+    the ND capture at 8 embedded tones (82–8000 Hz). **DRIVE=1.0 is closer to the reference on 5 of
+    8 tones; DRIVE=0.8 on 3, by small margins.** The tension resolved rather than persisted: at
+    DRIVE=1.0 the model already reads LOWER THD% than the ND capture at most tones (110/220/440/
+    1000/4000 Hz) — exactly s128's corrected GATE Z direction (model under-distorts at drive-max) —
+    and dropping to 0.8 pushes further under at most of those, it does not close a gap. ⇒ the ear
+    was hearing a real mismatch in session 120, but sessions 118 (D1/D2 clamp fix) and 124 (ADAA
+    enable) already moved the model past the point the ear-lead was measuring. ⛔ **Do not re-open
+    without a fresh listening test on the current build** — this closes the question, it does not
+    merely narrow it.
 
 ⚠ **A3 (item on this list since session 89) is compressed here but its exclusions must travel
 together — this sentence is load-bearing, do not lose it:** *no single element closes A3 (s50), no
