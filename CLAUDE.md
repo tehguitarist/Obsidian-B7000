@@ -142,6 +142,26 @@ nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were
 
 #### STATUS
 
+- ✅✅ **SESSION 169 = W2 CLOSED — item 13's clean-path phase residual is EXPECTED BEHAVIOUR
+  (2026-08-06).** No DSP change (W2's own rule). `analysis/clean_lf_corner_count.py` (no captures,
+  closed-form) counts the clean path's four modelled first-order LF corners (C1 1.59 Hz, `c21R`
+  12.24 Hz — the one deliberately re-anchored toward hardware, s91 — C36/C37 0.72 Hz each) and
+  brackets the s167-measured 2.0–2.5×-of-a-single-corner residual between two assumption-free
+  readings, **3.05–3.40×** (upper bound) and **1.61–1.73×** (lower-leaning) — the measured figure
+  sits between them, both declining with frequency like the measurement. ⭐ Found in passing:
+  **C31** (Baxandall→LO-MID, 2.2 µF) is a real fifth corner, flagged as a carry-forward at the
+  2026-07-21 EQ-block build and never implemented — the measured residual itself bounds its real
+  loading toward negligible (a ~33 Hz gap would over-predict the residual by 3–4×). Not fixed —
+  real, tiny, unactioned. `docs/session-log.md` SESSION 169; item 13 in the open-work list closed.
+- ✅✅ **SESSION 168 = W3 CLOSED — `OdDriveTilt`'s per-sample `std::log10` removed, EMPIRICALLY
+  BIT-IDENTICAL (2026-08-06).** No DSP constant changed, no matrix re-render owed. The precomputed
+  `env2`-window fast path replacing the unconditional per-sample `log10` call is proven
+  decision-for-decision identical to the pre-change algorithm over three stress trajectories
+  (`tests/OdDriveTiltTest.cpp` Test 5, worst diff 0.0 in all three) — a stronger bar than the plan's
+  own "bit-identical OR provably below floor". Actual saving: 11 % of this one stage's own
+  per-sample cost (REPORTED, not gated) — modest, matching the plan's own "very little left"
+  framing. Candidate (b) (`JfetStage`'s `std::tanh`) stays refused pending W1. **`ctest` 21/21.**
+  `docs/session-log.md` SESSION 168; the live-plan entry above carries the full derivation.
 - ✅✅ **SESSION 167 = THE 1.0 REVIEW. VERSION BUMPED 0.5.1 → 1.0.0, PHASE 10's OWN CRITERION IS
   CLOSED, AND THE PROJECT HAS ITS FIRST NULL MEASUREMENT (2026-08-06).** No DSP constant changed.
   **`ctest` 21/21** — `tests/FinalSweepTest.cpp` is the 21st and it closes Phase 10's stated
@@ -497,6 +517,7 @@ table in this file.
 | **TASK D** — *"reshape the LEVEL taper/mix law directly against the measured ~2–3× LEVEL-sensitivity gap"* (open item 9, user-authorised s160) | ⛔⛔ **REFUTED ON A BOUND OVER THE WHOLE TAPER FAMILY, s162 — nothing shipped** | 162 | The mixed clean-re-OD ratio is exactly **(1 − L)** (GATE L's reduction), L is a pot fraction in [0, 1], and **both endpoints are PINNED** (L(0) = 0 is the end stop; L(1) = 1 is the bleed-free anchor AY6 asserts and every absolute instrument in the project reads at). ⇒ the supremum of the interior span is 1.0 and the most **any** taper can buy is `1 / 0.7312 = ` **1.368×** — the shipped taper already spends **73.1 %** of a ratio bounded by 1. Against item 9's own matched-detent ratios: bass notch (s125) needs **1.744×** (1.28× short), `treble_notch` (s133 AE4) needs **2.670×** (1.95× short) ⇒ **0 of 2 REACH at the family's own supremum.** s126's bass-peak argument on a second control: a dose-response locus that cannot *contain* the target refutes the lever, not its setting. ⚠⚠ **And the two jobs pull OPPOSITE ways** — the taper that closes the LEVEL LAW wants fold **0.625×** (span 0.7312 → 0.4572), a *smaller* mix sweep, where the sensitivity gap needs a larger one (`one-knob-two-jobs-is-compensating`). ⚠ SCOPE, printed every run: (1 − L) is a **necessary** condition on the mechanism, **not** the feature measurement — whether a centre follows needs GATE W's locator on a re-render. | `analysis/level_taper_reshape.py` (GATE AY) AY5 |
 | GATE K's closure — *"THE TAPER CANNOT FIX IT … the best exponent reaches only rms 1.85 dB and lands 3.8 dB short at LEVEL max"* (s103), carried as the reason item 9 was a topology question | ⭐⭐ **REFUTED FOR THE *SEGMENTED* FAMILY, s162 — the LEVEL LAW *is* closable, to inside its own ambiguity** | 162 | GATE K fitted a single power-law **EXPONENT**, and *"no single exponent reaches"* is a different claim from *"no monotone taper reaches"* — the distinction s115/s146 were already forced to draw on the neighbouring MASTER pot. Re-asked on the current epoch, objective rms of (delivered − pedal) in dB, n = 24: **shipped p = 2.25 → 2.844** (worst 7.638), **best single exponent p = 2.0020 → 2.106** (3.344), **free monotone curve → 0.344** (0.901). ⭐ Graded against **AY2's own per-detent across-stimulus spread (0.755 dB rms)** — the bar that closed task A one session ago (s161 AX6), imported not chosen: the free curve is **INSIDE**, both exponent families **OUTSIDE by 3.77× / 2.79×**. ⭐ Outside corroboration nothing in the solve knows: required half-rotation **15.37 %** vs shipped **21.02 %**, moving **toward** the textbook A-taper 10–15 % band `circuit.md` says VR2 is (100k **A**); curve monotone in the knob, exact at both endpoints, single convexity dip **1.08 %** of a slope. ⚠ Floors, two and they are different quantities: solve residual **0.344 dB** of delivered level, required-taper spread **0.0778 rms / 0.1956 worst** in units of L — and both are **LOWER bounds**, because `dB_model(L)` is non-monotone at the hottest stimulus (GATE K3/L8) so that column is refused. ⚠ COST, priced first: worst \|Δ cleanFraction\| **0.1365**, which re-stales s156's mix law (it *reads* `cleanFraction()`). ⛔ Not a proposal — see task D's row above; the two targets pull opposite ways. | `analysis/level_taper_reshape.py` (GATE AY) AY3/AY4 |
 | ⭐ **NEW, and named nowhere in the project: at LEVEL MIN the model MUTES** | ⭐⭐ **MEASURED s162 — a real defect, NOT taper-reachable, and NOT task D's subject** | 162 | AY2 reads the model at **−249.96 dB** against a pedal only **−29.77 dB** below its own max. A taper cannot reach it in either direction — **L(0) = 0 exactly at the end stop under EVERY taper** — so a solve asking for L(0) > 0 (it asks for 0.0093) is asking for a pot that does not fully attenuate: a **TOPOLOGY** change (an end-stop resistance, or GATE K2's BLEND-body bleed path). ⚠ Excluded from AY2's requirement and AY3's objective by the SAME membership rule, and **the first draft's disagreement between the two sub-gates is what found it** — AY3 excluded it from the start, AY2 did not, and AY2 duly published a **214.41 dB** "requirement" (`ratio-statistics-need-a-denominator-guard`, differencing against digital silence). ⛔ Do not fold this into item 9's sensitivity question; it is a separate, unowned finding. | `analysis/level_taper_reshape.py` (GATE AY) AY2 |
+| item 13 — the clean path's ~20 dB (phase) null residual, s167: is it a mystery needing an instrument, or explicable from the chain's own known topology? | ✅✅ **EXPLAINED, s169 — bracketed by two closed-form readings of the model's OWN LF corners, no free parameter, no DSP change** | 169 | The clean path carries four modelled first-order LF corners in series (C1 1.59 Hz, `c21R` 12.24 Hz — the one deliberately re-anchored toward hardware, s91 — C36/C37 0.72 Hz each). Summing all four over the s167 single-corner reference unit gives **3.40→3.05×** (upper bound: assumes ND carries zero LF phase); counting only `c21R`'s own contribution plus the other three gives **1.73→1.61×** (lower-leaning). The measured **2.0–2.5×** sits BETWEEN them — exactly where a true answer set by ND's own (unknown) LF phase should land. ⭐ Found in passing: **C31** (Baxandall→LO-MID, 2.2 µF) is a real, unmodelled fifth corner, flagged as a carry-forward at the 2026-07-21 EQ-block build and never implemented (`grep` for `C31`/`kC31` finds nothing outside one docstring). Bracketed 0.33–33 Hz by loading resistance; the measured residual argues for the negligible end (a ~33 Hz gap would push the multiple to 8.6–9.6×, well above what's observed). ⛔ NOT fixed — real, tiny, unactioned, and W2's own rule was no DSP change either way. | `analysis/clean_lf_corner_count.py` |
 
 ### THE RELEASE GATE
 
@@ -585,23 +606,39 @@ are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking. W1 targets 1.1.
   (item 10 REQUIRES an `OdToneRestore` re-fit after any upstream OD change, plus a matrix
   re-render). **S3 is buffer for that re-fit ONLY.** ⛔ **If the gap is not materially closed by the
   end of S3, close item 6 / A3 PERMANENTLY as "bounded, not closable" and stop.**
-- **W2 — item 13, the clean-path phase residual. CAP 1 SESSION, and it is expected to CLOSE.**
-  ⭐ s167 already did the decisive arithmetic: the residual's shape is **a flat 2.0–2.5× multiple of
-  a single 7.2→12.2 Hz first-order corner difference, constant from 22 Hz to 359 Hz** (above ~450 Hz
-  the readings are at the estimator's own resolution). That is the signature of **~2–3 stacked LF
-  high-pass corners all differing the same way** — and one of them is s91's `c21R`, moved toward the
-  HARDWARE anchor **on purpose** (§5 rule 2). W2 = count the chain's actual LF corners and predict
-  the 2.4× directly. ⛔ **NO DSP CHANGE EITHER WAY** — the midband residual is 1–2°, below anything
-  this project can hear or grade. If it lands, item 13 closes as EXPECTED BEHAVIOUR.
-- **W3 — CPU. CAP 1 SESSION, and the rule is stricter than the target.** ⛔⛔ **ONLY SHIP A CHANGE
-  THAT IS BIT-IDENTICAL OR PROVABLY BELOW THE MEASUREMENT FLOOR.** Two candidates: **(a)** the
-  per-sample `std::log10` in `OdDriveTilt::currentEnvDb()`, whose only consumer is a **0.02 dB
-  hysteresis comparison** — a monotone transform, so the identical decision is reachable in the
-  LINEAR domain (`env2` ratio vs `10^0.002`) with no `log10` at all. Free, exact, ship it.
-  **(b)** `std::tanh` in `JfetStage` — ⛔ **REFUSE unless W1 has already forced a re-render**: it is
-  a *fitted* nonlinearity, so a fast-tanh owes a harmonic-accuracy gate AND a full re-baseline, and
-  at **2.5 % of one core** that trade does not pay. ⭐ The shipped `clipK = 2.0` already takes the
-  elementary `u/√(1+u²)` path, so there is no `pow` left in the clipper's hot loop.
+- ✅✅ **W2 — CLOSED, SESSION 169.** `analysis/clean_lf_corner_count.py` (no captures, closed-form):
+  the clean path carries **four** modelled first-order LF corners in series — C1 1.59 Hz
+  (`InputBuffer.h`), `c21R` 12.24 Hz (`PedalChain::C21Highpass`, the one deliberately re-anchored
+  toward hardware, s91), C36/C37 0.72 Hz each (`MasterOut.h`) — and TWO closed-form bracketing
+  reads of "count the corners" against s167's single-corner (7.2→12.2 Hz) reference unit give
+  **3.40→3.05×** (assume ND carries zero LF phase) and **1.73→1.61×** (count only `c21R`'s own
+  contribution plus the other three), both declining with frequency like the measured figure.
+  **The measured 2.0–2.5× sits BETWEEN the two** — exactly where it should if the gap depends on
+  ND's own (unknown) LF phase — so item 13 closes as **EXPECTED BEHAVIOUR**. ⭐ Found in passing,
+  not fixed: **C31** (Baxandall→LO-MID, 2.2 µF) was flagged as a carry-forward at the 2026-07-21
+  EQ-block build and never implemented — `grep -rn "C31\|kC31" src/dsp/*.h` finds nothing outside
+  one docstring. Bracketed at ~0.33–33 Hz depending on its loading resistance; the measured
+  residual itself argues for the low (negligible) end — a ~33 Hz gap would push the multiple to
+  8.6–9.6×, well above what's observed. ⛔ Real, tiny, unactioned — **no DSP change made or owed**
+  (W2's own rule). `docs/session-log.md` SESSION 169.
+- ✅✅ **W3 — CPU. CLOSED, SESSION 168.** Candidate (a) shipped, empirically **bit-identical, not
+  merely "provably below floor"**: `OdDriveTilt::process()`'s per-sample `std::log10` (called
+  unconditionally, only to feed a 0.02 dB hysteresis comparison on the biquad-rebuild decision) is
+  replaced by a precomputed linear-domain `env2` window — exact by monotonicity of the clamped
+  affine gain law `gainFor`, correctly accounting for `k`'s dB-per-dB scaling (⚠ the plan's own
+  sketch, `env2` ratio vs `10^0.002`, **omitted `k`** and is not what shipped — see the derivation).
+  `std::log10` now runs only on the rare sample a recompute actually fires (0.049 % of samples on a
+  4M-sample random-walk stress test), instead of every sample. **`tests/OdDriveTiltTest.cpp` Test 5**
+  diffs the shipped stage against a standalone reimplementation of the pre-W3 algorithm over three
+  stress trajectories (a ramp crossing both clamp boundaries, a silence↔loud step, a random walk) —
+  **worst `|fast − slow|` output: 0.0 in all three.** ⚠ The actual CPU saving is real but modest —
+  **11 %** of this one stage's own per-sample cost (7.28 vs 8.19 ns/sample, REPORTED not gated) —
+  matching the plan's own honest framing that little CPU is left to find. Candidate (b) (`std::tanh`
+  in `JfetStage`) **remains refused**, unchanged, pending W1 forcing a re-render. **`ctest` 21/21**
+  (`OdDriveTiltTest` gains a 6th sub-test, no new `add_test`). No matrix re-render owed or run — the
+  change is proven decision-identical. ⚠ The render cache IS re-armed by the rebuild (expected
+  precedent, s124/144/146/156) — the next matrix run pays the ~25 min cost. Derivation:
+  `docs/session-log.md` SESSION 168.
 
 0. ✅ **DONE, SESSION 126 — the bass peak is LOCALISED and the single-constant route is REFUTED**
    (`analysis/bass_peak_locus.py`, GATE Y; two CLOSED/REFUTED rows carry it). ⛔ Do NOT re-open
@@ -915,17 +952,16 @@ are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking. W1 targets 1.1.
     or GATE K2's BLEND-body bleed path. ⛔ Do not fold it into item 9's sensitivity question. Nothing
     proposed, no session has scoped it (`analysis/level_taper_reshape.py` AY2).
 
-13. ⭐⭐ **NEW, SESSION 167, UNOWNED: THE CLEAN PATH CARRIES ~20 dB OF PHASE RESIDUAL THAT NO GATE IN
-    THE PROJECT CAN SEE.** `ref-clean`'s FR band-RMS over 100 Hz–8 kHz is **0.05 dB** — as good as
-    anything in the project — yet its null is **−28.50 dB** band-limited / −16.92 broadband.
-    Decomposed: driving the *graded* ⅓-octave magnitude error to zero moves the null **0.03 dB**
-    (−16.92 → −16.89), while a magnitude **+ phase** correction reaches **−36.51 dB**. ⇒ the
-    residual is essentially all phase, and `release_gate.py` grades ⅓-oct **magnitude** only, so it
-    is structurally blind to it. ⛔ **NOT established as a defect** — some of it is the deliberate
-    LF divergence (s91's hardware-aimed `c21R`, §5 rule 2, which accounts for the 22 Hz end by
-    arithmetic), and a phase difference vs *ND* is not graded against hardware by anything. What is
-    new is that the quantity has never been measured, has no bar, and no other item names it.
-    ⚠ Sizing only, n = 1 capture decomposed. `analysis/null_review_gate.py` (GATE BD).
+13. ✅✅ **CLOSED, SESSION 169 — EXPECTED BEHAVIOUR, no DSP change.** Opened s167:
+    `ref-clean`'s FR band-RMS over 100 Hz–8 kHz is **0.05 dB** yet its null is **−28.50 dB**
+    band-limited / −16.92 broadband, essentially all PHASE (magnitude-only correction moves the
+    null 0.03 dB; magnitude+phase reaches −36.51 dB) — `release_gate.py` grades ⅓-oct magnitude
+    only, so it's structurally blind to it. **W2 (s169) counted the clean path's own LF corners**
+    (`analysis/clean_lf_corner_count.py`) and bracketed the measured 2.0–2.5×-of-a-single-corner
+    residual between two closed-form readings (3.05–3.40× and 1.61–1.73×) with no free parameter —
+    the measured figure sits between them. Closes as EXPECTED BEHAVIOUR: several stacked sub-100 Hz
+    HPF corners, `c21R` dominant, is the right topology for a residual this size. See the
+    SHIPPED CONSTANTS / open-work "W2" row above for the C31-gap finding (unactioned, negligible).
 
 ⚠ **A3 (on this list since session 89) is compressed here but its exclusions must travel together —
 this sentence is load-bearing:** *no single element closes A3 (s50), no post-clipper linear element

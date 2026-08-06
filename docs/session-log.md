@@ -21005,3 +21005,178 @@ consumer is a 0.02 dB hysteresis test — removable exactly, since log10 is mono
 decision is a linear-domain ratio against `10^0.002` — and (b) `std::tanh` in `JfetStage`, which is
 a **fitted** nonlinearity and therefore owes a harmonic gate plus a full re-baseline. At 2.5 % of one
 core the second does not pay, and W3's rule is written to refuse it.
+
+## SESSION 168 — W3 ships: `OdDriveTilt`'s per-sample `std::log10` removed, bit-identical
+
+W3's own rule ("ONLY SHIP A CHANGE THAT IS BIT-IDENTICAL OR PROVABLY BELOW THE MEASUREMENT FLOOR")
+governed the whole session. Candidate (b) (`std::tanh` in `JfetStage`) was refused per the plan's
+own instruction — it is a *fitted* nonlinearity and W1 has not yet forced a re-render, so it owes a
+harmonic gate and a full re-baseline it hasn't earned. Only candidate (a) was in scope.
+
+### 1. The optimisation
+
+`OdDriveTilt::process()` called `currentEnvDb()` (`10*log10(env2+floor)`) **unconditionally on
+every sample** — not to use `envDb` itself, but only to compute `gainFor(envDb)` and compare it
+against `lastGainDb` with a 0.02 dB hysteresis (`kRecomputeDb`), deciding whether the biquad needs
+rebuilding. `gainFor` is `clamp(-k*(envDb-ref), -maxCut, 0)`: a **clamped, non-increasing affine**
+map of `envDb`. Monotonicity means a bound on the *output* (`g` within `lastGainDb ± kRecomputeDb`)
+inverts EXACTLY to a bound on the *input* (`envDb`, hence `env2`, since `envDb` is monotone in
+`env2`), accounting correctly for both clamp boundaries (where the true bound is unconditionally
+satisfied and no envDb constraint is needed at all).
+
+⚠⚠ **The plan's own sketch — "env2 ratio vs `10^0.002`" — omits the `k` (dB-per-dB) scaling and is
+not what got shipped.** `10^(kRecomputeDb/10) = 10^0.002` is only the right ratio if the threshold
+being tested is on `envDb` directly; the actual code tests `g` (gain, dB), which relates to `envDb`
+by the factor `k` (0.203 shipped) — so the correct bound needs `ref - g/k`, not a bare envDb offset.
+Implemented exactly: `updateHysteresisWindow(envDb, g)` computes `[env2Lo, env2Hi]` — the widest
+linear-domain window around the current envelope for which `gainFor(currentEnvDb())` is
+**guaranteed** to stay within tolerance — via one `std::pow(10, x/10)` call, paid only when a
+recompute actually fires (rare), never per sample. `process()` collapses to two comparisons:
+
+```cpp
+if (env2 < env2Lo || env2 > env2Hi)
+    recompute(currentEnvDb());
+```
+
+Escaping the window is proven **necessary and sufficient** for a real recompute (not merely a fast
+reject), so this also incidentally fixes a pre-existing redundancy: the original code called
+`currentEnvDb()` twice on a triggering sample (once for the comparison, once inside `recompute()`);
+the new code calls it once.
+
+### 2. Why "provably below the floor" rather than literal bit-identity, and why it doesn't matter
+
+The window bounds are computed via `pow(10, x/10)`, the *exact* mathematical inverse of
+`10*log10(x)`, but IEEE double `log10`/`pow` are not guaranteed bit-exact round-trip inverses at
+the last ULP. So at the literal knife-edge instant `env2` crosses a threshold, the new code could
+in principle decide differently from the old by one sample. Given the design already accepts
+`kRecomputeDb = 0.02 dB` of coefficient staleness as inaudible by construction, an off-by-one-sample
+shift in *when* that staleness resets is a strict subset of an already-accepted tolerance — env2 is
+a continuously-evolving smoothed quantity, not adversarially chosen, so the probability of ever
+landing in that ULP-wide sliver is negligible, and even then the audible consequence is nil.
+
+### 3. Empirically bit-identical, not just argued
+
+`tests/OdDriveTiltTest.cpp` gained **Test 5**, differencing the shipped (windowed) stage against a
+standalone reimplementation of the PRE-W3 algorithm (`RefOdDriveTilt`, sharing no code with the
+header under test — the s156 pattern) over three stress trajectories chosen to hunt exactly the
+failure mode above: a slow ramp crossing both `ref` and the `maxCut` clamp boundary many times, an
+instantaneous silence→loud→silence step (bursts of consecutive recomputes), and a random walk in
+envDb space (no designed structure to dodge a boundary case). **Worst `|fast - slow|` output: 0.0
+in all three — literal bit-identity, not merely "provably below floor".** Recompute counts match
+exactly (600 vs 600 over a 768 000-sample ramp), which is the same claim stated a second way with
+no audio output involved.
+
+### 4. The actual saving is real but modest, and that is the honest finding
+
+A dedicated timing block (REPORTED, not gated, per `build.md`'s convention) drove both
+implementations with an identical 4 000 000-sample random-walk envelope: **1963 recomputes total**
+(0.049 %) against the reference's per-sample unconditional `log10`, yet wall-clock reads **7.28 ns
+new vs 8.19 ns old — 88.9 %, an 11 % reduction in this stage's own per-sample cost.** Smaller than a
+naive "removed 99.95 % of the log10 calls" would suggest — `std::log10` is evidently cheap on this
+platform/toolchain relative to the rest of `process()` (the biquad direct-form-I recursion, the
+envelope smoother, function-call overhead). ⇒ matches the plan's own framing exactly: *"the honest
+finding is that there is very little left."* `OdDriveTilt` was already ~a small fraction of the
+plugin's ~2.5 % one-core CPU at the shipped 2× default (`PerfBenchmark`'s existing arms, unchanged
+by this session, still read shipped 2× ≈ 2.36 % of one core) — this shaves a modest, real, free,
+zero-risk amount off one already-small stage. No re-run of the full capture matrix is owed: the
+change is proven decision-identical, not merely gain-matched-invisible.
+
+### 5. Diagnostics added (non-functional)
+
+`OdDriveTilt::recomputeCount()` — a `std::uint64_t` counter, incremented once per real recompute,
+alongside the existing `currentGainDb()` diagnostic. Exists so the optimisation's effect is
+measurable by any future session, not just argued once here.
+
+### 6. Release state
+
+**`ctest` 21/21** (OdDriveTiltTest now 6 sub-tests, up from 5 — Test 5 is new; no new `add_test`
+entry, ctest count unchanged). Full `cmake --build build` + `ObsidianB7000_AU`/`_VST3` rebuilt;
+`auval -v aufx Ob7k LPrc` → **AU VALIDATION SUCCEEDED**. No DSP constant changed; no matrix
+re-render needed or run (justified in §3–4, not merely asserted). ⚠⚠ **The render cache IS
+re-armed** (`OfflineRender` relinked as part of the full build, per the project's own standing
+rule) — the next matrix run pays the ~25 min cost regardless of the fact that nothing audible
+changed; this is a speed cost only, not a correctness one, and is expected precedent (s124, s144,
+s146, s156).
+
+### 7. W3 is CLOSED
+
+Candidate (a) shipped. Candidate (b) (`std::tanh` in `JfetStage`) remains explicitly refused —
+unchanged from the plan — pending W1 forcing a re-render. Nothing else in this stage's scope.
+
+## SESSION 169 — W2 ships: item 13's phase residual is EXPECTED BEHAVIOUR, no DSP change
+
+W2's rule, stated at s167: "count the chain's actual LF corners and predict the 2.4× directly ...
+NO DSP CHANGE EITHER WAY." `analysis/clean_lf_corner_count.py` is the tool; no capture, no render,
+no fit — every number is a closed-form `1/(2πRC)` read from the shipped source, cited per corner.
+
+### 1. The clean path's OWN first-order LF corners, counted
+
+Four are modelled, all in series on the post-BLEND clean path:
+
+| corner | source | R | C | fc |
+|---|---|---|---|---|
+| C1 (input coupling) | `InputBuffer.h` | R2 = 1 MΩ | 100 nF | 1.59 Hz |
+| C21 (`c21R`, current) | `PedalChain::C21Highpass` | 130 kΩ | 100 nF | 12.24 Hz |
+| C36 (MASTER input HPF) | `MasterOut.h` | 100 kΩ (pot, full CW) | 2.2 µF | 0.72 Hz |
+| C37 (output coupling) | `MasterOut.h` | R46 = 100 kΩ | 2.2 µF | 0.72 Hz |
+
+C21 is the only one deliberately re-anchored away from the ND captures — session 91 moved `c21R`
+220k→130k (7.23→12.24 Hz) toward the HARDWARE target, a documented, priced departure
+(`reference-sources.md` §5 rule 2). The other three have sat at their schematic/design values
+since the original build sessions and were never separately fit against either reference.
+
+### 2. Two bracketing predictions, both closed-form
+
+Session 167's "single corner" unit is `phase(fc=12.24) − phase(fc=7.23)` at each frequency — the
+exact size of `c21R`'s own move. Two natural ways to turn "count the corners" into a number:
+
+- **(a) all four corners' own phase, summed, over the unit** — an upper bound (assumes the ND
+  capture carries zero LF phase of its own, i.e. every degree of the model's LF phase is
+  "residual"): **3.40 → 3.05×** over 22–359 Hz, declining with frequency.
+- **(b) 1 (c21R's own contribution, which by construction equals the unit) + the other three
+  corners' phase over the unit** — a lower-leaning read: **1.73 → 1.61×** over the same range.
+
+Both are flat-ish and declining with frequency, same qualitative shape as the measured
+2.53→2.01× (session 167, inline/ad-hoc, not saved as a script — not reproduced bit-for-bit here).
+**The measured 2.0–2.5× sits BETWEEN (a) and (b)** — exactly where it should if the true answer
+depends on how much LF phase ND's own coupling/DC-blocking carries (unknown, since ND is a black
+box), bracketed above and below by two assumption-free readings of the model's own topology.
+
+### 3. A genuine gap, found while counting: C31 was never implemented
+
+`Baxandall.h`'s own docstring (written at the 2026-07-21 EQ-block build session) flags **C31**
+(2.2 µF, Baxandall Vout → LO-MID input) as an inter-stage coupling cap "deferred" at the stage's
+oracle boundary, with an explicit carry-forward instruction to place it during Phase-6/7
+integration alongside C21 — "do not forget it in the full chain." C21 landed
+(`PedalChain::C21Highpass`). **C31 did not** — `grep -rn "C31\|kC31" src/dsp/*.h` returns nothing
+outside that one docstring. Ninety-plus sessions later, it is still missing: a real, small,
+never-actioned gap, not a decision.
+
+Its corner is not simply computable — node "Min" (circuit.md "LO-MID (IC5_D)") has two legs, R38
+(2.2k) to the pot's upper lug (NOT a clean ground — it enters the pot's own 7-node sub-network)
+and R41 (220k) straight to the (−) virtual ground (a genuine low-Z AC-ground path). Bracketed:
+R38-dominant (too severe, since R38's far end isn't really ground) → **~33 Hz**; R41-dominant (the
+defensible bound) → **~0.33 Hz**, negligible, same order as C36/C37.
+
+**The measured residual argues for the low end.** Re-running formulation (a) with C31 added at
+its R38 (severe) estimate pushes the multiple to **8.6→9.6×** — 3–4× the actual measured
+2.0–2.5×. Since that's not what's observed, C31's real loading must sit much closer to the R41
+estimate (negligible) than the R38 one — consistent with the gap having produced no detectable
+symptom across 90+ sessions of FR/THD/matrix grading. The measured residual is evidence AGAINST a
+~30 Hz missing corner, not for one.
+
+### 4. Item 13 closes as EXPECTED BEHAVIOUR
+
+The clean path genuinely carries several stacked sub-100 Hz first-order HPF corners in series,
+of which `c21R` (12.2 Hz) is by far the dominant one at LF; the observed ~2.0–2.5× multiple over a
+single-corner reference unit is the right order of magnitude and the right declining-with-
+frequency shape for that topology, bracketed from both sides by closed-form arithmetic on known
+circuit values with no free parameter. No DSP change is owed (W2's own rule, and item 13's own:
+the midband residual this corresponds to is 1–2°, below anything gradeable). ⛔ NOT closed: C31
+itself — it is real, tiny (bounded negligible by the very residual that would have shown it),
+and unactioned; nothing here fixes it, and nothing here needs to.
+
+### 5. Release state
+
+**`ctest` 21/21**, no `src/` change, no rebuild owed, no cache re-arm. `analysis/clean_lf_corner_count.py`
+is a new, standalone, reproducible script — no captures, run instantly.

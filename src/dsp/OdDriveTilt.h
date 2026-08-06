@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 // =============================================================================
 // OdDriveTilt — engineered (NON-SCHEMATIC) LEVEL-DEPENDENT treble tilt
@@ -175,14 +177,27 @@ public:
         // The biquad is recomputed only when the gain has moved materially.  At
         // the oversampled rate a per-sample RBJ solve would dominate this
         // stage's cost, and the envelope moves far slower than the audio.
-        const double g = gainFor(currentEnvDb());
-        if (std::abs(g - lastGainDb) > kRecomputeDb)
+        //
+        // W3 (session 168): `env2Lo`/`env2Hi` are the exact linear-domain window
+        // (see updateHysteresisWindow()) within which gainFor(currentEnvDb())
+        // is GUARANTEED, by monotonicity of the clamped affine gain law, to sit
+        // within kRecomputeDb of lastGainDb -- so escaping the window is both
+        // necessary AND sufficient for a real recompute, and std::log10 need
+        // only run when it fires (rare: the window is exactly as wide as the
+        // hysteresis the biquad update already tolerates).
+        if (env2 < env2Lo || env2 > env2Hi)
             recompute(currentEnvDb());
         return shelf.process(x);
     }
 
     // Diagnostic only — the gain the law is currently asking for, in dB.
     double currentGainDb() const noexcept { return gainFor(currentEnvDb()); }
+
+    // Diagnostic only — how many times the biquad has actually been rebuilt
+    // (i.e. how many times std::log10 has run on the process() path). Exists
+    // to make the W3 (session 168) fast-path optimisation's effect
+    // measurable rather than merely argued.
+    std::uint64_t recomputeCount() const noexcept { return recomputes; }
 
 private:
     static constexpr double kRecomputeDb = 0.02;   // coefficient-update hysteresis
@@ -214,6 +229,52 @@ private:
         const double g = gainFor(envDb);
         lastGainDb = g;
         shelf.setHighShelf(sampleRate, f0, S, g);
+        updateHysteresisWindow(g);
+        ++recomputes;
+    }
+
+    // Exact inverse of currentEnvDb(): env2 + floor = 10^(envDb/10).
+    static double envDbToEnv2(double envDb) noexcept
+    {
+        return std::pow(10.0, envDb / 10.0) - kEnvFloor;
+    }
+
+    // Precomputes [env2Lo, env2Hi] -- the widest linear-domain window around
+    // the CURRENT envelope for which gainFor(currentEnvDb()) is provably
+    // within +/-kRecomputeDb of `g` (== lastGainDb after this call).
+    //
+    // gainFor is a clamped, NON-INCREASING affine map of envDb, so a bound on
+    // g maps to a bound on envDb by inverting the affine leg and clamping at
+    // the physical ceiling/floor of g itself (0 and -maxCut) wherever the
+    // requested tolerance band reaches past them -- at which point that side
+    // of the window is unbounded (the gain literally cannot move outside its
+    // own clamp, so no envDb bound is needed to guarantee it stays put).
+    void updateHysteresisWindow(double g) noexcept
+    {
+        if (k <= 0.0)
+        {
+            // Degenerate (k == 0 is not a shipped configuration): disable the
+            // fast path rather than divide by zero -- every sample falls back
+            // to the exact log10 path, which is always correct.
+            env2Lo = 1.0;
+            env2Hi = 0.0;
+            return;
+        }
+
+        const double gHi = std::min(0.0, g + kRecomputeDb);
+        const double gLo = std::max(-maxCut, g - kRecomputeDb);
+
+        // envDb = ref - g/k inverts g = -k*(envDb - ref); g falling as envDb
+        // rises means an UPPER bound on g gives a LOWER bound on envDb, and
+        // vice versa.
+        const double envDbLo = (gHi >= 0.0) ? -std::numeric_limits<double>::infinity()
+                                             : (ref - gHi / k);
+        const double envDbHi = (gLo <= -maxCut) ? std::numeric_limits<double>::infinity()
+                                                 : (ref - gLo / k);
+
+        env2Lo = std::isfinite(envDbLo) ? std::max(0.0, envDbToEnv2(envDbLo)) : 0.0;
+        env2Hi = std::isfinite(envDbHi) ? envDbToEnv2(envDbHi)
+                                         : std::numeric_limits<double>::infinity();
     }
 
     // ---- RBJ (Audio EQ Cookbook) high-shelf biquad, direct-form I -----------
@@ -263,6 +324,13 @@ private:
     double smooth = 1.0;
     double timeMs = 50.0;
     double lastGainDb = 1e9;
+
+    // The linear-domain no-recompute-needed window -- see updateHysteresisWindow().
+    // Starts empty (Lo > Hi) so the very first process() call always takes the
+    // exact path, until prepare()'s recompute(0.0) sets a real window.
+    double env2Lo = 1.0;
+    double env2Hi = 0.0;
+    std::uint64_t recomputes = 0;
 
     bool enabled = false;
     double f0 = 5388.0, S = 0.85, k = 0.203, ref = -33.9, maxCut = 6.0;
