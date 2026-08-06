@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(ObsidianB7000 VERSION 0.5.1)
+project(ObsidianB7000 VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -153,6 +153,14 @@ add_executable(PedalChainTest tests/PedalChainTest.cpp)
 target_link_libraries(PedalChainTest PRIVATE chowdsp::chowdsp_wdf)
 target_compile_options(PedalChainTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME PedalChainTest COMMAND PedalChainTest)
+
+# Phase 10's own criterion: "all controls full range: no instability, clicks, or NaN/Inf".
+# Covers what PedalChainTest does not — LEVEL, the four EQ knobs, all four OS factors (the
+# ADAA policy is gated on the factor), and knob-motion discontinuity. See the file header.
+add_executable(FinalSweepTest tests/FinalSweepTest.cpp)
+target_link_libraries(FinalSweepTest PRIVATE chowdsp::chowdsp_wdf)
+target_compile_options(FinalSweepTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME FinalSweepTest COMMAND FinalSweepTest)
 
 # Phase-7 calibration harness: render a WAV through the real chain from the CLI.
 # Mirrors PluginProcessor::processBlock (see the header comment in the source);

@@ -74,8 +74,11 @@ calibration → UI). Their per-step validation rules live in the rules files the
    signal (`analysis/gen_test_signal.py`), capture per `docs/validation-and-capture.md`, and A/B
    with the harness: FR (1/3-oct), continuous swept-THD, null depth, knob-tracking pass/fail.
    Decompose any level deficit before changing constants.
-10. **Final sweep** — all controls full range: no instability, clicks, or NaN/Inf. (Output > 0 dBFS
-    at extreme drive+volume is faithful, not a fault — the output trim manages it.)
+10. ✅ **Final sweep — DONE, SESSION 167** (`tests/FinalSweepTest.cpp`, ctest's 21st): all controls
+    full range, no instability, clicks, or NaN/Inf. **3123 configurations, 23 checks, 0 failures**,
+    covering LEVEL, the four EQ knobs, all four OS factors and knob MOTION — the four things
+    `PedalChainTest` never reached. (Output > 0 dBFS at extreme drive+volume is faithful, not a
+    fault — the output trim manages it.) ⚠ Switch transitions are reported, not gated.
 
 ## Current step
 
@@ -124,15 +127,59 @@ calibration → UI). Their per-step validation rules live in the rules files the
 ### Where we are
 
 **Phases 1–8 are COMPLETE** — the plugin builds, loads in a DAW, is fully playable, and the UI is
-done. **Phase 9 (reference validation) is the only phase in progress**; Phase 10 has not started
-**as a phase**, though **2 of its 3 specified probes now exist** —
-`PerfBenchmark` (s127) and `OSFidelity` (s144). ⛔ `FeatureProfile` is the third and s144 argues it
+done. ✅ **PHASE 10's OWN CRITERION IS NOW MET TOO (s167, `FinalSweepTest`)**, so **Phase 9
+(reference validation) is the ONLY phase still open, and it is open on ONE thing: 9 of 14 gated rows
+are over SHIP.** ⚠⚠ Read that with its history before treating it as 9 defects — **six have been
+over since the s124 re-anchor, and THREE crossed as the measured, user-accepted PRICE of [ENG]
+corrections aimed at defects this ND-referenced matrix cannot see** (s162, s163, s166; all decided
+KEEP, all with their own SHIPPED CONSTANTS rows). ⚠ The version is **1.0.0** as of s167 at the
+user's instruction; that bump did not change the gate and is trivially reversible.
+**2 of Phase 10's 3 specified probes exist** — `PerfBenchmark` (s127) and `OSFidelity` (s144).
+⛔ `FeatureProfile` is the third and s144 argues it
 should NOT be built in its template form: its stated lever (accurate-omega vs `omega4`) **does not
 exist in this pedal** (the omega provider belongs to chowdsp's diode models; this chain's
 nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were priced at s127.
 
 #### STATUS
 
+- ✅✅ **SESSION 167 = THE 1.0 REVIEW. VERSION BUMPED 0.5.1 → 1.0.0, PHASE 10's OWN CRITERION IS
+  CLOSED, AND THE PROJECT HAS ITS FIRST NULL MEASUREMENT (2026-08-06).** No DSP constant changed.
+  **`ctest` 21/21** — `tests/FinalSweepTest.cpp` is the 21st and it closes Phase 10's stated
+  criterion (*"all controls full range: no instability, clicks, or NaN/Inf"*): **3123
+  configurations, 23 checks, 0 failures**, covering the four things `PedalChainTest` never did —
+  **LEVEL** (s163's new taper), the **four EQ knobs**, **all four OS factors** (the ADAA policy is
+  gated on the factor, so 4×/8× was a path no finiteness test had ever reached), and **knob motion**
+  scored against each knob's own static control (ratios **0.88–1.00×** ⇒ no click from any
+  continuous knob). ⚠ Switch transitions are **REPORTED, not gated** (the project accepts unsmoothed
+  switches): attack/grunt **0.17×**, hiMidFreq 0.75×, **loMidFreq 2.49×** — the only measurable
+  discontinuity in the control surface. ⭐⭐ Its vacuity guards fired on the first run and **the
+  defect was the TEST's**: all four switches reported an identical 2.603e-02 step because both mid
+  pots sat at 0.5, where `circuit.md` says a B-taper mid band is *exactly flat* — re-centring a band
+  contributing nothing correctly does nothing. **AU + VST3 build; `auval` → AU VALIDATION
+  SUCCEEDED.** ⭐ The bump did **not** re-arm the render cache (`OfflineRender` mtime unchanged,
+  verified before/after) — the next matrix run is still fast. **CPU at the shipped 2× default:
+  ~2.5 % of one core, 40× realtime, 49 samples latency.** Narrative + the null table:
+  `docs/session-log.md` SESSION 167.
+- ⭐⭐ **SESSION 167 ALSO ADDED GATE BD (`analysis/null_review_gate.py`) — THE FIRST NULL
+  MEASUREMENT IN THE PROJECT, AND IT IS *NOT* A GATE** (no null bar has ever been agreed;
+  `release_gate.py` remains the criterion). 12 captures **pre-registered by AXIS** × 4 sweeps.
+  **Best 100 Hz–8 kHz null −28.50 dB** (`ref-clean`), median **−11.78**, worst **−1.59**
+  (`level-1700_grunt-flat`). Four things a future session must not re-derive:
+  **(a)** ⛔ **the BROADBAND null is dominated by a DELIBERATE divergence** — on `ref-clean` the
+  per-band residual spans −6.70 dB @22 Hz to −48.63 @905 Hz, and the LF edge is s91's
+  hardware-aimed `c21R` (§5 rule 2: a PASS), *attributed not assumed* (measured −27.5° phase there,
+  and `2·sin(27.5/2) = −6.5 dB` against −6.70 measured). **Quote the band-limited figure.**
+  **(b)** ⭐⭐ **the clean path's null is PHASE and the release gate is structurally blind to it** —
+  zeroing the *graded* ⅓-oct magnitude error moves it **0.03 dB** (−16.92 → −16.89) while
+  magnitude+phase reaches **−36.51**, against an FR band-RMS of **0.05 dB**. ~20 dB of unowned
+  phase residual; **no open item names it.**
+  **(c)** ⚠⚠ **the null does not resolve the setting at these depths** — a threshold-free rank test
+  (does the render of X null capture X best of 12?) scores **7/12**, and two *genuinely different*
+  captures null at **−28.66 dB**, deeper than every matched null in the set.
+  **(d)** ⭐ it **CORROBORATES** the FR gate on the same captures (`ref-clean` FR 0.05 dB vs the two
+  worst null rows at FR **6.14 / 7.98 dB**) ⇒ GRUNT off-flat bleed-free is the worst cell on two
+  independent instruments. ⛔ The first draft's KA2 was an **invented 3 dB bar and it FAILED**
+  (margin 1.35 dB) — the pair was not very different; do not re-introduce it.
 - ✅✅ **SESSION 166 = TASK E SHIPPED — item 6's treble-peak slope is CLOSED, USER DECISION KEEP
   (2026-08-06).** Sessions 164/165 refuted two architectures with NOTHING built (see below);
   session 166 built the third, `src/dsp/OdDriveTilt.h` — a level-dependent RBJ high-shelf (f0
@@ -235,17 +282,21 @@ nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were
   change. A render log counts what it tried; only the report's capture list counts what it graded.
   ⚠ `s151_odtone.json` exists and is NOT a baseline — it is the bleed-free-only `OdToneRestore`
   state, which cost +0.040 (1.947 → 1.987) where the shipped mix-keyed law costs +0.064.
-- **Release gate: 8 rows over SHIP (6 until s162, 7 until s163).** Run the script for the live
-  numbers — do not transcribe them:
+- **Release gate: 9 rows over SHIP (6 until s162, 7 until s163, 8 until s166).** ⛔ This bullet is
+  historical context for the s163 baseline; the CURRENT baseline is `s166_odtilt.json` — run the
+  script against THAT (the §"THE RELEASE GATE" block below has the live command). Never transcribe
+  its numbers:
   ```bash
-  /opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s163_leveltaper.json
+  /opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s166_odtilt.json
   ```
   The six that have been over since the session-124 re-anchor: OD 100 Hz–8 kHz p90, OD 25–100 Hz
   median/p90, OD 8–16.3 kHz p90, OD p99, THD level (full-send). ⛔ **The seventh is the HEADLINE —
   OD ALL band-RMS — which crossed at s162 as the price of s156's `OdToneRestore` mix law; the
   eighth is OD 100 Hz–8 kHz MEDIAN, which crossed at s163 as the price of the LEVEL taper.** Both
   are outstanding user decisions. See §"THE RELEASE GATE" below for the bars and fallback.
-- **ctest 19/19** (~68 s at `-j 12`), inherited unchanged since s146. ⭐ s146 gave `MasterOutTest` a
+- **ctest 21/21** (~14 s at `-j 12` + 56 s for the serial `PerfBenchmark`). ⭐ **21st = s167's
+  `FinalSweepTest`, which CLOSES Phase 10's own criterion** — see STATUS. 20th = `OdDriveTiltTest`
+  (s166). ⭐ s146 gave `MasterOutTest` a
   **Test 0** asserting the MASTER taper's own SHAPE — convexity (segment slopes must rise),
   monotonicity, exact endpoints, the A-taper 10–15 % half-rotation band — over six master values
   covering all three segments AND both breaks. `OSFidelity` was added s144 (19th, finite-only);
@@ -812,6 +863,18 @@ that list: **ship**.
     the end stop under every taper), so closing it is a **TOPOLOGY** change: an end-stop resistance,
     or GATE K2's BLEND-body bleed path. ⛔ Do not fold it into item 9's sensitivity question. Nothing
     proposed, no session has scoped it (`analysis/level_taper_reshape.py` AY2).
+
+13. ⭐⭐ **NEW, SESSION 167, UNOWNED: THE CLEAN PATH CARRIES ~20 dB OF PHASE RESIDUAL THAT NO GATE IN
+    THE PROJECT CAN SEE.** `ref-clean`'s FR band-RMS over 100 Hz–8 kHz is **0.05 dB** — as good as
+    anything in the project — yet its null is **−28.50 dB** band-limited / −16.92 broadband.
+    Decomposed: driving the *graded* ⅓-octave magnitude error to zero moves the null **0.03 dB**
+    (−16.92 → −16.89), while a magnitude **+ phase** correction reaches **−36.51 dB**. ⇒ the
+    residual is essentially all phase, and `release_gate.py` grades ⅓-oct **magnitude** only, so it
+    is structurally blind to it. ⛔ **NOT established as a defect** — some of it is the deliberate
+    LF divergence (s91's hardware-aimed `c21R`, §5 rule 2, which accounts for the 22 Hz end by
+    arithmetic), and a phase difference vs *ND* is not graded against hardware by anything. What is
+    new is that the quantity has never been measured, has no bar, and no other item names it.
+    ⚠ Sizing only, n = 1 capture decomposed. `analysis/null_review_gate.py` (GATE BD).
 
 ⚠ **A3 (on this list since session 89) is compressed here but its exclusions must travel together —
 this sentence is load-bearing:** *no single element closes A3 (s50), no post-clipper linear element

@@ -20838,3 +20838,131 @@ classification to **walking 83 % of the pedal's amount**, with clean margins on 
 6's own gates and zero measured collateral; the one new gate-row crossing is marginal (3.4 % over);
 and the THD cost is now understood as amplifying an already-diagnosed population rather than a new
 mechanism. Nothing reverted.
+
+---
+
+## SESSION 167 — the 1.0 review: version bumped, Phase 10's own criterion CLOSED, and the first null measurement the project has ever taken
+
+User request: *"I think we're in a good place to bump the version to 1.0. I think it's time to do a
+full review on where we sit"*, extended mid-session with *"we should also do some basic null tests
+(not on the WHOLE capture cohort, just some select ones, and report the best null too. But also do
+CPU performance analysis etc."*
+
+### 1. What was already true, verified live rather than transcribed
+
+`git status --porcelain` clean at `d25ff09`. `ctest -j 12` **20/20** on entry. Release gate on
+`s166_odtilt.json`: **9 rows over SHIP**, exactly as `CLAUDE.md` records. Render binary
+(06:55:21) postdates the newest `src/` header (06:54) ⇒ the matrix cache is warm and
+`s166_odtilt.json` is current-epoch.
+
+### 2. CPU — `PerfBenchmark`, re-run for the release
+
+Full-chain, BLEND 100 % OD, DRIVE 0.85, 48 kHz. Only within-run ratios are quotable (the harness
+says so itself; absolute ns/sample is machine-specific).
+
+| OS | latency | ns/sample | × realtime | CPU % of one core |
+|---|---|---|---|---|
+| 1× | 0 | 238.9 | 87.2 | 1.15 |
+| 2× (shipped default) | 49 | 519.7 | 40.1 | 2.49 |
+| 4× | 60 | 792.1 | 26.3 | 3.80 |
+| 8× | 64 | 1491.6 | 14.0 | 7.16 |
+
+⇒ **the shipped 2× default costs ~2.5 % of one core and runs 40× realtime.** Session 124's net
+win reproduces at **−45 to −55 %** of the whole chain at every factor (pow fast path −52…−56 %,
+ADAA +13.6 % at 2×). Nothing here is a concern for 1.0.
+
+### 3. GATE BD — `analysis/null_review_gate.py`, the first null measurement in the project
+
+12 captures **pre-registered by AXIS** (clean path, OD reference, both BLEND ends, both DRIVE ends,
+bleed-free, both ATTACK throws, both off-flat GRUNT throws) × 4 sweeps = 48 cells. Selection fixed
+before any number was read, and **every row is printed** — `self-selecting-scores` is the live trap
+when someone asks for "the best null".
+
+⭐⭐ **THE FIRST DRAFT'S KA2 WAS AN INVENTED BAR AND IT FAILED, AND THE DIAGNOSIS WAS THE TEST.** It
+asserted "the render nulled against a DIFFERENT capture must be >3 dB shallower"; measured margin
+**1.35 dB**, FAIL. Cause: the pair chosen was not very different (`suspect the mutation before the
+guard`, s110). Replaced by a **threshold-free rank test** — does the render of settings X null
+capture X better than any of the other 11 captures? — which is the only form in which "the null
+discriminates" is a measurement. Result: **7/12 correct** (chance 1/12), with 5 misidentifications
+whose margins are 0.03–0.9 dB.
+
+⚠⚠ **AND THE CROSS-NULL MATRIX IS THE FINDING THE HEADLINE NUMBER HIDES: two genuinely different
+captures (`ref-clean` vs `blend-0700`) null at −28.66 dB, DEEPER than every matched null in the
+set.** So at these depths the null is not resolving the setting.
+
+**Broadband null was dominated by a DELIBERATE divergence, and this had to be decomposed before any
+figure was quotable.** On `ref-clean` the per-band residual runs **−6.70 dB at 22 Hz to −48.63 dB
+at 905 Hz** — a 42 dB spread — and 44 % of the residual energy sits in the first 5 % of the sweep,
+which holds 4.4 % of the signal energy. The log sweep puts ~equal energy in every ⅓-oct band
+(measured 3.3 % each), so the broadband figure is an unweighted average dominated by the two edges.
+⛔ The LF edge is **session 91's hardware-aimed `c21R` 220k→130k**, moving the corner 7.2→12.2 Hz
+*away from ND on purpose* (`reference-sources.md` §2/§5 rule 2 — a PASS, not a regression), and it
+is **attributed rather than assumed**: measured phase difference at 22 Hz is −27.5°, and
+`2·sin(27.5/2) = 0.475 = −6.5 dB` against the −6.70 dB residual measured there.
+
+⭐⭐ **The clean path's null is PHASE, not magnitude, and the release gate is structurally blind to
+it.** Driving the *graded* ⅓-oct magnitude error to zero moves `ref-clean`'s null by **0.03 dB**
+(−16.92 → −16.89) while magnitude+phase correction reaches **−36.51 dB**. Its FR band-RMS over
+100 Hz–8 kHz is **0.05 dB**. ⇒ ~20 dB of the residual is a phase term nothing in the project grades.
+
+**Headline figures (band-limited 100 Hz–8 kHz, the gate's own main region):**
+
+| | best | median | worst |
+|---|---|---|---|
+| CLEAN sweep | **−28.50** (`ref-clean`) | −13.77 | −2.33 |
+| DRIVEN sweeps | −28.50 | −11.34 | −1.59 |
+| ALL 48 cells | **−28.50** | −11.78 | −1.59 |
+
+⭐ **The null CORROBORATES the FR gate rather than contradicting it** — checked against
+`s166_odtilt.json` on the same captures: `ref-clean` FR band-RMS **0.05 dB** (null phase-limited),
+while the two worst null rows, `level-1700_grunt-flat/boost`, read FR band-RMS **6.14 / 7.98 dB**.
+Two independent instruments agreeing that GRUNT off-flat bleed-free is the worst cell in the
+project. ⚠ NOT A GATE — no null bar has ever been agreed; `release_gate.py` remains the criterion.
+
+### 4. `tests/FinalSweepTest.cpp` — Phase 10's stated criterion, CLOSED
+
+Phase 10 is *"all controls full range: no instability, clicks, or NaN/Inf"*. `PedalChainTest` covers
+switches × DRIVE × BLEND **at 1× only**, leaving four gaps that all cover recently-changed code:
+LEVEL (s163's new PWL taper) never moved; the four EQ knobs never moved; **only 1× exercised, while
+the ADAA policy is GATED ON THE OS FACTOR** so 4×/8× run a path no finiteness test had reached; and
+nothing moved a knob *while processing*, so "no clicks" was untested — despite s166 adding
+`OdDriveTilt`, the project's first stage whose response depends on signal history.
+
+Result — **3123 configurations, 23 checks, 0 failures**:
+- exhaustive switches × DRIVE × BLEND × **LEVEL** @1×: **2187 configs, 0 bad**, worst peak 3.082 V
+- **EQ knobs** at extremes × both mid-freq selectors × DRIVE: **288 configs, 0 bad**
+- **all four OS factors** incl. the 4×/8× ADAA-off path: 162 configs each, 0 bad
+- **knob motion**: every one of the 8 continuous knobs scored against **its own static control**
+  (no invented bar) — ratios **0.88–1.00×**, i.e. moving a knob never produces a step larger than
+  the signal's own static maximum. The s(pre-Phase-9) `SmoothedValue::skip` zipper fix holds.
+- **switch transitions, REPORTED not gated** (the project explicitly accepts unsmoothed switches):
+  attack **0.17×**, grunt **0.17×**, hiMidFreq **0.75×**, **loMidFreq 2.49×** ⇒ the mid-frequency
+  selectors are the only measurable discontinuity in the whole control surface, and it is a small
+  step rather than a bang.
+
+⭐⭐ **THE VACUITY GUARDS EARNED THEIR PLACE ON THE FIRST RUN, AND THE DEFECT WAS THE TEST'S.** The
+switch arm initially reported the SAME step (**2.603e-02**) for all four switches to four
+significant figures — `an-implausible-coincidence-is-a-bug-report`. The added guard (the flip must
+diverge from an unflipped twin) failed for `loMidFreq`/`hiMidFreq` at **4.8e-14 / 6.0e-14**, i.e.
+the selector did nothing. **That is CORRECT plugin behaviour**: both mid pots sat at their 0.5
+default, and `circuit.md` records the mid band's B-taper centre as *exactly* flat, so re-centring a
+band contributing nothing must change nothing. Moving the pots off centre gives divergence
+**1.187 / 1.226** and the arm passes. `suspect the mutation before the guard` (s110), and a ratio
+near 1.0× would otherwise have been published as "no click" when it was "no effect".
+
+### 5. Release state
+
+- **`ctest` 21/21** (20 parallel + `PerfBenchmark` serial), ~14 s at `-j 12` plus 56 s serial.
+- **AU and VST3 both build**; `auval -v aufx Ob7k LPrc` → **AU VALIDATION SUCCEEDED**.
+- **`project(ObsidianB7000 VERSION 1.0.0)`** — bumped from 0.5.1, AU rebuilt and installed so Logic
+  rescans.
+- ⭐ **The version bump did NOT re-arm the render cache** — `OfflineRender`'s mtime is unchanged at
+  06:55:21 across the new test target, the reconfigure and the AU rebuild, verified before and
+  after. The next matrix run is still fast.
+
+⚠⚠ **THE ONE THING THAT ARGUES AGAINST THE 1.0 LABEL, STATED PLAINLY: the agreed Phase-9 release
+criterion is NOT met — 9 of 14 gated rows are over SHIP.** Six have been over since the s124
+re-anchor; three crossed as the *measured, user-accepted price* of [ENG] corrections aimed at
+defects this ND-referenced matrix cannot see (s162 `OdToneRestore` mix law, s163 LEVEL taper, s166
+`OdDriveTilt`). All three are decided KEEP. The bump was the user's instruction and is trivially
+reversible; the gate status is recorded here so the decision is on the record rather than implied.
