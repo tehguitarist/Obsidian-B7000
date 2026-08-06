@@ -32,6 +32,10 @@
 #include <random>
 #include <vector>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static int failures = 0;
 
 static void check(bool ok, const char* what, double got, double want, double tol)
