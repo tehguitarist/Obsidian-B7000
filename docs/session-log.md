@@ -21180,3 +21180,185 @@ and unactioned; nothing here fixes it, and nothing here needs to.
 
 **`ctest` 21/21**, no `src/` change, no rebuild owed, no cache re-arm. `analysis/clean_lf_corner_count.py`
 is a new, standalone, reproducible script — no captures, run instantly.
+
+---
+
+## SESSION 170 — W1's premise is refuted, and so is its lever: GATE BE fires the pre-registered stop at one session of three (2026-08-06)
+
+No `src/` change, no rebuild, no cache re-arm. **`ctest` 21/21.** New: `analysis/clipsat_headroom_gate.py`
+(GATE BE) + `analysis/_mutate_gate_be.py` (**11/11 arms**, five of them computed-verdict).
+Report: `analysis/reports/s170_clipsat_headroom.json`.
+
+### 1. What W1 was, and why its premise got screened before anything rendered
+
+Session 167 put W1 at the head of the live plan on one analytical claim, and that claim is the
+*only* thing distinguishing W1 from the route session 142 already refuted on supply arithmetic:
+
+> "the GRUNT off-flat null and the OD accuracy gap are THE SAME DEFECT. Bleed-free the model is
+> −1 dB midband at GRUNT cut and −6…−8 dB BROADBAND at GRUNT flat/boost. GRUNT sets the clipper's
+> coupling cap, and at 1 kHz the cut cap attenuates ~6 dB more ⇒ flat/boost drive the clipper
+> ~6 dB harder, and that is exactly where the model collapses."
+
+That is a mechanism claim with a **dose** in it, so it is falsifiable for free against the stored
+`s166_odtilt.json`. `verify-the-PREMISE-not-the-prior-session's-framing-of-it`, eleventh occurrence.
+
+### 2. BE1 — the framing reproduces on ONE column and the two columns disagree
+
+Bleed-free, GRUNT × three driven sweeps, at DRIVE noon:
+
+| GRUNT | null gain | ABS mid | MATCH mid |
+|---|---|---|---|
+| cut | +2.21 … +1.53 | −3.72 … −4.59 | −1.58 … −2.37 |
+| flat | −3.22 … −1.91 | −2.96 … −3.96 | −4.87 … −6.96 |
+| boost | −2.01 … −0.99 | −3.42 … −3.65 | −4.60 … −5.44 |
+
+**Worst-case GRUNT spread: ABSOLUTE 0.94 dB, GAIN-MATCHED 5.38 dB.** The framing was quoting the
+gain-matched column, and the 5.38 dB is **manufactured by the per-row null gain**, which swings
+from **+2.21 dB at cut to −3.22 dB at flat** — 5.4 dB, in the opposite direction, on a broadband
+time-domain scalar that the log sweep's LF octaves dominate.
+
+⭐⭐ **BE1b localises why, and it is the reusable half.** Per band at `sweep_drv_-12`, the GRUNT
+spread is **18.38 dB max / 4.92 dB median below 100 Hz** and **3.13 dB max / 0.35 dB median across
+100 Hz–4 kHz**. Above 100 Hz the three GRUNT positions agree to a few tenths of a dB all the way to
+4 kHz (101 Hz: 0.21 · 160 Hz: 0.09 · 508 Hz: 0.20 · 2032 Hz: 0.18 · 4064 Hz: 0.19). ⇒ **the GRUNT
+difference is a LOW-FREQUENCY one — which is exactly what switching the clipper's coupling cap
+does — and the midband deficit is GRUNT-INDEPENDENT.** The >4 kHz region is reported separately and
+is not this gate's: GATE I owns it, and its 8.98 dB at 8128 Hz would otherwise swamp the midband.
+
+### 3. BE2 — the dose, closed form, and it points the wrong way
+
+The clipper input branch is the composed GRUNT cap in series into `R16 + Zin`, `Zin = R18/(1+a0)`.
+Composed through the **ADD-cap** rule (s139's trap — `Clipper::gruntCapNow` returns c11 / c11+c12 /
+c11+c13; reading `clipC12`/`clipC13` raw understates flat by 7.9 %), with `clipC11` at its **fitted
+3.69 nF**, not the schematic 4n7:
+
+    R16 6800  +  Zin = 330k/25.871 = 12756  =>  Rtot 19556
+    cut  3.69 nF -> -7.682 dB      flat 50.69 nF -> -0.111 dB      boost 223.69 nF -> -0.006 dB
+
+⇒ **flat drives the clipper +7.57 dB harder than cut, boost +7.68 dB** — *larger* than the framing's
+~6 dB estimate, so the dose is if anything more favourable to the hypothesis than claimed.
+
+Against that dose the measured midband deficit moves **+0.007 to +0.122 dB per dB**, and **6 of 6
+cells move the WRONG WAY** — the deficit *shrinks* where the clipper is pushed harder. A ceiling
+that is too low must hurt MORE where it is approached harder. ⇒ **refuted on the dose, with no
+render, no fit and no threshold.**
+
+### 4. BE3 — and the stimulus axis says the same thing
+
+Over a 12 dB stimulus range the midband deficit moves **at most 1.00 dB** and is **monotone in 0 of
+3** GRUNT positions (cut −3.79/−4.59/−3.72, flat −3.74/−3.96/−2.96, boost −3.42/−3.65/−3.61).
+⇒ a ~3.5 dB level offset invariant to 12 dB of stimulus *and* to 7.6 dB of clipper drive is not a
+headroom defect on either axis. ⚠ This does not contradict GATE Q's `D(f)` rms 2.64 dB — the
+per-band table shows the stimulus-dependent term living at the band edges, not in the midband.
+
+### 5. BE4 — the sweep, and its three known answers
+
+80 renders: `clipSatLo`/`clipSatHi` × L for L ∈ {1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, **5.442**},
+`kInputRef` UNCHANGED at 0.90 (that is the experiment — s142 refuted raising the ceiling while
+holding the operating point fixed; this raises it and deliberately lets the clipper compress less),
+across the 9 bleed-free GRUNT × DRIVE conditions plus a CLEAN control. The top rung is asserted to
+be `VDD/satsum = 5.636/1.0356`, i.e. s142's own co-scaling factor, imported as arithmetic.
+
+- **KA(a) baseline reproduction: L = 1.0 reproduces the stored `s166_odtilt.json` to 0.0000 dB** at
+  all three GRUNT positions — exact, as a deterministic renderer must.
+- **KA(b) CLEAN scope: bit-identical (0.000e+00) at every rung** — the override is OD-only, as the
+  topology requires. A CLEAN move would have meant the constant reached further than intended.
+- **KA(c) non-vacuity: 0 of 9 OD conditions inert.**
+
+### 6. BE5 — ⚠⚠ THE GATE'S OWN FIRST DRAFT PUBLISHED A FALSE NEGATIVE, AND IT IS THE `abs()` TRAP
+
+The first draft scored the locus on `mean|absolute midband error|`, found a V at L = 1.5 with an
+interior depth of 1.882 dB, and printed **"INTERIOR OPTIMUM FOUND — the stop does NOT fire; W1
+continues to S2."** That is wrong, and wrong in the flattering direction.
+
+**The SIGNED error is monotone at all eight rungs and at every GRUNT position:**
+
+| L | satsum V | cut | flat | boost | SIGNED | mean\|abs\| | match rms |
+|---|---|---|---|---|---|---|---|
+| 1.000 | 1.036 | −3.986 | −3.466 | −1.370 | **−2.941** | 3.923 | 5.547 |
+| 1.250 | 1.295 | −2.945 | −1.757 | +0.395 | −1.436 | 2.672 | 5.482 |
+| 1.500 | 1.553 | −2.182 | −0.383 | +1.830 | −0.245 | **2.041** | **5.462** |
+| 2.000 | 2.071 | −1.142 | +1.673 | +4.020 | +1.517 | 3.015 | 5.480 |
+| 2.500 | 2.589 | −0.543 | +3.224 | +5.616 | +2.766 | 4.079 | 5.537 |
+| 3.000 | 3.107 | −0.130 | +4.429 | +6.880 | +3.726 | 4.993 | 5.583 |
+| 4.000 | 4.142 | +0.341 | +6.250 | +8.739 | +5.110 | 6.370 | 5.624 |
+| 5.442 | 5.636 | +0.736 | +7.643 | +10.179 | **+6.186** | 7.442 | 5.672 |
+
+7 of 7 steps one-signed. ⇒ **`mean|error|` of a MONOTONE signed error has a V at its zero crossing
+BY CONSTRUCTION, for any level lever whatsoever** — the L = 1.5 "optimum" is just where the level
+error passes through zero, and it carries no information about the mechanism. The repaired gate
+reads the signed column, and `_mutate_gate_be.py`'s `be5-signed` arm makes the signed locus
+genuinely turn over and requires the stop to stand down.
+
+⚠ A second slip in the same block, worth recording because of *how* it survived: the first fixed
+version still crashed on a stale `floor` reference in the report dict — and I did not notice,
+because I had piped the run through `sed` and read the output instead of the **exit code**. The
+verdict text was printed correctly above the crash. **Check `rc`, not just the tail of stdout.**
+
+### 7. BE5b — what the lever actually delivers, and the bar-free half
+
+Per band, the change in absolute error from L = 1.0, split into its MEAN (a pure scalar, which the
+162-capture matrix deletes by construction) and the residual rms (the shape a scalar cannot explain):
+
+| L | level part dB | shape part dB | shape/level |
+|---|---|---|---|
+| 1.250 | 1.638 | 0.391 | 0.239 |
+| 1.500 | 2.936 | 0.715 | 0.244 |
+| 2.500 | 6.344 | 1.625 | 0.256 |
+| 5.442 | 10.411 | 2.837 | 0.272 |
+
+⭐ **The shape/level ratio is 0.239–0.272 across the WHOLE sweep** — the lever makes ONE fixed shape
+scaled by how far it is turned, not a tunable family.
+
+⭐⭐ **And that direction is not the defect's, measured BAR-FREE.** cos² between the lever's per-band
+shape change and the residual shape error is a SHARE, so it needs no threshold (GATE AR's r², s154).
+Both vectors de-meaned first, so a pure scalar is free to both sides:
+
+    median cos^2  0.065 - 0.072  at every rung
+    best reachable shape rms, amplitude free PER CONDITION:  3.016 -> 2.711 dB  (10.1 % of it)
+
+Even with its amplitude chosen freely per condition — strictly more than any single shipped constant
+could do — this direction closes **10.1 %** of the shape error. That is why the gain-matched column
+moves only **0.084 dB** while the lever delivers 0.715 dB of shape at L = 1.5: ~88 % of what it
+delivers is orthogonal to the defect.
+
+⚠ The bar-free form matters here specifically because judging 0.084 dB against any number I chose
+would be `a-threshold-you-guessed-is-not-a-guard`, and s154's "a verdict that flips on 1 % of its own
+bar is not a verdict". The first repaired draft *did* gate on an invented 0.05 dB floor and reported
+"STOP DOES NOT FIRE" on 0.084 > 0.05. The share replaced it.
+
+### 8. THE VERDICT — the stop fires, on all three grounds
+
+1. **The signed midband error is MONOTONE** from −2.94 dB at L = 1.0 to +6.19 dB at the physical
+   ceiling, 7 of 7 steps one-signed. No interior optimum exists.
+2. **What it delivers is 0.24–0.27 dB of shape per dB of LEVEL**, a ratio constant across the sweep
+   — one fixed direction, and the matrix deletes the level part by construction.
+3. **BAR-FREE: that direction is not the defect's** — median cos² 0.072, closing 10.1 % at free
+   amplitude.
+
+⇒ **`clipSat` is a LEVEL lever wearing a headroom name.** This is the "make the clipper see less"
+degeneracy for the **fifth** time (s5/s6 clipper fits, GAP #3b's C13, the rail-voltage fit, C15) —
+approached from the opposite side (raise the ceiling rather than lower the drive) and identical in
+shape. **W1 is REFUTED at one session of its three, exactly as its own pre-registered stop
+instructed.** No matrix run is owed: W1's stop says the matrix is owed only if an interior optimum
+is found, and none is.
+
+### 9. What survives, and what does not
+
+⛔ **Refuted:** the GRUNT→headroom framing (BE1/BE1b/BE2); `clipSat` as a lever on the OD *shape*
+gap (BE5).
+⭐ **NOT refuted, and it is a real measurement to keep:** the OD path's **absolute** midband deficit
+is ~−2.9 dB pooled bleed-free, it *is* closable to ~0 by raising `clipSat` ×1.5, and the release
+gate is **structurally blind to it** (the standing rule: the matrix fits a per-row null gain before
+differencing anything). That is A3 seen as a level, and it remains open — but closing it buys
+0.084 dB of the graded shape error, so it is not a route to the 9 over-SHIP rows.
+⛔ **Unchanged:** s142's supply arithmetic (a *physical* `clipSat` is unreachable on this supply)
+is neither used nor re-litigated here — W1 proposed a different experiment and that experiment has
+now been run and refuted on its own terms.
+
+### 10. Release state
+
+**`ctest` 21/21.** No `src/` change, no rebuild, **no render-cache re-arm** (the binary's mtime is
+unchanged at 2026-08-06 10:45). GATE W's cache `build/s122_feature_locus` untouched — GATE BE
+renders into its own private `build/s170_clipsat_headroom` (1.2 GB, regenerable) and asserts at BE0
+that the two are not the same directory.

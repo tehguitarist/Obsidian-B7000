@@ -142,6 +142,30 @@ nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were
 
 #### STATUS
 
+- ⛔⛔ **SESSION 170 = W1 REFUTED AT ONE SESSION OF ITS THREE — THE PRE-REGISTERED STOP FIRED, AND
+  W1's PREMISE FELL BEFORE ANY RENDER (2026-08-06).** No `src/` change, no rebuild, no cache
+  re-arm, no matrix run owed. **`ctest` 21/21.** GATE BE (`analysis/clipsat_headroom_gate.py` +
+  `_mutate_gate_be.py`, **11/11 arms**, five computed-verdict). ⭐⭐ **THE PREMISE FIRST: s167's
+  claim that "the GRUNT off-flat null and the OD accuracy gap are THE SAME DEFECT" was quoting the
+  GAIN-MATCHED column, and the ABSOLUTE one says the midband deficit is GRUNT-INDEPENDENT** —
+  worst GRUNT spread **0.94 dB absolute vs 5.38 dB gain-matched**, the difference manufactured by
+  the per-row null gain swinging **+2.21 dB at cut to −3.22 dB at flat**. Per band, the GRUNT
+  difference is **18.4 dB max below 100 Hz and 0.35 dB MEDIAN across 100 Hz–4 kHz** ⇒ it is a
+  coupling-cap (LF) difference, not a midband headroom one. ⭐ And the dose points the wrong way:
+  closed form on the shipped constants (ADD-cap composed, `clipC11` at its fitted 3.69 nF), flat
+  drives the clipper **+7.57 dB** harder than cut and boost **+7.68 dB** — *more* than the framing's
+  ~6 dB — yet **6 of 6 cells move the WRONG WAY** (the deficit SHRINKS where the clipper is pushed
+  harder). Stimulus axis agrees: ≤**1.00 dB** over 12 dB, monotone **0 of 3**. ⛔ **THEN THE LEVER
+  ITSELF: 80 renders, `clipSat` × L to the physical ceiling with `kInputRef` UNCHANGED (the
+  experiment s142 did NOT run). The SIGNED midband error is MONOTONE, −2.94 dB → +6.19 dB, 7 of 7
+  steps one-signed**; what it delivers is **0.24–0.27 dB of shape per dB of LEVEL, a ratio constant
+  across the sweep** (one fixed direction); and BAR-FREE, **median cos² 0.072** against the defect,
+  so at free amplitude it closes **10.1 %** of the shape error and the gain-matched column moves
+  **0.084 dB**. ⇒ **`clipSat` is a LEVEL lever wearing a headroom name — the "make the clipper see
+  less" degeneracy for the FIFTH time.** Three known answers held: L=1.0 reproduces `s166_odtilt`
+  to **0.0000 dB**, CLEAN **bit-identical at every rung**, 0 of 9 OD conditions inert.
+  ⚠⚠ **This gate's OWN first draft published the opposite verdict** — see its CLOSED/REFUTED row.
+  `docs/session-log.md` SESSION 170.
 - ✅✅ **SESSION 169 = W2 CLOSED — item 13's clean-path phase residual is EXPECTED BEHAVIOUR
   (2026-08-06).** No DSP change (W2's own rule). `analysis/clean_lf_corner_count.py` (no captures,
   closed-form) counts the clean path's four modelled first-order LF corners (C1 1.59 Hz, `c21R`
@@ -518,6 +542,9 @@ table in this file.
 | GATE K's closure — *"THE TAPER CANNOT FIX IT … the best exponent reaches only rms 1.85 dB and lands 3.8 dB short at LEVEL max"* (s103), carried as the reason item 9 was a topology question | ⭐⭐ **REFUTED FOR THE *SEGMENTED* FAMILY, s162 — the LEVEL LAW *is* closable, to inside its own ambiguity** | 162 | GATE K fitted a single power-law **EXPONENT**, and *"no single exponent reaches"* is a different claim from *"no monotone taper reaches"* — the distinction s115/s146 were already forced to draw on the neighbouring MASTER pot. Re-asked on the current epoch, objective rms of (delivered − pedal) in dB, n = 24: **shipped p = 2.25 → 2.844** (worst 7.638), **best single exponent p = 2.0020 → 2.106** (3.344), **free monotone curve → 0.344** (0.901). ⭐ Graded against **AY2's own per-detent across-stimulus spread (0.755 dB rms)** — the bar that closed task A one session ago (s161 AX6), imported not chosen: the free curve is **INSIDE**, both exponent families **OUTSIDE by 3.77× / 2.79×**. ⭐ Outside corroboration nothing in the solve knows: required half-rotation **15.37 %** vs shipped **21.02 %**, moving **toward** the textbook A-taper 10–15 % band `circuit.md` says VR2 is (100k **A**); curve monotone in the knob, exact at both endpoints, single convexity dip **1.08 %** of a slope. ⚠ Floors, two and they are different quantities: solve residual **0.344 dB** of delivered level, required-taper spread **0.0778 rms / 0.1956 worst** in units of L — and both are **LOWER bounds**, because `dB_model(L)` is non-monotone at the hottest stimulus (GATE K3/L8) so that column is refused. ⚠ COST, priced first: worst \|Δ cleanFraction\| **0.1365**, which re-stales s156's mix law (it *reads* `cleanFraction()`). ⛔ Not a proposal — see task D's row above; the two targets pull opposite ways. | `analysis/level_taper_reshape.py` (GATE AY) AY3/AY4 |
 | ⭐ **NEW, and named nowhere in the project: at LEVEL MIN the model MUTES** | ⭐⭐ **MEASURED s162 — a real defect, NOT taper-reachable, and NOT task D's subject** | 162 | AY2 reads the model at **−249.96 dB** against a pedal only **−29.77 dB** below its own max. A taper cannot reach it in either direction — **L(0) = 0 exactly at the end stop under EVERY taper** — so a solve asking for L(0) > 0 (it asks for 0.0093) is asking for a pot that does not fully attenuate: a **TOPOLOGY** change (an end-stop resistance, or GATE K2's BLEND-body bleed path). ⚠ Excluded from AY2's requirement and AY3's objective by the SAME membership rule, and **the first draft's disagreement between the two sub-gates is what found it** — AY3 excluded it from the start, AY2 did not, and AY2 duly published a **214.41 dB** "requirement" (`ratio-statistics-need-a-denominator-guard`, differencing against digital silence). ⛔ Do not fold this into item 9's sensitivity question; it is a separate, unowned finding. | `analysis/level_taper_reshape.py` (GATE AY) AY2 |
 | item 13 — the clean path's ~20 dB (phase) null residual, s167: is it a mystery needing an instrument, or explicable from the chain's own known topology? | ✅✅ **EXPLAINED, s169 — bracketed by two closed-form readings of the model's OWN LF corners, no free parameter, no DSP change** | 169 | The clean path carries four modelled first-order LF corners in series (C1 1.59 Hz, `c21R` 12.24 Hz — the one deliberately re-anchored toward hardware, s91 — C36/C37 0.72 Hz each). Summing all four over the s167 single-corner reference unit gives **3.40→3.05×** (upper bound: assumes ND carries zero LF phase); counting only `c21R`'s own contribution plus the other three gives **1.73→1.61×** (lower-leaning). The measured **2.0–2.5×** sits BETWEEN them — exactly where a true answer set by ND's own (unknown) LF phase should land. ⭐ Found in passing: **C31** (Baxandall→LO-MID, 2.2 µF) is a real, unmodelled fifth corner, flagged as a carry-forward at the 2026-07-21 EQ-block build and never implemented (`grep` for `C31`/`kC31` finds nothing outside one docstring). Bracketed 0.33–33 Hz by loading resistance; the measured residual argues for the negligible end (a ~33 Hz gap would push the multiple to 8.6–9.6×, well above what's observed). ⛔ NOT fixed — real, tiny, unactioned, and W2's own rule was no DSP change either way. | `analysis/clean_lf_corner_count.py` |
+| ⭐⭐ s167's W1 framing — *"the GRUNT off-flat null and the OD accuracy gap are THE SAME DEFECT ... bleed-free the model is −1 dB midband at GRUNT cut and −6…−8 dB BROADBAND at flat/boost ... flat/boost drive the clipper ~6 dB harder, and that is exactly where the model collapses"* — the ONE claim that made W1 different from the route s142 refuted | ⛔⛔ **REFUTED BEFORE ANY RENDER, s170 — IT IS A GAIN-MATCHED READING OF A GRUNT-INDEPENDENT DEFECT** | 170 | The −1 vs −6…−8 dB contrast is real **only in the gain-matched column**. Measured ABSOLUTE on the same stored baseline, the bleed-free midband deficit is **−2.96…−4.59 dB at ALL THREE GRUNT positions** — worst GRUNT spread **0.94 dB**, against a framing quoting ~5. The gain-matched **5.38 dB** is manufactured by `comprehensive_report`'s per-row broadband null gain, which swings **+2.21 dB at cut to −3.22 dB at flat** (a time-domain scalar the log sweep's LF octaves dominate). ⭐⭐ Per band it localises exactly: GRUNT spread **18.38 dB max / 4.92 median BELOW 100 Hz** vs **3.13 max / 0.35 MEDIAN over 100 Hz–4 kHz** (101 Hz 0.21 · 508 Hz 0.20 · 2032 Hz 0.18 · 4064 Hz 0.19) ⇒ **the GRUNT difference is a COUPLING-CAP (LF) difference and the midband is GRUNT-independent.** ⭐ And the dose is *bigger* than claimed and points the wrong way: closed form on the shipped constants — ADD-cap composed (s139) with `clipC11` at its fitted 3.69 nF, `Zin = R18/(1+a0) = 12756` — flat drives the clipper **+7.57 dB** harder, boost **+7.68 dB**, yet **6 of 6 cells move the WRONG WAY** (deficit SHRINKS where the clipper is pushed harder), at **+0.007…+0.122 dB per dB**. Second axis agrees: over 12 dB of stimulus the deficit moves **≤1.00 dB**, monotone **0 of 3**. ⇒ a ~3.5 dB level offset invariant to 7.6 dB of clipper drive AND 12 dB of stimulus is not a headroom defect. ⚠ Does NOT contradict GATE Q's `D(f)` 2.64 dB — the stimulus-dependent term lives at the band edges, not the midband. ⛔ Do not re-open W1 from GRUNT evidence. | `analysis/clipsat_headroom_gate.py` (GATE BE) BE1/BE1b/BE2/BE3 |
+| **W1's LEVER** — raise `clipSat` toward the 5.636 V rail with `kInputRef` UNCHANGED, i.e. deliberately let the clipper compress LESS (the experiment s142 did *not* run; s142 refuted raising it while HOLDING the operating point fixed) | ⛔⛔ **REFUTED, s170 — W1's OWN PRE-REGISTERED STOP FIRES, ON ALL THREE OF ITS GROUNDS. 1 of 3 capped sessions spent, NOTHING built, no `src/` edit** | 170 | 80 renders, L ∈ [1.0, **5.442** = `VDD/satsum`, asserted rather than transcribed], 9 bleed-free GRUNT × DRIVE conditions + a CLEAN control. **(1)** The **SIGNED** midband error is **MONOTONE**, −2.94 dB at L=1.0 → **+6.19 dB** at the physical ceiling, **7 of 7 steps one-signed** ⇒ no interior optimum exists. **(2)** What it delivers is **0.24–0.27 dB of SHAPE per dB of LEVEL — a ratio constant across the whole sweep**, i.e. ONE fixed direction scaled by how far it is turned, and the matrix deletes the level part by construction. **(3)** ⭐⭐ **BAR-FREE: that direction is not the defect's** — median **cos² 0.072** between the lever's per-band shape change and the residual shape error (both de-meaned, so a scalar is free to both sides), so even with its amplitude chosen freely PER CONDITION — strictly more than any shipped constant could do — it closes **10.1 %** of the shape error (3.016 → 2.711 dB) and the gain-matched column moves **0.084 dB**. ⇒ **`clipSat` is a LEVEL lever wearing a headroom name: the "make the clipper see less" degeneracy for the FIFTH time** (s5/s6 clipper fits, GAP #3b's C13, the rail-voltage fit, C15), approached from the opposite side and identical in shape. ⭐ Three known answers held: **L=1.0 reproduces `s166_odtilt.json` to 0.0000 dB**, **CLEAN bit-identical (0.000e+00) at every rung** (the override is OD-only, as the topology requires), **0 of 9 OD conditions inert**. ⭐ NOT refuted and worth keeping: the OD path's **ABSOLUTE** midband deficit (~−2.9 dB pooled) **IS** closable to ~0 at L≈1.5 — but that is A3 seen as a LEVEL, which `release_gate` is structurally blind to, so it is not a route to the 9 over-SHIP rows. ⛔ No matrix run owed — W1's stop says the matrix is owed only if an interior optimum is found. | `analysis/clipsat_headroom_gate.py` (GATE BE) BE4/BE5 |
+| ⭐⭐ GATE BE's OWN FIRST DRAFT — *"INTERIOR OPTIMUM FOUND at L = 1.5, depth 1.882 dB — the stop does NOT fire; W1 continues to S2"* | ⛔⛔ **THE `abs()` TRAP: `mean\|error\|` OF A MONOTONE SIGNED ERROR HAS A V AT ITS ZERO CROSSING *BY CONSTRUCTION*, s170** | 170 | The draft scored the locus on `mean\|absolute midband error\|`. The **signed** error is monotone at all 8 rungs and at every GRUNT position (7/7 one-signed), so its absolute value must fall to a minimum where it crosses zero and rise after — **for ANY level lever whatsoever**, which is precisely the class the pre-registered stop exists to catch. ⇒ the "interior optimum" was the zero crossing, and the gate written to fire the degeneracy stop had **published the degeneracy as a pass**. ✅ Repaired: the verdict reads the SIGNED column plus a bar-free alignment share; `_mutate_gate_be.py`'s `be5-signed` arm makes the signed locus genuinely turn over and requires the stop to stand down. ⚠⚠ **Two further slips in the same block, both recorded because of HOW they survived:** (a) the first repaired draft gated the escape hatch on an **invented 0.05 dB floor** and reported "STOP DOES NOT FIRE" on 0.084 > 0.05 — `a-threshold-you-guessed-is-not-a-guard`, and s154's *"a verdict that flips on 1 % of its own bar is not a verdict"*; replaced by cos², a SHARE needing no bar. (b) the run then **crashed on a stale `floor` reference** and it went unnoticed because the output was piped through `sed` and the **exit code was never read** — the verdict text printed correctly above the traceback. ⭐ **Check `rc`, not the tail of stdout.** ⚠ Also: the arm's own first mutation (`+4·(L−1.5)²`) was **VACUOUS** — the real curve climbs ~9 dB, so a perturbation that small left it monotone and the arm read GUARD DEAD against a working guard (s110). | `analysis/_mutate_gate_be.py` `be5-signed` |
 
 ### THE RELEASE GATE
 
@@ -579,12 +606,37 @@ and CLOSED/REFUTED row cites these numbers, so they are kept. The session-160 ta
 shipped s163 (the LEVEL taper); E shipped s166 (`OdDriveTilt`); **ship done s167 — version 1.0.0,
 `CHANGELOG.md`, Phase 10's criterion closed.**
 
-#### ✅✅ THE LIVE PLAN — agreed with the user, session 167. **W1 → W2 → W3**, and every one is CAPPED.
+#### ✅✅ THE LIVE PLAN — agreed with the user, session 167. **W1 → W2 → W3 — ALL THREE NOW CLOSED.**
 
 ✅✅ **USER DECISION (2026-08-06): SHIP 1.0 ON THE CURRENT NUMBERS, W1 AFTER.** The 9 over-SHIP rows
-are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking. W1 targets 1.1.
+are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking.
 
-- ⭐⭐ **W1 — CAN THE OD GAP CLOSE AT ALL? The clipper-headroom lever. HARD CAP 3 SESSIONS.**
+⛔⛔ **THE PLAN IS COMPLETE AS OF SESSION 170, AND W1 — THE ONLY ONE THAT TARGETED THE GATE — WAS
+REFUTED.** W3 closed s168 (CPU, bit-identical), W2 closed s169 (item 13 = expected behaviour), W1
+refuted s170 at 1 of its 3 capped sessions. ⇒ **there is no open plan item, and the 9 over-SHIP rows
+stand as the accepted, documented 1.0 state.** The next direction is a **USER DECISION**, not a
+carry-forward: nothing in the backlog is scoped, and item 6 / A3 have now closed as *bounded, not
+closable* on W1's own S3 clause.
+
+- ⛔⛔ **W1 — REFUTED AND CLOSED, SESSION 170, at 1 of its 3 capped sessions. NOTHING BUILT, no
+  `src/` edit, no matrix run owed.** Three CLOSED/REFUTED rows carry it. Short version, and note it
+  fell **twice over**: **(a) THE PREMISE** — the "GRUNT off-flat and the OD gap are the same defect"
+  framing below is a **GAIN-MATCHED** reading; measured ABSOLUTE the midband deficit is
+  GRUNT-INDEPENDENT (spread **0.94 dB**, vs 5.38 gain-matched, the difference manufactured by the
+  per-row null gain), the GRUNT difference lives **below 100 Hz** (18.4 dB max vs 0.35 dB MEDIAN over
+  100 Hz–4 kHz), and the closed-form dose is *larger* than claimed (**+7.57/+7.68 dB**, not ~6) yet
+  **6 of 6 cells move the WRONG WAY**. **(b) THE LEVER** — 80 renders to the physical ceiling with
+  `kInputRef` unchanged: the **SIGNED** locus is **MONOTONE** (7/7 one-signed, −2.94 → +6.19 dB), it
+  delivers **0.24–0.27 dB of shape per dB of LEVEL** (one fixed direction), and bar-free its **cos²
+  with the defect is 0.072** ⇒ 10.1 % closable at free amplitude. **The pre-registered stop fired as
+  written.** ⭐ Worth keeping: A3's **absolute** OD level deficit *is* closable at L≈1.5, but
+  `release_gate` is structurally blind to a level, so it is not a route to the 9 over-SHIP rows.
+  ⛔ **Do not re-open W1 from GRUNT evidence.** ⇒ **item 6 / A3 close as "bounded, not closable"**,
+  which is what W1's own S3 clause instructed on this outcome. `docs/session-log.md` SESSION 170.
+
+  <details><summary>HISTORICAL — W1 as written at s167 (the framing above refutes its premise)</summary>
+
+  ⭐⭐ **W1 — CAN THE OD GAP CLOSE AT ALL? The clipper-headroom lever. HARD CAP 3 SESSIONS.**
   ⭐⭐⭐ **The framing that makes this new, and it is s167's main analytical result: the GRUNT
   off-flat null and the OD accuracy gap are THE SAME DEFECT.** Bleed-free the model is **−1 dB**
   midband at GRUNT cut and **−6…−8 dB BROADBAND at GRUNT flat/boost** (s166 report, per band). GRUNT
@@ -606,6 +658,7 @@ are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking. W1 targets 1.1.
   (item 10 REQUIRES an `OdToneRestore` re-fit after any upstream OD change, plus a matrix
   re-render). **S3 is buffer for that re-fit ONLY.** ⛔ **If the gap is not materially closed by the
   end of S3, close item 6 / A3 PERMANENTLY as "bounded, not closable" and stop.**
+  </details>
 - ✅✅ **W2 — CLOSED, SESSION 169.** `analysis/clean_lf_corner_count.py` (no captures, closed-form):
   the clean path carries **four** modelled first-order LF corners in series — C1 1.59 Hz
   (`InputBuffer.h`), `c21R` 12.24 Hz (`PedalChain::C21Highpass`, the one deliberately re-anchored
