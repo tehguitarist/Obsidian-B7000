@@ -407,6 +407,13 @@ public:
     // caller) → EQ → MasterOut → OUT.
     inline double processPostBlend(double cleanDelayed, double odDown) noexcept
     {
+        // dist_engage footswitch crossfade (item 14, s171). Advanced here rather than
+        // inside process() so that process() stays pure — cleanFraction() evaluates it
+        // twice per block with unit inputs to recover its own coefficients, and a
+        // state-advancing process() would make that accessor eat the fade. A no-op
+        // (one compare, early return) whenever the switch is not mid-stomp, which is
+        // every sample of every offline render.
+        levelBlend.tickSmoothing();
         double s = levelBlend.process(cleanDelayed, odDown);
         s = c21.process(s);          // C21 100n inter-stage HP (bass shaping)
         s = eqPreGain.process(s);

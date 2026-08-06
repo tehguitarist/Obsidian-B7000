@@ -162,6 +162,14 @@ target_link_libraries(FinalSweepTest PRIVATE chowdsp::chowdsp_wdf)
 target_compile_options(FinalSweepTest PRIVATE ${PEDAL_WARNING_FLAGS})
 add_test(NAME FinalSweepTest COMMAND FinalSweepTest)
 
+# Open-work item 14 — switch and FOOTSWITCH transitions, GATED (FinalSweepTest [5]
+# only REPORTED the four selectors, and it did not cover `dist_engage` at all).
+# See the file header for the pre-registered click bar and the mid-pot known answer.
+add_executable(SwitchTransitionTest tests/SwitchTransitionTest.cpp)
+target_link_libraries(SwitchTransitionTest PRIVATE chowdsp::chowdsp_wdf)
+target_compile_options(SwitchTransitionTest PRIVATE ${PEDAL_WARNING_FLAGS})
+add_test(NAME SwitchTransitionTest COMMAND SwitchTransitionTest)
+
 # Phase-7 calibration harness: render a WAV through the real chain from the CLI.
 # Mirrors PluginProcessor::processBlock (see the header comment in the source);
 # needs juce_audio_formats for 32-bit-float WAV I/O and juce_dsp for the

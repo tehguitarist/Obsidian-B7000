@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include "../utils/TaperUtils.h"
+#include "MnaSolve.h" // mna::differs — exact-inequality float compare without -Wfloat-equal
 
 // =============================================================================
 // Stage 7/8 — LEVEL (VR2) + BLEND (VR1) — OD volume + clean/OD crossfade
@@ -62,9 +64,31 @@
 // ---- dist_engage override ---------------------------------------------------
 // When dist_engage = false, the output is forced to 100% clean (Vc), ignoring
 // the BLEND knob. This implements the [ENG] DIST footswitch behaviour per
-// circuit.md "Footswitches". The ~5ms crossfade smoothing for this override is
-// deferred to Phase 6 (the BLEND crossfade itself must not be wired before
-// Phase 6's delay-compensation line exists — build-plan risk #8).
+// circuit.md "Footswitches".
+//
+// ⭐⭐ SESSION 171 — THE CROSSFADE IS NOW BUILT (open-work item 14, S2). It was
+// "deferred to Phase 6" from the stage's first draft and never picked up, so for
+// ~165 sessions this override was a HARD BRANCH on a control that is a FOOTSWITCH
+// — stomped live, mid-performance — while `bypass`, the less time-critical of the
+// two, had had its 5 ms crossfade since Phase 6. `architecture.md` specifies it as
+// "a target-mix override on the existing BLEND crossfade … with its own short
+// crossfade"; that is what `distMix` below is.
+//
+// Measured before it was built (`tests/SwitchTransitionTest.cpp`, the item's own
+// pre-registered bar — the per-sample step the switch introduces, against the
+// tone's own steady-state step): the hard branch ran **3.2x to 53.8x**, the worst
+// of any control in the chain, and it failed in BOTH directions at every pot
+// configuration. That is expected rather than surprising: the step is the full
+// |OD − clean| difference between two signals that have been through entirely
+// different chains, so it is order-unity where a selector switch's is a transient.
+//
+// ⚠⚠ THE STEADY-STATE PATH MUST BE THE IDENTICAL CODE PATH, not this crossfade
+// evaluated at coefficient 1.0 — a design constraint, not an afterthought. That is
+// what makes the 162-capture matrix come back BIT-IDENTICAL (OfflineRender never
+// flips a switch mid-render, so `distMix` sits pinned at an endpoint for every
+// rendered sample) and is why NO re-baseline is owed for this change, unlike
+// s162/s163/s166. Both endpoints below are therefore explicit early returns onto
+// exactly the pre-change expressions.
 //
 // ---- Polarity ---------------------------------------------------------------
 // Both paths are non-inverting (resistive dividers). The polarity concern at
@@ -142,9 +166,34 @@ public:
                            : (f3 + (1.0 - f3) * (x - b3) / (1.0 - b3));
     }
 
-    void prepare(double /*sampleRate*/) noexcept {}
+    // ---- dist_engage footswitch crossfade ------------------------------------
+    // ⚠⚠ NOT 5 ms. The 5 ms bypass precedent (`architecture.md` "Bypass") was the
+    // first guess, and `SwitchTransitionTest`'s full sweep (every pot config, every
+    // flip phase, not just one) refuted it: at `blend-noon` (LEVEL/BLEND both near
+    // max, the largest measured divergence, 0.66) the settled difference signal's
+    // own per-sample step is comparable to the tone's own quiet step regardless of
+    // fade speed, so a 5 ms fade landed the gated ratio at 1.00-1.004x — genuinely
+    // over the bar, not a floor artefact (verified: a slower fade measurably lowers
+    // it, a floor would not move). Swept 8/10/12 ms; 12 ms clears every cell with
+    // real margin (worst 0.80x at blend-noon and mids-cut) while 10 ms leaves only
+    // ~2% (0.98x). Still well inside item 14's own "~5-20 ms" spec and far too fast
+    // to read as a fade-in under a footswitch stomp.
+    static constexpr double kDistFadeSeconds = 0.012;
 
-    void reset() noexcept {}
+    void prepare(double sampleRate) noexcept
+    {
+        // ⚠ Guard the rate: a zero/negative would make `distStep` non-finite and the
+        // ramp would never land ON an endpoint, so the bit-identical steady-state
+        // branches below would stop being reachable — a silent loss of the property
+        // this whole design rests on, not a crash.
+        distStep = (sampleRate > 0.0) ? 1.0 / (kDistFadeSeconds * sampleRate) : 1.0;
+        distMix = distTarget; // a rate change is not a footswitch press
+    }
+
+    // Snaps the fade to its target. Called before every render and at the top of
+    // playback, which is what keeps a static render free of a head ramp
+    // (`offline_render.cpp` does setParams() THEN reset(), in that order).
+    void reset() noexcept { distMix = distTarget; }
 
     void setLevel(double x) noexcept
     {
@@ -178,7 +227,23 @@ public:
         B = x;
     }
 
-    void setDistEngage(bool engage) noexcept { distEngage = engage; }
+    void setDistEngage(bool engage) noexcept { distTarget = engage ? 1.0 : 0.0; }
+
+    // Advance the footswitch crossfade by one sample. Deliberately SEPARATE from
+    // process(): process() must stay pure and const because `cleanFraction()` calls
+    // it twice with unit inputs to recover its own coefficients by superposition, and
+    // a process() that advanced state would make that accessor corrupt the fade.
+    inline void tickSmoothing() noexcept
+    {
+        if (! mna::differs(distMix, distTarget))
+            return;
+        // Land exactly ON the endpoint rather than approaching it — the two
+        // bit-identical branches in process() are `<= 0.0` and `>= 1.0`, so an
+        // asymptotic ramp would leave the shipped steady state permanently inside
+        // the interpolating arm and silently break the no-re-baseline property.
+        distMix = (distTarget > distMix) ? std::min(distTarget, distMix + distStep)
+                                         : std::max(distTarget, distMix - distStep);
+    }
 
     // Fraction of the OUTPUT that is clean-tap signal, in [0,1].
     //
@@ -197,8 +262,12 @@ public:
     // agree to 0.03-0.05 dB), which is what makes one number sufficient here.
     double cleanFraction() const noexcept
     {
-        const double od = process(0.0, 1.0);
-        const double cl = process(1.0, 0.0);
+        // ⚠ Evaluated at the SETTLED mix (`distTarget`), not at the live `distMix`.
+        // This keys `OdToneRestore`'s notch law, which is re-read once per block; a
+        // mid-stomp reading would chatter that stage's coefficients for a few ms against
+        // a mix that is already on its way somewhere else.
+        const double od = processAt(0.0, 1.0, distTarget);
+        const double cl = processAt(1.0, 0.0, distTarget);
         const double sum = od + cl;
         return sum > 0.0 ? cl / sum : 1.0;
     }
@@ -208,10 +277,31 @@ public:
     // odIn    = signal from IC4_A Sallen-Key output (VD-referenced AC voltage).
     inline double process(double cleanIn, double odIn) const noexcept
     {
-        // dist_engage override: 100% clean.
-        if (!distEngage)
-            return cleanIn;
+        return processAt(cleanIn, odIn, distMix);
+    }
 
+    // The stage evaluated at an EXPLICIT dist-engage mix, so the two endpoints are
+    // reachable independently of where the fade currently sits — which is what
+    // cleanFraction() needs (it must key OdToneRestore off the settled mix, not off
+    // a mid-fade value that will be gone in a few ms).
+    inline double processAt(double cleanIn, double odIn, double dm) const noexcept
+    {
+        // dist_engage fully DISENGAGED: 100% clean. Unchanged pre-crossfade path.
+        if (dm <= 0.0)
+            return cleanIn;
+        const double engaged = engagedPath(cleanIn, odIn);
+        // dist_engage fully ENGAGED: unchanged pre-crossfade path, bit-identical.
+        if (dm >= 1.0)
+            return engaged;
+        // Mid-stomp only. Never reached by a static render.
+        return (1.0 - dm) * cleanIn + dm * engaged;
+    }
+
+private:
+    // The BLEND network proper — everything this stage did before the footswitch
+    // crossfade existed, moved wholesale and otherwise untouched.
+    inline double engagedPath(double cleanIn, double odIn) const noexcept
+    {
         // LEVEL divider wiper voltage (loaded by BLEND pot).
         // Handle endpoints analytically to avoid division by zero.
         double vw;
@@ -244,10 +334,13 @@ public:
         return (1.0 - B) * cleanIn + B * vw;
     }
 
-private:
     double L = 1.0; // LEVEL taper-mapped position [0,1] (default = max OD)
     double B = 0.0; // BLEND position [0,1] (default = 100% clean)
-    bool distEngage = true; // true = normal BLEND behaviour
+    // dist_engage footswitch: 1 = OD engaged (normal BLEND behaviour), 0 = forced
+    // clean. `distMix` is where the crossfade (`kDistFadeSeconds`) currently is; `distTarget` is
+    // where the switch says it should be.
+    double distMix = 1.0, distTarget = 1.0;
+    double distStep = 1.0; // 1/(fade samples); prepare() derives it from the rate
     // Capture-fit taper shape + the knob position it was applied to. Defaults are
     // the fitted s163 values, so a default-constructed LevelBlend matches the
     // shipped FitParams.

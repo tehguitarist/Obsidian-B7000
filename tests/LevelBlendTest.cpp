@@ -269,7 +269,13 @@ int main()
                      rClean, idealCleanGain, cleanLoadingDb);
     }
 
-    // ---- Test 5: dist_engage=false → 100% clean ------------------------
+    // ---- Test 5: dist_engage=false -> 100% clean ------------------------
+    // ⚠ Session 171 (item 14, S2): dist_engage now crossfades over ~12 ms
+    // (`LevelBlend::kDistFadeSeconds`) rather than switching instantly, so a
+    // single process() after setDistEngage() reads mid-fade, not the settled
+    // endpoint. Settle it explicitly with tickSmoothing() (the same call
+    // PedalChain::processPostBlend makes every sample) before reading the
+    // steady-state value the endpoints are still bit-identical to.
     std::printf("\n=== Test 5: dist_engage=false (override to clean) ===\n");
     {
         LevelBlend stage;
@@ -278,9 +284,14 @@ int main()
         stage.setBlend(1.0);
         stage.setDistEngage(false);
 
+        // 1000 samples comfortably clears the ~12 ms (576-sample) fade at 48 kHz.
+        constexpr int kSettleSamples = 1000;
         double y = 0.0;
-        for (int n = 0; n < 10; ++n)
+        for (int n = 0; n < kSettleSamples; ++n)
+        {
+            stage.tickSmoothing();
             y = stage.process(1.0, 3.0); // clean=1V, OD=3V
+        }
         const bool cleanOverride = std::abs(y - 1.0) < 1e-9;
         std::printf("  dist_engage=false: output=%.6f (expect 1.0 clean): %s\n",
                      y, cleanOverride ? "PASS" : "FAIL");
@@ -289,9 +300,12 @@ int main()
 
         stage.setDistEngage(true);
         y = 0.0;
-        for (int n = 0; n < 10; ++n)
+        for (int n = 0; n < kSettleSamples; ++n)
+        {
+            stage.tickSmoothing();
             y = stage.process(1.0, 3.0);
-        // LEVEL=1, BLEND=1 → output = OD = 3.0
+        }
+        // LEVEL=1, BLEND=1 -> output = OD = 3.0
         const bool normalBlend = std::abs(y - 3.0) < 1e-9;
         std::printf("  dist_engage=true:  output=%.6f (expect 3.0 OD): %s\n",
                      y, normalBlend ? "PASS" : "FAIL");
