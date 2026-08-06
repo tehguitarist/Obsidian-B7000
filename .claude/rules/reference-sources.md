@@ -304,6 +304,14 @@ than re-deriving a new chart-based target.
 
 ## 6. What is NOT claimed
 
+- ⛔⛔ **AND AS OF SESSION 170 WE DO NOT HAVE THE IMAGES EITHER — THEY ARE NOT ON DISK.** A
+  whole-repo search finds only `ui/` assets and the two `schematics/` pages; no §2 sweep, no §3
+  overlay, no §4 spectrum. ⚠ Stated precisely and without over-claiming: they may never have been
+  committed rather than having been deleted. What is operative is that **they cannot be re-read**,
+  so every §2/§3/§4 number in this file is a **transcription that can no longer be checked against
+  its source** — and §4a's headline already DEMOTES the two derived numbers a fit would score
+  against. ⇒ **§4 is unfittable until real B7K Ultra hardware is measured** (open-work item 15);
+  ⛔ do not open it as a fitting item, and do not "re-read the chart" — there is no chart.
 - We have **images only**, no underlying measurement data, and no statement of the exact drive /
   blend / level conditions behind §3 and §4.
 - The source's provenance is a third-party comparison. Its *internal* consistency is good (charts 2

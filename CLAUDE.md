@@ -614,9 +614,20 @@ are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking.
 ⛔⛔ **THE PLAN IS COMPLETE AS OF SESSION 170, AND W1 — THE ONLY ONE THAT TARGETED THE GATE — WAS
 REFUTED.** W3 closed s168 (CPU, bit-identical), W2 closed s169 (item 13 = expected behaviour), W1
 refuted s170 at 1 of its 3 capped sessions. ⇒ **there is no open plan item, and the 9 over-SHIP rows
-stand as the accepted, documented 1.0 state.** The next direction is a **USER DECISION**, not a
-carry-forward: nothing in the backlog is scoped, and item 6 / A3 have now closed as *bounded, not
+stand as the accepted, documented 1.0 state.** Item 6 / A3 have now closed as *bounded, not
 closable* on W1's own S3 clause.
+
+✅✅ **SESSION 170 THEN SCOPED WHAT REMAINS, AND THE AGREED NEXT MOVE IS ITEM 14 → ITEM 12.**
+Three candidates were measured (not read off the handover) and two changed shape when checked —
+`docs/session-log.md` SESSION 170 §11:
+- ⭐⭐ **item 14 — switch/footswitch transitions. THE PICK, ~2 sessions, starting with `dist_engage`**
+  (a live-performance footswitch with NO smoothing and NO test — the carry-forward had absorbed it
+  into a list of set-and-forget selectors). ⭐ Carries a **free matrix bit-identity known answer**,
+  so unlike s162/163/166 it owes **no re-baseline**.
+- ⭐ **item 12 — LEVEL min mutes. The natural companion** (~1 session, same file, same free scope
+  check): confirmed by render as **exact digital zero** against ND's −46.11 dBFS.
+- ⛔ **item 15 — the even-order harmonic gap. PARKED, blocked on a reference the project does not
+  have** (the §4 source PNGs are not on disk); needs real B7K Ultra hardware, not a session.
 
 - ⛔⛔ **W1 — REFUTED AND CLOSED, SESSION 170, at 1 of its 3 capped sessions. NOTHING BUILT, no
   `src/` edit, no matrix run owed.** Three CLOSED/REFUTED rows carry it. Short version, and note it
@@ -634,31 +645,6 @@ closable* on W1's own S3 clause.
   ⛔ **Do not re-open W1 from GRUNT evidence.** ⇒ **item 6 / A3 close as "bounded, not closable"**,
   which is what W1's own S3 clause instructed on this outcome. `docs/session-log.md` SESSION 170.
 
-  <details><summary>HISTORICAL — W1 as written at s167 (the framing above refutes its premise)</summary>
-
-  ⭐⭐ **W1 — CAN THE OD GAP CLOSE AT ALL? The clipper-headroom lever. HARD CAP 3 SESSIONS.**
-  ⭐⭐⭐ **The framing that makes this new, and it is s167's main analytical result: the GRUNT
-  off-flat null and the OD accuracy gap are THE SAME DEFECT.** Bleed-free the model is **−1 dB**
-  midband at GRUNT cut and **−6…−8 dB BROADBAND at GRUNT flat/boost** (s166 report, per band). GRUNT
-  sets the clipper's coupling cap, and at 1 kHz the cut cap (4n7 = 33.9 kΩ against R16 6k8 + Zin
-  ~12.7 k) attenuates **~6 dB more** than flat/boost ⇒ **flat/boost drive the clipper ~6 dB harder,
-  and that is exactly where the model collapses.** That is GATE Q's "the OD path saturates too
-  early", A3's 4.4 dB deficit, and **item 5's UNTESTED branch (b)**, all one mechanism.
-  ⭐ **THE UNTRIED EXPERIMENT:** `clipSat` sums to **1.036 V against the derived 5.636 V supply
-  (5.44× low)**. s142 refuted raising it **while holding the operating point fixed** — nobody has
-  raised it and *deliberately let the clipper compress less*, which is what the GRUNT evidence asks
-  for. **S1 = GATE BE:** sweep the clipSat sum toward 5.636 V with the drive UNCHANGED, scoring
-  (a) GRUNT off-flat bleed-free midband, (b) GRUNT cut (must not regress from ~1 dB), (c) CLEAN,
-  (d) the full gate. ⛔⛔ **PRE-REGISTERED STOP: if the locus is monotone with NO interior optimum,
-  that is the "make the clipper see less" degeneracy this project has already hit four times
-  (s5/s6 clipper fits, GAP #3b's C13, the rail-voltage fit, C15) — REFUTE and STOP AT ONE SESSION.**
-  ✅ **USER DECISION on the ambiguous case: SHIP ANY MEASURED IMPROVEMENT that does not regress
-  GRUNT cut or CLEAN** — same posture as s162/163/166 (price it, decide, keep if net positive). No
-  size bar; do NOT spend a session chasing the last dB. **S2** ships it and pays the known debts
-  (item 10 REQUIRES an `OdToneRestore` re-fit after any upstream OD change, plus a matrix
-  re-render). **S3 is buffer for that re-fit ONLY.** ⛔ **If the gap is not materially closed by the
-  end of S3, close item 6 / A3 PERMANENTLY as "bounded, not closable" and stop.**
-  </details>
 - ✅✅ **W2 — CLOSED, SESSION 169.** `analysis/clean_lf_corner_count.py` (no captures, closed-form):
   the clean path carries **four** modelled first-order LF corners in series — C1 1.59 Hz
   (`InputBuffer.h`), `c21R` 12.24 Hz (`PedalChain::C21Highpass`, the one deliberately re-anchored
@@ -999,11 +985,18 @@ closable* on W1's own S3 clause.
     direction — so dropping to 0.8 pushes further under rather than closing a gap. ⛔ Do not re-open
     without a fresh listening test on the current build.
 
-12. ⭐ **NEW, SESSION 162, UNOWNED: at LEVEL MIN the model MUTES** — −249.96 dB against a pedal only
-    −29.77 dB below its own max. **Not taper-reachable in either direction** (L(0) = 0 exactly at
-    the end stop under every taper), so closing it is a **TOPOLOGY** change: an end-stop resistance,
-    or GATE K2's BLEND-body bleed path. ⛔ Do not fold it into item 9's sensitivity question. Nothing
-    proposed, no session has scoped it (`analysis/level_taper_reshape.py` AY2).
+12. ⭐ **AT LEVEL MIN THE MODEL MUTES — s162, SCOPED AND RE-MEASURED s170. UNOWNED, ~1 SESSION.**
+    ✅ **Confirmed by direct render, not inferred:** at LEVEL = 0 / BLEND = 1 the model's output is
+    **exact digital zero (`max|x| = 0.000e+00`)** where ND delivers **−46.11 dBFS rms, 27.3 dB below
+    its own LEVEL-max** on `sweep_drv_-12` — a real, audible signal. ⚠ Quote 27.3 dB with its sweep;
+    GATE AY2's **−29.77 dB** is the same finding on a different statistic, not a second one.
+    ⭐ **The mechanism needs no further instrument — it is two lines of `LevelBlend::process`:**
+    `if (L <= 0.0) { vw = 0.0; }` then `if (B >= 1.0) return vw;`. **Not taper-reachable in either
+    direction** (L(0) = 0 exactly at the end stop under every taper), so closing it is a **TOPOLOGY**
+    change: a pot **end-stop resistance**, or **GATE K2's BLEND-body bleed path**. ⭐ Carries a free
+    scope check: a change confined to the L→0 corner must leave every other LEVEL setting
+    bit-identical. ⛔ Do not fold it into item 9's sensitivity question.
+    (`analysis/level_taper_reshape.py` AY2; `docs/session-log.md` SESSION 170 §11c.)
 
 13. ✅✅ **CLOSED, SESSION 169 — EXPECTED BEHAVIOUR, no DSP change.** Opened s167:
     `ref-clean`'s FR band-RMS over 100 Hz–8 kHz is **0.05 dB** yet its null is **−28.50 dB**
@@ -1015,6 +1008,50 @@ closable* on W1's own S3 clause.
     the measured figure sits between them. Closes as EXPECTED BEHAVIOUR: several stacked sub-100 Hz
     HPF corners, `c21R` dominant, is the right topology for a residual this size. See the
     SHIPPED CONSTANTS / open-work "W2" row above for the C31-gap finding (unactioned, negligible).
+
+14. ⭐⭐ **NEW, SESSION 170 — SWITCH AND FOOTSWITCH TRANSITIONS. THE MOST ACTIONABLE ITEM ON THIS
+    LIST, ~2 SESSIONS, AND THE STANDING CARRY-FORWARD WAS POINTING AT THE WRONG ONE.** Measured
+    (`FinalSweepTest` [5], mid pots at FULL BOOST = worst case; step at the flip sample against the
+    tone's own motion there): attack **0.17×**, grunt **0.17×**, hiMidFreq **0.75×**, loMidFreq
+    **2.49×** — only loMidFreq exceeds the signal's own sample-to-sample step.
+    ⭐⭐ **BUT `dist_engage` IS NOT IN THAT TABLE, IS NOT SMOOTHED AT ALL, AND IS A *FOOTSWITCH*** —
+    stomped live, mid-performance. `LevelBlend::process` opens with a hard
+    `if (!distEngage) return cleanIn;`, so its step is the full |OD − clean| difference between two
+    signals from entirely different chains: **order-unity, not 0.18**. `architecture.md` SPECIFIES
+    it as *"a target-mix override on the existing BLEND crossfade … with its own short crossfade"*;
+    it was never built and **no test covers it**. ⇒ the carry-forward *"switches are unsmoothed"*
+    had absorbed a footswitch into a list of set-and-forget selectors.
+    **S1 = instrument** (extend [5] or a new `SwitchTransitionTest`): cover `dist_engage` and
+    `bypass`, sweep pot positions, pre-register the click bar as *step > 1× the quiet step*.
+    ⭐ Free known answer: at mid pots = 0.5 the mid-freq flips must read **exactly zero**
+    (`circuit.md`'s B-taper centre is exactly flat) — s167 hit this as a vacuity FAILURE, so it
+    converts into a validity check. **S2 = implement**: per-stage dual-instance crossfade (~5–20 ms)
+    on the affected stage only; `MidBand` carries just two state doubles, and `dist_engage` folds
+    into the existing BLEND crossfade.
+    ⭐⭐ **COST IS UNUSUALLY LOW AND MUST NOT BE PRICED AS A NORMAL DSP CHANGE: a crossfade is inert
+    in steady state and `OfflineRender` never flips a switch mid-render, so the 162-capture matrix
+    must come back BIT-IDENTICAL — a free known answer, and NO re-baseline is owed.** ⚠ True only
+    if the steady-state path is the **identical code path**, not a crossfade at coefficient 1.0 —
+    a design constraint, not an afterthought. ⛔ **PRE-REGISTERED STOP:** if every switch at every
+    pot position sits below the signal's own quiet step, close it as measured-and-accepted (where
+    attack/grunt/hiMid already sit). `docs/session-log.md` SESSION 170 §11a.
+
+15. ⛔⛔ **THE ~27 dB EVEN-ORDER HARMONIC GAP — BLOCKED ON A REFERENCE, NOT ON EFFORT. DO NOT OPEN
+    THIS AS A FITTING ITEM (s170).** `reference-sources.md` §4's structural finding stands (hardware
+    is even-dominant where ND essentially is not; odds match to the dB) and it is still the largest
+    hardware gap in the project. What a session cannot do is *fit* to it:
+    ⛔ **the three source spectrum PNGs are NOT ON DISK** (whole-repo search, s170 — only `ui/`
+    assets and the two `schematics/` pages), so the only surviving evidence is the transcribed
+    table, and **§4a's own headline DEMOTES the two derived numbers a fit would score against**;
+    ⛔ §4a already concludes *"no capture can resolve this further — the chart under-specifies its
+    own operating point by more than the quantity in dispute"*; ⛔ sessions **72–84 (thirteen)**
+    worked this axis and shipped **one** constant (`jfetSatNeg`, s91); ⛔ s84 priced the one
+    candidate that scored "free" and it bought **+0.23 dB on H2** (no authority — ND is 27 dB down
+    there) for **−1.45 dB on H3** (authoritative — ND == hardware).
+    ⇒ **UNBLOCKED ONLY BY a harmonic measurement of a REAL B7K Ultra** at stated drive/EQ settings.
+    That is an acquisition question for the user, not a session of work; if hardware appears, S1 is
+    one session defining the capture protocol so the operating point is finally known.
+    `docs/session-log.md` SESSION 170 §11b.
 
 ⚠ **A3 (on this list since session 89) is compressed here but its exclusions must travel together —
 this sentence is load-bearing:** *no single element closes A3 (s50), no post-clipper linear element
@@ -1134,6 +1171,9 @@ cleanFrac, frequency), worst disagreement **5.0e-09 dB**.
   state never advanced) and the **knob-turn zipper, worst on DRIVE** (`applyParams()` runs once per
   block, so a fast sweep jumped the raw APVTS value uninterpolated; fixed with `SmoothedValue::skip`
   at knob-value level, ~20 ms). Full diagnosis: `docs/session-log.md`.
-  ⚠ **Still open, and NOT covered by either fix:** switches (ATTACK/GRUNT/mid-freq/bypass/
-  `dist_engage`) are unsmoothed — the harder glitch-free-crossfade problem (`circuit.md`,
-  `TrebleAttack.h`).
+  ⚠ **Still open, and NOT covered by either fix:** switches (ATTACK/GRUNT/mid-freq/`dist_engage`)
+  are unsmoothed — the glitch-free-crossfade problem (`circuit.md`, `TrebleAttack.h`).
+  ⭐⭐ **MEASURED AND SCOPED AT s170 — THIS IS NOW OPEN-WORK ITEM 14, READ IT THERE.** ⛔ And correct
+  two things in the sentence above: **bypass IS smoothed** (its own 5 ms crossfade, see "Bypass" in
+  `architecture.md`), and lumping **`dist_engage`** in with the selector switches is what hid it —
+  it is a **FOOTSWITCH**, stomped live, with no smoothing and no test at all.
