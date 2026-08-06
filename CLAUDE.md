@@ -522,6 +522,13 @@ ND-referenced matrix cannot see.** OD band-RMS 1.947 → 2.011 (s162, `OdToneRes
 (s166, `OdDriveTilt`, mechanism-attributed to GATE Z's already-diagnosed under-distortion — see
 that row's SHIPPED CONSTANTS entry). ⛔ None was reverted; all three are decided, KEEP.
 
+✅✅ **AND AS OF SESSION 167 THE 9 ROWS ARE AN ACCEPTED, DOCUMENTED STATE FOR 1.0 — NOT A BLOCKER.**
+User decision (2026-08-06): ship 1.0 on the current numbers and take the OD gap afterwards (plan
+W1). ⛔ **This does NOT retire the gate or move any bar** — the criterion is unchanged and still
+unmet; what changed is that the release no longer waits on it. `CHANGELOG.md` states the limitation
+in customer-facing terms. Re-read this beside W1's own pre-registered stop before treating a future
+improvement as "the gate finally closing".
+
 ⚠ **The OD headline is membership-weighted** — it moves with the capture inventory's BLEND
 composition, not only with the model (`release_gate.blend_composition()` prints this every run;
 `aggregate-moved-check-membership-first`, twelve occurrences). Never diff two reports' OD numbers
@@ -546,11 +553,55 @@ these bands is a **USER DECISION**, and open-work item 6 carries the live hypoth
 ### Open work, in order
 
 ⚠ **The numbering is historical and is NOT the priority order** — every rules file, gate docstring
-and CLOSED/REFUTED row cites these numbers, so they are kept. The live ordering was the **session-160
-task list, agreed with the user: A → D → E → ship** — ✅✅ **ALL THREE NOW DONE (2026-08-06): A
-refuted s161; D(a) refuted s162, D(b) shipped s163 (the LEVEL taper); E shipped s166
-(`OdDriveTilt`, three sessions, two architectures refuted before the third was built).** Next per
-that list: **ship**.
+and CLOSED/REFUTED row cites these numbers, so they are kept. The session-160 task list
+(**A → D → E → ship**) is ✅✅ **COMPLETE (2026-08-06)**: A refuted s161; D(a) refuted s162, D(b)
+shipped s163 (the LEVEL taper); E shipped s166 (`OdDriveTilt`); **ship done s167 — version 1.0.0,
+`CHANGELOG.md`, Phase 10's criterion closed.**
+
+#### ✅✅ THE LIVE PLAN — agreed with the user, session 167. **W1 → W2 → W3**, and every one is CAPPED.
+
+✅✅ **USER DECISION (2026-08-06): SHIP 1.0 ON THE CURRENT NUMBERS, W1 AFTER.** The 9 over-SHIP rows
+are **ACCEPTED AND DOCUMENTED for 1.0**, not blocking. W1 targets 1.1.
+
+- ⭐⭐ **W1 — CAN THE OD GAP CLOSE AT ALL? The clipper-headroom lever. HARD CAP 3 SESSIONS.**
+  ⭐⭐⭐ **The framing that makes this new, and it is s167's main analytical result: the GRUNT
+  off-flat null and the OD accuracy gap are THE SAME DEFECT.** Bleed-free the model is **−1 dB**
+  midband at GRUNT cut and **−6…−8 dB BROADBAND at GRUNT flat/boost** (s166 report, per band). GRUNT
+  sets the clipper's coupling cap, and at 1 kHz the cut cap (4n7 = 33.9 kΩ against R16 6k8 + Zin
+  ~12.7 k) attenuates **~6 dB more** than flat/boost ⇒ **flat/boost drive the clipper ~6 dB harder,
+  and that is exactly where the model collapses.** That is GATE Q's "the OD path saturates too
+  early", A3's 4.4 dB deficit, and **item 5's UNTESTED branch (b)**, all one mechanism.
+  ⭐ **THE UNTRIED EXPERIMENT:** `clipSat` sums to **1.036 V against the derived 5.636 V supply
+  (5.44× low)**. s142 refuted raising it **while holding the operating point fixed** — nobody has
+  raised it and *deliberately let the clipper compress less*, which is what the GRUNT evidence asks
+  for. **S1 = GATE BE:** sweep the clipSat sum toward 5.636 V with the drive UNCHANGED, scoring
+  (a) GRUNT off-flat bleed-free midband, (b) GRUNT cut (must not regress from ~1 dB), (c) CLEAN,
+  (d) the full gate. ⛔⛔ **PRE-REGISTERED STOP: if the locus is monotone with NO interior optimum,
+  that is the "make the clipper see less" degeneracy this project has already hit four times
+  (s5/s6 clipper fits, GAP #3b's C13, the rail-voltage fit, C15) — REFUTE and STOP AT ONE SESSION.**
+  ✅ **USER DECISION on the ambiguous case: SHIP ANY MEASURED IMPROVEMENT that does not regress
+  GRUNT cut or CLEAN** — same posture as s162/163/166 (price it, decide, keep if net positive). No
+  size bar; do NOT spend a session chasing the last dB. **S2** ships it and pays the known debts
+  (item 10 REQUIRES an `OdToneRestore` re-fit after any upstream OD change, plus a matrix
+  re-render). **S3 is buffer for that re-fit ONLY.** ⛔ **If the gap is not materially closed by the
+  end of S3, close item 6 / A3 PERMANENTLY as "bounded, not closable" and stop.**
+- **W2 — item 13, the clean-path phase residual. CAP 1 SESSION, and it is expected to CLOSE.**
+  ⭐ s167 already did the decisive arithmetic: the residual's shape is **a flat 2.0–2.5× multiple of
+  a single 7.2→12.2 Hz first-order corner difference, constant from 22 Hz to 359 Hz** (above ~450 Hz
+  the readings are at the estimator's own resolution). That is the signature of **~2–3 stacked LF
+  high-pass corners all differing the same way** — and one of them is s91's `c21R`, moved toward the
+  HARDWARE anchor **on purpose** (§5 rule 2). W2 = count the chain's actual LF corners and predict
+  the 2.4× directly. ⛔ **NO DSP CHANGE EITHER WAY** — the midband residual is 1–2°, below anything
+  this project can hear or grade. If it lands, item 13 closes as EXPECTED BEHAVIOUR.
+- **W3 — CPU. CAP 1 SESSION, and the rule is stricter than the target.** ⛔⛔ **ONLY SHIP A CHANGE
+  THAT IS BIT-IDENTICAL OR PROVABLY BELOW THE MEASUREMENT FLOOR.** Two candidates: **(a)** the
+  per-sample `std::log10` in `OdDriveTilt::currentEnvDb()`, whose only consumer is a **0.02 dB
+  hysteresis comparison** — a monotone transform, so the identical decision is reachable in the
+  LINEAR domain (`env2` ratio vs `10^0.002`) with no `log10` at all. Free, exact, ship it.
+  **(b)** `std::tanh` in `JfetStage` — ⛔ **REFUSE unless W1 has already forced a re-render**: it is
+  a *fitted* nonlinearity, so a fast-tanh owes a harmonic-accuracy gate AND a full re-baseline, and
+  at **2.5 % of one core** that trade does not pay. ⭐ The shipped `clipK = 2.0` already takes the
+  elementary `u/√(1+u²)` path, so there is no `pow` left in the clipper's hot loop.
 
 0. ✅ **DONE, SESSION 126 — the bass peak is LOCALISED and the single-constant route is REFUTED**
    (`analysis/bass_peak_locus.py`, GATE Y; two CLOSED/REFUTED rows carry it). ⛔ Do NOT re-open

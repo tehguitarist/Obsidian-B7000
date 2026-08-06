@@ -20966,3 +20966,42 @@ re-anchor; three crossed as the *measured, user-accepted price* of [ENG] correct
 defects this ND-referenced matrix cannot see (s162 `OdToneRestore` mix law, s163 LEVEL taper, s166
 `OdDriveTilt`). All three are decided KEEP. The bump was the user's instruction and is trivially
 reversible; the gate status is recorded here so the decision is on the record rather than implied.
+
+### 6. SESSION 167 addendum — the residual plan, agreed with the user
+
+Two user decisions taken after the review was presented:
+1. **Ship 1.0 on the current numbers; W1 after.** The 9 over-SHIP rows are accepted and documented
+   (`CHANGELOG.md`), not blocking. The gate itself is unchanged and still unmet.
+2. **W1's ambiguous-case rule: ship any measured improvement that does not regress GRUNT cut or
+   CLEAN.** No size bar — same posture as s162/163/166.
+
+⭐⭐⭐ **THE ANALYTICAL RESULT THAT SHAPED THE PLAN: the GRUNT off-flat null and the OD accuracy gap
+are the same defect, and that merges two of the four residuals into one workstream.** Read per band
+off `s166_odtilt.json`, bleed-free: GRUNT cut is **−0.9…−2 dB** across the midband while GRUNT
+flat/boost are **−6…−8 dB broadband** (plus a −13.5/−16.9 dB spike at 320 Hz, which is GAP #2's
+known null). GRUNT selects the clipper's coupling cap, and at 1 kHz the cut cap (4n7 ⇒ 33.9 kΩ,
+against R16 6k8 in series with a clipper input impedance of ~R18/(1+a0) ≈ 12.7 kΩ) attenuates
+**~6 dB more** than flat (50.69 n ⇒ 3.1 kΩ) or boost (223.69 n ⇒ 0.71 kΩ). ⇒ **flat/boost drive the
+clipper ~6 dB harder broadband, and that is precisely where the model collapses.** Same mechanism as
+GATE Q's "the OD path saturates too early", A3's 4.4 dB deficit and item 5's untested branch (b).
+⚠ The deficit is only weakly stimulus-dependent (grunt-boost midband −8.5 dB at `sweep_clean` vs
+−6.1 at `sweep_drv_-12`), which is what an *already-saturated* stage looks like — consistent with a
+ceiling 5.44× below the supply, and the reason W1's experiment is worth one session.
+
+⭐⭐ **ITEM 13 WAS LARGELY CLOSED BEFORE THE PLAN WAS WRITTEN.** Its phase residual is not a mystery:
+measured pedal−model phase divided by the phase of a single 7.2→12.2 Hz first-order corner
+difference is **flat at 2.53 / 2.50 / 2.50 / 2.43 / 2.42 / 2.37 / 2.38 / 2.34 / 2.31 / 2.27 / 2.21 /
+2.09 / 2.01** across **22 → 359 Hz** (falling off above ~450 Hz only because the readings there are
+0.3–0.7°, at the estimator's own resolution). A constant multiple over a decade and a half of
+frequency is the signature of **~2–3 stacked LF high-pass corners differing the same way** — and one
+of them is s91's `c21R`, moved toward the HARDWARE anchor deliberately (`reference-sources.md` §5
+rule 2). ⇒ W2 is a one-session confirmation with **no DSP change either way**; the midband residual
+is 1–2°, which is what a −28.5 dB band-limited null costs.
+
+⚠ **CPU: the honest finding is that there is very little left.** The shipped `clipK = 2.0` already
+takes `vtc`'s elementary `u/√(1+u²)` branch, so **no `pow` remains in the clipper's hot loop**, and
+the `sqrt` is hardware. What is left is (a) a per-sample `std::log10` in `OdDriveTilt` whose only
+consumer is a 0.02 dB hysteresis test — removable exactly, since log10 is monotone and the same
+decision is a linear-domain ratio against `10^0.002` — and (b) `std::tanh` in `JfetStage`, which is
+a **fitted** nonlinearity and therefore owes a harmonic gate plus a full re-baseline. At 2.5 % of one
+core the second does not pay, and W3's rule is written to refuse it.
