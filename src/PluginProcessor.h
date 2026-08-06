@@ -127,6 +127,7 @@ private:
     std::atomic<float>* pRenderOversampling = nullptr;
 
     int reportedLatency = -1; // last value pushed to the host via setLatencySamples
+    int currentProgramIndex = 0; // see PluginProcessor.cpp's kFactoryPresets table
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ObsidianB7000AudioProcessor)
 };

@@ -2,6 +2,60 @@
 #include "PluginEditor.h"
 #include "dsp/PedalDSP.h"
 
+#include <utility>
+#include <vector>
+
+namespace
+{
+// Factory presets transcribed from https://www.guitarchalk.com/darkglass-microtubes-b7k-ultra-v2-settings/
+// (0-10 knob readings -> normalised 0..1 pot position; "Grunt: None" has no
+// off position on this switch, so it maps to Cut, the minimum-bass setting).
+// Every id here must match a real apvts parameter ID (PluginProcessor::createParameterLayout).
+struct FactoryPreset
+{
+    const char* name;
+    std::vector<std::pair<const char*, float>> values;
+};
+
+const std::array<FactoryPreset, 5> kFactoryPresets { {
+    { "Modern",
+      { { "master", 0.6f }, { "blend", 0.7f }, { "level", 0.6f }, { "drive", 0.7f },
+        { "lo", 0.6f }, { "lo_mid", 0.7f }, { "hi_mid", 0.8f }, { "hi", 0.7f },
+        { "attack", 1.0f }, { "grunt", 2.0f }, { "lo_mid_freq", 1.0f }, { "hi_mid_freq", 1.0f },
+        { "bypass", 0.0f }, { "dist_engage", 1.0f }, { "trim_link", 1.0f }, { "hq", 1.0f },
+        { "input_trim", 0.0f }, { "output_trim", 0.0f },
+        { "oversampling", 1.0f }, { "render_oversampling", 3.0f } } },
+    { "Vintage",
+      { { "master", 0.6f }, { "blend", 0.6f }, { "level", 0.5f }, { "drive", 0.5f },
+        { "lo", 0.7f }, { "lo_mid", 0.6f }, { "hi_mid", 0.4f }, { "hi", 0.3f },
+        { "attack", 0.0f }, { "grunt", 0.0f }, { "lo_mid_freq", 0.0f }, { "hi_mid_freq", 2.0f },
+        { "bypass", 0.0f }, { "dist_engage", 1.0f }, { "trim_link", 1.0f }, { "hq", 1.0f },
+        { "input_trim", 0.0f }, { "output_trim", 0.0f },
+        { "oversampling", 1.0f }, { "render_oversampling", 3.0f } } },
+    { "Slap",
+      { { "master", 0.7f }, { "blend", 0.5f }, { "level", 0.7f }, { "drive", 0.3f },
+        { "lo", 0.8f }, { "lo_mid", 0.3f }, { "hi_mid", 0.4f }, { "hi", 0.8f },
+        { "attack", 1.0f }, { "grunt", 1.0f }, { "lo_mid_freq", 1.0f }, { "hi_mid_freq", 0.0f },
+        { "bypass", 0.0f }, { "dist_engage", 1.0f }, { "trim_link", 1.0f }, { "hq", 1.0f },
+        { "input_trim", 0.0f }, { "output_trim", 0.0f },
+        { "oversampling", 1.0f }, { "render_oversampling", 3.0f } } },
+    { "Doom",
+      { { "master", 0.5f }, { "blend", 0.9f }, { "level", 0.8f }, { "drive", 0.9f },
+        { "lo", 0.9f }, { "lo_mid", 0.4f }, { "hi_mid", 0.3f }, { "hi", 0.2f },
+        { "attack", 0.0f }, { "grunt", 0.0f }, { "lo_mid_freq", 0.0f }, { "hi_mid_freq", 0.0f },
+        { "bypass", 0.0f }, { "dist_engage", 1.0f }, { "trim_link", 1.0f }, { "hq", 1.0f },
+        { "input_trim", 0.0f }, { "output_trim", 0.0f },
+        { "oversampling", 1.0f }, { "render_oversampling", 3.0f } } },
+    { "Clean",
+      { { "master", 0.7f }, { "blend", 0.3f }, { "level", 0.8f }, { "drive", 0.2f },
+        { "lo", 0.6f }, { "lo_mid", 0.5f }, { "hi_mid", 0.6f }, { "hi", 0.6f },
+        { "attack", 0.0f }, { "grunt", 1.0f }, { "lo_mid_freq", 1.0f }, { "hi_mid_freq", 2.0f },
+        { "bypass", 0.0f }, { "dist_engage", 1.0f }, { "trim_link", 1.0f }, { "hq", 1.0f },
+        { "input_trim", 0.0f }, { "output_trim", 0.0f },
+        { "oversampling", 1.0f }, { "render_oversampling", 3.0f } } },
+} };
+} // namespace
+
 ObsidianB7000AudioProcessor::ObsidianB7000AudioProcessor()
     : AudioProcessor(BusesProperties()
                         .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -143,11 +197,37 @@ bool ObsidianB7000AudioProcessor::producesMidi() const { return false; }
 bool ObsidianB7000AudioProcessor::isMidiEffect() const { return false; }
 double ObsidianB7000AudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int ObsidianB7000AudioProcessor::getNumPrograms() { return 1; }
-int ObsidianB7000AudioProcessor::getCurrentProgram() { return 0; }
-void ObsidianB7000AudioProcessor::setCurrentProgram(int) {}
-const juce::String ObsidianB7000AudioProcessor::getProgramName(int) { return {}; }
+int ObsidianB7000AudioProcessor::getNumPrograms() { return (int) kFactoryPresets.size(); }
+int ObsidianB7000AudioProcessor::getCurrentProgram() { return currentProgramIndex; }
+
+void ObsidianB7000AudioProcessor::setCurrentProgram(int index)
+{
+    if (index < 0 || index >= (int) kFactoryPresets.size())
+        return;
+
+    currentProgramIndex = index;
+    for (const auto& [id, value] : kFactoryPresets[(size_t) index].values)
+    {
+        if (auto* param = apvts.getParameter(id))
+        {
+            param->beginChangeGesture();
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+            param->endChangeGesture();
+        }
+    }
+}
+
+const juce::String ObsidianB7000AudioProcessor::getProgramName(int index)
+{
+    if (index < 0 || index >= (int) kFactoryPresets.size())
+        return {};
+    return kFactoryPresets[(size_t) index].name;
+}
+
 void ObsidianB7000AudioProcessor::changeProgramName(int, const juce::String&) {}
+// Factory presets are fixed; renaming is not supported (isProgramNameEditable defaults to
+// false-equivalent for a JUCE-wrapped plugin because host UIs never call this without an
+// editable-name affordance we haven't added).
 
 void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
@@ -170,6 +250,14 @@ void ObsidianB7000AudioProcessor::prepareToPlay(double sampleRate, int samplesPe
         // (kInputRef/kOutputMakeup) are deliberately NOT here — they live in GainStaging.h.
         d.setFitParams(FitParams{});
         d.setFactorOrder(startOrder);
+        // Seed the CONTROL state at the knobs' actual current positions before
+        // reset(), for the same reason the pot smoothers are seeded below: reset()
+        // snaps the dist_engage footswitch crossfade to its target, so applying the
+        // real switch position first is what stops prepareToPlay (a sample-rate
+        // change, or playback simply starting) from painting a 5 ms fade over the
+        // head of the first block on a session recalled with the OD disengaged.
+        d.setParams(readParams(pMaster->load(), pBlend->load(), pLevel->load(), pDrive->load(),
+                               pLo->load(), pLoMid->load(), pHiMid->load(), pHi->load()));
         d.reset();
     }
     reportedLatency = dsp[0].getLatencySamples();

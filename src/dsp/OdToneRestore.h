@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "MnaSolve.h" // mna::differs — exact-inequality float compare without -Wfloat-equal
+
 // =============================================================================
 // OdToneRestore — engineered (NON-SCHEMATIC) drive-tracking notch/peak restore
 // =============================================================================
@@ -114,7 +116,7 @@ public:
     void setDrive(double driveKnob) noexcept
     {
         const double x = std::clamp(driveKnob, 0.0, 1.0);
-        if (x == lastDrive)
+        if (! mna::differs(x, lastDrive))
             return;
         lastDrive = x;
         recompute();
@@ -168,7 +170,7 @@ public:
     void setCleanFraction(double cf) noexcept
     {
         const double x = std::clamp(cf, 0.0, 1.0);
-        if (x == lastCleanFrac)
+        if (! mna::differs(x, lastCleanFrac))
             return;
         lastCleanFrac = x;
         recompute();
