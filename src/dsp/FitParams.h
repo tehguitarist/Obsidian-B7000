@@ -1087,6 +1087,54 @@ struct FitParams
     double midWiperRLo = 6.8e3;    // LO-MID (IC5_D) wiper leg; 33k (GAP #4) -> 22k (A2c-2)
     double midWiperRHi = 6.8e3;    // HI-MID (IC6_A) wiper leg; 22k (GAP #4) -> 18k (A2c-2)
 
+    // ---- C31, the Baxandall -> LO-MID coupling cap (session 177, open-work item 16) --
+    // circuit.md: IC5_C's output reaches LO-MID's input node "Min" through C31 (2u2).
+    // It was flagged as a carry-forward at the 2026-07-21 EQ-block build alongside C21
+    // and NEVER IMPLEMENTED — C21 landed as PedalChain::C21Highpass, C31 did not, and
+    // s169 confirmed `grep -rn "C31\|kC31" src/dsp/*.h` found nothing outside one
+    // docstring. This is the element, wired through MidBand::setInputCap().
+    //
+    // ⛔⛔ DO NOT SIZE THIS BY ITS CORNER, AND DO NOT RE-IMPLEMENT IT AS A FIXED-R HP.
+    // Its DC corner is 1.715 Hz — computable with no fit, and pot-/switch-position-
+    // INDEPENDENT (Ra+Rb = Rp at every wiper position, and at DC the wiper leg carries
+    // no current so the stage's gain is exactly -1, giving the Miller factor (1-G0) = 2):
+    //     Zin_DC = 1/(1/R41 + 2/(R38+Rp+R39)) = 42.19 kOhm
+    // But that number describes only the very bottom of the response. GATE BG
+    // (analysis/c31_corner_gate.py) measures |Zin| FALLING 42.2 kOhm -> 2.2 kOhm across
+    // the audio band, because C32 shorts P3 to P1 and collapses the Miller-loaded
+    // R38+Rp+R39 ladder onto the bare R38+R39. |Zin| and |1/(w*C31)| therefore fall
+    // TOGETHER through the bass and the divider ratio never recovers: the true insertion
+    // is a broad PLATEAU reaching -1.07 dB at a graded band centre, against the -0.02 dB
+    // a fixed-R first-order HP at the same corner predicts — 54x smaller.
+    // ⇒ it is solved as a FIFTH NODE inside MidBand's MNA. Nothing else reproduces it.
+    //
+    // ⚠ The plateau's SIZE rides on C32, which is a FIT (A2c-3's scaled pair), not a
+    // schematic value: at the 1 kHz switch position C32 = 22n = the stock board's value
+    // and the loss is smallest (-0.20 dB), at 250 Hz C32 = 68n = 3.1x stock and it is
+    // largest (-1.07). So the element is schematic and its dose is partly fitted.
+    // ✅✅ USER DECISION 2026-08-08: ENABLED. The matrix was priced FIRST, both ways, on two full
+    // 162-capture renders (`s177_c31off.json` / `s177_c31on.json`, identical membership):
+    //   8 rows over SHIP either way, NOTHING crosses a bar. CLEAN 100 Hz-8 kHz p90 0.732 -> 0.666,
+    //   CLEAN 8-16.3 kHz p90 1.289 -> 1.097, OD 8-16.3 kHz median 0.908 -> 0.823, OD 25-100 Hz
+    //   median 1.263 -> 1.355 (the one row that genuinely worsens), OD band-RMS 2.338 -> 2.347.
+    // ⛔⛔ DO NOT QUOTE THOSE IMPROVEMENTS AS FIDELITY. They are mostly the LF-DOMINATED null-gain
+    // fit leaking a LEVEL correction: `comprehensive_report` fits its per-row null gain in the TIME
+    // domain, which s170/GATE BE established the log sweep's LF octaves dominate, so removing LF
+    // energy RAISES it (+0.14 dB median on BOTH paths) and lifts every band — and the model is
+    // signed-negative at nearly every band above 80 Hz, so a uniform lift flatters all of them.
+    // Re-levelled per row by its own BAND-DOMAIN mean, the OD improvement is 100% gone (median
+    // +0.004, rms +0.014 — slightly WORSE on shape) and 77-84% of CLEAN's p90/rms gain is level.
+    // ⇒ the honest reading is a WASH, and this is the "make the model louder" degeneracy for the
+    // SIXTH time (s5/s6, GAP #3b's C13, the rail-voltage fit, C15, s170's clipSat).
+    // ⇒ IT SHIPS ON SCHEMATIC FIDELITY, NOT ON THE MATRIX: C31 is a real, schematic-verified part
+    // the model never had, the captures are indifferent to it, and `capture-outranks-schematic`
+    // arbitrates CONFLICTS — there is no conflict here to arbitrate.
+    // ⚠ It does NOT touch open item 17: C31 is POST-BLEND, every notch item 17 concerns is a
+    // cancellation between the OD path and the clean tap, and a shared post-BLEND element scales
+    // both identically and leaves that RATIO exactly unchanged.
+    double c31 = 2.2e-6;           // schematic-verified (circuit.md IC5_C row). NOT a fit target.
+    bool c31Enabled = true;        // s177, user decision — the block above carries the price
+
     // ---- Mid across-lug cap ratio (Phase 9 A2c-3, session 27) -------------------
     // C32 (LO-MID) / C34 (HI-MID) is switched TOGETHER with the series cap, as a
     // SCALED PAIR: C32_position = midCapRatio * C33_position. MidBand::setAcrossCap.

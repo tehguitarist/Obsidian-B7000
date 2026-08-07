@@ -56,6 +56,25 @@ FC_C21_HW_ANCHORED = 1.0 / (2.0 * np.pi * 130.0e3 * 100.0e-9)  # session-91 HW r
 # (PedalChain::C21Highpass). C31 did not -- grep for "C31"/"kC31" across src/dsp/*.h returns
 # nothing outside Baxandall.h's own docstring. It is a genuine, still-open gap, NOT a decision.
 #
+# ⛔⛔ SUPERSEDED AT SESSION 177 BY GATE BG (analysis/c31_corner_gate.py) — READ THAT FIRST.
+# Everything below this line about C31 is the s169 BRACKET, and it is wrong in both directions:
+#   (1) THE CORNER IS COMPUTABLE, and the paragraph below saying it is not is what stopped s169
+#       computing it. The two legs are not ALTERNATIVES, they load node Min TOGETHER, and the
+#       R38 leg's far end is neither ground nor open — it runs through the pot ladder to the
+#       stage's own DRIVEN output, whose DC gain is exactly -1. That inversion is a MILLER
+#       factor: Zin_DC = 1/(1/R41 + (1-G0)/(R38+Rp+R39)) = 42.19k => fc = 1.715 Hz, with no fit
+#       and no pot-/switch-position dependence.
+#   (2) ⭐⭐ AND THE CORNER IS NOT THE STORY, so this whole file's framing does not reach it.
+#       A corner-count assumes each cap sees a FIXED resistance. This one does not: |Zin| falls
+#       42.2k -> 2.2k across the audio band (C32 shorts P3 to P1), so |Zin| and |1/(w*C31)| fall
+#       TOGETHER and the divider never recovers. The true insertion is a broad PLATEAU reaching
+#       -1.07 dB at a graded band centre, against the -0.02 dB the corner predicts there — 54x.
+# ⇒ this file's closing sentence, "real, tiny, unactioned", is HALF RIGHT: it was real and
+# unactioned, and it was not tiny. C31 was implemented at s177 (MidBand::setInputCap).
+# ⚠ What DOES survive is this file's own subject — the PHASE count for item 13. A 1.715 Hz
+# corner adds little phase over 22-359 Hz, so "the measured residual is NOT evidence of a
+# ~30 Hz missing corner" stands, and item 13 stays closed. The magnitude was never in view.
+#
 # Its corner is NOT precisely computable without solving the 7-node MidBand input impedance at
 # an arbitrary pot position, so this is bracketed rather than pinned. Node "Min" (circuit.md
 # "LO-MID (IC5_D)") has TWO legs: R38 (2.2k) to P3 (the pot's upper lug -- NOT ground, it's the
@@ -123,6 +142,14 @@ def main():
     print("than a naive per-corner count suggests. Either way the measured residual is NOT")
     print("evidence of a ~30 Hz missing corner, and the gap is left exactly where W2 found it:")
     print("real, tiny, unactioned -- no DSP change owed (W2's own rule).")
+    print()
+    print("*** SUPERSEDED, SESSION 177 — run analysis/c31_corner_gate.py (GATE BG). ***")
+    print("The corner IS computable: both legs load node Min together and the ladder leg lands on")
+    print("a node driven at -1x, a MILLER factor, giving fc = 1.715 Hz with no fit and no pot- or")
+    print("switch-position dependence. And the corner is NOT the story: |Zin| itself falls 42.2k")
+    print("-> 2.2k across the band, so the true insertion is a broad PLATEAU reaching -1.07 dB at")
+    print("a graded band centre where this framing predicts -0.02 dB. 'Tiny' was wrong; the PHASE")
+    print("conclusion above (item 13) is unaffected, because a 1.7 Hz corner adds little phase.")
 
 
 if __name__ == "__main__":

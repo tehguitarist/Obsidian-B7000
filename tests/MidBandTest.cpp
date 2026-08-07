@@ -82,18 +82,26 @@ static const std::vector<Cfg> kCfgs = {
 };
 
 static double measureDb(const MidBand::Values& v, double cSeries, double a, double freq, double fs,
-                        double wiperR = 0.0, double acrossCap = 0.0)
+                        double wiperR = 0.0, double acrossCap = 0.0, double inputCap = 0.0)
 {
     MidBand stage;
     stage.configure(v, cSeries);
     if (acrossCap > 0.0)
         stage.setAcrossCap(acrossCap); // A2c-3 scaled cap pair; 0 = leave Values::c32
+    if (inputCap > 0.0)
+        stage.setInputCap(inputCap);   // C31 (item 16, s177); 0 = the 4-unknown path
     stage.prepare(fs);
     stage.setPosition(a);
     stage.setWiperR(wiperR);
 
     const double period = fs / freq;
-    const int settle = static_cast<int>(std::max(0.25 * fs, 8.0 * period));
+    // ⚠ C31's corner is 1.715 Hz (tau ~= 93 ms), so the default 0.25 s settle is only
+    // ~2.7 tau and leaves ~7% of the startup transient in the "steady-state" peak — it
+    // would read as a model error. 2 s is ~21 tau. Kept OFF the default path so Tests
+    // 1-6 run the identical sample counts they always have.
+    const int settle = inputCap > 0.0
+                           ? static_cast<int>(std::max(2.0 * fs, 8.0 * period))
+                           : static_cast<int>(std::max(0.25 * fs, 8.0 * period));
     const int measure = static_cast<int>(std::ceil(2.0 * period)) + 1;
 
     const double amp = 1.0e-3; // tiny → pure linear TF (rails off anyway)
@@ -298,6 +306,76 @@ int main()
         std::printf("  %-26s worst |dev| = %.4f dB  %s\n", "decade scale-invariance", worstS,
                     okS ? "PASS" : "FAIL");
         if (! okS)
+            ++failures;
+    }
+
+    // ---- Test 7: C31, the input coupling cap (item 16, session 177) ---------
+    // C31 (2u2) couples IC5_C's output into LO-MID's input node. It is solved as a
+    // FIFTH MNA node, not as a separate fixed-R high-pass stage, because the load it
+    // sees is frequency-dependent — see MidBand::setInputCap() and GATE BG.
+    //
+    // Three things must hold, and (c) is the one that stops this test being vacuous:
+    //   (a) the 5-unknown path reproduces the oracle (analysis/c31_corner_gate.py ::
+    //       mid_tf_through_c31), at the SHIPPED cap pairs and wiper R;
+    //   (b) inputCap = 0 is EXACTLY the 4-unknown network, so Tests 1-6 stay valid;
+    //   (c) the insertion is LARGE ENOUGH TO MEASURE. A stage that silently ignored
+    //       setInputCap() would pass (a) only if the oracle were also ~0 dB; asserting
+    //       that C31 moves the flat position by MORE than Test 1's own 0.15 dB
+    //       tolerance is what makes (a) a test of the mechanism rather than of nothing.
+    {
+        std::printf("\n=== C31 input coupling cap vs oracle (5-unknown MNA path) ===\n");
+        struct CCfg { const char* name; double c33; double c32; double a; double db[kNF]; };
+        const std::vector<CCfg> ccfgs = {
+            { "LO-MID 6n8/68n C31 boost", 6.8e-09, 6.8e-08, 1e-06,
+              { -0.37209, +0.62898, +3.17511, +8.56069, +12.21316, +10.23150, +4.36998, +1.42966 } },
+            { "LO-MID 6n8/68n C31 flat", 6.8e-09, 6.8e-08, 0.5,
+              { -0.50844, -0.48145, -0.46737, -0.42828, -0.37667, -0.27199, -0.11816, -0.03622 } },
+            { "LO-MID 6n8/68n C31 cut", 6.8e-09, 6.8e-08, 0.999999,
+              { -0.66218, -1.59425, -4.12622, -9.71233, -13.54765, -10.69977, -4.52113, -1.48951 } },
+            { "LO-MID 2n2/22n C31 boost", 2.2e-09, 2.2e-08, 1e-06,
+              { -0.19104, -0.04941, +0.34953, +1.70007, +3.43224, +7.10027, +13.22492, +7.81427 } },
+            { "LO-MID 2n2/22n C31 cut", 2.2e-09, 2.2e-08, 0.999999,
+              { -0.19393, -0.28299, -0.67116, -2.01282, -3.74486, -7.44551, -13.64316, -7.89895 } },
+        };
+        for (const auto& c : ccfgs)
+        {
+            double worst = 0.0;
+            for (int i = 0; i < kNF; ++i)
+                worst = std::max(worst, std::abs(measureDb(MidBand::kLoMid, c.c33, c.a, kFreqs[i],
+                                                           48000.0, 6.8e3, c.c32, 2.2e-6)
+                                                 - c.db[i]));
+            const bool ok = worst < 0.15; // same bar as Test 1: <= 2 kHz it is bilinear warp
+            std::printf("  %-26s worst |dev| = %.4f dB  %s\n", c.name, worst, ok ? "PASS" : "FAIL");
+            if (! ok)
+                ++failures;
+        }
+
+        // (b) inputCap = 0 must be bit-identical to never calling setInputCap.
+        double worst0 = 0.0;
+        for (int i = 0; i < kNF; ++i)
+            worst0 = std::max(worst0,
+                              std::abs(measureDb(MidBand::kLoMid, 6.8e-9, 0.0, kFreqs[i], 48000.0,
+                                                 6.8e3, 68.0e-9, 0.0)
+                                       - measureDb(MidBand::kLoMid, 6.8e-9, 0.0, kFreqs[i], 48000.0,
+                                                   6.8e3, 68.0e-9)));
+        const bool ok0 = worst0 == 0.0;
+        std::printf("  %-26s worst |dev| = %.1e dB  %s\n", "C31=0 is exactly the 4x4", worst0,
+                    ok0 ? "PASS" : "FAIL");
+        if (! ok0)
+            ++failures;
+
+        // (c) NON-VACUITY: C31 must actually move the response, by more than the bar
+        // (a) is graded at. Measured at the FLAT position, where the stage's own
+        // response is identically 0 dB, so every dB here is C31's.
+        double biggest = 0.0;
+        for (int i = 0; i < kNF; ++i)
+            biggest = std::max(biggest,
+                               std::abs(measureDb(MidBand::kLoMid, 6.8e-9, 0.5, kFreqs[i], 48000.0,
+                                                  6.8e3, 68.0e-9, 2.2e-6)));
+        const bool okV = biggest > 0.15;
+        std::printf("  %-26s largest |dev| = %.4f dB  %s\n", "C31 is non-vacuous (flat)", biggest,
+                    okV ? "PASS" : "FAIL");
+        if (! okV)
             ++failures;
     }
 

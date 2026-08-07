@@ -82,12 +82,13 @@ public:
         twoOverT = 2.0 * sampleRate;
         gc32 = val.c32 * twoOverT;
         gc33 = cSeries * twoOverT;
+        gc31 = cInput * twoOverT;   // 0 when the C31 path is disabled
         dirty = true;
         rebuild();  // establish a valid inverse before the first process()
         reset();
     }
 
-    void reset() noexcept { ieqC32 = ieqC33 = 0.0; }
+    void reset() noexcept { ieqC32 = ieqC33 = ieq31 = 0.0; }
 
     // Pot position a ∈ [0,1]: a→0 = full BOOST (wiper at P3/input), a→1 = full CUT
     // (wiper at P1/output), a=0.5 = flat. This is the ELECTRICAL pot fraction; the
@@ -163,10 +164,42 @@ public:
     void setRailClampEnabled(bool e) noexcept { rail.setEnabled(e); }
     void setRailVoltages(double vNeg, double vPos) noexcept { rail.setRailVoltages(vNeg, vPos); }
 
+    // ---- C31 input coupling cap (session 177, open-work item 16) ----------------
+    // LO-MID ONLY: circuit.md has C31 (2u2) between IC5_C's output and this stage's
+    // input node "Min".  HI-MID has NO such cap (its input is IC5_D's output wire),
+    // so it never calls this and stays on the 4-unknown path bit-for-bit.
+    //
+    // ⛔⛔ WHY THIS IS A FIFTH NODE AND NOT A `C21Highpass`-SHAPED BOLT-ON STAGE.
+    // A coupling cap into a FIXED resistance is a first-order high-pass and can be a
+    // separate one-node stage; that is what C21 and C15 are.  This load is NOT fixed:
+    // GATE BG measures |Zin| falling 42.2 kOhm -> 2.2 kOhm across the audio band,
+    // because C32 shorts P3 to P1 and collapses the Miller-loaded R38+Rp+R39 ladder
+    // onto the bare R38+R39.  So |Zin| and |1/(w*C31)| fall TOGETHER through the bass
+    // and the divider ratio does not recover: the true insertion is a broad plateau
+    // reaching -1.07 dB at a graded band centre, where a fixed-R first-order HP at the
+    // same corner predicts -0.02 dB (54x smaller).  The plateau exists only if C31 and
+    // the pot network are solved TOGETHER, which is what this does.
+    // ⚠ The DC corner itself is 1.715 Hz and IS pot- and switch-position-independent
+    // (Ra+Rb = Rp always, and at DC the wiper leg carries no current so G0 = -1
+    // exactly).  Do not read that number as a description of the element — it
+    // describes only the very bottom of the response.  GATE BG's docstring has both.
+    //
+    // c31 <= 0 disables it and restores the exact 4-unknown expressions below.
+    void setInputCap(double farads) noexcept
+    {
+        const double next = (farads > 0.0) ? farads : 0.0;
+        if (mna::differs(next, cInput)) { cInput = next; dirty = true; }
+        if (twoOverT > 0.0)
+            gc31 = cInput * twoOverT;
+    }
+
     inline double process(double vin) noexcept
     {
         if (dirty)
             rebuild();
+
+        if (cInput > 0.0)
+            return processWithInputCap(vin);
 
         // RHS: source (R38, R41) + capacitor history. See header stamping.
         //   rhs[P3] = Vin/R38 + ieqC32 ;  rhs[P1] = -ieqC32
@@ -195,6 +228,33 @@ public:
     }
 
 private:
+    // 5-unknown path [Vin, P3, P1, W, Vout] — see setInputCap(). Stamps are the 4×4's
+    // with Vin promoted from a known to an unknown: the two places it entered the RHS
+    // (P3's Vin/R38 and the (−) row's −Vin/R41) move to the LHS as −1/R38 and +1/R41,
+    // and Vin gains its own KCL row carrying C31's companion. Maps 1:1 onto
+    // `analysis/c31_corner_gate.py :: mid_tf_through_c31`, which the FR test checks.
+    inline double processWithInputCap(double vs) noexcept
+    {
+        const double ieqC33b = ieqC33 / dampDiv;
+
+        double rhs[5];
+        rhs[0] = gc31 * vs - ieq31; // C31 companion: cap from the SOURCE node to Vin
+        rhs[1] = ieqC32;
+        rhs[2] = -ieqC32;
+        rhs[3] = ieqC33b;
+        rhs[4] = ieqC33b;
+
+        double x[5];
+        mna::matvec<5>(yinv5, rhs, x);
+
+        ieq31 = 2.0 * gc31 * (vs - x[0]) - ieq31;      // v_ab = Vs − Vin
+        ieqC32 = 2.0 * gc32 * (x[1] - x[2]) - ieqC32;  // v_ab = P3 − P1
+        const double i33 = g33eff * x[3] - ieqC33b;
+        ieqC33 = 2.0 * gc33 * (x[3] - i33 * wiperR) - ieqC33;
+
+        return rail.process(x[4]);
+    }
+
     void rebuild() noexcept
     {
         const double Ra = posA * kRp;         // P3 → W
@@ -203,8 +263,37 @@ private:
 
         // Wiper-leg Norton reduction (setWiperR): a series Rw + C33 branch from W to
         // the 0 V virtual ground collapses to one conductance, no extra node.
+        // ⚠ HOISTED above the C31 branch (s177) — both matrices need it. Pure statement
+        // reordering: same expressions, same inputs, so the 4×4 path is bit-identical.
         dampDiv = 1.0 + gc33 * wiperR;   // == 1 when Rw = 0 -> ideal cap, exactly
         g33eff = gc33 / dampDiv;
+
+        if (cInput > 0.0)
+        {
+            double Y5[5][5] = {};
+            // Row Vin: (gc31 + 1/R38 + 1/R41) Vin − (1/R38) P3
+            Y5[0][0] = gc31 + 1.0 / val.r38 + 1.0 / val.r41; Y5[0][1] = -1.0 / val.r38;
+            // Row P3: −(1/R38) Vin + (1/R38 + gc32 + 1/Ra) P3 − gc32 P1 − (1/Ra) W
+            Y5[1][0] = -1.0 / val.r38; Y5[1][1] = 1.0 / val.r38 + gc32 + gRa;
+            Y5[1][2] = -gc32; Y5[1][3] = -gRa;
+            // Row P1: unchanged from the 4×4
+            Y5[2][1] = -gc32; Y5[2][2] = 1.0 / val.r39 + gc32 + gRb;
+            Y5[2][3] = -gRb; Y5[2][4] = -1.0 / val.r39;
+            // Row W: unchanged from the 4×4
+            Y5[3][1] = -gRa; Y5[3][2] = -gRb; Y5[3][3] = gRa + gRb + g33eff;
+            // Row (−)/Vout: + (1/R41) Vin + g33eff W + (1/R40) Vout
+            Y5[4][0] = 1.0 / val.r41; Y5[4][3] = g33eff; Y5[4][4] = 1.0 / val.r40;
+
+            double tmp5[5][5];
+            if (mna::invert<5>(Y5, tmp5))
+            {
+                for (int i = 0; i < 5; ++i)
+                    for (int j = 0; j < 5; ++j)
+                        yinv5[i][j] = tmp5[i][j];
+            }
+            dirty = false;
+            return;
+        }
 
         double Y[4][4] = {};
         // Row P3: (1/R38 + gc32 + 1/Ra) P3 − gc32 P1 − (1/Ra) W
@@ -236,6 +325,10 @@ private:
     double g33eff = 0.0;             // gc33 / dampDiv — the stamped leg conductance
     double posA = 0.5;               // electrical pot fraction (0.5 = flat)
     double yinv[4][4] = {};          // precomputed Y^-1 (rebuilt on dirty)
+    double cInput = 0.0;             // C31 input coupling cap (0 = absent, LO-MID only)
+    double gc31 = 0.0;               // its companion conductance
+    double yinv5[5][5] = {};         // the 5-unknown inverse, used only when cInput > 0
+    double ieq31 = 0.0;
     double ieqC32 = 0.0, ieqC33 = 0.0;
     bool dirty = true;
     RailClamp rail;

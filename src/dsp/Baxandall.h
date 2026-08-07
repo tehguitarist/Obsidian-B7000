@@ -36,13 +36,22 @@
 // The matrix depends on both pot splits, so it re-inverts whenever EITHER pot
 // moves (dirty flag), never per sample. Maps 1:1 onto baxandall_tf.
 //
-// ---- Coupling caps C21/C31 (stage boundary — deferred) ----------------------
+// ---- Coupling caps C21/C31 (stage boundary) ---------------------------------
 // C21(100n) couples IC5_B → this stage's Vin, and C31(2u2) couples this stage's
 // Vout → LO-MID. Both are inter-stage HP couplers (like C2/C15/C36 elsewhere);
 // the oracle (and this stage) are defined at the Baxandall network boundary and
-// EXCLUDE them. C21 into the ~10k stack input is a ~150 Hz HP that DOES shape the
-// bass, so it must be placed at the IC5_B→Baxandall boundary during Phase-6
-// integration (flagged as a carry-forward — do not forget it in the full chain).
+// EXCLUDE them, so BOTH had to be placed during Phase-6 integration.
+//   C21 → `PedalChain::C21Highpass` (a ~150 Hz HP into the ~10k stack input; it
+//         shapes the bass audibly, and its R is the Phase-7 fit `c21R`).
+//   C31 → ⭐ LANDED AT SESSION 177 (open-work item 16), and NOT here: it is
+//         `MidBand::setInputCap()`, a FIFTH MNA node inside the LO-MID stage.
+//         ⚠ It is deliberately NOT a `C21Highpass`-shaped bolt-on, because the
+//         load it sees is frequency-dependent (|Zin| falls 42.2k → 2.2k as C32
+//         shorts the pot lugs), so a fixed-R first-order HP reproduces ~2% of it.
+//         See that method's comment and `analysis/c31_corner_gate.py` (GATE BG).
+// ⚠ This block said "deferred … do not forget it in the full chain" for 156
+// sessions while C21 had in fact landed and C31 had not — the carry-forward
+// outlived its own half-completion. s169 caught the gap by grepping for `C31`.
 //
 // ---- Rail clamp / polarity --------------------------------------------------
 // Op-amp output → RailClamp on Vout (GATE item; disabled by default so the

@@ -426,6 +426,13 @@ public:
         loMid.setWiperR(f.midWiperRLo);
         hiMid.setWiperR(f.midWiperRHi);
 
+        // C31 (2u2) — the Baxandall→LO-MID coupling cap (item 16, s177). LO-MID ONLY:
+        // circuit.md gives HI-MID's input as IC5_D's output wire, with no coupling cap,
+        // so hiMid is deliberately NOT given one and stays on the 4-unknown path.
+        // ⚠ Solved INSIDE MidBand rather than added as a C21Highpass-shaped stage — the
+        // load is frequency-dependent and a fixed-R HP reproduces ~2% of it (GATE BG).
+        loMid.setInputCap(f.c31Enabled ? f.c31 : 0.0);
+
         // Baxandall TREBLE range limiter (Phase 9 A2c).
         baxandall.setTrebleWiperR(f.trebleWiperR);
     }

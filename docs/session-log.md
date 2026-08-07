@@ -22590,3 +22590,219 @@ which is an argument for keeping those tables in the session log rather than onl
 **`ctest` 22/22.** No `src/` edit, no rebuild, no render, no constant moved — the cache is still
 re-armed from s174/s175 and the next matrix run still pays ~25 min. Open work is unchanged: the
 agreed order is **16 → 17 → 18, then 12**, and item 16 (C31) is next.
+
+## SESSION 177 (2026-08-08) — open-work item 16: C31 is implemented, and the "fifth LF corner" framing that named it is refuted
+
+Item 16 was user-directed and scheduled ahead of items 17/18 on the grounds that it was **cheap and
+might move item 17**. It was cheap. It is not what item 16 described.
+
+### 1. The instruction that made the difference
+
+Item 16 carried one ⛔: *"Do NOT size it from the s169 bracket alone — derive the loading resistance
+from the LO-MID stage's actual input impedance (`MidBand`'s R41 + the pot network), which is
+computable."* s169 had bracketed C31's corner between **0.33 Hz** (R41 alone, 220k) and **33 Hz**
+(R38 alone, 2.2k), a hundredfold spread, and stopped — it treated the two legs as **alternatives**
+and said the corner was "NOT precisely computable without solving the 7-node MidBand input
+impedance at an arbitrary pot position".
+
+Both halves of that are wrong, and the second is what stopped s169 computing the first.
+
+⭐ **The two legs are not alternatives — they load node Min TOGETHER, and the R38 leg's far end is
+neither ground nor open.** It runs through the pot ladder to the stage's own **driven output**. At
+DC that output sits at exactly `-Vin`, so the ladder leg carries **twice** the current a path to
+ground would: a **Miller factor**.
+
+    Zin_DC = 1 / (1/R41 + (1 - G0)/(R38 + Rp + R39)),   G0 = -R40/R41 = -1
+           = 1 / (1/220k + 2/104.4k) = 42.19 kOhm   =>   fc = 1.715 Hz
+
+⭐⭐ **And it is pot- and switch-position-INDEPENDENT, exactly**, which is why one number can be
+quoted at all. Two things have to hold and both do: `Ra + Rb = Rp` at every wiper position, so the
+ladder's series resistance never moves; and at DC both caps are open, so the wiper leg (C33 and the
+fitted `midWiperR`) carries no current and the (−)-node KCL collapses to `Vin/R41 + Vout/R40 = 0`,
+giving `G0 = -1` at every position. Measured across 5 pot × 3 switch positions: `|G0 + 1| ≤ 9e-07`,
+`Zin` agreeing to `1.4e-11` relative on two independent extractions.
+
+### 2. ⛔⛔ And then the corner turns out not to be the story at all
+
+This is the session's real finding, and it retires the framing the item was written in.
+
+**A corner-count assumes each coupling cap sees a FIXED resistance.** That is what makes a coupling
+cap a first-order high-pass, it is why `C21Highpass` and `OdCoupling` are separate one-node stages,
+and it is the premise of `clean_lf_corner_count.py`'s entire method. **This cap's load is not
+fixed.** GATE BG measures it (flat position, shipped values):
+
+| f (Hz) | 1e-3 | 25.2 | 100 | 400 | 1000 | 20000 |
+|---|---|---|---|---|---|---|
+| \|Zin\| at C33 = 6n8 | 42,190 | 31,722 | 11,815 | 3,717 | 2,491 | 2,179 |
+
+**A fall of 19.4×, and the mechanism is closed-form:** C32 — the across-lug cap, which since A2c-3
+is switched as a scaled PAIR with C33 — shorts P3 to P1, collapsing the Miller-loaded
+`R38 + Rp + R39 = 104.4k` ladder onto the bare `R38 + R39 = 4.4k`, halved again by the same
+`(1 - G0)` to the measured ~2.2k asymptote.
+
+⇒ **`|Zin|` and `|1/(w·C31)|` fall TOGETHER through the bass, so the divider ratio does not recover
+the way a fixed-R high-pass does.** The element's real contribution is a broad **PLATEAU** of loss
+that its corner frequency cannot express. At the release gate's own band centres:
+
+| f (Hz) | 250 bst | 250 cut | 500 bst | 500 cut | 1k bst | 1k cut |
+|---|---|---|---|---|---|---|
+| 25.2 | −0.575 | −0.436 | −0.341 | −0.265 | −0.202 | −0.160 |
+| 100.2 | −0.632 | −0.319 | −0.337 | −0.217 | −0.187 | −0.135 |
+| 251.9 | **−1.073** | −0.234 | −0.423 | −0.161 | −0.200 | −0.111 |
+
+**Worst graded-band magnitude 1.073 dB, against the 0.020 dB the corner-count framing predicts at
+the same place — 54× smaller.** s169's closing sentence, *"real, tiny, unactioned"*, is half right:
+it was real and unactioned, and it was not tiny.
+
+⚠ **What DOES survive from s169 is its own subject.** That file is a **phase** count, built for
+item 13, and a 1.715 Hz corner adds little phase over 22–359 Hz — so *"the measured residual is not
+evidence of a ~30 Hz missing corner"* stands and **item 13 stays closed**. The magnitude was never
+in its view. The superseding note is written into `clean_lf_corner_count.py` itself, at the top of
+its C31 block and in its printed output, not only here.
+
+### 3. Consequence for the implementation, which is the part that could have gone wrong quietly
+
+⇒ **implementing C31 as a `C21Highpass`-shaped fixed-R stage would have reproduced ~2 % of it**, in
+the one place a fifth "LF corner" would obviously have been bolted on. It has to be solved
+**inside** `MidBand`'s MNA, together with the pot network, as a **fifth node**.
+
+Shipped as `MidBand::setInputCap()`: unknowns `[Vin, P3, P1, W, Vout]`, the two places `Vin` entered
+the RHS (`P3`'s `Vin/R38` and the (−) row's `−Vin/R41`) moving to the LHS, and `Vin` gaining its own
+KCL row carrying C31's trapezoidal companion. `mna::invert` is already templated, so 5×5 is free.
+**LO-MID only** — circuit.md gives HI-MID's input as IC5_D's output wire with no coupling cap, so
+`hiMid` is deliberately left on the 4-unknown path.
+
+⚠ **A real bug in this session's own edit, found before it could ship:** the 5×5 block was inserted
+*above* the lines that compute `dampDiv`/`g33eff`, so it stamped the wiper leg with stale
+conductances. Fixed by hoisting those two lines — pure statement reordering, same expressions and
+same inputs, so the 4×4 path stays bit-identical.
+
+### 4. Verification
+
+- **GATE BG** (`analysis/c31_corner_gate.py`), **6/6 mutation arms** (`_mutate_gate_bg.py`),
+  including two **computed-verdict** arms (s128) that force the opposite verdict to be printed.
+  - **BG1** divergence guard (s149/GATE AO): the shipped element set is **read from source** and
+    must differ from `eq_reference`'s drawn defaults, or BG1b's transfer known answer is blind to
+    the value set. 2 of 7 differ (**C32 68n vs 22n, Rw 6.8k vs 0**) plus C33 (6n8 vs the [ENG] 47n).
+  - **BG1b** cross-instrument known answer: C31 shorted (1e6 F) reproduces the shipped 4-unknown
+    `mid_stage_tf` to **1.5e-12** over 9 cells × 41 frequencies.
+  - **BG3** refuses to publish its own refutation if `|Zin|` moves less than 5× — i.e. the gate
+    cannot report "the corner-count framing is wrong" on data where it would have been right.
+- **`MidBandTest` Test 7**, three parts: the 5-unknown path reproduces the oracle at the shipped cap
+  pairs (worst **0.098 dB**, same bar as Test 1); `inputCap = 0` is **bit-identical** to never
+  calling it (0.0e+00), so Tests 1–6 stay valid; and ⭐ a **NON-VACUITY** assertion — C31 must move
+  the FLAT position (where the stage's own response is identically 0 dB) by **more than the bar part
+  (a) is graded at**, measured **0.508 dB**. Without it, a stage that silently ignored
+  `setInputCap()` would pass (a) whenever the oracle was also ~0 dB.
+  ⚠ Test 7 needs a **2 s** settle, not the default 0.25 s: C31's τ is ~93 ms, so 0.25 s is 2.7 τ and
+  leaves ~7 % of the startup transient in the "steady-state" peak — it would read as a model error.
+  Kept off the default path so Tests 1–6 run the identical sample counts they always have.
+- **`ctest` 22/22.**
+
+### 5. Shipped state and what is owed
+
+`FitParams::c31 = 2.2e-6` (schematic, **not** a fit target) and **`c31Enabled = false`** — so the
+plugin is **bit-identical to every pre-s177 build** until the switch is thrown. Both are reachable
+from `offline_render` (`--fit c31 = …`, `--fit c31Enabled = …`).
+
+⚠ **The default is OFF because the decision is not this session's to take.** C31 is a
+schematic-verified component the model has never had, so turning it on is the fidelity-correct move
+— but `reference-sources.md` §1 makes the **captures** authoritative for linear/EQ work, and the
+whole EQ block (`c21R`, the A2c-3 mid caps, the Baxandall trebleWiperR) was **fitted with C31
+absent**, so some of its ~0.2–1.1 dB may already be absorbed elsewhere. That is exactly the
+`capture-outranks-schematic` tension, and it is a USER DECISION once priced.
+
+⚠⚠ And note the dose is **partly fitted, not purely schematic**: the plateau scales with C32, which
+is A2c-3's fitted scaled pair. At the **1 kHz** switch position C32 = 22n = the **stock board's own
+value** and the loss is smallest (−0.20 dB); at **250 Hz** C32 = 68n = **3.1× stock** and it is
+largest (−1.07 dB). So the element is schematic and its size is not.
+
+### 6. The two matrices, and ⛔ my own prediction was over-called
+
+**Known answer first.** `s177_c31off.json` vs `s173c_hfmix.json` (the pre-s177 baseline, different
+binary): identical membership, identical BLEND composition, **162/162 captures BIT-IDENTICAL, 0
+moved** — CLEAN 47/47, OD 115/115. So the 5×5 addition, the `dampDiv`/`g33eff` hoist and all the
+wiring changed **nothing** in the shipped path on real renders, not merely in the unit test.
+
+**The price**, `s177_c31off.json` → `s177_c31on.json`, identical membership, 158 of 162 moved
+(the 4 unmoved are the BLEND = 0 rows, where LO-MID still runs but the OD path is out of circuit):
+
+| row | off | on | |
+|---|---|---|---|
+| CLEAN 100 Hz–8 kHz median / p90 | 0.221 / 0.732 | **0.196 / 0.666** | better |
+| CLEAN 8–16.3 kHz median / p90 | 0.340 / 1.289 | **0.279 / 1.097** | better |
+| OD 100 Hz–8 kHz median / p90 | 0.696 / 4.055 | **0.675** / 4.088 | mixed |
+| OD 25–100 Hz median / p90 | 1.263 / 5.828 | **1.355 / 5.919** | **worse** |
+| OD 8–16.3 kHz median | 0.908 | **0.823** | better |
+| OD ALL p99 / band-RMS | 10.469 / 2.338 | 10.480 / **2.347** | ~flat / worse |
+| THD full send / gain-n12 | 2.506 / 2.101 | 2.520 / 2.121 | ~flat |
+
+**8 rows over SHIP either way; nothing crosses a bar.**
+
+⛔⛔ **AND THE IMPROVEMENTS ARE MOSTLY NOT REAL — they are the LF-DOMINATED NULL-GAIN FIT LEAKING A
+LEVEL CORRECTION.** `comprehensive_report` fits a per-row broadband null gain in the TIME domain,
+which s170's GATE BE established *"the log sweep's LF octaves dominate"*. C31 removes LF energy, so
+that fit rises — measured, **+0.14 dB median on BOTH CLEAN and OD** — and lifts every band. The
+model is signed-NEGATIVE (too quiet) at nearly every band above 80 Hz, so a uniform lift improves
+everything above 80 Hz and worsens 20–63 Hz. That is the whole shape of the result.
+
+⭐ **Tested, not asserted.** Re-levelling each row by its own BAND-DOMAIN mean (a proper level match,
+which the time-domain one is not) and re-scoring:
+
+| | as graded | re-levelled |
+|---|---|---|
+| CLEAN median / p90 / rms | −0.047 / −0.101 / −0.055 | −0.040 / **−0.016** / **−0.012** |
+| OD median / p90 / rms | −0.100 / −0.135 / −0.085 | **+0.004 / +0.030 / +0.014** |
+
+⇒ **100 % of the OD improvement is the level shift, and on shape alone OD is slightly WORSE; for
+CLEAN, 77–84 % of the p90/rms improvement is level, leaving a small genuine shape gain.** This is
+the *"make the model louder"* degeneracy for the **sixth** time (s5/s6, GAP #3b's C13, the
+rail-voltage fit, C15, s170's `clipSat`), reached from yet another direction — and it is exactly
+what CLAUDE.md's standing rule predicts: *"the matrix is the arbiter of a shape/frequency question
+only, never a level/law one."*
+
+⚠⚠ **s177's own §5 prediction — "C31 deepens an existing bass deficit ⇒ it will make accuracy worse,
+and it is not marginal" — was OVER-CALLED.** The bass half is right and reproduces (OD 25–100 Hz
+median 1.263 → 1.355, and the signed 20–63 Hz error deepens at every band). The "not marginal" half
+is wrong: 7 of 14 gated rows improve as graded, and on shape the whole thing is a **WASH**
+(CLEAN marginally better, OD marginally worse, no row crossing anything).
+
+### 7. ⭐⭐ C31 CANNOT MOVE ITEM 17, AND THAT IS STRUCTURAL
+
+The user's stated reason for scheduling item 16 first was that it *"is cheap and might move item
+17"* (the bass/treble notches reading deeper than ND). **It cannot**, for a reason that needs no
+measurement: C31 lives in LO-MID, which sits **AFTER `LevelBlend`** in the chain
+(`levelBlend → c21 → eqPreGain → baxandall → loMid → hiMid → masterOut`). Every notch item 17 is
+about is a **cancellation between the OD path and the clean tap**, i.e. a property of their RATIO at
+the summing node. A shared post-BLEND element multiplies both contributions by the same transfer and
+**leaves that ratio exactly unchanged**, so it cannot alter any composite null's depth at any
+setting. ⇒ item 17 is unaffected either way, and the decision below can be taken on its own merits.
+
+### 8. ✅✅ USER DECISION (2026-08-08): ENABLE — and the ground it is taken on
+
+`c31Enabled` ships **true**. ⭐ **The ground matters and is recorded at the constant itself: it ships
+on SCHEMATIC FIDELITY, explicitly NOT on the matrix.** The matrix is a **wash** once the level leak
+is removed (§6), so it neither rewards nor punishes the change; the tie-break is that C31 is a real,
+schematic-verified part the model has never had. `capture-outranks-schematic` arbitrates a
+**conflict**, and §6 established there is no conflict here to arbitrate.
+
+Verification of the flip, all on the SAME binary:
+- **Defaults bit-identical to the explicit `--fit c31Enabled=1` list at ALL THREE LO-MID switch
+  positions (max |diff| 0.0), with the MUTATION CONTROL (`--fit c31Enabled=0`) FIRING at all three**
+  (0.0273 / 0.0251 / 0.0244). Without the mutation arm the first check passes for a constant that
+  never reaches the DSP (the s100 trap).
+- **The shipped build reproduces the named baseline: a 33-capture subset re-rendered with the
+  defaults is 33/33 BIT-IDENTICAL to `s177_c31on.json`**, so that report is the shipped behaviour
+  and not merely a `--fit` experiment.
+- **`ctest` 22/22** — and this now includes the owed check: `SwitchTransitionTest` runs on the
+  shipped defaults, so with C31 enabled it exercises the LO-MID selector crossfade **with the fifth
+  node live**, through `MidBand`'s defaulted copy-assignment (s175's deliberate choice, which is
+  what makes a newly-added member impossible to silently miss — the s146 `masterTaperBreak` trap).
+
+⚠ **BASELINE MOVES: `analysis/reports/s177_c31on.json`.** Membership identical to its predecessor
+(162 graded / 172 attempted, same 2 named dropouts, same BLEND composition), **8 rows over SHIP**,
+nothing crossed. `s177_c31off.json` is kept as the C31-disabled twin and is the artefact that proves
+the 5×5 addition inert when off (162/162 vs `s173c_hfmix.json`).
+
+⚠ **CACHE: re-armed, and the standing "~25 min" figure is STALE.** s177 measured a full 172-capture
+render at **~55 min** on this machine, twice.

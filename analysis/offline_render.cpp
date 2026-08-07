@@ -292,6 +292,10 @@ static const FitField kFitFields[] = {
     {"midCapRatioLo", &FitParams::midCapRatioLo},
     {"midCapRatioHi", &FitParams::midCapRatioHi},
     {"trebleWiperR", &FitParams::trebleWiperR},
+    // C31, the Baxandall->LO-MID coupling cap (session 177, item 16). The VALUE is
+    // schematic (2u2) and is exposed only so GATE BG can sweep it; the switch that
+    // decides whether it exists at all is the bool `c31Enabled` below.
+    {"c31", &FitParams::c31},
     // [ENG] level-dependent treble tilt (session 166) — see src/dsp/OdDriveTilt.h
     {"odTiltF0", &FitParams::odTiltF0},
     {"odTiltS", &FitParams::odTiltS},
@@ -310,6 +314,15 @@ static void applyFitAssignment(FitParams& fit, const std::string& assignment)
     const std::string name = assignment.substr(0, eq);
     const std::string value = assignment.substr(eq + 1);
     const std::string key = lower(name);
+
+    if (key == "c31enabled")
+    {
+        // Session 177, open-work item 16. A bool, not a double: whether the schematic's
+        // C31 coupling cap exists in the LO-MID stage at all. Off reproduces every
+        // pre-s177 render bit-for-bit (the 4-unknown path is untouched).
+        fit.c31Enabled = parseBool("--fit c31Enabled", value);
+        return;
+    }
 
     if (key == "railenabled")
     {
@@ -367,7 +380,7 @@ static void applyFitAssignment(FitParams& fit, const std::string& assignment)
         }
     }
 
-    std::string known = "railEnabled, clipAdaa, clipAdaaMaxOs";
+    std::string known = "railEnabled, c31Enabled, clipAdaa, clipAdaaMaxOs";
     for (const auto& f : kFitFields)
         known += std::string(", ") + f.name;
     fail("--fit: unknown parameter '" + name + "' — known: " + known);
@@ -521,6 +534,7 @@ static void printFitReport(const Options& o, const PedalChain::Params& p, int la
     for (const auto& ff : kFitFields)
         std::printf("fit.%s=%.9g\n", ff.name, f.*(ff.member));
     std::printf("fit.railEnabled=%d\n", f.railEnabled ? 1 : 0);
+    std::printf("fit.c31Enabled=%d\n", f.c31Enabled ? 1 : 0);
     std::printf("fit.clipAdaa=%d\n", f.clipAdaa);
     std::printf("fit.clipAdaaMaxOs=%d\n", f.clipAdaaMaxOs);
 }
