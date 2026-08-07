@@ -134,22 +134,61 @@ public:
     // INSIDE the requirement's own per-detent spread at EVERY detent (worst
     // 0.085 of it), which is the overfitting test in the constant's own units.
     //
-    // ⭐ Outside corroboration no term of the objective knew about: the segment
-    // slopes RISE monotonically (0.174 → 0.413 → 0.791 → 4.034, i.e. convex — a
-    // physically buildable resistive track), and the half-rotation fraction goes
-    // 21.02 % → 15.41 %, TOWARD the textbook A-taper 10–15 % band that
-    // circuit.md specifies for VR2 (100k A). `LevelBlendTest` Test 0 asserts the
+    // ⛔⛔ RE-FITTED s173, AND THESE DEFAULTS WERE LEFT ON THE RETIRED s163 SET
+    // UNTIL s174 (was 0.219415/0.038146, 0.529680/0.166340, 0.857645/0.425688).
+    // The shipped plugin was never wrong — `PedalChain::applyFitParams` always
+    // calls `setTaper()` from `FitParams.h` — but TWO consumers read these
+    // compiled defaults and both were therefore reading a curve nothing runs:
+    // `setLevel()`'s invalid-set FALLBACK, and `LevelBlendTest` Test 0, i.e. the
+    // one test that exists to catch a lost convexity was asserting the shape of
+    // the retired curve. s146's `masterTaperBreak` lesson (a name surviving a
+    // VALUE change while its consumers keep rebuilding the old curve), one file
+    // over. ⇒ when FitParams' taper moves, move these in the same edit.
+    //
+    // ⚠⚠ AND THE OUTSIDE CORROBORATION THIS BLOCK USED TO CLAIM HAS INVERTED —
+    // STATED, NOT DELETED, because a future session must not re-quote it. It
+    // read: "the half-rotation fraction goes 21.02 % → 15.41 %, TOWARD the
+    // textbook A-taper 10–15 % band that circuit.md specifies for VR2 (100k A)".
+    // Under the s173 re-fit L(0.5) = **23.75 %**, i.e. it moved AWAY from that
+    // band and past where the retired power law sat. Convexity survives and is
+    // the half that still corroborates — slopes 0.256 → 0.636 → 1.266 → 9.568,
+    // rising, a physically buildable track — but the A-taper agreement does not,
+    // and it was never a term of the objective in either epoch. ⇒ the taper is
+    // fitted to the measured LEVEL law and that is its whole warrant; do not
+    // re-derive it from the A-taper band. `LevelBlendTest` Test 0 asserts the
     // shape and FAILS if convexity, monotonicity or an endpoint is lost.
     //
     // ⚠ The last segment is a LOWER bound on its own steepness: GATE AY3 reports
     // the LEVEL-max requirement as `above` (the pedal wants more than L = 1 can
-    // deliver), so it is clamped by the anchor rather than met.
-    static constexpr double kLevelTaperBreak1 = 0.219415;
-    static constexpr double kLevelTaperFrac1 = 0.038146;
-    static constexpr double kLevelTaperBreak2 = 0.529680;
-    static constexpr double kLevelTaperFrac2 = 0.166340;
-    static constexpr double kLevelTaperBreak3 = 0.857645;
-    static constexpr double kLevelTaperFrac3 = 0.425688;
+    // deliver), so it is clamped by the anchor rather than met. That clamp is
+    // what puts the last break at **98.4 %** of rotation with a slope of 9.568 —
+    // the fit pressing against the anchor, not a measured feature of the pot.
+    //
+    // ✅ RE-CHECKED s174 on the current epoch (GATE AY against
+    // `s173c_hfmix.json`): AY2 REFUSES to run — "no detent has a requirement
+    // larger than its own across-stimulus spread" (worst need −0.58 dB against a
+    // 1.27 dB spread) — so this set still closes the LEVEL law after `OdMakeup`
+    // and the mix-keyed HF term moved the OD:CLEAN ratio under it. No re-fit.
+    //
+    // ✅✅ USER DECISION TAKEN (s174): KEEP, not re-derived toward the A-taper
+    // band. AY2's refusal means the current epoch supplies no per-detent
+    // requirement to fit a smoother curve AGAINST — the LEVEL law is inside its
+    // own measurement noise everywhere, so any alternative shape chosen only to
+    // improve the half-rotation number would be an unmeasured, self-selected
+    // pick with nothing behind it (`measurement-discipline.md`'s
+    // `self-selecting-scores` / `known-answer-must-not-start-at-its-answer`
+    // family). The shipped curve is the one thing on record that IS
+    // measurement-grounded: it was fitted against the strictest epoch this law
+    // has had (s172's, before `OdMakeup` diluted the requirement) and it still
+    // satisfies the current one. Trading that for A-taper cosmetics — a
+    // property never in either fit's objective — is the worse trade, not the
+    // better one.
+    static constexpr double kLevelTaperBreak1 = 0.221598;
+    static constexpr double kLevelTaperFrac1 = 0.056630;
+    static constexpr double kLevelTaperBreak2 = 0.494043;
+    static constexpr double kLevelTaperFrac2 = 0.229938;
+    static constexpr double kLevelTaperBreak3 = 0.984417;
+    static constexpr double kLevelTaperFrac3 = 0.850908;
 
     // The taper itself, as a free function so tests, the oracle and any future
     // consumer read ONE implementation rather than rebuilding the curve from the
@@ -342,8 +381,10 @@ private:
     double distMix = 1.0, distTarget = 1.0;
     double distStep = 1.0; // 1/(fade samples); prepare() derives it from the rate
     // Capture-fit taper shape + the knob position it was applied to. Defaults are
-    // the fitted s163 values, so a default-constructed LevelBlend matches the
-    // shipped FitParams.
+    // the fitted s173 values, so a default-constructed LevelBlend matches the
+    // shipped FitParams. ⚠ That sentence was FALSE from s173 to s174 — see the
+    // kLevelTaper* block; keep the two sets in step or it silently goes stale
+    // again, and only the fallback and the test oracle will notice.
     double tb1 = kLevelTaperBreak1, tf1 = kLevelTaperFrac1;
     double tb2 = kLevelTaperBreak2, tf2 = kLevelTaperFrac2;
     double tb3 = kLevelTaperBreak3, tf3 = kLevelTaperFrac3;
