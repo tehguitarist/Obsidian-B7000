@@ -68,7 +68,26 @@
 // no mid pot can reach, must NOT. A run where all four move is measuring the tone,
 // not the switch.
 //
-// ⛔⛔ OUTCOME, AND IT REVISES s170's OWN NUMBERS — the item 14 pre-registered stop
+// ✅✅ OUTCOME AT s175 — ALL FIVE SWITCHES ARE NOW GATED AND ALL FIVE PASS. The
+// four selectors got the per-stage dual-instance crossfade the s171 outcome note
+// below scoped out (`src/dsp/SwitchFade.h`, `PedalChain`'s shadow stages): worst
+// selector cell **39.47x -> 0.33x** at the 30 ms probe, **0.50x** at the shipped
+// 20 ms. `dist_engage` is unmoved (its own 12 ms ramp is untouched), which is the
+// free scope check — a change confined to the selectors must leave the footswitch
+// column bit-identical, and it does, cell for cell.
+//
+// ⭐ Two of the four needed more than the switch itself. GRUNT moves the clipper's
+// cap network AND `OdToneRestore`'s grunt-keyed (gain, Q) table, which jumps a whole
+// row — so it is crossfaded at TWO points off ONE ramp. Had only the clipper been
+// faded, the residual would have been the notch stage's, wearing the switch's name.
+//
+// ⚠ The four selectors' fade is 20 ms, NOT `dist_engage`'s 12 ms; the sweep and the
+// 1/t argument that chose it are at `SwitchFade::kSeconds`. Do not unify the two
+// constants on the grounds that they look like the same quantity — they were swept
+// against different worst cells.
+//
+// ⛔⛔ THE s171 OUTCOME, KEPT BECAUSE IT REVISES s170's OWN NUMBERS — the item 14
+// pre-registered stop
 // ("if every switch at every pot position sits below the signal's own quiet step,
 // close it as measured-and-accepted") does NOT fire. s170's `FinalSweepTest [5]`
 // read attack/grunt/hiMidFreq/loMidFreq at ONE pot config (mids at full boost) and
@@ -136,14 +155,13 @@ const char* swName(Sw s)
     return "?";
 }
 
-// Only `dist_engage` has a crossfade shipped (S2, this session) — its stage is a
-// mix override, so "fade the mix coefficient" is the whole fix. The four selector
-// switches (attack/grunt/loMidFreq/hiMidFreq) change ACTUAL TOPOLOGY (a cap network
-// in Clipper.h, or MidBand's series/across caps) and need a per-stage dual-instance
-// crossfade (architecture.md), which is unbuilt. GATE only what is fixed; REPORT
-// the rest so the sweep's own numbers are on record without failing ctest for a
-// known, scoped-out gap. See the file header's outcome note.
-bool isGated(Sw s) { return s == Sw::DistEngage; }
+// ⭐ EVERY SWITCH IN THE CHAIN IS NOW GATED (s175). This function used to return
+// true for `dist_engage` alone, because the four selectors' per-stage dual-instance
+// crossfade was unbuilt and their numbers were REPORTED rather than gated. It is
+// kept — rather than deleted for an unconditional `true` — precisely so that a
+// future switch added to `Sw` has to make an explicit decision about whether it is
+// gated, instead of silently inheriting a gate it may not yet satisfy.
+bool isGated(Sw) { return true; }
 
 // A named pot configuration. `mids` drives BOTH mid pots, because the mid
 // selectors' observability is set by how far off centre those two sit (see the

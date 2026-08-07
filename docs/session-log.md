@@ -22222,3 +22222,288 @@ either change is quoted individually.
 ⇒ the ordered prerequisites in section 11 are UNCHANGED except that step 1 is now DONE
 (`s173c_hfmix.json` is the current baseline). Step 2 (re-run GATE AY/AZ against it) is next, and
 the taper constants that shipped were fitted one epoch earlier.
+
+
+## SESSION 174 — the two owed re-fits are BOTH closed with NO change, and the LEVEL taper's own housekeeping had gone stale (2026-08-07)
+
+Opened on s173 §11's ordered prerequisite list. Step 1 (matrix re-render) was already done
+(`s173c_hfmix.json`, committed as `a1d4b3d`). This session ran steps 2 and 3. **Both close with no
+constant moved** — and step 3's closure is a measured refutation rather than a "looks fine".
+One `src/` change landed and it is a correctness fix to *compiled defaults nothing runs*, plus the
+test that reads them. **`ctest` 22/22.**
+
+### 1. GATE AY on the current epoch — the s173 taper HOLDS, and the gate refuses to fit anything
+
+⛔ First, the gate refused for the right reason and it was not the taper: `level_law_gate.py`'s
+`SHIPPED_LEVEL_TAPER` was still the **s163** literal, so `check_shipped_constant()` stopped the run
+against `FitParams.h` (worst component 4.252e-01). That literal is a **pinned epoch, not a
+convenience copy** — the guard exists precisely to force an explicit acknowledgement when the
+header moves — so it was updated with the reason recorded at the constant, not silently.
+
+Re-run, with both epoch guards passing (`s173c_hfmix.json` postdates all 24 `src/` files and the
+render binary; no capture postdates the report):
+
+```
+      LEVEL |   pedal (mean)   model (mean)     need   spread       verdict
+      0.125 |         -22.07        -21.51    -0.56     3.20     AMBIGUOUS
+      0.250 |         -15.31        -14.73    -0.58     1.64     AMBIGUOUS
+      0.375 |          -9.99         -9.46    -0.53     1.40     AMBIGUOUS
+      0.500 |          -7.27         -6.69    -0.58     1.27     AMBIGUOUS
+      0.625 |          -4.55         -4.05    -0.50     1.20     AMBIGUOUS
+      0.750 |          -2.84         -2.74    -0.11     1.20 NOTHING TO DO
+      0.875 |          -1.79         -1.96    +0.17     0.39 NOTHING TO DO
+```
+
+⇒ **AY2 REFUSES**: *"no detent has a requirement larger than its own across-stimulus spread"*.
+Worst |need| is **0.58 dB against that detent's own 1.27 dB spread**. At fit time (against
+`s172_odmakeup.json`) the same column read **+1.83…+3.10 dB**, so the fit did its job and it
+survives the epoch it was owed a re-check against. GATE AZ has no input and is structurally not
+runnable — the identical closure signature to s163's.
+
+⇒ **owed item 2 CLOSED, no constant moved.**
+
+### 2. `OdToneRestore`'s mix law — owed since s172, and it needs NO re-fit
+
+The acceptance table re-measured on the current binary across all five `--set` conditions (the tool
+re-rendered every cell on its own epoch check — *"rendered at a DIFFERENT BINARY"*), then split by
+each capture's **measured** `cleanFraction` rather than by its filename:
+
+| | over the ±0.83 dB bar |
+|---|---|
+| **bleed-free (cf = 0)** | **6 of 8** |
+| **mixed (cf > 0), both dilution axes** | **0 of 7** |
+
+⭐⭐ **And the listening condition is inside the bar for the first time** — the reference the user
+named at s173 §9 (*"ref-od should be the starting reference, NEVER the bleed free one"*):
+**−0.03 / −0.21 / −0.59 / −0.51** across DRIVE, against s156's **+1.0…+1.5** and s163's
+**+1.04…+1.59**. The BLEND axis matches too (−0.38 / −0.22 / −0.27 at cf = 0.25 / 0.50 / 0.75).
+
+The residual is confined to the bleed-free corner and it is **TOO DEEP** — the direction s172
+predicted in writing (*"it keeps applying its old, LARGER dilution correction, so residual error
+lands on the TOO-DEEP side (the direction the user asked for)"*), pre-accepted by the user, and a
+move **toward hardware** (`reference-sources.md` §1/§3 make HARDWARE the authority for this null's
+depth and record it deeper than ND), which §5 rule 2 defines as a PASS.
+
+**⭐ AND IT IS NOT REACHABLE FROM THIS STAGE — screened closed-form, no render.** Run against
+`shipped_tables()`, i.e. the header PARSED, so nothing is retyped. Three known answers first:
+`S(kMixCfRef) = +0.00014` (the base table's anchor is a real pinned zero); a hand transcription of
+`kMixS`/`kNotchMixK` diffs to the parsed header at **max |dS| = 0, max |dK| = 0**; and a zero move
+reproduces every reading exactly.
+
+| lever | largest move costing no in-bar reading | binding constraint | bleed-free rms \|corr\| | worst left |
+|---|---|---|---|---|
+| **S(0)** | +0.1355 | `level-1700_grunt-boost` (cf 0) | 1.933 → 1.445 dB (**25.3 %** closed) | 2.17 dB = **2.61× bar** |
+| **K[cut]** | −1.1107 | `level-1700_blend-1430` (cf 0.25) | 1.933 → 1.440 dB (**25.5 %** closed) | 2.38 dB = **2.87× bar** |
+
+- **`S(0)` is the only node read exclusively at cf = 0** — and it is **shared across GRUNT** while
+  `kNotchMixK`'s sign FLIPS (Cut −9.34, Flat +2.97, Boost +5.81 at DRIVE 0.5), so the three rows
+  want opposite moves from one node. Sized to null the Cut row it pushes flat (−0.14 → −1.11) and
+  boost (−0.04 → −1.94) OUT of the bar.
+- **`K[cut]` looks separable** because S is pinned to ~0 at the anchor — and at the listening
+  condition it genuinely is (that reading moves **0.04 dB**). It fails at cf = 0.25, where S dips to
+  **−0.405**: the deepest part of the **non-monotone shape s156 built and deliberately refused to
+  clamp**. The very feature that makes the law right at intermediate mix is what stops K being a
+  bleed-free-only lever.
+- ⚠ The two ~25 % figures bind on **different readings** — a coincidence of magnitudes, not a shared
+  cause. Do not build on it.
+
+⭐ Free by-product, quantified rather than assumed: `kMixCfRef` is **0.441** but the listening
+captures now land at **cf = 0.4326** under the s173 taper, so the anchor has drifted. Cost:
+**+0.112 dB** of extra cut on the Cut row at DRIVE 0.5 — 7.4× inside the bar, and already a
+component of the measured −0.21. **Named, not fixed**; re-anchoring would move the whole base table
+for a tenth of a dB.
+
+⇒ **owed item 3 CLOSED, no constant moved.**
+
+### 3. ⛔⛔ `LevelBlend.h`'s compiled defaults were still the RETIRED s163 taper
+
+s173 moved the shipped taper in `FitParams.h` and did not move the compiled defaults one file over.
+**The shipped plugin was never wrong, and that is verified rather than assumed** — `PluginProcessor.cpp:251`
+and `offline_render.cpp:581` both call `setFitParams` unconditionally, so `FitParams{}`'s values
+always reach `setTaper()`. But **two** consumers read the compiled defaults: `setLevel()`'s
+invalid-set fallback, and **`LevelBlendTest` Test 0 — i.e. the one test that exists to catch a lost
+convexity spent a session asserting the shape of a curve nothing runs, and passing.** s146's
+`masterTaperBreak` trap, in a second file.
+
+### 4. ⭐⭐ And fixing it turned Test 0 RED — on a real conflict, resolved by DELETING a bar rather than widening one
+
+With the defaults corrected, Test 0's half-rotation assertion **failed**: the shipped taper reads
+**23.75 %** against its own 8–18 % bar. That bar was `circuit.md`'s A-taper corroboration
+(VR2 = 100k **A**, textbook 10–15 %).
+
+⛔ **NOT widened** — that is the concession `measurement-discipline.md` names. The bar was
+**deleted and the quantity is now REPORTED**, because its PREMISE does not hold: GATE AY defines
+`levelTaper` as a **REPARAMETERISATION OF THE KNOB AXIS** — the curve that makes the model's
+rendered ladder match the pedal's — so it absorbs every model-vs-pedal difference downstream of the
+pot, not just VR2's track. Both s146 and s163 label the A-taper agreement *"outside corroboration no
+term of the objective knew about"*: a bonus, never a constraint.
+
+⭐ And the quantity behaves like the thing it is rather than like a pot: across three epochs it runs
+**21.02 % (retired power law) → 15.41 % (s163) → 23.75 % (s173)**, moved each time by DSP changes
+elsewhere in the chain (`OdMakeup`, the mix-keyed HF term) that cannot touch a physical pot.
+
+⭐⭐ **Replaced by a STRICTLY HARDER assertion, and it is the one that would have caught the defect
+above: the compiled defaults must EXACTLY equal `FitParams`' shipped taper.** Exact equality is the
+right bar (both are literals of the same fit, so any difference is a missed edit, never rounding).
+Mutation-controlled — perturbing one constant in the 6th decimal gives exit 1 and names it:
+`STALE: LevelBlend::kLevelTaperFrac2 = 0.229939 but FitParams ships 0.229938`. *If the rebuilt test
+is harder than the one it replaces and still passes, it is a correction.*
+
+⚠⚠ **BUT 23.75 % IS NOT DISMISSED, AND IT IS A USER QUESTION.** Recorded at the constant, not only
+here. Alongside it the last break now sits at **98.4 % of rotation** with slope **9.568** over
+1.6 % of travel — and AY3 reports the LEVEL-max requirement as `above` (the pedal wants more than
+L = 1 can deliver), so segment 4 is **the fit pressing against the pinned anchor**, not a measured
+feature of the pot. The taper *delivers* (AY2 refuses to fit anything), convexity survives
+(0.256 → 0.636 → 1.266 → 9.568, rising), and both endpoints are exact — but its outside
+corroboration has gone and its top segment is degenerate-looking. **Whether that is acceptable is a
+decision, not a measurement.**
+
+### 5. State at session end
+
+**`ctest` 22/22.** `src/` changes: `LevelBlend.h` (six constants + the block that documents them),
+`tests/LevelBlendTest.cpp` (Test 0 (d) → reported, new (e) staleness gate).
+`analysis/level_law_gate.py`: the pinned epoch literal.
+⚠ The rebuild **re-armed the render cache** — the next matrix run pays ~25 min.
+
+**Owed, unchanged:** the s171 `dist_engage` bit-identical-matrix check (needs a revert + rebuild, so
+it cannot run while a matrix render is in flight). And `CLAUDE.md` is past its own 1200-line
+re-archive trigger, deliberately not actioned because `docs/release-cleanup-plan.md` §4 would make
+it redundant — a live user decision.
+
+### 6. ✅✅ USER DECISION (2026-08-07): the 23.75 % half-rotation figure — KEEP, not re-derived
+
+Put to the user as an open question at session end (§4); answered "go with whatever gets a net
+better result". There is no principled alternative to compute one against: AY2's refusal means the
+current epoch supplies **no per-detent requirement** to fit a smoother curve against — the LEVEL
+law is already inside its own measurement noise at every detent. Any curve chosen only to move the
+half-rotation figure toward the A-taper band would be an unmeasured, self-selected pick with
+nothing behind it (`self-selecting-scores` / `known-answer-must-not-start-at-its-answer`). The
+shipped curve is the one candidate on record that IS measurement-grounded — fitted against the
+strictest epoch this law has had (s172's, before `OdMakeup` diluted the requirement) — and it still
+satisfies the loosened current one. Trading that for A-taper cosmetics, never a term of either fit's
+objective, is the worse trade. Recorded at the constant (`LevelBlend.h`) and in the STATUS block;
+nothing further changed.
+
+## SESSION 175 — open-work item 14 CLOSES: the four selector switches get their dual-instance crossfade (2026-08-07)
+
+`ctest` 22/22. **No matrix render run and none owed** — the settled path is bit-identical, measured
+rather than argued (§4). ⚠ A commit named `052138d "Pre-release-cleanup checkpoint: commit all
+working-tree state"` appeared mid-session, made by neither this session nor any command it ran; it
+swept in both s174's uncommitted work and this session's in-progress item-14 work. Nothing was lost.
+See §6 for how the history was resolved before the merge.
+
+### 1. What was left, and why it was a bigger job than `dist_engage`
+
+s171 shipped the footswitch (`dist_engage`) and left the four SELECTOR switches REPORTED but not
+gated, with the reason stated: `dist_engage` is a **mix override**, so smoothing it was one
+coefficient ramp inside `LevelBlend`, whereas attack/grunt/loMidFreq/hiMidFreq change **actual
+topology** — cap networks inside `TrebleAttack` / `Clipper`, and `MidBand`'s switched series/across
+cap PAIR. Each of those re-solves an MNA matrix, so there is no coefficient to interpolate between:
+the stage simply *is* a different circuit either side of the flip. `architecture.md` names the
+remedy and s171 scoped it out: a **per-stage dual-instance crossfade**.
+
+Baseline, re-measured this session on the current binary (`SwitchTransitionTest`, worst over 4 flip
+phases × 4 pot configs × both directions): attack **1.99×**, grunt **6.01×**, loMidFreq **28.31×**,
+hiMidFreq **39.47×**, against a bar of 1.00.
+
+### 2. The build — `src/dsp/SwitchFade.h` plus shadow stages in `PedalChain`
+
+On a flip the live stage is copied into a SHADOW (topology *and* state), the live stage takes the new
+position, and for the fade both are driven by the same input with their outputs crossfaded. mix = 0
+reproduces exactly what the pedal would have produced had nothing been flipped; mix = 1 is exactly
+the new position.
+
+⭐ **Copying rather than starting the shadow from rest is the physically correct initial condition,
+not a convenience**: a mechanical switch does not discharge the caps around it, so the old network's
+stored charge IS what the arm that keeps running should start from. A zero-state shadow would replace
+one discontinuity with a different one.
+
+⭐ **GRUNT needed TWO crossfade points off ONE ramp, and that is the finding worth keeping.** The
+switch moves the clipper's cap network *and* `OdToneRestore`'s grunt-keyed (gain, Q) table, which
+jumps a whole row — a stage whose name contains no switch. Had only the clipper been faded, the
+residual would have been the notch stage's discontinuity wearing the switch's name. Nothing in
+item 14's own description says this; it came out of reading what `applyParams` actually does when
+`gruntIdx` moves.
+
+Mechanically: `TrebleAttack`, `Clipper` and `MidBand` gain a **public defaulted copy-ASSIGNMENT**
+while keeping the copy CONSTRUCTOR deleted. Defaulted rather than hand-written on purpose — a
+hand-copied clone is the s146 `masterTaperBreak` trap waiting to happen (a future member silently
+left behind, plausible result, no compile error). The deleted constructor keeps the original guard
+where it earns its keep: a prepared DSP stage still cannot be passed or returned by value.
+
+⚠ Detection and priming order is load-bearing in both directions: detection must read `cur` BEFORE it
+is overwritten, and priming must happen BEFORE the setters run, because after `treble.setAttack(...)`
+there is nothing left to copy. A `paramsApplied` guard suppresses the first apply — at construction
+the stages sit at their own defaults (`Clipper::grunt` is Cut) while `cur` sits at `Params{}`'s
+(gruntIdx 0 = Boost), so a "change" detected against that never-applied state would prime a shadow
+with a topology the chain has never run.
+
+### 3. The fade time is measured, not picked — and it is NOT `dist_engage`'s 12 ms
+
+Swept against the test's own bar, worst selector cell of 32:
+
+| fade | 8 ms | 10 ms | 12 ms | 15 ms | 20 ms | 25 ms | 30 ms |
+|---|---|---|---|---|---|---|---|
+| worst ratio | 0.98× | 1.00× | 0.83× | 0.66× | **0.50×** | 0.40× | 0.33× |
+
+⭐⭐ **From 12 ms up the statistic is purely fade-rate-limited**, which is what makes this a
+measurement rather than a preference: `ratio × t` reads **9.96 / 9.90 / 10.00 / 9.90 / 9.90 ms**
+across 12–30 ms — constant to 1 %, an exact 1/t law. A floor artefact does not scale with fade speed
+(s154), so the bar is genuinely tracking the ramp here. ⚠ Below 12 ms it LEAVES that law (8 ms
+measures 0.98× where 1/t predicts 1.24×), so those two points are not on the mechanism the bar
+measures and were not used to choose the value — which is also why the 8/10 ms pair is non-monotone.
+
+⭐ **The worst cell is not phase-sampling noise, and checking that validated the instrument's own
+`n`**: re-run at **16** flip phases instead of 4, every figure in that table is **IDENTICAL**. So
+s171's 4-phase choice is adequate, which nothing had established.
+
+⇒ **20 ms**: a 2× margin inside the 1/t region, and the top of the "~5–20 ms" band item 14 states,
+rather than headroom invented outside it. ⛔ Do NOT unify this with `LevelBlend::kDistFadeSeconds`
+(12 ms) on the grounds that the two look like the same quantity — they were swept against different
+worst cells.
+
+### 4. Result, and the free scope check
+
+All five switches are now GATED and all five pass. Worst selector cell **39.47× → 0.33×** at the
+30 ms probe, **0.50×** at the shipped 20 ms. `SwitchTransitionTest` 245 checks, 0 failures (was 213 —
+gating added the assertions).
+
+⭐ **`dist_engage`'s column is unmoved, cell for cell** — a change confined to the selectors must
+leave the footswitch alone, and it does. Free, and it is the check that would have caught a fade
+accidentally wired to the wrong control.
+
+⭐⭐ **BIT-IDENTITY, MEASURED: 27 render pairs, 0 differ, 0 missing.** Old binary built from
+`a1d4b3d`'s versions of exactly the five touched files (s174's `LevelBlend.h` held at its shipped
+state, so the comparison isolates item 14), new binary from the current tree; hashes confirmed
+distinct (`7a9f6af51b91` vs `57e69f2c8722`). Coverage: all 3 ATTACK × 3 GRUNT positions at **both**
+OS regimes (2× and 8× — the attack/grunt fades are OS-rate-derived, so both had to be exercised) plus
+all 3 × 3 mid-selector positions. ⇒ **no re-baseline owed**, unlike s162/s163/s166. This works
+because `OfflineRender` calls `reset()` AFTER `setParams()`, so every rendered sample runs with every
+fade settled and therefore down an `active()` branch that is not taken — each call site is written as
+a branch AROUND the untouched pre-change expression, never a rewrite of it.
+
+⚠⚠ **MUTATION CONTROL, and it was not optional — this session's first two attempts at this very
+comparison both passed vacuously.** Attempt 1 copied a stale artefact after the revert build FAILED
+(I checked that `cp` succeeded, not that the build did). Attempt 2 hit the project's own
+**five-times-documented zsh trap**: `args="--attack 0 ..."` expanded unquoted is ONE argv in zsh, so
+all 36 renders exited rc=2, wrote nothing, and `cmp` on two non-existent files duly reported
+"DIFFER" — `empty-gate-must-fail` producing a wrong verdict *about the thing under test* rather than
+an obvious crash, exactly as the s100 entry predicts. The rebuilt comparison uses an ARRAY expanded
+as `"${argv[@]}"`, asserts both outputs EXIST and are non-empty before comparing, counts them, and
+carries a control run (same binaries, one GRUNT position changed) that MUST report a difference. The
+control fires.
+
+### 5. Cost
+
+A shadow doubles its own stage's per-sample work, and only while a fade runs (20 ms). The clipper is
+the expensive one — a bracketed Newton solve — so a GRUNT flip is the priciest transition in the
+chain. Bounded, transient, and it buys the click. `PerfBenchmark` measures the SETTLED chain, which
+is untouched by construction (the `active()` branches are not taken), and it is unchanged.
+
+### 6. History
+
+`052138d` was an unpushed, local-only checkpoint whose own message declares it a checkpoint rather
+than curated history, and it bundled two sessions' work under one meaningless line. Before merging it
+was restructured into two described commits (s174, s175) off `a1d4b3d`; the original is recoverable
+from the reflog. Nothing else about it was changed — no file content was touched in the restructure,
+verified by diffing the resulting tree against `052138d`.
