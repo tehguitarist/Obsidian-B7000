@@ -22806,3 +22806,197 @@ the 5×5 addition inert when off (162/162 vs `s173c_hfmix.json`).
 
 ⚠ **CACHE: re-armed, and the standing "~25 min" figure is STALE.** s177 measured a full 172-capture
 render at **~55 min** on this machine, twice.
+
+---
+
+## SESSION 178 (2026-08-08) — open-work item 17: the two notches are ONE mechanism, and the "bass notch" was the wrong feature for most of the session
+
+**Nothing shipped. No `src/` edit, no constant moved, ctest untouched, no re-baseline owed.** New
+`analysis/hf_null_shape_gate.py` (**GATE BH**) + `analysis/_mutate_gate_bh.py` (**10/10 arms**),
+report `analysis/reports/s178_hf_null_shape.json`.
+
+### 0. The user's steer, taken at the top, and it decided the grading
+
+> *"keep the hardware differences as being more desirable — err on that side rather than the ND
+> captures where they do differ"*
+
+⇒ the gate grades **direction against hardware**, never distance to ND. That is `reference-sources.md`
+§5 rule 2 as an instrument, and on this item it changes the answer at two of the three features.
+
+### 1. ⚠⚠ THE FEATURE WAS WRONG FOR HALF THE SESSION — and the correction came from the user
+
+Item 17 says *"bass / ~320 Hz null"*, so the session opened by measuring `mid_notch`. The user
+corrected it mid-turn: **the reported "bass notch" is the ~40–60 Hz one** (GATE W's `bass_notch`,
+window 30–110 Hz), not the 320 Hz null. Those are different features with **opposite hardware
+stories**, and conflating them inverts the recommendation:
+
+| feature | §1 authority | §3 says | ⇒ a model DEEPER than ND is |
+|---|---|---|---|
+| `mid_notch` ~320 Hz | **HARDWARE** | HW deeper than ND (+1.6 cut / +3.5–4.8 flat / ~26 boost) | **a PASS** |
+| `bass_notch` ~40–60 Hz | — (LF row) | HW at 18 Hz vs ND 35 Hz; at attack boost **ND ~10 dB DEEPER** | **away from BOTH** |
+| `treble_notch` 6150–10708 Hz | **NEITHER — unresolved** | *"Inconsistent"*, "far deeper" unquantified | **ungradeable on depth** |
+
+⭐ GENERAL, and it is the session's cheapest lesson: **an item's own wording is not a feature
+specification.** Item 17 named a frequency ("bass") and a gate-window name ("~320 Hz null") that
+belong to two different features, and three sessions of item text carried the conflation. The
+window is the claim; the label is somebody's memory of one (s133's `AE2` on a third feature).
+
+### 2. What the hardware notes actually pin down (asked for explicitly, so recorded once, here)
+
+Six driven ATTACK/GRUNT FR overlays, HW vs ND. Position map self-checked (charts 2≡5 to the pixel
+⇒ 1/2/3 = ATTACK {Cut, Flat, Boost}, 4/5/6 = GRUNT {Cut, Flat, Boost}).
+
+* **~320 Hz null — the ONLY per-condition depth numbers in the whole reference set:** HW deeper in
+  all six, **+1.6 dB at GRUNT cut, +3.5 / +3.8 / +4.8 at flat, ~26 dB at GRUNT boost.** ⚠ That is
+  **5 numbers for 6 charts** and `reference-sources.md` renders it as a progression, so no clean
+  per-chart assignment survives.
+* ⚠⚠ **There is NO per-position ATTACK depth number for any null** — the progression is quoted by
+  GRUNT throughout. For the ATTACK axis the record is *"HW deeper in all six"* and nothing more.
+* **150–250 Hz:** HW +2.8…+4.8 dB in every driven condition and **exactly 0 at GRUNT cut**.
+* **2–2.5 kHz:** ND +1.4…+2.8 dB hotter. **LF null:** grunt boost HW 18 Hz vs ND 35 Hz; attack
+  boost same frequency (~43 Hz) with **ND ~10 dB deeper**.
+* **5–6 kHz null: no numbers at all.**
+* ⛔ s170 established the source images are **not on disk**, so none of this is refinable and all of
+  it is sign-and-rough-size only (§5 rule 3).
+
+### 3. The ~320 Hz null: a PASS, and we are UNDER the licence rather than over
+
+Model − ND at the listening mix (`drv_-12`), the axis the licence is quoted on:
+
+| GRUNT | model − ND | HW licence | verdict |
+|---|---|---|---|
+| cut | +0.24 / +0.53 | +1.6 | **under** |
+| flat | +4.51 | +3.5–4.8 | **inside** |
+| boost | +5.38 / +6.66 | ~26 | **far under** |
+
+Monotone in GRUNT, same sign as hardware at all three ⇒ **§5 rule 2 PASS**, and it reproduces
+s172's own reading (+4.27 flat / +5.13 boost) on a different sweep. ⛔ The only wrong direction here
+is *shallower*: `odMakeupDb=0` takes GRUNT cut to **1.75 dB**, below ND *and* below hardware. The
+bridged-T (~800 Hz) is ±0.7 dB throughout — no defect. **Nothing to do at 320 Hz.**
+
+### 4. ⛔⛔ MY OWN FIRST TREBLE CONCLUSION WAS WRONG, FROM READING ONE STIMULUS RUNG
+
+The session's first attribution pass read `drv_-12` only and concluded *"the 20 dB treble overshoot
+is 100 % attributable to s172/s173"*. It **inverts one rung down**:
+
+| `ref-od` | ND | shipped | pre-s172 |
+|---|---|---|---|
+| `drv_-18` | 13.56 | **2.58** | 34.11 |
+| `drv_-12` | 4.93 | **24.78** | 7.11 |
+| `drv_-6` | 2.35 | 6.83 | 2.96 |
+
+⇒ *"the model is 20 dB too deep"* and *"the model is 11 dB too shallow"* are **the same build, two
+rungs apart**. `an-endpoint-pair-is-not-a-ladder` (s129) committed inside a session that quotes it.
+⛔⛔ **DEPTH HERE IS A KNIFE-EDGE AND MUST NEVER BE A FIT TARGET** — a near-perfect cancellation is
+deep and narrow, a slightly detuned one is neither.
+
+### 5. ⭐⭐ THE MECHANISM, AND IT UNIFIES BOTH NULLS
+
+Both nulls are OD-vs-clean **cancellations**, so depth peaks at whichever stimulus makes
+|OD| = |clean| at that frequency. **Raising the OD branch slides that crossing UP the stimulus
+ladder.** The lever is arithmetic on the shipped constants:
+
+```
+s172:  +6.0 flat  − 6.0 (high shelf @2800)              =  0.0 dB at 5.5 kHz
+s173:  +6.0 flat  − 3.0 (high shelf @1600)  + 3.3 peak  = +6.3 dB at 5.5 kHz
+                        ^^^ HALVED              ^^^ centred 5600 Hz, i.e. ON the null
+```
+
+⇒ **s172 left the null's own frequency at unity and preserved the ordering; s173 added ~6.3 dB
+there and inverted it.** BH3 measures the rank correlation between OD-branch gain at the null and
+which rung is deepest over 6 arms: **rho = +0.657, CONSISTENT.** ⚠ BH1a licenses that arithmetic
+rather than asserting it — bleed-free the composite IS the OD branch, so `render(ship) −
+render(makeup off)` is the stage's transfer exactly: **rms 0.000 dB, worst 0.002 dB over 284 cells.**
+
+### 6. ⭐⭐⭐ BH2 — THE ORDERING, WHICH IS THE GRADEABLE STATISTIC
+
+§1 gives neither reference authority over this null's **depth**, so depth is printed and never
+scored. What IS gradeable is the dose-response SHAPE, threshold-free, as GATE AD grades the
+hardware trend. Matched membership, **8/10 conditions** (dropped and named):
+
+| side | monotone-falling | exact p |
+|---|---|---|
+| **ND** | **8/8** | 5.95e-07 |
+| ship (s173) | **1/8** | 0.77 |
+| s173 no-HF | 3/8 | 0.14 |
+| **s172 shelf** | **8/8** | 5.95e-07 |
+| pre-s172 | **8/8** | 5.95e-07 |
+| lowCut 0 / lowCut 6 | 1/8 | 0.77 |
+
+`p` is the exact binomial tail against P(monotone falling | random) = **1/6** — 3 rungs give exactly
+6 orderings and 1 is falling, so there is no bar to argue about. ⭐ The two `lowCut` arms scoring
+identically to shipped is a free **specificity** check: an LF lever must not move an HF ordering.
+
+### 7. ⛔ BH5 — NO DOMINATING CANDIDATE. The two axes are IN TENSION
+
+s173 changed those constants to fix a **user-reported regression** (GATE BF: the notch centre had
+walked ~5.3 → ~4 kHz, monotone in 18 of 18 driven cells). Grading both axes together:
+
+| arm | ordering | centre ratio | centre vs ship |
+|---|---|---|---|
+| ship (s173) | 1/8 | **0.958** | — |
+| s172 shelf | **8/8** | 0.841 | **+0.117 worse** |
+| pre-s172 | **8/8** | 0.904 | +0.054 worse |
+
+⇒ **every arm that reaches ND's ordering gives back centre accuracy, and every arm that keeps the
+centre fails the ordering.** ⛔⛔ **DO NOT SHIP A REVERT ON THE ORDERING COLUMN ALONE.** Closing the
+treble half needs a term the current constants cannot express — not a re-tune of them.
+
+### 8. ⭐⭐⭐ BH6 — THE BASS NULL, AND IT IS THE CLEANEST RESULT IN THE SESSION
+
+Matched membership, **15/15 cells** readable by ND and every arm:
+
+| arm | median (model − ND) | mean \|err\| | deeper than ND |
+|---|---|---|---|
+| **ship (s173)** | **+2.34** | **2.74** | **15/15** |
+| s173 no-HF | +2.32 | 2.73 | 15/15 |
+| s172 shelf | +2.31 | 2.74 | 15/15 |
+| **pre-s172** | **+0.03** | **0.31** | 12/15 |
+| lowCut 0 | +1.28 | 3.04 | 12/15 |
+| lowCut 6 | +1.50 | 5.81 | 15/15 |
+
+⭐⭐ **With the makeup off the model tracks ND to a mean \|err\| of 0.31 dB; shipped it is 2.74 dB
+and deeper in 15 of 15.** The three HF arms are identical to shipped ⇒ **the bass defect is s172's
+flat +6 dB, not the shelves and not the HF term.** And §3 puts hardware SHALLOWER than ND here, so
+the shipped build is away from **both** references — the one place in item 17 with an unambiguous
+direction. ⚠ Depth is stimulus-INVARIANT on both sides (span 0.04 dB ND, 0.02 shipped), so unlike
+the treble null this one has a stable, quotable depth.
+
+⚠⚠ **BUT `odMakeupLowCutDb` IS NOT THE FIX.** The dose-response is monotone (6.68 → 4.82 → 3.98 →
+2.51 median depth) so the lever is real and single-signed — and its **mean \|err\| gets WORSE**
+(2.74 → 5.81 at lowCut 6.0), because at `blend 1430` removing the LF lift pushes |OD| *through* the
+crossing and the null blows up to **36.6 dB against ND's 12.1**. ⇒ the same crossing behaviour as
+the treble null, at the other band edge. **A shelf moves the crossing everywhere at once and the
+conditions sit on different sides of it.**
+
+### 9. ⚠⚠ A REAL DEFECT IN THIS SESSION'S OWN INSTRUMENT — UNMATCHED MEMBERSHIP, CAUGHT AND FIXED
+
+GATE BH's first run printed each arm pooled over whatever it could read: **n = 17 / 17 / 17 / 19 /
+15 / 18**, side by side, as though comparable. That is
+`aggregate-moved-check-membership-first` in its purest form, and here it is **actively
+self-serving**: an arm whose null is too SHALLOW to read drops that cell, and *shallow is the
+outcome being scored* — so unmatched pooling **rewards exactly the arms it should penalise**. Fixed
+by `matched_cells()`, which restricts every statistic to cells readable by ND **and every arm** and
+NAMES the drops. ⭐ It moved the numbers: `lowCut 6`'s mean |err| went 6.50 → 5.81 and `pre-s172`'s
+n went 19 → 15 with its median 0.02 → 0.03. Thirteenth occurrence.
+
+### 10. The mutation runner, and two arms that were the TEST's fault
+
+**10/10 after two repairs, both `suspect the mutation before the guard` (s110):**
+* `bh6-unmatched` patched the line *after* the one that PRINTS the membership, so the token it
+  required was unreachable — reported NARRATED against a working gate.
+* `bh2-verdict-ordering` gave the shipped arm s172's shelf, which makes two `ARMS` entries
+  identical, at which point the **non-vacuity guard fires first (rc=1)** and the verdict is never
+  reached. The gate being better than the runner's model of it (s119) ⇒ **the expectation changed,
+  not the guard** — re-point `BASELINE_ARM` instead.
+
+### 11. ▶ NEXT
+
+1. ⛔ **320 Hz: nothing.** Closed as a PASS; do not "fix" it (we are already under the licence).
+2. **The bass null is the actionable half** — unambiguous direction, stable depth, 15/15, and
+   attributable to one constant. But `odMakeupLowCutDb` is refuted as the lever (§8), so a
+   candidate must be band-limited in a way the flat+2-shelf family cannot express. ⚠ s172 rejected
+   a BELL for a *measured* reason (it moves the bleed-free contrast ~1.5 dB where a flat term moves
+   it 0.0000) — any successor must re-assert that invariance.
+3. **The treble null is blocked on the frontier**, not on effort (§7).
+4. ⚠ **Item 18 is entangled with both** and item 17 says so: do not fit them independently.
