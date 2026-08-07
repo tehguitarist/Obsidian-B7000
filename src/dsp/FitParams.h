@@ -402,12 +402,30 @@ struct FitParams
     // worst |Δcf| = 0.1292 at LEVEL 0.875 (GATE AZ5). The notch fit is therefore stale by
     // construction after any change here; re-run its acceptance table across all five `--set`
     // conditions (open work item 10).
-    double levelTaperBreak1 = 0.219415;   // rotation at which the wiper reaches levelTaperFrac1
-    double levelTaperFrac1 = 0.038146;    // fraction of full resistance at that rotation
-    double levelTaperBreak2 = 0.529680;
-    double levelTaperFrac2 = 0.166340;
-    double levelTaperBreak3 = 0.857645;
-    double levelTaperFrac3 = 0.425688;
+    // ⛔⛔ RE-FITTED s173 (was 0.219415/0.038146, 0.529680/0.166340, 0.857645/0.425688 — s163).
+    // The s163 curve was fitted while the OD path was ~5 dB quiet and was PARTLY COMPENSATING for
+    // that: s172's `OdMakeup` corrected the OD:CLEAN ratio and handed the job back, at which point
+    // GATE AY2 went from refusing to run (nothing to fit) to 7 of 8 detents WELL-DEFINED with a
+    // +1.84…+3.16 dB requirement. ⛔ "Just revert s163" is REFUTED by measurement: the power law
+    // s163 retired scores 2.066 dB rms against the requirement's own 1.213 dB ambiguity.
+    // Still 4 segments — the count is MEASURED, as the smallest family inside BOTH imported bars
+    // (the target's across-stimulus ambiguity, in dB of delivered level, AND the requirement's own
+    // per-detent spread, in units of L). Containment 0.249; 2- and 3-segment fail it at 1.89/1.16.
+    // ⚠⚠ THE LAST SEGMENT IS NOT DETERMINED BY DATA. The ladder's detents stop at 0.875 and L(1)=1
+    // is pinned, so NOTHING measures the curve between them — yet that is where it climbs hardest
+    // (slope 9.568 here; an equally-good fit on the previous epoch put 3.885). Convex and monotone
+    // either way, and the measured detents are matched either way. Do not read the top slope as a
+    // finding, and do not "improve" it against a detent that does not exist.
+    // ⚠ Half-rotation is 23.75 % against the textbook A-taper 10–15 % band `circuit.md` specifies
+    // for VR2 — i.e. the requirement moves the pot AWAY from a physical audio taper, where the
+    // s163 curve sat at 15.41 % (just outside). Outside corroboration going the WRONG way, and the
+    // second such sign after the treble-notch walk; recorded, not fatal.
+    double levelTaperBreak1 = 0.221598;   // rotation at which the wiper reaches levelTaperFrac1
+    double levelTaperFrac1 = 0.056630;    // fraction of full resistance at that rotation
+    double levelTaperBreak2 = 0.494043;
+    double levelTaperFrac2 = 0.229938;
+    double levelTaperBreak3 = 0.984417;
+    double levelTaperFrac3 = 0.850908;
     // VR8 100k A-taper [ENG]. ** SESSION-41: 2.25 -> 1.998. ** Session 17 set 2.25 by borrowing
     // LEVEL's exponent, on the grounds that the master captures "bracket it: 2.06/2.37". They no
     // longer do — `master-1700_gain-n12_base-clean.wav` was found to be a BAD TAKE and re-recorded
@@ -1227,7 +1245,26 @@ struct FitParams
     int odTiltEnabled = 1;
     double odTiltF0 = 5388.0;        // Hz, RBJ high-shelf corner
     double odTiltS = 0.85;           // RBJ shelf slope parameter
-    double odTiltDbPerDb = 0.203;    // dB of shelf gain per dB of envelope (-4.87 dB / 24 dB)
+    // ⛔⛔ REDUCED 0.203 -> 0.100 at s173, ON A USER REPORT AND A USER DECISION (2026-08-07).
+    // The report: "high end still looks a little attenuated ... good at clean sweep levels but
+    // gets steadily worse as it moves to -6", plus the fact that decides it — **-12 is ordinary
+    // playing level**. This stage darkens the top octave in proportion to signal level, so its
+    // COST is largest exactly where the instrument is played, while its BENEFIT (item 6's
+    // treble-peak walk) is scored across the ladder's ENDPOINTS, clean -> drv_-6. At the level
+    // that matters it was nearly all cost.
+    // Measured, bleed-free, 8-16.3 kHz model-minus-pedal at drv_-12 / the peak walk it buys
+    // (pedal's own walk -10.52 %):
+    //   0.000  +0.57 dB  /  -0.37 %      0.100  -1.06 dB  /  -3.85 %   <- shipped
+    //   0.050  -0.25 dB  /  -2.07 %      0.203  -2.74 dB  /  -6.94 %   <- s166
+    // i.e. ~0.8 dB of top octave per 0.05 of tilt, against ~1.7 points of walk. 0.100 halves the
+    // loss at playing level and keeps ~37 % of the walk.
+    // ⚠ THIS DOES NOT CLOSE THE HF DEFICIT AND MUST NOT BE READ AS DOING SO. With the stage
+    // disabled entirely the model is still -6.82 dB at drv_-6 — that residue is open item 6 /
+    // GATE I (the pedal GAINS with frequency under drive where the model rolls off, 15 of 15
+    // conditions), which is a missing generative mechanism and not a knob.
+    // ⚠ GATE BC's acceptance numbers (s166: walk -6.07 %, 83 % of the pedal's) were measured at
+    // 0.203 and DO NOT DESCRIBE THE SHIPPED VALUE. Re-run it before quoting them.
+    double odTiltDbPerDb = 0.100;    // dB of shelf gain per dB of envelope
     // Envelope level (dBV, RMS at the OD region's input) at which the shelf is FLAT.
     // -33.9 dBV is the quietest analysis rung (-30 dBFS x kInputRef), so the law is
     // one-sided: it only ever CUTS.  A boost below the reference would lift the top end
@@ -1238,4 +1275,191 @@ struct FitParams
     // RMS level.  See OdDriveTilt.h — an asymmetric follower biases the reading by
     // up to +3 dB without changing the level DIFFERENCE the correction depends on.
     double odTiltTimeMs = 50.0;
+
+    // ---- OD-path makeup [ENG, NON-SCHEMATIC] — the OD:CLEAN RATIO -------------------
+    // Session 172, open work item 10 / A3.  A scalar on the OD branch AT the LevelBlend
+    // summing node.  ✅ SHIPPED at +6.0 dB, USER DECISION 2026-08-07, priced before the
+    // decision (see the cost list at odNotchDepthDb below).  0.0 reproduces every prior build
+    // bit-identically, which is the control this was measured against.
+    //
+    // WHAT IT IS FOR.  The user's report: the 320 Hz null, the ~450 Hz recovery peak and
+    // the ~800 Hz bridged-T notch are ALL under-contrasted at most settings.  Measured,
+    // that is ONE defect and it is not a filter:
+    //   * BLEED-FREE (LEVEL max AND BLEND max, the only bleed-free corner — GATE K2) the
+    //     model is RIGHT.  320 Hz null within +-0.41 dB at all three drive rungs; the
+    //     notch-peak-notch excursion reads 14.07 dB against the pedal's 13.92.
+    //   * At EVERY mixed setting it collapses, on BOTH mix axes independently, worst at
+    //     moderate mix (LEVEL 0.875: pedal 7.14 dB vs model 2.48; BLEND 1430 at LEVEL
+    //     max: 6.32 vs 3.67).  Zero bleed-free, peaking mid-mix, is the DILUTION
+    //     signature — the composite carries too much clean, so every feature flattens at
+    //     once.  A filter cannot produce that pattern and a deeper notch cannot fix it
+    //     (s156 measured the depth CEILING: a 40 dB OD-path cut buys 0.47 dB of
+    //     composite null at the listening mix).
+    //   * The ratio itself, measured with each side differenced against ITSELF so every
+    //     per-side capture-chain scalar cancels exactly (pure OD minus pure CLEAN, dB):
+    //     the model's OD path is quiet re its own clean path by -4.97 / -5.00 / -5.74 dB
+    //     over 250-900 Hz at the three stimulus rungs — stable to 0.77 dB over a 12 dB
+    //     span, and an independent third reading of GATE O's A3 deficit (4.40 dB).
+    //
+    // ⭐ WHY A FLAT SCALAR AND NOT A BELL.  Raising the OD path's SHOULDERS is what
+    // deepens a composite notch — at the notch bottom the OD path is already nulled, so
+    // the floor is set by the clean tap and boosting there does nothing.  The ~450 Hz
+    // peak IS the shoulder between the two notches, so one correction raises the peak
+    // and deepens both notches together.  A scalar additionally CANNOT change any
+    // contrast bleed-free (a constant cancels from every difference within a curve), so
+    // the one condition that is currently correct is protected BY CONSTRUCTION — that is
+    // a free known answer, and a bell would forfeit it (a Q~0.6 bell at 500 Hz moves the
+    // bleed-free excursion ~1.5 dB and would overshoot there).
+    // ⚠ The price of flatness: the measured deficit is NOT flat outside the midrange
+    // (-1.4 dB at 101 Hz, -0.8 at 4 kHz, and POSITIVE above 5 kHz), so a flat gain
+    // over-boosts the OD path's extremes by ~4-5 dB.  That collateral is REPORTED, not
+    // assumed small, and is what decides whether a shaped successor is owed.
+    //
+    // ⛔ THE APPLICATION POINT IS DELIBERATE AND IS NOT AN OVERSIGHT.  It is applied to
+    // `odDown` in processPostBlend() OUTSIDE `LevelBlend::process()`, so
+    // `LevelBlend::cleanFraction()` keeps reporting the POT-LAW clean fraction and
+    // `OdToneRestore`'s s156 mix law keys on exactly what it does today.  One change at
+    // a time: folding it into cleanFraction() would re-key the notch stage in the same
+    // edit and make the two effects unattributable.  The consequence is that the notch
+    // stage still applies its old, larger dilution correction, so any residual error
+    // lands on the TOO-DEEP side — which is the direction the user asked for, and it is
+    // re-fittable afterwards (item 10's acceptance table).
+    double odMakeupDb = 6.0;
+    // Band limits. ⛔ The corners sit OUTSIDE the feature span (mid_notch 285-358,
+    // mid_peak 358-620, bt_notch 620-905 Hz) ON PURPOSE — a shelf whose transition
+    // reached a feature would re-introduce the bleed-free contrast change the flat
+    // form was chosen to avoid. Re-assert the bleed-free invariance after ANY change.
+    // ⭐ SHAPING IS NOT OPTIONAL POLISH -- it is what makes this strictly better than the
+    // incumbent on BOTH axes rather than a trade.  Measured (s172), OD:CLEAN ratio residual:
+    //     incumbent   mid rms 5.11   out rms 3.79
+    //     flat +5     mid rms 1.04   out rms 5.46   <- midrange fixed, extremes PAID for it
+    //     shaped +6   mid rms 1.41   out rms 3.33   <- both better than the incumbent
+    // A bare flat gain over-boosts the OD path's extremes because the deficit is not flat
+    // there (-1.4 dB at 101 Hz, -0.8 at 4 kHz, POSITIVE above 5 kHz).
+    // Cuts of 0 make the shelves exact identities (branch, not arithmetic -- see OdMakeup.h).
+    double odMakeupLowHz = 130.0;      // below this the boost is reduced by odMakeupLowCutDb
+    double odMakeupLowCutDb = 3.5;
+    // ⛔⛔ RE-SHAPED s173 ON A USER REPORT (was 2800.0 / 6.0, s172) — the treble notch had walked
+    // from ~5.3 kHz to ~4 kHz and it was this shelf. s172 sized the corners on a ONE-SIDED
+    // constraint ("outside the 285-905 Hz feature span"), i.e. it checked the side facing the
+    // feature being corrected; the shelf's transition actually runs through 4-12 kHz, where the
+    // OD/clean mix cancellation the user hears as the treble notch lives. GATE BF measured the
+    // walk MONOTONE in 18 of 18 driven cells and the median model/pedal centre ratio going
+    // 0.834 (makeup off) -> 0.759 (s172 shelf). Mechanism was already on the books: GATE AF6
+    // (s134) — these treble features are VERTICES, and a vertex moves with a TILT without any
+    // corner moving. A shelf is a tilt.
+    // ⭐⭐ AND THE SPLIT IS WHY THESE VALUES AND NOT OTHERS: a POOLED out-of-band residual hid
+    // that the s172 shelf was WORST in the very region it was meant to protect (2.8-8 kHz rms
+    // 6.12, the largest of the three sub-bands). Lowering the corner and halving the cut is
+    // better on BOTH out-of-band sub-bands as well as on the notch — this is not a trade.
+    //   notch ratio 0.759 -> 0.836 (>= the 0.834 the makeup-off build had)
+    //   0.9-2.8 kHz 1.95 -> 1.85     2.8-8 kHz 6.12 -> 5.47     60-250 Hz 3.78 -> 3.79
+    //   midrange (250-900) 2.14 -> 2.16, i.e. the correction s172 shipped for is preserved
+    // ⚠ The notch is still ~16 % below the pedal's. That is PRE-EXISTING (open item 6) and is
+    // not this constant's job; what is fixed here is the regression s172 introduced.
+    double odMakeupHighHz = 1600.0;    // above this the boost is reduced by odMakeupHighCutDb
+    double odMakeupHighCutDb = 3.0;
+
+    // ---- shelf SLOPE (s173) --------------------------------------------------------
+    // RBJ shelf `S`. Was hardcoded 0.9 in OdMakeup::rebuild(); 0.9 is the shipped value,
+    // so a default build is bit-identical to s172.
+    // ⚠⚠ EXPOSED BECAUSE THE SHELVES' TRANSITION IS AUDIBLE, WHICH s172's SIZING DID NOT
+    // COVER. That session placed the corners on a ONE-SIDED constraint -- "outside the
+    // 285-905 Hz feature span", i.e. it checked the side facing the feature being
+    // corrected and not the side facing everything else. The high shelf's transition
+    // actually runs through 4-12 kHz, where the OD/clean mix cancellation the user hears
+    // as the treble notch lives, and at S = 0.9 it is broad enough to walk that null
+    // 13-17 % DOWN the band (GATE BF, s173, monotone in 18 of 18 driven cells; median
+    // model/pedal centre ratio 0.834 with the makeup off -> 0.758 shipped).
+    // ⇒ SLOPE is the degree of freedom that separates the shelf's two jobs: depth sets
+    // how much boost is removed out of band, slope sets how much TILT the removal
+    // presents at the feature. Depth alone cannot do both -- GATE BF6 measured it
+    // monotone in opposite directions on the two axes (`one-knob-two-jobs-is-
+    // compensating`).
+    // ⚠ RBJ shelves need `(A + 1/A)(1/S - 1) + 2 >= 0` or `alpha` goes imaginary; OdMakeup
+    // clamps S to the range where that holds rather than emitting NaN.
+    double odMakeupLowS = 0.9;
+    double odMakeupHighS = 0.9;
+
+    // ---- the MIX-KEYED HF term (s173) ----------------------------------------------
+    // ⛔⛔ THE REASON THIS IS KEYED ON THE MIX AND NOT A CONSTANT.  Measured at the user's
+    // stated ordinary playing level (`sweep_drv_-12`), the 4-8 kHz error CHANGES SIGN
+    // across the mix — bleed-free reads +4.53 dB TOO BRIGHT while every setting the
+    // instrument is actually played at reads 0.7-3.3 dB TOO DARK:
+    //     cleanFrac  0.000  0.335  0.397  0.431  0.458*  0.487  0.767  0.958
+    //     4-8 kHz   +4.53  -1.49  -2.68  -3.27  -2.80   -2.01  -0.72  -0.95
+    //                                       * = ref-od, THE reference condition
+    // ⇒ a FIXED correction fitted bleed-free does not merely miss elsewhere, it pushes
+    // the WRONG WAY at every setting that matters.  s172 fitted this stage bleed-free and
+    // s173 sized its corners there; this term is what makes the stage work at the settings
+    // the plugin is used at, and it follows `OdToneRestore`'s s156 precedent exactly.
+    // ⚠ Read as a MEDIAN over the band, not a mean: 4-8 kHz contains the treble notch and
+    // at cleanFrac 0.335 the notch drags the band mean 4.35 dB off the median.
+    // ⚠ PEAKING, not shelving: 8-16.3 kHz already measures right at every mixed setting,
+    // so a shelf would break a band that is correct.
+    // ⚠⚠ All three gains at 0 makes the whole stage inert and BIT-IDENTICAL to pre-s173.
+    // FITTED s173 against the requirement above, then Q/centre swept against EVERY band
+    // (rms |err| over 5 captures spanning the LEVEL and BLEND ladders, at drv_-12):
+    //          250-900  0.9-2.8k  2.8-4k   4-8k   8-16.3k   notch ratio
+    //   off       0.74     1.10     0.87    3.30    1.18       0.882
+    //   SHIPPED   0.72     1.07     0.50    0.98    1.31       0.926
+    // ⇒ four bands better or unchanged, ONE worse by 0.13, and the treble notch moves
+    // 0.882 -> 0.926 toward the pedal as a side effect. ⚠ Q matters: at Q = 1.0 the peak is
+    // wide enough to OVERSHOOT 2.8-4 kHz (that band goes -0.62 -> +1.03 at ref-od), which is
+    // the same "check the other side" failure that caused the s172 shelf regression. Narrowing
+    // to 2.0 turns that band from 0.87 into 0.50, i.e. better than leaving the term out.
+    double odMakeupHfHz = 5600.0;      // centre of the 4-8 kHz band this corrects
+    double odMakeupHfQ = 2.0;
+    double odMakeupHfAtOdDb = -4.5;    // gain at cleanFrac = 0 (pure OD)
+    double odMakeupHfPeakDb = 3.3;     // gain at odMakeupHfPeakCf
+    double odMakeupHfPeakCf = 0.43;    // where the requirement turns over
+    double odMakeupHfAtCleanDb = 0.9;  // gain as cleanFrac -> 1
+
+    // ---- OdToneRestore notch WIDTH (s172) ------------------------------------------
+    // MULTIPLIER on the fitted kNotchQ table (OdToneRestore.h), 1.0 = shipped.
+    // ⚠⚠ THIS IS THE SECTION'S Q, NOT THE AUDIBLE NULL'S. At GRUNT cut x DRIVE noon the
+    // shipped section Q is 16.07 and the COMPOSITE null it produces measures 6.71 -- the
+    // composite is this section convolved with the model's own broad ladder null, so the
+    // two numbers are not interchangeable and a target expressed in composite Q must be
+    // converted by measurement, never by reading this table.
+    // ⛔ BEFORE RAISING THIS, READ s153's GATE AQ (AQ2): sweeping the section Q to 120 with
+    // the depth re-solved at every rung, the pedal's composite Q is attainable in 21 of 26
+    // cells -- but GRUNT cut x DRIVE 0.50 fails at ALL THREE sweeps (attainable 3.50-9.46
+    // against a required 13.91), so that cell has no shape-matched solution at any Q.
+    // ⛔⛔ AND THE TARGET MOVES THE OTHER WAY (s172, measured bleed-free at GRUNT cut x
+    // DRIVE noon): the PEDAL's composite null Q FALLS with stimulus, 18.01 / 13.91 / 10.53
+    // / 8.39 across the ladder, while the MODEL's RISES, 5.27 / 5.60 / 6.71 / 8.39 -- they
+    // CROSS, and at the hottest rung the model is already EXACTLY right (ratio 1.00).  So a
+    // single scale fixes the quiet end and OVERSHOOTS the loud end; the mean error (6.22) is
+    // inside the pedal's own across-stimulus spread (9.62), which is s161 AX6's argument
+    // that no constant is meaningfully "closer".  A LEVEL-DEPENDENT Q is the shape that
+    // tracks it (the OdDriveTilt architecture) -- this scale is the static baseline it would
+    // modulate around, not an answer on its own.
+    double odNotchQScale = 1.0;
+    // Uniform extra CUT on the 320 Hz null, dB, on top of the fitted table. 0.0 = shipped.
+    // ⭐ This, not odNotchQScale, is the WIDTH lever -- see the OdToneRestore.h block: the
+    // half-depth crossing that sets the measured Q sits on the ladder's broad bowl, and cutting
+    // deeper moves it into the narrow section.  ⚠ Overshooting ND's depth is licensed by
+    // reference-sources.md §5 rule 2 (hardware is the authority here and is DEEPER); the peak
+    // between the notches is NOT covered by that licence and must be tracked separately.
+    //
+    // ✅ SHIPPED at +3.0 dB, USER DECISION 2026-08-07.  Priced across ALL THREE GRUNT positions
+    // before the decision -- ⚠ every capture without a `grunt-` token is GRUNT = CUT, and s151
+    // lost a session's fit to exactly that, so the cut row alone must never choose this value.
+    // C1 (peak - notch320) at sweep_drv_-12, shipped vs the ND captures, with the HW licence
+    // reference-sources.md §3 records for this null (HW deeper than ND at every position):
+    //     cut   listening   3.04 vs 3.09  (-0.05)          flat  listening 8.19 vs 3.92 (+4.27, lic 3.5-4.8)
+    //     cut   bleed-free 17.00 vs 13.92 (+3.08, lic 1.6) boost listening 9.30 vs 4.17 (+5.13, lic ~26)
+    //     flat  bleed-free 26.55 vs 26.40 (+0.15)          boost bleed-free 25.24 vs 25.19 (+0.05)
+    // ⇒ inside the hardware trend everywhere except CUT BLEED-FREE, which sits ~1.5 dB beyond
+    // its licence -- accepted as "a bit too much is fine" (user, and §5 rule 2 makes the
+    // DIRECTION correct).  +2.0 spends the cut licence exactly if a future session wants strict.
+    // ⚠⚠ TWO UNLICENSED CONSEQUENCES, recorded because neither is covered by §3:
+    //   * the ~450 Hz PEAK lands 0.6-1.1 dB ABOVE the captures across GRUNT.  §3's licence is
+    //     for DEPTH only.  Small, and in the direction of the original report, but unbacked.
+    //   * at makeup 0 the model's GRUNT spread at the listening mix is 4.4 dB against the
+    //     pedal's 1.08 -- the model's MIX responds to the GRUNT switch ~4x too strongly.  That
+    //     is a SEPARATE, unowned defect; it is why the three positions want different
+    //     corrections when judged against ND alone, and it must NOT be absorbed into this stage.
+    double odNotchDepthDb = 3.0;
 };

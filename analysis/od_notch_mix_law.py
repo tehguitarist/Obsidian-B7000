@@ -71,23 +71,30 @@ BAND = (240.0, 1600.0)
 F_MID, F_BT = 323.0, 800.0
 REAL = ("sweep_drv_-18", "sweep_drv_-12", "sweep_drv_-6")
 
-# The LEVEL taper the plugin SHIPS.  ⚠ `LevelBlend.h`'s own kLevelTaperExp is 1.43 and is
-# OVERRIDDEN at runtime by FitParams::levelTaperExp = 2.25 (PedalChain::applyFitParams ->
-# setTaperExp).  Reading the header default here would silently use a taper the plugin does not
-# run -- the s149 ladder-epoch trap in miniature -- so it is read from FitParams.h and asserted.
-def _shipped_level_exp():
-    import re
-    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "dsp",
-                            "FitParams.h")).read()
-    m = re.search(r"levelTaperExp\s*=\s*([0-9.]+)\s*;", src)
-    if not m:
-        sys.exit("od_notch_mix_law: cannot parse levelTaperExp out of FitParams.h")
-    return float(m.group(1))
+# The LEVEL taper the plugin SHIPS.
+# ⚠⚠ RE-POINTED s172, AND THE RE-POINTING MOVES A NUMBER THIS TOOL'S OWN FIT WAS ANCHORED ON.
+# This used to parse `FitParams::levelTaperExp` and rebuild `L = x ** p` (p = 2.25).  s163 RETIRED
+# that constant -- the LEVEL law is a 4-segment PWL now -- and DELETED it rather than aliasing it,
+# so this parse has hard-exited ever since and the tool has been unusable for 8 sessions.
+# ⇒ call `level_law_gate.level_taper(x)`, the single implementation checked against the header.
+#
+# ⛔⛔ THE CONSEQUENCE IS NOT COSMETIC AND MUST NOT BE LOST: the s156 mix law that SHIPS was fitted
+# with clean fractions computed through the RETIRED power taper.  At LEVEL noon that taper gave
+# L = 0.5 ** 2.25 = 0.2102; the shipped PWL gives L = 0.1541.  So every capture's clean fraction --
+# the law's own independent variable -- moved under the fit after it shipped.  `CF_REF` below is
+# recomputed rather than transcribed for exactly that reason.
+def _cf_at(blend, level, taper=None):
+    """Clean fraction at a (BLEND, LEVEL) knob pair through the shipped mix algebra + taper."""
+    import level_law_gate as _LL
+    tf = _LL.level_taper if taper is None else taper
+    od, cl = _LL.coef_closed(blend, tf(level))
+    return (cl / (od + cl)) if (od + cl) > 0 else 1.0
 
 
-LEVEL_EXP = _shipped_level_exp()
-
-CF_REF = 0.441            # the clean fraction at LEVEL noon / BLEND max = the listening point
+# The clean fraction at LEVEL noon / BLEND max = the listening point.  COMPUTED, not transcribed:
+# the literal 0.441 that stood here was the pre-s163 value and is wrong for the shipped taper.
+CF_REF = _cf_at(1.0, 0.5)
+CF_REF_RETIRED = 0.441    # what this tool used up to s162 -- kept so pre-s163 numbers reproduce
 
 # ⛔⛔ THE CLAMP IS OFF, AND THE REASON IT WAS TURNED OFF IS THE INTERESTING PART.
 # A first pass held S flat below its peak (S_CLAMP_CF = 0.21) on the argument that the raw law's
@@ -112,10 +119,14 @@ def clean_frac(fname):
     """The single scalar LEVEL and BLEND jointly produce, from the SHIPPED mix algebra.
 
     `coef_closed` is IMPORTED from GATE K, never re-derived, and it takes the TAPERED level
-    (s113: a shipped stage's closed form takes the STAGE's input, not the knob).  Sanity: LEVEL
-    noon / BLEND max returns 0.441, which is GATE K2's own independently-measured ~44 % clean."""
+    (s113: a shipped stage's closed form takes the STAGE's input, not the knob).
+
+    ⚠ The old sanity note here read "LEVEL noon / BLEND max returns 0.441, which is GATE K2's own
+    independently-measured ~44 % clean".  That agreement was real AND it was against the RETIRED
+    power taper; under the shipped PWL the same knob pair returns `CF_REF` (printed every run).
+    GATE K2's ~44 % is a measurement of the pre-s163 build and is not a check on this one."""
     p = C.parse_capture(fname)
-    od, cl = LL.coef_closed(p["blend"], p["level"] ** LEVEL_EXP)
+    od, cl = LL.coef_closed(p["blend"], LL.level_taper(p["level"]))
     return (cl / (od + cl) if (od + cl) > 0 else 1.0), p
 
 

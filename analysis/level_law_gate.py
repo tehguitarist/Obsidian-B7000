@@ -89,7 +89,11 @@ import release_gate as RG
 #
 # ⇒ CALL `level_taper(x)`.  One implementation, checked against the header by
 # `check_shipped_constant()`, so the analysis layer and the DSP cannot drift.
-SHIPPED_LEVEL_TAPER = (0.219415, 0.038146, 0.529680, 0.166340, 0.857645, 0.425688)
+# ⚠ RE-FITTED s173 (was 0.219415/0.038146, 0.529680/0.166340, 0.857645/0.425688 -- s163).  The
+# s163 set was fitted before `OdMakeup` shipped, so the OD:CLEAN ratio the LEVEL law reads moved
+# under it.  `check_shipped_constant()` REFUSED against the header rather than assuming, which is
+# what this literal is for -- it is a pinned epoch, not a convenience copy.
+SHIPPED_LEVEL_TAPER = (0.221598, 0.056630, 0.494043, 0.229938, 0.984417, 0.850908)
 LEVEL_TAPER_NAMES = ("levelTaperBreak1", "levelTaperFrac1", "levelTaperBreak2",
                      "levelTaperFrac2", "levelTaperBreak3", "levelTaperFrac3")
 RETIRED_LEVEL_TAPER_EXP = 2.25   # what shipped up to s162 -- for reading pre-s163 reports ONLY

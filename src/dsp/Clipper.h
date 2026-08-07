@@ -758,5 +758,13 @@ private:
     Grunt grunt = Grunt::Cut;
 
     Clipper(const Clipper&) = delete;
-    Clipper& operator=(const Clipper&) = delete;
+
+public:
+    // Assignment permitted, construction not — see the identical block in
+    // TrebleAttack.h. `PedalChain` primes a shadow Clipper on a GRUNT flip and
+    // crossfades the two (`SwitchFade.h`); the copy must carry the switched cap
+    // network AND the solver's own carried state (`wPrev`, `ieq14`, `ieqG`), since
+    // the shadow has to keep solving the OLD network from where the live one left
+    // off. Defaulted so a future member cannot be missed.
+    Clipper& operator=(const Clipper&) = default;
 };

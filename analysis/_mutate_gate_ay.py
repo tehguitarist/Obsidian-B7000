@@ -47,6 +47,8 @@ Mechanics, each paid for by an earlier session:
 
 Run:  python3.11 analysis/_mutate_gate_ay.py
 """
+import glob
+import json
 import os
 import re
 import subprocess
@@ -57,13 +59,50 @@ ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "level_taper_reshape.py")
 MUT = os.path.join(HERE, f"_mutated_gate_ay_{os.getpid()}.py")
 
-CURRENT = "analysis/reports/s162_shipped.json"     # current-epoch, rendered this session
 STALE = "analysis/reports/s146_mastertaper.json"   # pre-s156 DSP change — AY1b must refuse it
+
+
+# ⚠⚠ s173: `CURRENT` used to be the transcribed literal `s162_shipped.json`, and by this session
+# it was THREE epochs stale (s163's taper, s166's `OdDriveTilt`, s172's `OdMakeup`).  AY1b duly
+# refused it — correctly — which broke the CONTROL, and with the control broken every arm below
+# was unattributable: the three arms that "passed" expect rc != 0 and were getting it from the
+# EPOCH guard rather than from their own mutation (s117: check guard IDENTITY, not just a non-zero
+# exit).  A runner that names an epoch has to be re-pointed every time an epoch ends, and nothing
+# was making that happen, so it is DERIVED instead: newest report on disk that is STRUCTURALLY a
+# matrix report.  A structural test cannot go stale the way a filename does.
+def newest_matrix_report():
+    best, best_mt = None, -1.0
+    for path in glob.glob(os.path.join(ROOT, "analysis", "reports", "*.json")):
+        try:
+            with open(path) as fh:
+                doc = json.load(fh)
+        except Exception:
+            continue                       # a gate's own artefact, or a partial write
+        if not (isinstance(doc, dict) and {"captures", "meta", "summary"} <= set(doc)):
+            continue
+        if len(doc.get("captures") or []) < 100:      # a --only subset is not the matrix
+            continue
+        mt = os.path.getmtime(path)
+        if mt > best_mt:
+            best, best_mt = path, mt
+    if best is None:
+        sys.exit("MUTATION TEST FAIL: no full matrix report found under analysis/reports/ -- the "
+                 "control has nothing current-epoch to run against, so no arm below would be "
+                 "attributable (`empty-gate-must-fail`)")
+    return os.path.relpath(best, ROOT)
+
+
+CURRENT = newest_matrix_report()
 
 # (name, why, [(pattern, replacement), ...], expect_rc, must_contain, must_absent, report)
 ARMS = [
+    # ⚠ s173: the control used to assert `"0 of 2 REACH"` — AY5's headroom VERDICT, which was true
+    # on the s162 epoch and is a computed outcome that legitimately flips (it now reads 1 of 2).
+    # A control asserts that the unmutated gate RAN TO COMPLETION; an epoch-dependent verdict
+    # belongs in an arm that mutates the data behind it, not here.  `AY6 OK` is the last line of
+    # the last sub-gate and `sup/need =` proves it reached AY5's computed block — both invariant.
     ("control", "unmutated — if this does not pass, nothing below is attributable",
-     [], 0, "0 of 2 REACH", None, CURRENT),
+     [], 0, "AY6 OK", None, CURRENT),
 
     # ---- AY1: the imported invariant and the anchor the whole gate is referred to ---------------
     ("ay1-coef-drift",
@@ -115,21 +154,56 @@ ARMS = [
        r'res\[sw\]\[x\]\[0\] < MUTE_DB:', '            if True:')],
      1, "empty-gate-must-fail", None, CURRENT),
 
+    # ⚠⚠ s173, TWO stale things in this one arm, both from the same root as the control's:
+    #  (a) its replacement was `x ** p`, written when `p` was an EXPONENT.  s163 made `p` the
+    #      shipped PWL CALLABLE, so the mutant died on a TypeError and scored rc=1 — the arm was
+    #      "failing" for a reason that had nothing to do with the guard it aims at.
+    #  (b) it broke the FREE CURVE only, which forced the fallback on the s162 epoch because the
+    #      exponent family was outside the ambiguity there.  On this epoch the exponent family
+    #      REACHES on its own (that is AY3's headline), so nuking the free curve alone leaves the
+    #      verdict at "AN EXPONENT IS ENOUGH" and the fallback branch is never reached.  Both
+    #      non-shipped families are replaced now, which is what the arm's own description meant.
     ("ay3-family",
-     "the required taper is replaced by the SHIPPED one, so the free curve can buy nothing and the "
-     "verdict must fall back to GATE K's closure — otherwise 'THE FAMILY IS WHAT DECIDES IT' is a "
-     "caption, and it is the sentence that re-opens a question closed since s103",
+     "BOTH non-shipped families are replaced by the SHIPPED taper, so neither can buy anything and "
+     "the verdict must fall back to GATE K's closure — otherwise 'THE FAMILY IS WHAT DECIDES IT' "
+     "is a caption, and it is the sentence that re-opens a question closed since s103",
      [(r'score\(\{x: need_tap\[x\]\["mean"\] for x in need_tap\}\)',
-       'score({x: (0.0 if x <= 0.0 else x ** p) for x in need_tap})')],
+       'score({x: p(x) for x in need_tap})'),
+      (r'^    best_rms, best_exp = min\(scored\)$',
+       '    best_rms, best_exp = min(scored); best_rms = ship_rms')],
      0, "STANDS on this epoch", None, CURRENT),
 
+    # ⭐ s173, NEW: the first branch only became reachable when the exponent family started to
+    # reach, so it has never been mutation-tested.  Degrade the exponent alone and the verdict must
+    # move to the OTHER branch — which is what proves the three-way verdict reads its three inputs
+    # rather than printing whichever sentence the epoch it was written on happened to need.
+    ("ay3-exponent",
+     "the exponent family alone is degraded, so the free curve becomes the only one inside the "
+     "ambiguity and the verdict must read 'THE FAMILY IS WHAT DECIDES IT'",
+     [(r'^    best_rms, best_exp = min\(scored\)$',
+       '    best_rms, best_exp = min(scored); best_rms = ship_rms')],
+     0, "THE FAMILY IS WHAT DECIDES IT", None, CURRENT),
+
     # ---- AY4: the outside corroboration -------------------------------------------------------
+    # ⚠⚠ s173: this arm used to MOVE THE BAND to a hard-coded 20-25 % and assert the literal string
+    # "AWAY FROM".  That configuration was chosen on the s162 epoch, where shipped sat inside the
+    # moved band and required outside.  On this epoch the two half-rotations are 15.41 % and
+    # 23.74 %, so the same moved band puts REQUIRED inside and the arm asserts a string the
+    # unmutated gate ALREADY prints — a mutation that cannot discriminate, dressed as one.
+    # ⇒ mutate the RELATION instead of the constants: swap the two operands' roles.  A computed
+    # verdict must then flip, on any epoch and for any band, and the runner checks it against what
+    # the CONTROL actually printed rather than against a transcribed word (see FLIP below).
+    # ⚠ It would fail spuriously if the two values were exactly equidistant from the band centre;
+    # that is a measure-zero coincidence and it fails in the safe direction (a false alarm, not a
+    # false pass).
     ("ay4-band",
-     "the textbook taper band is moved so the SHIPPED value sits inside it and the required value "
-     "does not — the 'moves TOWARD the band' line must then read AWAY FROM, or the one piece of "
-     "outside corroboration in this gate is narration",
-     [(r'^A_TAPER_LO, A_TAPER_HI = 0\.10, 0\.15$', 'A_TAPER_LO, A_TAPER_HI = 0.20, 0.25')],
-     0, "AWAY FROM", None, CURRENT),
+     "the shipped and required half-rotations swap roles in the TOWARD/AWAY comparison — the "
+     "printed direction must flip, or the one piece of outside corroboration in this gate is "
+     "narration",
+     [(r'moved_in = \(not ship_band\) and band', 'moved_in = (not band) and ship_band'),
+      (r'moved_toward = abs\(half - centre\) < abs\(ship_half - centre\)',
+       'moved_toward = abs(ship_half - centre) < abs(half - centre)')],
+     0, None, None, CURRENT),
 
     # ---- AY5(c): THE arm.  This verdict is why task D closes as specified. ----------------------
     ("ay5-reaches",
@@ -177,12 +251,28 @@ def build(muts):
     return MUT
 
 
+# ⭐ s173: arms whose verdict is EPOCH-DEPENDENT cannot assert a transcribed word — that is how
+# `ay4-band` came to assert a string the unmutated gate already printed.  Instead, name a regex
+# with one capture group; the arm passes iff the token it captures DIFFERS from the token the
+# CONTROL captured on the same run.  The comparison is against measured output, so it stays sharp
+# on every epoch and needs no maintenance when a verdict legitimately flips.
+FLIP = {
+    "ay4-band": r"the requirement moves the pot (INTO|TOWARD|AWAY FROM) the band",
+}
+
+
+def _flip_token(pattern, text):
+    m = re.search(pattern, text)
+    return m.group(1) if m else None
+
+
 def main():
     n_cv = sum(1 for a in ARMS if a[3] == 0) - 1
     print(f"MUTATION TEST — GATE AY  ({len(ARMS)} arms, {n_cv} computed-verdict)\n")
     preflight()
     print()
     bad = []
+    control_out = ""
     for name, why, muts, exp_rc, need, absent, report in ARMS:
         if build(muts) is None:
             print(f"  ❌ {name:18} PATCH DID NOT APPLY — the arm tests nothing")
@@ -191,12 +281,27 @@ def main():
         r = subprocess.run([sys.executable, os.path.relpath(MUT, ROOT), report],
                            cwd=ROOT, capture_output=True, text=True)
         out = r.stdout + r.stderr
+        if name == "control":
+            control_out = out
         ok_rc = (r.returncode != 0) if exp_rc else (r.returncode == 0)
         ok_txt = (need is None or need in out) and (absent is None or absent not in out)
+        flip_msg = None
+        if name in FLIP:
+            pat = FLIP[name]
+            was, now = _flip_token(pat, control_out), _flip_token(pat, out)
+            if was is None or now is None:
+                ok_txt, flip_msg = False, (
+                    f"the flip pattern matched neither the control ({was!r}) nor the arm ({now!r}) "
+                    f"-- the arm can neither pass nor fail (`empty-gate-must-fail`)")
+            elif was == now:
+                ok_txt, flip_msg = False, (
+                    f"the verdict did NOT flip: control and arm both read {was!r}, so the direction "
+                    f"is narrated rather than computed from its two operands")
         if ok_rc and ok_txt:
             print(f"  ✅ {name:18} rc={r.returncode}  {why[:64]}")
         else:
             reason = ("rc" if not ok_rc else
+                      flip_msg if flip_msg else
                       ("missing " + repr(need) if need and need not in out
                        else "did not suppress " + repr(absent)))
             print(f"  ❌ {name:18} rc={r.returncode} ({reason})  — {why[:54]}")

@@ -142,6 +142,142 @@ nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were
 
 #### STATUS
 
+- ⛔⛔ **RE-ARCHIVE IS OWED AND IT IS THE NEXT SESSION'S FIRST JOB — CLAUDE.md is 1402 lines against
+  this file's own 1200-line trigger, target under 800.** ⚠ It was ALREADY over before s175 (1308 at
+  `052138d`), so this is not one session's overrun and the next session must not defer it again.
+  ⛔ Compress NARRATIVE only: the **SHIPPED CONSTANTS** and **CLOSED / REFUTED** tables have never
+  been touched by any pass and compressing them is never the move. ⚠ Verify each compressed passage
+  is present verbatim in `docs/session-log.md` FIRST — the condition the rule requires. ⚠⚠ The
+  structural cause named at s136 and hit again at s143/s147/s163 is live here too: **items 14 and 17
+  each grew a long block this session.** When an item gains a result, edit a table row; do not append
+  a paragraph.
+
+- ✅✅✅ **SESSION 175 = OPEN-WORK ITEM 14 IS CLOSED. ALL FIVE SWITCHES IN THE CHAIN ARE NOW SMOOTHED
+  AND GATED, AND THE CHANGE IS BIT-IDENTICAL SO NO RE-BASELINE IS OWED (2026-08-07).** The four
+  SELECTOR switches got the per-stage dual-instance crossfade s171 scoped out —
+  **`src/dsp/SwitchFade.h`** plus shadow stages in `PedalChain`. **`ctest` 22/22**;
+  `SwitchTransitionTest` 245 checks (was 213 — gating added them), 0 failures.
+  **Worst selector cell 39.47× → 0.50×** at the shipped 20 ms; `dist_engage`'s column is **unmoved
+  cell for cell**, which is the free scope check.
+  ⭐⭐ **GRUNT NEEDED TWO CROSSFADE POINTS OFF ONE RAMP, and that is the part to carry forward**: it
+  moves the clipper's cap network AND `OdToneRestore`'s grunt-keyed (gain, Q) table, which jumps a
+  whole row — a stage whose name contains no switch. Fading only the clipper would have left the
+  notch stage's discontinuity wearing the switch's name.
+  ⭐⭐ **THE FADE TIME IS MEASURED, NOT PICKED, AND IT IS *NOT* `dist_engage`'s 12 ms.** From 12 ms up
+  the statistic is purely fade-rate-limited — `ratio × t` = **9.96/9.90/10.00/9.90/9.90 ms across
+  12–30 ms, constant to 1 %**, an exact 1/t law, which is what proves the bar tracks the ramp rather
+  than a floor (s154). Below 12 ms it leaves that law (8 ms reads 0.98× where 1/t predicts 1.24×), so
+  those points did not choose the value. ⇒ **20 ms**, a 2× margin inside the 1/t region.
+  ⭐ Free instrument validation: re-run at **16** flip phases instead of 4 and **every figure is
+  identical**, so s171's 4-phase choice is adequate — nothing had established that.
+  ⭐⭐ **BIT-IDENTITY MEASURED, NOT ARGUED: 27 render pairs, 0 differ, 0 missing**, over all 3 ATTACK ×
+  3 GRUNT positions at BOTH OS regimes (2× and 8×, since those two fades are OS-rate-derived) plus
+  all 3 × 3 mid-selector positions, old-vs-new binaries with distinct hashes and a mutation control
+  that fires. ⇒ **the s171 owed matrix check is subsumed and closed** — the settled path is provably
+  the same code path. ⚠⚠ **Two earlier attempts at that same comparison PASSED VACUOUSLY** (a stale
+  artefact copied after a FAILED build; then the project's five-times-documented zsh word-splitting
+  trap making all 36 renders exit rc=2 and `cmp` report DIFFER on files that did not exist) —
+  `docs/session-log.md` SESSION 175 §4.
+  ⚠ A commit `052138d "Pre-release-cleanup checkpoint: commit all working-tree state"` appeared
+  mid-session, authored by neither this session nor any command it ran, bundling s174 + s175. Nothing
+  was lost; it was restructured into two described commits before the merge (§6).
+
+- ✅✅ **SESSION 174 = BOTH OWED RE-FITS CLOSED WITH NO CONSTANT MOVED, AND ONE OPEN USER DECISION
+  CAME OUT OF IT (2026-08-07).** s173 §11 left three ordered prerequisites; step 1 (the matrix) was
+  already done, and this session ran steps 2 and 3. **`ctest` 22/22.** Two CLOSED/REFUTED rows carry
+  the detail.
+  **(a) THE LEVEL TAPER HOLDS.** GATE AY against `s173c_hfmix.json` (both epoch guards passing)
+  **REFUSES to fit anything** — worst per-detent requirement **0.58 dB inside its own 1.27 dB
+  spread** — where at fit time the same column read **+1.83…+3.10 dB**. No re-fit owed.
+  **(b) `OdToneRestore`'s MIX LAW NEEDS NO RE-FIT, and that is a measured refutation.** Split by
+  measured `cleanFraction`: **bleed-free 6 of 8 over the ±0.83 dB bar, mixed 0 of 7 over on BOTH
+  dilution axes**, with the **listening condition inside the bar for the first time** (−0.03…−0.59
+  vs s156's +1.0…+1.5). The bleed-free residual is TOO DEEP ⇒ toward hardware ⇒ §5 rule 2 PASS, and
+  **neither of the stage's two levers can reach it** (25.3 % / 25.5 % closed at the largest move
+  that costs nothing; worst left 2.6–2.9× the bar).
+  **(c) ✅✅ USER DECISION TAKEN: KEEP, NOT RE-DERIVED.** Fixing a stale-defaults defect in
+  `LevelBlend.h` turned `LevelBlendTest` Test 0 red and exposed that **the s173 taper's
+  half-rotation fraction is 23.75 %**, outside the A-taper band `circuit.md` specifies for VR2 and
+  **further from it than the retired power law's 21.02 %** (s163 was 15.41 %). Its last break also
+  sits at **98.4 % of rotation** with slope **9.568** over 1.6 % of travel — segment 4 pressing
+  against the pinned L(1) = 1 anchor rather than a measured feature. **The taper delivers** (AY2
+  refuses to fit anything; convexity and both exact endpoints survive) — but its outside
+  corroboration has gone and its top segment is degenerate-looking. ⛔ NOT re-derived toward the
+  A-taper band: AY2's refusal means the current epoch supplies **no per-detent requirement to fit a
+  smoother curve against**, so any alternative shape chosen purely to improve the half-rotation
+  number would be an unmeasured, self-selected pick — the shipped curve is the one thing on record
+  that IS measurement-grounded (fitted against the strictest epoch this law has had, before
+  `OdMakeup` diluted the requirement, and it still satisfies the current one). ⛔ The test bar was
+  **deleted, not widened**, and replaced by a strictly harder mutation-controlled staleness gate.
+  `docs/session-log.md` SESSION 174.
+  ⚠ The rebuild **re-armed the render cache** — the next matrix run pays ~25 min. ✅ The s171
+  `dist_engage` bit-identical-matrix check that was owed here is **CLOSED by s175's 27-pair
+  bit-identity measurement**, which covers `dist_engage`'s stage as well as the four selectors.
+
+- ✅✅ **SESSION 173's MATRIX: 9 ROWS OVER SHIP → 8, AND THE ROW THAT CLOSED IS THE THD ONE GATE Z
+  PREDICTED 45 SESSIONS AGO.** Current baseline **`analysis/reports/s173c_hfmix.json`** (162
+  captures, membership identical, **CLEAN bit-identical**). **THD (OD) full send 3.138 → 2.506,
+  under its 3.00 bar**, and `gain-n12` 2.101 — BOTH THD rows now SHIP. s128 measured that row as
+  *mostly mix DILUTION, not added distortion*, and predicted it *"closes when A3 does"*; s172/s173
+  closed most of A3 for unrelated tone reasons and the row followed. Also better: OD p99 10.701 →
+  10.469, OD 8–16.3 kHz p90 6.168 → 5.667. Worse: OD 25–100 Hz median/p90, OD 100 Hz–8 kHz
+  median/p90, OD band-RMS 2.172 → 2.338. ⚠⚠ **TWO CHANGES ARE BUNDLED (the LEVEL taper and the
+  mix-keyed HF term) — do NOT quote this as either one's price.** One attribution is FREE: the
+  **25–100 Hz rows moved and the HF term is a Q=2.0 peak at 5600 Hz that cannot reach them**, so
+  that cost is the taper, exactly as s163's precedent predicts. `docs/session-log.md` SESSION 173 §12.
+
+- ⛔⛔ **SESSION 173 = A USER-REPORTED TREBLE-NOTCH REGRESSION FROM s172, TRACED AND FIXED, PLUS THE
+  LEVEL-TAPER RE-FIT (FITTED, NOT SHIPPED) (2026-08-07).** ⚠ **NOTHING IS COMMITTED**; the tree
+  carries s171 + s172 + this session. **`ctest` 22/22.**
+  **(a) THE REGRESSION.** The user reported the treble notch sitting at ~4 kHz instead of ~5.3 kHz.
+  It is `OdMakeup`'s high shelf: GATE BF (`analysis/hf_shelf_locus_gate.py`) measures the walk
+  **MONOTONE in 18 of 18 driven cells** and the median model/pedal centre ratio **0.834 (makeup off)
+  → 0.759 (shipped)**. s172 sized the shelf corners on a **ONE-SIDED** constraint — *"outside the
+  285–905 Hz feature span"* — checking only the side facing the feature being corrected, while the
+  transition runs through **4–12 kHz**. ⭐ Mechanism was already on the books: **GATE AF6 (s134) —
+  these treble features are VERTICES, and a vertex moves with a TILT with no corner moving.**
+  ⇒ SHIPPED `odMakeupHighHz` 2800 → **1600**, `odMakeupHighCutDb` 6.0 → **3.0** (own SHIPPED
+  CONSTANTS row). ⭐⭐ **Not a trade** — better on the notch AND both out-of-band sub-bands, because
+  the **SUB-BAND SPLIT** revealed the s172 shelf was **worst in the region it existed to protect**
+  (2.8–8 kHz rms 6.12, its largest). Verified at the **SHIPPED `odNotchDepthDb`=3.0** (every search
+  arm held it at 0): **0.759 → 0.837**. ⚠ Still ~16 % below the pedal — **pre-existing** (makeup-off
+  0.834), open item 6.
+  **(b) THE TAPER: FITTED, HELD, AND NOW STALE BY ONE EPOCH.** GATE AY is well posed again (7 of 8
+  detents, requirement +1.83…+3.10 dB). ⛔ *"Just revert s163"* is REFUTED — the retired power law
+  scores 2.066 dB rms against a 1.213 dB ambiguity. The answer is a **4-segment** PWL (same count as
+  shipped, convex). ⛔⛔ **But `s173_level_taper_fit.json` was derived from `s172_odmakeup.json` and
+  the shelf change moved the OD:CLEAN ratio under it — DO NOT SHIP those constants; re-fit.**
+  **(c) THE ORDER CHANGED.** s172 handed over taper → mix law → matrix. AY1b's epoch guard needs a
+  report postdating the binary, so it is now **matrix → taper → mix law → matrix**.
+  `docs/session-log.md` SESSION 173.
+
+- ✅✅ **SESSION 172 = THE OD:CLEAN RATIO SHIPPED (`src/dsp/OdMakeup.h`), ON A USER REPORT, AND THE
+  NOTCH-Q ROUTE REFUTED (2026-08-07).** The user's three-part complaint (320 Hz null + ~450 Hz peak
+  + 800 Hz notch all under-contrasted "at most settings") measured as **ONE dilution defect**:
+  bleed-free the model is RIGHT (C1 **14.07 vs 13.92**) and it collapses at every mixed setting on
+  BOTH mix axes. ⇒ the lever is the **RATIO**, not a filter and not a notch depth (s156's ceiling).
+  Shipped `odMakeupDb=6.0` + band-limiting shelves (130 Hz/−3.5, 2800 Hz/−6.0) + `odNotchDepthDb=3.0`.
+  ⭐⭐ **A flat term cannot change any bleed-free contrast — asserted 0.0000 dB over a 0→7.5 dB
+  sweep** — which is why the one already-correct condition is protected BY CONSTRUCTION and why a
+  bell was rejected. **Shaped is strictly better than the incumbent on BOTH axes** (mid rms
+  5.11→1.41, out rms 3.79→3.33) where flat trades one for the other. **`ctest` 22/22**; defaults
+  **bit-identical** to the explicit `--fit` list at all 3 GRUNT positions with the mutation control
+  firing at all 3. ⛔⛔ **`kNotchQ` IS REFUTED AS A LEVER** (×5 moves the composite null ≤0.8,
+  non-monotonically, the wrong way at the quiet end, and costs contrast) — and with it a
+  level-dependent Q. **DEPTH is the width lever instead**, and a **level-dependent DEPTH** is the
+  real open successor. ⚠⚠ **TWO RE-FITS ARE OWED**: the s163 LEVEL taper and s156's mix law were
+  both partly compensating for this deficit.
+  **Baseline `analysis/reports/s172_odmakeup.json`: 9 rows over SHIP — the SAME NINE as s166, none
+  crossed either way**, membership identical (every gated `n` matches), **CLEAN bit-identical**.
+  ⭐⭐ **THD full-send 5.501 → 3.586 (−1.915)** — an independent confirmation of GATE Z's s128
+  prediction that the row is mostly mix DILUTION and *"closes when A3 does"*, made 44 sessions
+  earlier and confirmed by a change designed for an unrelated reason. ⛔⛔ **The FR cost is NOT the
+  hardware licence** — split by GRUNT, **cut +0.236 / flat +0.260 / boost −0.094**, and cut is where
+  we moved TOWARD ND, so §5 rule 2 cannot cover it. Split by MIX it attributes exactly: **B=0 +0.000
+  (known answer), bleed-free −0.049, mixed +0.265** ⇒ all of it is the composite becoming more
+  OD-dominant while the OD path still carries its nine shape errors — the mixed rows were previously
+  FLATTERED BY DILUTION. ⇒ **the OD path's SHAPE is now the binding defect** (items 6 and 2).
+  `docs/session-log.md` SESSION 172.
 - ⛔⛔ **SESSION 170 = W1 REFUTED AT ONE SESSION OF ITS THREE — THE PRE-REGISTERED STOP FIRED, AND
   W1's PREMISE FELL BEFORE ANY RENDER (2026-08-06).** No `src/` change, no rebuild, no cache
   re-arm, no matrix run owed. **`ctest` 21/21.** GATE BE (`analysis/clipsat_headroom_gate.py` +
@@ -412,6 +548,10 @@ lives in the named source file's own comment block — **not duplicated here**.
 | LEVEL taper | power law `levelTaperExp = 2.25` → **4-segment PWL** (`levelTaperBreak1..3`/`Frac1..3` = 0.219415/0.038146, 0.529680/0.166340, 0.857645/0.425688) | 163 | ⛔ **`levelTaperExp` IS DELETED, not aliased** — C++ consumers fail to COMPILE, `--fit levelTaperExp=` fails loudly, and `analysis/` must call `level_law_gate.level_taper(x)`. Closes the LEVEL LAW: worst detent error **7.28 → 0.66 dB**, and GATE AY2 now REFUSES to run (*"no detent has a requirement larger than its own across-stimulus spread"*). ⚠⚠ **COSTS THE MATRIX: 7 rows over SHIP → 8** (OD 100 Hz–8 kHz median crossed 0.478 → 0.515, THD full-send 3.657 → 4.737) — a taper is not a gain, it moves the clean/OD MIX, which GATE Z says the THD row mostly is. ✅✅ **USER DECISION TAKEN (2026-08-05): KEEP, net positive** — the THD move is a further dilution of an already-diagnosed mix artefact (GATE Z, s128), not new distortion generation | `LevelBlend.h` constants block; `analysis/level_taper_fit.py` (GATE AZ) |
 | `OdDriveTilt` stage | *(new)* → RBJ high-shelf, envelope-driven, `f0=5388 Hz S=0.85 dbPerDb=0.203 refDbv=-33.9 maxCut=6.0 timeMs=50` | 166 | ⚠⚠ **[ENG], NON-SCHEMATIC, session-160-authorised task E, THIRD architecture tried** — the first two (a post-clipper section reusing `OdToneRestore`'s slot; a fixed pre-clipper pre-emphasis) were REFUTED BY MEASUREMENT with nothing built (GATE BA/BB). This one's coefficients move with the OD region's own input LEVEL, which is what both refutations showed is structurally required. Closes item 6's treble-peak-slope target: GATE W6's `FIXED, 0.2 %` classification → the peak now **WALKS −6.07 %, 83 % of the pedal's −7.34 %**, no overshoot (gate 2), gate 1 shape rms **0.0077 vs 0.627** (81× the refused constant-tilt class), gate 3 CLEAN bit-identical over the full matrix. ⚠⚠ **COSTS THE MATRIX: 8 rows over SHIP → 9** (new: OD 8–16.3 kHz median 0.669 → 0.724) **and THD full-send 4.737 → 5.501** — MECHANISM-ATTRIBUTED before shipping: correlates with sweep LOUDNESS (−0.88) not the DRIVE knob (−0.10), i.e. it amplifies GATE Z's already-diagnosed under-distortion at hot stimulus, not a new mechanism. ✅✅ **USER DECISION TAKEN (2026-08-06): KEEP** | `OdDriveTilt.h`, `PedalChain.h`, `FitParams.h`; `analysis/task_e_placement_gate.py` (GATE BA), `analysis/preclip_preemph_gate.py` (GATE BB), `analysis/od_drive_tilt_gate.py` (GATE BC) |
 | `OdToneRestore` stage | bleed-free-fitted table → **MIX-KEYED**: `cut = kNotchGainDb[g][d] + kNotchMixK[g][d]*S(cleanFrac)` | 156 | ⚠⚠ **kNotchGainDb CHANGED MEANING** — it is now the cut at `kMixCfRef` (LEVEL noon/BLEND max), not the bleed-free cut. The stage sits upstream of LEVEL/BLEND and cannot see the mix directly, so `LevelBlend::cleanFraction()` (new, superposition on the shipped `process()`) is read into it every `applyParams()`/`applyFitParams()` via `PedalChain::syncOdToneMix()`. One scalar is provably sufficient — captures reaching the same clean fraction by different LEVEL/BLEND routes agree to 0.05 dB (GATE AT's AT2). Listening-condition depth error down from ~+8 dB to +1.0…+1.5 dB; DRIVE-0 sign corrected (was boosting where a cut was needed). ⚠ A measured DEPTH CEILING (~1.5–2 dB composite at the listening mix, a 40 dB probe gives 0.47 dB — shallower than the shipped 12.34 dB cut's 1.60) means the residual is not closable from this stage; the lever is A3 | `OdToneRestore.h`, `LevelBlend.h`, `PedalChain.h`; `analysis/od_notch_mix_law.py` (GATE AT) |
+| `OdMakeup` stage + `odNotchDepthDb` | *(new)* → OD-branch makeup **+6.0 dB**, low shelf 130 Hz/−3.5, high shelf 2800 Hz/−6.0; notch depth offset **+3.0 dB** | 172 | ⚠ **[ENG], NON-SCHEMATIC, USER-DECIDED 2026-08-07** — the OD:CLEAN **RATIO**, i.e. A3 corrected directly at the LevelBlend summing node. The user's report (320 Hz null + ~450 Hz peak + 800 Hz notch all under-contrasted "at most settings") is **ONE dilution defect**: bleed-free the model is RIGHT (C1 14.07 vs pedal 13.92) and it collapses at every mixed setting on BOTH mix axes (LEVEL noon 1.51 vs 3.09). ⛔ NOT fixable by a deeper notch — s156's DEPTH CEILING. ⭐ Raising the OD path deepens a composite notch by raising its SHOULDERS (the bottom is floored by the clean tap), and the ~450 Hz peak IS that shoulder ⇒ one correction serves all three features. ⭐⭐ **A FLAT term cannot change any bleed-free contrast** (a constant cancels within a curve) — asserted **0.0000 dB** across a 0→7.5 dB sweep, which is why a BELL was rejected (it moves that cell ~1.5 dB). The two SHELVES band-limit it because the deficit is not flat outside the midrange; **shaped is strictly better than the incumbent on BOTH axes** (mid rms 5.11→1.41, out rms 3.79→3.33) where flat trades one for the other (1.04 / 5.46). Depth +3 sits INSIDE §3's hardware licence at flat/boost (+4.27 vs 3.5–4.8; +5.13 vs ~26) and ~1.5 dB beyond it at cut bleed-free (accepted, "a bit too much is fine"). ✅ Verified before use: defaults **bit-identical** to the explicit `--fit` list at all 3 GRUNT positions, mutation control fires at all 3. **`ctest` 22/22.** ⚠⚠ **OBSOLETES TWO FITS — BOTH RE-FITS OWED**: the s163 LEVEL taper and s156's mix law were each fitted while the OD path was ~5 dB quiet (LEVEL law re LEVEL max degrades 0.4–1.4 → ~3.5 dB). ⚠ Unlicensed: the ~450 Hz peak lands 0.6–1.1 dB above the captures | `OdMakeup.h`, `OdToneRestore.h`, `FitParams.h`; `docs/session-log.md` SESSION 172 |
+| `odMakeupHighHz` / `odMakeupHighCutDb` | 2800 → **1600** / 6.0 → **3.0** | 173 | ⛔⛔ **A USER-REPORTED REGRESSION FROM s172, MEASURED AND FIXED** — the treble notch had walked ~5.3 kHz → ~4 kHz. s172 sized these corners on a **ONE-SIDED** constraint (*"outside the 285–905 Hz feature span"*), i.e. it checked the side facing the feature being corrected; the shelf's transition actually runs through **4–12 kHz**, where the OD/clean mix cancellation the user hears as the treble notch lives. GATE BF: the walk is **MONOTONE in 18 of 18 driven cells** and the median model/pedal centre ratio goes **0.834 (makeup off) → 0.759**. ⭐ Mechanism was already on the books from an unrelated investigation — GATE AF6 (s134): these treble features are **VERTICES**, and a vertex moves with a **TILT** with no corner moving anywhere. A shelf is a tilt. ⭐⭐ **THE SUB-BAND SPLIT CHOSE THE VALUES AND EXPOSED THAT THE s172 SHELF WAS WORST IN THE REGION IT EXISTED TO PROTECT** (2.8–8 kHz rms **6.12**, its largest sub-band). Lowering the corner and HALVING the cut is better on the notch **and both** out-of-band sub-bands: notch **0.759 → 0.836**, 0.9–2.8k 1.95 → **1.85**, 2.8–8k 6.12 → **5.47**, midrange 2.14 → 2.16. **Not a trade.** ⚠⚠ **THE SLOPE IS NOT THE LEVER** — `odMakeupHighS` was exposed expecting it to be and buys **0.004** against the 0.077 corner+depth buys; it ships inert at 0.9. ✅ Verified: defaults **bit-identical** to the explicit `--fit` list, mutation control fires, and **at the SHIPPED `odNotchDepthDb`=3.0** (every search arm held it at 0) the ratio is **0.759 → 0.837**. ⚠ Still ~16 % below the pedal — **pre-existing** (makeup-off reads 0.834), open item 6, not this fix's job | `FitParams.h`, `OdMakeup.h`; `analysis/hf_shelf_locus_gate.py` (GATE BF) |
+| `OdMakeup` MIX-KEYED HF term + `levelTaper*` re-fit | *(new)* → peak 5600 Hz Q 2.0, gain −4.5 dB at cleanFrac 0 → +3.3 at 0.43 → +0.9 at 1; taper → 4-seg PWL | 173 | ⛔⛔ **A SECOND USER REPORT, AND IT RETIRES A PROJECT-WIDE HABIT.** *"ONLY looking at bleed free for literally anything breaks ANY setting that isn't level1700 ... ref-od should be the starting reference, NEVER the bleed free one."* ⭐⭐ **MEASURED, AND IT IS WORSE THAN A MISS: at the user's stated playing level (`drv_-12`) the 4–8 kHz error CHANGES SIGN across the mix** — bleed-free reads **+4.53 dB TOO BRIGHT** while every played setting reads **0.7–3.3 dB TOO DARK** (`ref-od` −2.80). ⇒ a correction fitted bleed-free **pushes the WRONG WAY** everywhere else, which applies retroactively to s172's whole fit. ⚠ I put a bleed-free frontier in front of the user for a `ref-od` complaint and was about to ship from it; the edit was rejected mid-flight. ⚠ Band read as a MEDIAN — the notch drags the 4–8 kHz MEAN **4.35 dB** off it at one capture. ⭐ PEAKING not shelving (8–16.3 kHz already measures right), and **Q is load-bearing**: at Q 1.0 the peak overshoots 2.8–4 kHz (−0.62 → +1.03), the same "check the other side" failure as the s172 shelf — caught before shipping this time. rms|err| over 5 captures on the LEVEL+BLEND ladders: 250–900 0.74→0.72, 0.9–2.8k 1.10→1.07, 2.8–4k 0.87→**0.50**, 4–8k **3.30→0.98**, 8–16.3k 1.18→1.31, and ⭐ the treble notch moves **0.882→0.926** toward the pedal as a side effect. ✅ defaults bit-identical to the explicit `--fit` list, mutation fires on OD, **CLEAN bit-identical**. **`ctest` 22/22.** ⛔ **THE MATRIX AND THE TAPER FIT ARE BOTH STALE AGAIN** — `s173_hfshelf.json` predates both this and the taper | `OdMakeup.h`, `FitParams.h`, `PedalChain.h`; `docs/session-log.md` SESSION 173 §9–10 |
+| `SwitchFade` + `PedalChain` shadow stages | *(new)* → 20 ms per-stage dual-instance crossfade on ATTACK / GRUNT / LO-MID-freq / HI-MID-freq | 175 | ⭐⭐ **OPEN-WORK ITEM 14 CLOSES — every switch in the chain is now smoothed and gated.** s171 shipped the `dist_engage` FOOTSWITCH (a mix override: one coefficient ramp) and scoped the four SELECTORS out, because they change **actual topology** (cap networks in `TrebleAttack`/`Clipper`, `MidBand`'s switched series/across cap PAIR) and each re-solves an MNA matrix, so there is no coefficient to interpolate. `architecture.md`'s remedy, built: on a flip the live stage is copied into a SHADOW (topology AND state), live takes the new position, and both are driven by the same input with their outputs crossfaded. ⭐ **Copying rather than starting the shadow from rest is the physically correct initial condition** — a mechanical switch does not discharge the caps around it. ⭐⭐ **GRUNT NEEDED TWO CROSSFADE POINTS OFF ONE RAMP**: it moves the clipper's cap network AND `OdToneRestore`'s grunt-keyed (gain, Q) table, which jumps a whole row — fading only the clipper would have left the notch stage's discontinuity wearing the switch's name. Worst selector cell **39.47× → 0.50×**; `dist_engage` **unmoved cell for cell** (the free scope check). ⭐⭐ **THE 20 ms IS MEASURED**: from 12 ms up the statistic is purely fade-rate-limited, `ratio × t` = **9.96/9.90/10.00/9.90/9.90 ms across 12–30 ms, constant to 1 %** — an exact 1/t law, which is what proves the bar tracks the ramp and not a floor (s154); below 12 ms it leaves that law (8 ms reads 0.98× where 1/t predicts 1.24×), so those points did not choose it. ⛔ **Do NOT unify with `LevelBlend::kDistFadeSeconds` (12 ms)** — swept against a different worst cell. ⭐ Free instrument validation: 16 flip phases reproduce the 4-phase table **identically**. ⭐⭐ **BIT-IDENTICAL, MEASURED: 27 render pairs, 0 differ** (3 ATTACK × 3 GRUNT at BOTH OS regimes — those two fades are OS-rate-derived — plus 3 × 3 mid selectors), distinct binary hashes, mutation control fires ⇒ **NO re-baseline owed**, and the s171 owed matrix check is subsumed. Rests on `OfflineRender` calling `reset()` AFTER `setParams()`, so every rendered sample runs with every fade settled and each call site is a branch AROUND the untouched pre-change expression. ⚠ `TrebleAttack`/`Clipper`/`MidBand` gain a **public DEFAULTED copy-ASSIGNMENT** (copy CONSTRUCTOR stays deleted) — defaulted so a future member cannot be silently missed, the s146 `masterTaperBreak` trap made impossible. ⚠ Cost: a shadow doubles its own stage's work for 20 ms only; `PerfBenchmark` measures the settled chain and is unchanged. **`ctest` 22/22**, `SwitchTransitionTest` 245 checks | `SwitchFade.h`, `PedalChain.h`, `TrebleAttack.h`, `Clipper.h`, `MidBand.h`; `tests/SwitchTransitionTest.cpp`; `docs/session-log.md` SESSION 175 |
 
 #### CLOSED / REFUTED — do not re-open without reading the pointer
 
@@ -545,6 +685,14 @@ table in this file.
 | ⭐⭐ s167's W1 framing — *"the GRUNT off-flat null and the OD accuracy gap are THE SAME DEFECT ... bleed-free the model is −1 dB midband at GRUNT cut and −6…−8 dB BROADBAND at flat/boost ... flat/boost drive the clipper ~6 dB harder, and that is exactly where the model collapses"* — the ONE claim that made W1 different from the route s142 refuted | ⛔⛔ **REFUTED BEFORE ANY RENDER, s170 — IT IS A GAIN-MATCHED READING OF A GRUNT-INDEPENDENT DEFECT** | 170 | The −1 vs −6…−8 dB contrast is real **only in the gain-matched column**. Measured ABSOLUTE on the same stored baseline, the bleed-free midband deficit is **−2.96…−4.59 dB at ALL THREE GRUNT positions** — worst GRUNT spread **0.94 dB**, against a framing quoting ~5. The gain-matched **5.38 dB** is manufactured by `comprehensive_report`'s per-row broadband null gain, which swings **+2.21 dB at cut to −3.22 dB at flat** (a time-domain scalar the log sweep's LF octaves dominate). ⭐⭐ Per band it localises exactly: GRUNT spread **18.38 dB max / 4.92 median BELOW 100 Hz** vs **3.13 max / 0.35 MEDIAN over 100 Hz–4 kHz** (101 Hz 0.21 · 508 Hz 0.20 · 2032 Hz 0.18 · 4064 Hz 0.19) ⇒ **the GRUNT difference is a COUPLING-CAP (LF) difference and the midband is GRUNT-independent.** ⭐ And the dose is *bigger* than claimed and points the wrong way: closed form on the shipped constants — ADD-cap composed (s139) with `clipC11` at its fitted 3.69 nF, `Zin = R18/(1+a0) = 12756` — flat drives the clipper **+7.57 dB** harder, boost **+7.68 dB**, yet **6 of 6 cells move the WRONG WAY** (deficit SHRINKS where the clipper is pushed harder), at **+0.007…+0.122 dB per dB**. Second axis agrees: over 12 dB of stimulus the deficit moves **≤1.00 dB**, monotone **0 of 3**. ⇒ a ~3.5 dB level offset invariant to 7.6 dB of clipper drive AND 12 dB of stimulus is not a headroom defect. ⚠ Does NOT contradict GATE Q's `D(f)` 2.64 dB — the stimulus-dependent term lives at the band edges, not the midband. ⛔ Do not re-open W1 from GRUNT evidence. | `analysis/clipsat_headroom_gate.py` (GATE BE) BE1/BE1b/BE2/BE3 |
 | **W1's LEVER** — raise `clipSat` toward the 5.636 V rail with `kInputRef` UNCHANGED, i.e. deliberately let the clipper compress LESS (the experiment s142 did *not* run; s142 refuted raising it while HOLDING the operating point fixed) | ⛔⛔ **REFUTED, s170 — W1's OWN PRE-REGISTERED STOP FIRES, ON ALL THREE OF ITS GROUNDS. 1 of 3 capped sessions spent, NOTHING built, no `src/` edit** | 170 | 80 renders, L ∈ [1.0, **5.442** = `VDD/satsum`, asserted rather than transcribed], 9 bleed-free GRUNT × DRIVE conditions + a CLEAN control. **(1)** The **SIGNED** midband error is **MONOTONE**, −2.94 dB at L=1.0 → **+6.19 dB** at the physical ceiling, **7 of 7 steps one-signed** ⇒ no interior optimum exists. **(2)** What it delivers is **0.24–0.27 dB of SHAPE per dB of LEVEL — a ratio constant across the whole sweep**, i.e. ONE fixed direction scaled by how far it is turned, and the matrix deletes the level part by construction. **(3)** ⭐⭐ **BAR-FREE: that direction is not the defect's** — median **cos² 0.072** between the lever's per-band shape change and the residual shape error (both de-meaned, so a scalar is free to both sides), so even with its amplitude chosen freely PER CONDITION — strictly more than any shipped constant could do — it closes **10.1 %** of the shape error (3.016 → 2.711 dB) and the gain-matched column moves **0.084 dB**. ⇒ **`clipSat` is a LEVEL lever wearing a headroom name: the "make the clipper see less" degeneracy for the FIFTH time** (s5/s6 clipper fits, GAP #3b's C13, the rail-voltage fit, C15), approached from the opposite side and identical in shape. ⭐ Three known answers held: **L=1.0 reproduces `s166_odtilt.json` to 0.0000 dB**, **CLEAN bit-identical (0.000e+00) at every rung** (the override is OD-only, as the topology requires), **0 of 9 OD conditions inert**. ⭐ NOT refuted and worth keeping: the OD path's **ABSOLUTE** midband deficit (~−2.9 dB pooled) **IS** closable to ~0 at L≈1.5 — but that is A3 seen as a LEVEL, which `release_gate` is structurally blind to, so it is not a route to the 9 over-SHIP rows. ⛔ No matrix run owed — W1's stop says the matrix is owed only if an interior optimum is found. | `analysis/clipsat_headroom_gate.py` (GATE BE) BE4/BE5 |
 | ⭐⭐ GATE BE's OWN FIRST DRAFT — *"INTERIOR OPTIMUM FOUND at L = 1.5, depth 1.882 dB — the stop does NOT fire; W1 continues to S2"* | ⛔⛔ **THE `abs()` TRAP: `mean\|error\|` OF A MONOTONE SIGNED ERROR HAS A V AT ITS ZERO CROSSING *BY CONSTRUCTION*, s170** | 170 | The draft scored the locus on `mean\|absolute midband error\|`. The **signed** error is monotone at all 8 rungs and at every GRUNT position (7/7 one-signed), so its absolute value must fall to a minimum where it crosses zero and rise after — **for ANY level lever whatsoever**, which is precisely the class the pre-registered stop exists to catch. ⇒ the "interior optimum" was the zero crossing, and the gate written to fire the degeneracy stop had **published the degeneracy as a pass**. ✅ Repaired: the verdict reads the SIGNED column plus a bar-free alignment share; `_mutate_gate_be.py`'s `be5-signed` arm makes the signed locus genuinely turn over and requires the stop to stand down. ⚠⚠ **Two further slips in the same block, both recorded because of HOW they survived:** (a) the first repaired draft gated the escape hatch on an **invented 0.05 dB floor** and reported "STOP DOES NOT FIRE" on 0.084 > 0.05 — `a-threshold-you-guessed-is-not-a-guard`, and s154's *"a verdict that flips on 1 % of its own bar is not a verdict"*; replaced by cos², a SHARE needing no bar. (b) the run then **crashed on a stale `floor` reference** and it went unnoticed because the output was piped through `sed` and the **exit code was never read** — the verdict text printed correctly above the traceback. ⭐ **Check `rc`, not the tail of stdout.** ⚠ Also: the arm's own first mutation (`+4·(L−1.5)²`) was **VACUOUS** — the real curve climbs ~9 dB, so a perturbation that small left it monotone and the arm read GUARD DEAD against a working guard (s110). | `analysis/_mutate_gate_be.py` `be5-signed` |
+| the user's three-part report — *"the 320 notch, the following peak, and the 800 Hz notch are not deep/high enough at most settings"* | ⭐⭐ **ONE DEFECT, AND IT IS DILUTION — NOT A FILTER, NOT A NOTCH DEPTH, s172** | 172 | Bleed-free (LEVEL max AND BLEND max, GATE K2's only corner) the model is **RIGHT**: C1 (peak−notch320) **14.07 vs the pedal's 13.92**, and the null within ±0.41 dB at all three drive rungs. It collapses at EVERY mixed setting, on BOTH mix axes independently, worst at MODERATE mix (LEVEL 0.875 pedal 7.14 vs model 2.48; BLEND 1430 @ LEVEL max 6.32 vs 3.67). **Zero bleed-free + peaking mid-mix = the dilution signature**; a filter error would show bleed-free too. ⛔ And a deeper notch cannot reach it (s156's DEPTH CEILING: a 40 dB OD-path cut buys 0.47 dB of composite null at the listening mix). ⭐ The ratio, measured with each side differenced against ITSELF so every per-side capture-chain scalar cancels: the model's OD path is quiet re its OWN clean path by **−4.97/−5.00/−5.74 dB** over 250–900 Hz across the stimulus ladder — stable to 0.77 dB over 12 dB, and an independent THIRD reading of GATE O's A3 deficit (4.40 dB). ⇒ fixed by `OdMakeup` (SHIPPED CONSTANTS row) | `docs/session-log.md` SESSION 172 §1 |
+| "narrow the notch Q" — the user's own proposal, and the obvious next move after the dilution fix | ⛔⛔ **REFUTED TWICE OVER, s172 — `kNotchQ` IS NOT A LEVER, AND A LEVEL-DEPENDENT Q FALLS WITH IT** | 172 | **(a) The target moves the OTHER WAY and they CROSS.** Bleed-free, GRUNT cut × DRIVE noon, across the stimulus ladder: **pedal Q 18.01 / 13.91 / 10.53 / 8.39 (FALLING)** against **model 5.27 / 5.60 / 6.71 / 8.39 (RISING)** — at the hottest rung the model is **already exactly right (ratio 1.00)**, so any constant fixes the quiet end and overshoots the loud one. The mean error (6.22) is INSIDE the pedal's own across-stimulus spread (9.62) — s161 AX6 on a new axis. **(b) And the knob barely acts:** `odNotchQScale` swept ×1→×5 (section Q 16→80) moves the composite null **≤ +0.8 and NON-MONOTONICALLY** (peaks ×2–×3 then falls), moving the WRONG way at the quiet end, and it COSTS contrast (C1 14.07 → 13.14). ⭐ **Root cause, structural:** the audible null is `OdToneRestore`'s narrow section (Q≈16 ⇒ ~20 Hz) inside the pre-clipper ladder's own BROAD cancellation (~48 Hz), so the half-depth crossing that sets the measured Q lands on the **BOWL**. Reproduces s153's AQ2 from a different construction and strengthens it. ⛔ Setting Q to "11" would make it **BROADER** — the shipped section Q at that cell is **16.07**. ⛔ A LEVEL-DEPENDENT Q modulates a parameter that does not move the composite ⇒ modulates nothing. `odNotchQScale` ships at 1.0 (inert) so this stays reproducible | `analysis/`-free; `docs/session-log.md` SESSION 172 §4 |
+| ⭐ what the WIDTH lever actually is | ⭐⭐ **DEPTH, NOT Q — and it is bounded, s172** | 172 | Same reasoning inverted: cutting deeper moves the half-depth crossing INTO the narrow section. `odNotchDepthDb` 0→+9 dB sharpens **MONOTONICALLY** bleed-free (Q **6.68 → 8.94**) where the Q knob wobbled 0.8. ⚠ Two bounds: at the LISTENING mix deeper makes it slightly **BROADER** (3.22 → 2.91) — s156's depth ceiling, the clean tap floors the bottom so extra cut widens the suppressed region; and the requirement **CROSSES** (bleed-free at the clean sweep we are 10 dB short and want ~+9; at drv −12 we are already exact and +9 overshoots by 8.8 dB). ⇒ **a LEVEL-DEPENDENT DEPTH is the real fix for the clean-stimulus shortfall, and unlike level-dependent Q it is a genuine lever (8+ dB of authority)** — deliberately NOT approximated with a constant. Shipped at +3.0 | `OdToneRestore.h` `depthOffsetDb` block |
+| ⚠⚠ the makeup's apparent OVERSHOOT at GRUNT flat/boost | ⭐⭐ **PRE-EXISTING, AND LICENSED BY HARDWARE — s172** | 172 | ⚠ Every capture without a `grunt-` token is GRUNT = **cut** (the s151 trap), so the value was nearly chosen from one row. Extended: **at makeup 0 the defect is already GRUNT-dependent in OPPOSITE directions** — listening-mix C1, pedal vs model: cut 3.09 vs **1.51 (under)**, flat 3.92 vs **5.23 (over)**, boost 4.17 vs **5.91 (over)**. So the uniform makeup AMPLIFIES an overshoot rather than creating it. ⭐⭐ And `reference-sources.md` §3 records hardware's 320 Hz null DEEPER than ND in all six measured conditions (**+1.6 dB at cut, +3.5/+3.8/+4.8 at flat, ~26 dB at boost**), so shipped we sit +4.27 over ND at flat (licence 3.5–4.8) and +5.13 at boost (licence ~26) — **inside the hardware trend at both, which §5 rule 2 defines as a PASS**. The user reported the same by ear before §3 was quoted. ⚠ §3 is a PNG read and s170 established the images are no longer on disk — SIGN and rough SIZE only. ⭐ **Separate, unowned defect found in passing: the model's MIX responds to the GRUNT switch ~4× too strongly** (listening-mix spread **4.4 dB vs the pedal's 1.08** at makeup 0). Recorded, NOT absorbed into this stage | `docs/session-log.md` SESSION 172 §6 |
+| *"the shelves' corners sit OUTSIDE the feature span (285–905 Hz) so their transitions cannot reach a feature"* — s172's own sizing constraint for `OdMakeup` | ⛔⛔ **ONE-SIDED, AND THE OTHER SIDE COST A USER-AUDIBLE REGRESSION, s173** | 173 | The constraint checked the side facing the feature being *corrected* and nothing checked the side facing everything else. A −6 dB shelf opening at 2800 Hz has its transition in **4–12 kHz**, which is where the OD/clean treble-notch cancellation lives; it walked that null **13–17 % down the band, monotone in 18 of 18 driven cells**. ⭐ GENERAL: a "clear of the feature" constraint on a SHELF is a statement about *both* skirts — name what is on the far side before sizing it, because a shelf's transition is unbounded above (or below) its corner by construction. | `analysis/hf_shelf_locus_gate.py` (GATE BF) BF3 |
+| the LEVEL taper re-fit s173 shipped — does it survive the epoch it was owed a re-check against? (s173 §11's owed item 2) | ✅✅ **YES — GATE AY REFUSES TO FIT ANYTHING, s174. No constant moved** | 174 | Re-run against `s173c_hfmix.json` with both epoch guards passing (report postdates all 24 `src/` files and the render binary; no capture postdates the report). The per-detent requirement runs **−0.56/−0.58/−0.53/−0.58/−0.50/−0.11/+0.17 dB** against per-detent across-stimulus spreads of **3.20/1.64/1.40/1.27/1.20/1.20/0.39** ⇒ AY2 exits: *"no detent has a requirement larger than its own across-stimulus spread"*. Worst \|need\| **0.58 dB inside its own 1.27 dB spread**. At fit time (against `s172_odmakeup.json`) the same column read **+1.83…+3.10 dB**, so the fit worked AND survives `OdMakeup` + the mix-keyed HF term moving the OD:CLEAN ratio under it. GATE AZ has no input and is structurally not runnable — the identical closure signature to s163's. ⛔ First run REFUSED for a different reason and it was the right one: `level_law_gate.SHIPPED_LEVEL_TAPER` was still the **s163** literal (worst component 4.252e-01). That literal is a **pinned epoch, not a convenience copy** — updated with the reason recorded at the constant | `analysis/level_taper_reshape.py` (GATE AY) AY2 |
+| `LevelBlend.h`'s compiled `kLevelTaper*` defaults, and `LevelBlendTest` Test 0's A-taper bar | ⛔⛔ **DEFAULTS WERE THE RETIRED s163 SET; FIXING THEM TURNED TEST 0 RED; THE BAR WAS DELETED, NOT WIDENED — s174** | 174 | s173 moved the shipped taper in `FitParams.h` and not the compiled defaults one file over. ⭐ **The shipped plugin was never wrong, VERIFIED not assumed** (`PluginProcessor.cpp:251` and `offline_render.cpp:581` both call `setFitParams` unconditionally, so `FitParams{}` always reaches `setTaper()`) — but **two** consumers read the defaults: `setLevel()`'s invalid-set fallback, and **`LevelBlendTest` Test 0, i.e. the one test that exists to catch a lost convexity spent a session asserting the shape of a curve nothing runs, and passing.** s146's `masterTaperBreak` trap in a second file. ⭐⭐ **Corrected, Test 0's half-rotation assertion then FAILED: the shipped taper reads 23.75 % against its own 8–18 % bar** (`circuit.md`'s A-taper corroboration, VR2 = 100k **A**). ⛔ **NOT widened** — the bar was **deleted and the quantity REPORTED**, because its PREMISE does not hold: GATE AY defines `levelTaper` as a **REPARAMETERISATION OF THE KNOB AXIS**, so it absorbs every model-vs-pedal difference downstream of the pot, not VR2's track; s146 and s163 both label the A-taper agreement *"outside corroboration no term of the objective knew about"* — a bonus, never a constraint. ⭐ And it behaves like that rather than like a pot: **21.02 % (retired power law) → 15.41 % (s163) → 23.75 % (s173)**, moved each time by DSP changes elsewhere that cannot touch a physical pot. ⭐⭐ **Replaced by a STRICTLY HARDER assertion — compiled defaults must EXACTLY equal `FitParams`' shipped taper** (exact is right: both are literals of one fit, so any difference is a missed edit, never rounding), mutation-controlled (6th-decimal perturbation → exit 1, names the constant). ⚠⚠ **23.75 % IS NOT DISMISSED — see STATUS; it is a USER DECISION, not a measurement** | `tests/LevelBlendTest.cpp` Test 0 (d)/(e); `src/dsp/LevelBlend.h` `kLevelTaper*` block |
+| a mutation runner's *"current-epoch report"*, named as a FILENAME | ⛔⛔ **BOTH LEVEL-TAPER RUNNERS HAD GONE STALE AND ONE HAD BEEN SCORING NOTHING, s173** | 173 | `_mutate_gate_ay.py`'s `CURRENT` and `_mutate_gate_az.py`'s `REPORT`/`AY` were the transcribed literals `s162_*.json`, **three epochs old** (s163's taper, s166's `OdDriveTilt`, s172's `OdMakeup`). AY1b's epoch guard correctly REFUSED it — which broke the **control**, and with the control broken every arm was unattributable: the three that "passed" expect `rc != 0` and were getting it from the **epoch guard**, not from their own mutation (s117: check guard IDENTITY, not a non-zero exit). ⭐ Fixed by DERIVING both structurally — newest report that *is* a matrix report (`captures`/`meta`/`summary`, ≥100 captures) — and AZ takes its matrix report from **GATE AY's own record of what it ran against**, so the pair is consistent BY CONSTRUCTION rather than by timestamp luck (the newest matrix report is usually `comprehensive_data.json`, the unnamed working copy, which is nobody's named baseline). ⭐ GENERAL: **the s146 lesson that an epoch-naming GUARD must be extended every time an epoch ends applies equally to the RUNNER that feeds it** — and a runner has no guard of its own, so it fails silently. Two arms also asserted epoch-specific VERDICT strings; `_mutate_gate_ay.py` now supports a `FLIP` check (a captured token must DIFFER from the control's) so an epoch-dependent verdict is tested against measured output instead of a transcribed word. **AY 13/13, AZ 9/9.** | `analysis/_mutate_gate_ay.py::newest_matrix_report`, `_mutate_gate_az.py` |
 
 ### THE RELEASE GATE
 
@@ -973,6 +1121,33 @@ Three candidates were measured (not read off the handover) and two changed shape
       re-fitting the two sections already shipped**, and the shipped Q error is already **smaller
       than the pedal's own across-stimulus Q spread at 3 of 3 rungs** ⇒ no single number can be
       meaningfully "closer". ⛔ Do not re-open with another section at the null's centre.
+    - ✅✅ **THE OWED RE-FIT IS CLOSED WITH NO CHANGE, s174 — and the closure is a MEASURED
+      REFUTATION, not a "looks fine".** s172 flagged the mix law STALE (fitted while the OD path was
+      ~5 dB quiet) and predicted in writing that the residual would land **TOO DEEP**. Re-measured
+      on the current binary across all five `--set` conditions and split by each capture's
+      **measured** `cleanFraction` (not its filename): **bleed-free (cf = 0) 6 of 8 over the ±0.83 dB
+      bar; mixed (cf > 0) 0 of 7 over, on BOTH dilution axes.** ⭐⭐ The listening condition — the
+      reference the user named at s173 §9 — is **inside the bar for the first time**: −0.03/−0.21/
+      −0.59/−0.51 against s156's +1.0…+1.5 and s163's +1.04…+1.59. The bleed-free residual is too
+      deep, i.e. **toward hardware** (§1/§3 make HARDWARE the authority for this null's depth and
+      record it deeper than ND) ⇒ §5 rule 2 PASS. ⛔ **AND IT IS NOT REACHABLE FROM THIS STAGE:**
+      both available levers were screened closed-form on the PARSED header (3 known answers, incl.
+      hand-transcription vs parsed at max |dS| = |dK| = 0). **`S(0)`** is the only node read
+      exclusively at cf = 0 but is **shared across GRUNT while `kNotchMixK`'s sign FLIPS**
+      (−9.34/+2.97/+5.81) ⇒ closes **25.3 %**, worst left **2.61× the bar**, binding on grunt-boost.
+      **`K[cut]`** is clean at the anchor (0.04 dB) but fails at cf = 0.25 where S dips to −0.405 —
+      **the non-monotone shape s156 built and refused to clamp is what stops it being a
+      bleed-free-only lever** ⇒ closes **25.5 %**, worst left **2.87× the bar**. ⚠ The two ~25 %
+      figures bind on DIFFERENT readings; coincidence, not a shared cause. ⭐ Free by-product,
+      quantified not assumed: `kMixCfRef` = 0.441 but the listening captures now land at
+      **cf = 0.4326** under the s173 taper — cost **+0.112 dB** of extra cut (7.4× inside the bar),
+      **named, not fixed**. `docs/session-log.md` SESSION 174 §2.
+    - ⛔⛔ **`kNotchQ` IS A NON-LEVER — do not re-open it, and do not build a level-dependent Q**
+      (s172, its own CLOSED/REFUTED row). ×5 on the section Q moves the composite null ≤0.8 dB,
+      non-monotonically, the wrong way at the quiet end, and costs contrast; the audible width is
+      set by the pre-clipper ladder's BROAD bowl, not by this narrow section. ⭐ **DEPTH is the
+      width lever** (`odNotchDepthDb`, shipped +3.0), and a **LEVEL-DEPENDENT DEPTH** is the real
+      open successor — 8+ dB of authority, unlike Q.
     **Instruments:** `analysis/od_tone_restore_fit.py` (`--stage-off`, `--depth point|area`,
     `q_interp`), `analysis/od_notch_mix_law.py` (GATE AT), plus GATEs AP / AQ / AR / AX and their
     mutation runners. ⚠ AP/AQ/AR's stored reports were fitted against the PRE-s156 bleed-free-only
@@ -1009,32 +1184,46 @@ Three candidates were measured (not read off the handover) and two changed shape
     HPF corners, `c21R` dominant, is the right topology for a residual this size. See the
     SHIPPED CONSTANTS / open-work "W2" row above for the C31-gap finding (unactioned, negligible).
 
-14. ⭐⭐ **NEW, SESSION 170 — SWITCH AND FOOTSWITCH TRANSITIONS. THE MOST ACTIONABLE ITEM ON THIS
-    LIST, ~2 SESSIONS, AND THE STANDING CARRY-FORWARD WAS POINTING AT THE WRONG ONE.** Measured
-    (`FinalSweepTest` [5], mid pots at FULL BOOST = worst case; step at the flip sample against the
-    tone's own motion there): attack **0.17×**, grunt **0.17×**, hiMidFreq **0.75×**, loMidFreq
-    **2.49×** — only loMidFreq exceeds the signal's own sample-to-sample step.
-    ⭐⭐ **BUT `dist_engage` IS NOT IN THAT TABLE, IS NOT SMOOTHED AT ALL, AND IS A *FOOTSWITCH*** —
-    stomped live, mid-performance. `LevelBlend::process` opens with a hard
-    `if (!distEngage) return cleanIn;`, so its step is the full |OD − clean| difference between two
-    signals from entirely different chains: **order-unity, not 0.18**. `architecture.md` SPECIFIES
-    it as *"a target-mix override on the existing BLEND crossfade … with its own short crossfade"*;
-    it was never built and **no test covers it**. ⇒ the carry-forward *"switches are unsmoothed"*
-    had absorbed a footswitch into a list of set-and-forget selectors.
-    **S1 = instrument** (extend [5] or a new `SwitchTransitionTest`): cover `dist_engage` and
-    `bypass`, sweep pot positions, pre-register the click bar as *step > 1× the quiet step*.
-    ⭐ Free known answer: at mid pots = 0.5 the mid-freq flips must read **exactly zero**
-    (`circuit.md`'s B-taper centre is exactly flat) — s167 hit this as a vacuity FAILURE, so it
-    converts into a validity check. **S2 = implement**: per-stage dual-instance crossfade (~5–20 ms)
-    on the affected stage only; `MidBand` carries just two state doubles, and `dist_engage` folds
-    into the existing BLEND crossfade.
-    ⭐⭐ **COST IS UNUSUALLY LOW AND MUST NOT BE PRICED AS A NORMAL DSP CHANGE: a crossfade is inert
-    in steady state and `OfflineRender` never flips a switch mid-render, so the 162-capture matrix
-    must come back BIT-IDENTICAL — a free known answer, and NO re-baseline is owed.** ⚠ True only
-    if the steady-state path is the **identical code path**, not a crossfade at coefficient 1.0 —
-    a design constraint, not an afterthought. ⛔ **PRE-REGISTERED STOP:** if every switch at every
-    pot position sits below the signal's own quiet step, close it as measured-and-accepted (where
-    attack/grunt/hiMid already sit). `docs/session-log.md` SESSION 170 §11a.
+14. ✅✅✅ **CLOSED, SESSION 175 — ALL FIVE SWITCHES SMOOTHED AND GATED, BIT-IDENTICAL, NO
+    RE-BASELINE OWED.** The four selectors got the dual-instance crossfade s171 scoped out
+    (`src/dsp/SwitchFade.h` + `PedalChain` shadows): worst cell **39.47× → 0.50×** at a **measured**
+    20 ms, `dist_engage` unmoved cell for cell, **27 render pairs bit-identical** with a firing
+    mutation control. ⇒ **the s171 bit-identical-matrix check owed below is SUBSUMED and closed.**
+    Its own SHIPPED CONSTANTS row and `docs/session-log.md` SESSION 175 carry the derivation —
+    including the two things worth not re-deriving: **GRUNT needs TWO crossfade points off one ramp**
+    (the clipper's caps AND `OdToneRestore`'s grunt-keyed table), and the fade time is fixed by an
+    **exact 1/t law above 12 ms**, not by analogy with `dist_engage`'s 12 ms.
+    ⛔ Everything below is the s171 HISTORICAL RECORD — read it for the instrument's design and the
+    baseline numbers, not as open work.
+
+    ⭐⭐ **SESSION 171 — S1 (INSTRUMENT) DONE AND IT REVISES s170's OWN NUMBERS; S2 SHIPS FOR
+    `dist_engage` ONLY. UNCOMMITTED at session end.** `tests/SwitchTransitionTest.cpp` (new) sweeps
+    every switch × 4 pot configs × 4 flip phases × both directions on a windowed diff-vs-unflipped-
+    twin statistic — `FinalSweepTest [5]`'s reading (one config, one phase, flip-sample-only) was
+    catching a favourable alignment: re-measured, attack/grunt/loMidFreq/hiMidFreq **ALL** exceed
+    the bar (worst **1.99× / 6.01× / 28.31× / 39.47×**) ⇒ **the PRE-REGISTERED STOP DOES NOT FIRE.**
+    These four change actual topology (Clipper.h cap networks, MidBand series/across caps) mid-block
+    — not a mix coefficient — so they need the per-stage dual-instance crossfade S2 always specified,
+    a materially bigger job; **not built this session**, REPORTED not gated in the test.
+    ✅ **`dist_engage`: BUILT.** `LevelBlend` gained a `distMix`/`distTarget` crossfade
+    (`tickSmoothing()`, called once per sample from `PedalChain::processPostBlend`, deliberately
+    outside `process()` so `cleanFraction()`'s superposition trick stays uncorrupted); both endpoints
+    are explicit early-return branches onto the pre-change expressions (the "no re-baseline owed"
+    claim's whole basis). ⚠⚠ **5 ms (the bypass precedent) DOES NOT CLEAR THE BAR** — the
+    `blend-noon` cell's settled difference tone has its own per-sample step ~ the signal's quiet
+    step regardless of fade speed there, landing 5 ms at 1.00-1.004× (confirmed genuine by varying
+    fade speed — a floor artefact would not move). Shipped at **12 ms** (worst 0.80×), inside the
+    "~5-20 ms" spec.
+    ⚠⚠ **THE BIT-IDENTICAL-MATRIX FREE KNOWN ANSWER WAS NOT RUN THIS SESSION** — set up (stash the
+    item-14 files, render, unstash, re-render, diff) and interrupted before completion. Run it before
+    or at the next commit. `ctest` **22/22** confirmed by direct run (not re-verified after the
+    documentation pass). `docs/session-log.md` SESSION 171.
+    ✅ **RUN AND PASSED AT s175** — 27 render pairs, 0 differ, over both OS regimes, with a mutation
+    control. ⚠⚠ It took THREE attempts and the first two **passed vacuously**: a stale artefact copied
+    after a FAILED revert build, then the project's five-times-documented zsh word-splitting trap
+    (`$args` unquoted is ONE argv in zsh) making all 36 renders exit rc=2 so `cmp` reported DIFFER on
+    files that did not exist. ⇒ **any render-comparison harness must assert its inputs EXIST and
+    carry a control that fires**; `docs/session-log.md` SESSION 175 §4.
 
 15. ⛔⛔ **THE ~27 dB EVEN-ORDER HARMONIC GAP — BLOCKED ON A REFERENCE, NOT ON EFFORT. DO NOT OPEN
     THIS AS A FITTING ITEM (s170).** `reference-sources.md` §4's structural finding stands (hardware
@@ -1052,6 +1241,50 @@ Three candidates were measured (not read off the handover) and two changed shape
     That is an acquisition question for the user, not a session of work; if hardware appears, S1 is
     one session defining the capture protocol so the operating point is finally known.
     `docs/session-log.md` SESSION 170 §11b.
+
+16. ⭐ **C31 — THE UNIMPLEMENTED FIFTH LF CORNER. USER-DIRECTED, AND IT RUNS BEFORE ITEM 17
+    (2026-08-07).** C31 (2.2 µF, Baxandall IC5_C output → LO-MID input) is a real coupling cap,
+    flagged as a carry-forward at the 2026-07-21 EQ-block build and **never implemented** — s169
+    confirmed `grep -rn "C31\|kC31" src/dsp/*.h` finds nothing outside one docstring. Bracketed
+    **0.33–33 Hz** depending on its loading resistance, and s169's own measured clean-path phase
+    residual argues for the negligible (low) end: a ~33 Hz corner would over-predict that residual by
+    3–4×. ⇒ expected to be small, and the user's reason for doing it first is exactly that it is
+    cheap and might move item 17 ("you never know"). ⚠ Unlike item 14 this is a **real DSP change in
+    the base-rate path**, so it is NOT bit-identical by construction — if it moves anything it owes a
+    matrix re-baseline, and the render cache is already re-armed (~25 min).
+    ⛔ Do NOT size it from the s169 bracket alone — derive the loading resistance from the LO-MID
+    stage's actual input impedance (`MidBand`'s R41 + the pot network), which is computable.
+
+17. ⭐⭐ **THE BASS AND TREBLE NOTCHES ARE DEEPER THAN ND — USER REPORT BY EAR (2026-08-07), AND THE
+    QUESTION IS WHICH REFERENCE GOVERNS.** Both notches sit *much* deeper than the captures. The
+    question to answer is NOT "close the gap" but **"is this licensed by hardware, or are we simply
+    too deep?"** — and the two notches have DIFFERENT answers available:
+    - **Bass / ~320 Hz null: HARDWARE IS THE AUTHORITY AND IT IS DEEPER THAN ND** (`reference-
+      sources.md` §1, and §3 records +1.6 dB at GRUNT cut rising to ~26 dB at boost). So *some*
+      overshoot re ND is a **§5 rule 2 PASS, not a regression** — the trap here is "fixing" a
+      correct divergence. ⚠ §3 is a PNG read and those images are **no longer on disk** (s170): sign
+      and rough size only, never a fit target.
+    - **Treble / measured 6150–10708 Hz null: §1 gives NEITHER reference authority** ("unresolved").
+      ⛔ So there is no target to fit to, and quoting "4.5–6 kHz" is the s133 label trap — quote the
+      measured band.
+    ⭐ **The likely mechanism is already on record and is this project's own recent work**: s172's
+    `OdMakeup` and s173's mix-keyed HF term both RAISE the OD path, and a composite notch deepens by
+    having its SHOULDERS raised (that is the documented reason one correction served all three of
+    s172's features). s174 independently measured `OdToneRestore`'s bleed-free residual as **too
+    deep, 6 of 8 over the ±0.83 dB bar** — same direction. ⇒ start by asking how much of the depth
+    is those two corrections, using their own `--fit` knobs, before touching a notch constant.
+    ⛔⛔ **Measure per GRUNT position and split by MIX — do NOT read bleed-free only.** s173 §9 is the
+    standing instruction (*"ref-od should be the starting reference, NEVER the bleed free one"*), and
+    s172 measured this defect as GRUNT-dependent in OPPOSITE directions at makeup 0.
+
+18. ⭐ **THE MIX RESPONDS TO GRUNT ~4× TOO STRONGLY — promoted from an unowned s172 by-product to an
+    action item by the user (2026-08-07).** Listening-mix C1 spread **4.4 dB against the pedal's
+    1.08 dB**, measured at `odMakeupDb = 0` so it is not the makeup's doing. ⚠ Read it beside the
+    same session's other GRUNT finding, because they interact: at makeup 0 the C1 defect is already
+    GRUNT-dependent in **opposite directions** (cut **under** at 1.51 vs the pedal's 3.09; flat and
+    boost **over** at 5.23/5.91 vs 3.92/4.17), which is why s172's uniform makeup amplifies an
+    asymmetry rather than creating one. ⇒ this and item 17 are plausibly one defect seen twice;
+    ⛔ do not fit them independently before checking that.
 
 ⚠ **A3 (on this list since session 89) is compressed here but its exclusions must travel together —
 this sentence is load-bearing:** *no single element closes A3 (s50), no post-clipper linear element

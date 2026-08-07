@@ -12,6 +12,7 @@
 //   6. DC-step polarity — both paths non-inverting
 // =============================================================================
 
+#include "../src/dsp/FitParams.h"
 #include "../src/dsp/LevelBlend.h"
 
 #include <cmath>
@@ -155,17 +156,60 @@ int main()
         failures += (!ordered) + (!convex);
 
         // (d) the half-rotation fraction, the way a pot taper is actually
-        //     specified. circuit.md calls VR2 a 100k A taper; the textbook band
-        //     is 10-15 %. This is the OUTSIDE corroboration (s146's for MASTER)
-        //     and is asserted only as a loose sanity bound — the fitted value is
-        //     15.41 %, just above the band, and the point is that it moved
-        //     TOWARD it from the retired power law's 21.02 %.
+        //     specified. REPORTED, NOT GATED — and it was gated until s174, when
+        //     the gate went red and the reason turned out to be its own premise.
+        //
+        //     ⛔⛔ DO NOT RE-GATE THIS, AND DO NOT WIDEN THE OLD 8-18 % BAR
+        //     EITHER — widening is the concession this project's own rule warns
+        //     about, and re-gating re-asserts a premise that does not hold.
+        //     circuit.md calls VR2 a 100k A taper and the textbook band is
+        //     10-15 %, but `levelTaper` is NOT a measurement of VR2's track: GATE
+        //     AY defines it as a REPARAMETERISATION OF THE KNOB AXIS — the curve
+        //     that makes the model's rendered ladder match the pedal's — so it
+        //     absorbs every model-vs-pedal difference downstream of the pot, not
+        //     just the pot. Both s163 and s146 label the A-taper agreement
+        //     "outside corroboration no term of the objective knew about", i.e.
+        //     a bonus, never a constraint.
+        //     ⭐ And the quantity behaves like the thing it is: across three
+        //     epochs it went 21.02 % (retired power law) -> 15.41 % (s163)
+        //     -> 23.75 % (s173), moved each time by DSP changes elsewhere in the
+        //     chain (`OdMakeup`, the mix-keyed HF term) that cannot touch a
+        //     physical pot. A property of VR2 would not do that.
+        //     ⚠ 23.75 % is a real departure and is NOT dismissed — it is an open
+        //     question recorded against the taper, not a test failure. See the
+        //     kLevelTaper* block in LevelBlend.h.
         const double half = levelTaperShipped(0.5) * 100.0;
-        const bool sane = half > 8.0 && half < 18.0;
-        std::printf("  half-rotation fraction: %.2f %% (A-taper band 10-15 %%; "
-                    "retired power law: 21.02 %%)\n", half);
-        std::printf("  %-50s %s\n", "half rotation within 8-18 %", sane ? "PASS" : "FAIL");
-        failures += !sane;
+        std::printf("  half-rotation fraction: %.2f %% (REPORTED, not gated; A-taper band "
+                    "10-15 %%; s163 15.41 %%, retired power law 21.02 %%)\n", half);
+
+        // (e) ⭐⭐ THE ASSERTION THAT REPLACES IT, AND IT IS STRICTLY HARDER —
+        //     it catches the defect that hid the above for a whole session.
+        //     These compiled defaults are read by `setLevel()`'s invalid-set
+        //     fallback AND by this test's own oracle, and s173 moved the SHIPPED
+        //     taper in FitParams.h without moving them, so Test 0 spent a session
+        //     asserting the shape of a curve nothing runs (and passed). Exact
+        //     equality is the right bar: both are literals of the same fit, so
+        //     any difference at all is a missed edit, never rounding.
+        const FitParams fp{};
+        struct { const char* name; double compiled, shipped; } pairs[] = {
+            {"Break1", LevelBlend::kLevelTaperBreak1, fp.levelTaperBreak1},
+            {"Frac1",  LevelBlend::kLevelTaperFrac1,  fp.levelTaperFrac1},
+            {"Break2", LevelBlend::kLevelTaperBreak2, fp.levelTaperBreak2},
+            {"Frac2",  LevelBlend::kLevelTaperFrac2,  fp.levelTaperFrac2},
+            {"Break3", LevelBlend::kLevelTaperBreak3, fp.levelTaperBreak3},
+            {"Frac3",  LevelBlend::kLevelTaperFrac3,  fp.levelTaperFrac3},
+        };
+        bool inStep = true;
+        for (const auto& p : pairs)
+            if (p.compiled != p.shipped)
+            {
+                inStep = false;
+                std::printf("    STALE: LevelBlend::kLevelTaper%s = %.6f but FitParams ships "
+                            "%.6f\n", p.name, p.compiled, p.shipped);
+            }
+        std::printf("  %-50s %s\n", "compiled defaults == FitParams' shipped taper",
+                    inStep ? "PASS" : "FAIL");
+        failures += !inStep;
     }
 
     // ---- Test 1: LEVEL=0 → OD fully off --------------------------------

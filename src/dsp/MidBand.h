@@ -241,5 +241,12 @@ private:
     RailClamp rail;
 
     MidBand(const MidBand&) = delete;
-    MidBand& operator=(const MidBand&) = delete;
+
+public:
+    // Assignment permitted, construction not — see the identical block in
+    // TrebleAttack.h. `PedalChain` primes a shadow MidBand on a mid-frequency
+    // selector flip and crossfades the two (`SwitchFade.h`); the copy carries the
+    // switched cap PAIR, the precomputed 4x4 inverse and the two companion-cap
+    // currents. Defaulted so a future member cannot be missed.
+    MidBand& operator=(const MidBand&) = default;
 };

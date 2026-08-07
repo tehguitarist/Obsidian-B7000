@@ -601,5 +601,21 @@ private:
     Attack attack = Attack::Flat;
 
     TrebleAttack(const TrebleAttack&) = delete;
-    TrebleAttack& operator=(const TrebleAttack&) = delete;
+
+public:
+    // ⭐ ASSIGNMENT IS PERMITTED, CONSTRUCTION IS NOT (open-work item 14, S2).
+    // `PedalChain` primes a SHADOW instance from the live one on an ATTACK flip and
+    // crossfades the two (`SwitchFade.h`), which needs an exact memberwise copy of
+    // BOTH the topology (the three precomputed nodal inverses, every fitted value)
+    // and the state (the six companion-cap currents). Defaulting it — rather than
+    // hand-copying fields or `memcpy`ing a non-trivially-copyable object — is what
+    // makes it pick up a future member automatically; a hand-written clone is the
+    // s146 `masterTaperBreak` trap waiting to happen (a new field silently left
+    // behind, with a plausible-looking result and no compile error).
+    //
+    // ⛔ The copy CONSTRUCTOR stays deleted, so the original guard survives where it
+    // earns its keep: a prepared DSP stage still cannot be passed or returned by
+    // value, and a shadow can only come into existence beside an already-prepared
+    // live stage.
+    TrebleAttack& operator=(const TrebleAttack&) = default;
 };

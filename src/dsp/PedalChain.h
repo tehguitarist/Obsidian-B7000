@@ -12,12 +12,14 @@
 #include "RecoveryBridgedT.h"
 #include "OdToneRestore.h"
 #include "OdDriveTilt.h"
+#include "OdMakeup.h"
 #include "SallenKeyLPF.h"
 #include "LevelBlend.h"
 #include "EqPreGain.h"
 #include "Baxandall.h"
 #include "MidBand.h"
 #include "MasterOut.h"
+#include "SwitchFade.h"
 
 // =============================================================================
 // PedalChain — the complete per-channel B7K Ultra signal chain (JUCE-free)
@@ -136,6 +138,7 @@ public:
         baseSampleRate = baseRate; // the ADAA OS-factor gate's denominator
         inputBuffer.prepare(baseRate);
         levelBlend.prepare(baseRate);
+        odMakeup.prepare(baseRate);   // OD:CLEAN ratio correction (s172) — base rate, OD branch
         c21.prepare(baseRate);
         eqPreGain.prepare(baseRate);
         baxandall.prepare(baseRate);
@@ -144,6 +147,10 @@ public:
         hiMid.configure(MidBand::kHiMid, MidBand::kHiMid820p);
         hiMid.prepare(baseRate);
         masterOut.prepare(baseRate);
+        // A rate change is not a switch flip, and the two base-rate fades' steps
+        // were derived from the OLD rate — snap rather than carry them across.
+        loMidFade.reset();
+        hiMidFade.reset();
     }
 
     // Oversampled-region stages. Re-prepared at the new osRate whenever the OS
@@ -171,6 +178,10 @@ public:
         odSampleRate = osRate;
         applyAdaaPolicy(); // the OS factor just changed => the ADAA gate may flip
 
+        // Same reason as prepareBase: these two fades' steps are OS-rate-derived.
+        attackFade.reset();
+        gruntFade.reset();
+
         applyParams(cur);
     }
 
@@ -188,19 +199,64 @@ public:
         skB.reset();
         skA.reset();
         levelBlend.reset();
+        odMakeup.reset();
         c21.reset();
         eqPreGain.reset();
         baxandall.reset();
         loMid.reset();
         hiMid.reset();
         masterOut.reset();
+        // Settle every selector crossfade. This is what `offline_render.cpp` leans
+        // on — it calls setParams() THEN reset(), so a static render runs with all
+        // four fades at mix = 1 and therefore down the untouched pre-change code
+        // path, every sample. The shadows themselves need no reset: they are
+        // write-before-read by construction (primed by copy in applyParams, and
+        // only ever processed while the fade that priming started is still active).
+        attackFade.reset();
+        gruntFade.reset();
+        loMidFade.reset();
+        hiMidFade.reset();
     }
 
     // Map APVTS-domain params onto the stage setters. Cheap (per-block, not
     // per-sample); the MNA-based stages only re-invert on an actual change.
     void applyParams(const Params& p)
     {
+        // ---- Selector-switch crossfades (open-work item 14, S2) -----------------
+        // ⚠ ORDER IS LOAD-BEARING, in both directions. Detection must read `cur`
+        // BEFORE it is overwritten, and priming must run BEFORE the setters below,
+        // because a shadow is only worth anything while it still holds the OUTGOING
+        // topology — after `treble.setAttack(...)` there is nothing left to copy.
+        //
+        // ⚠ The `paramsApplied` guard is not defensiveness about the first block, it
+        // is a correctness condition: at construction the stages sit at their own
+        // defaults (e.g. `Clipper::grunt` is Cut) while `cur` sits at Params{}'s
+        // (gruntIdx 0 = Boost), so the two disagree and a "change" detected against
+        // that never-applied state would prime a shadow with a topology the chain
+        // has never actually run. `prepareOd()`'s own `applyParams(cur)` is what
+        // first makes them agree, and it detects nothing by construction (p == cur).
+        const bool attackMoved = paramsApplied && p.attackIdx != cur.attackIdx;
+        const bool gruntMoved = paramsApplied && p.gruntIdx != cur.gruntIdx;
+        const bool loMidMoved = paramsApplied && p.loMidFreq != cur.loMidFreq;
+        const bool hiMidMoved = paramsApplied && p.hiMidFreq != cur.hiMidFreq;
+
+        if (attackMoved)
+            trebleShadow = treble;
+        if (gruntMoved)
+        {
+            // GRUNT moves TWO stages, and only one of them is the switch itself:
+            // the clipper's cap network, and `OdToneRestore`'s grunt-keyed (gain, Q)
+            // table, which jumps a whole row. Both are crossfaded, off the one ramp.
+            clipperShadow = clipper;
+            odToneShadow = odToneRestore;
+        }
+        if (loMidMoved)
+            loMidShadow = loMid;
+        if (hiMidMoved)
+            hiMidShadow = hiMid;
+
         cur = p;
+        paramsApplied = true;
 
         drive.setDrive(p.drive);
         odToneRestore.setDrive(p.drive);
@@ -231,6 +287,19 @@ public:
         hiMid.setSeriesCap(hiMidCap(p.hiMidFreq));
         hiMid.setAcrossCap(fit.midCapRatioHi * hiMidCap(p.hiMidFreq));
         masterOut.setMaster(p.master);
+
+        // Arm the ramps LAST, so a fade can never be active over a stage pair that
+        // has not finished being reconfigured. Each takes the rate its own stages
+        // run at — ATTACK/GRUNT are inside the oversampled region, the two mid
+        // selectors are not (`SwitchFade::start`).
+        if (attackMoved)
+            attackFade.start(odSampleRate);
+        if (gruntMoved)
+            gruntFade.start(odSampleRate);
+        if (loMidMoved)
+            loMidFade.start(baseSampleRate);
+        if (hiMidMoved)
+            hiMidFade.start(baseSampleRate);
     }
 
     // Apply the Phase-7 capture-fit constants (FitParams.h) to every stage that
@@ -306,6 +375,16 @@ public:
                             f.levelTaperBreak3, f.levelTaperFrac3);
         syncOdToneMix();   // the LEVEL taper moves the clean fraction — see applyParams()
 
+        // [ENG] OD-path makeup — the OD:CLEAN ratio (s172, item 10/A3). See OdMakeup.h.
+        // Set here and NOT in applyParams(): these are fitted constants, not knobs.
+        odMakeup.setLaw(f.odMakeupDb, f.odMakeupLowHz, f.odMakeupLowCutDb,
+                        f.odMakeupHighHz, f.odMakeupHighCutDb,
+                        f.odMakeupLowS, f.odMakeupHighS);
+        odMakeup.setHfMix(f.odMakeupHfHz, f.odMakeupHfQ, f.odMakeupHfAtOdDb,
+                          f.odMakeupHfPeakDb, f.odMakeupHfPeakCf, f.odMakeupHfAtCleanDb);
+        odToneRestore.setQScale(f.odNotchQScale);   // notch WIDTH multiplier (s172)
+        odToneRestore.setDepthOffset(f.odNotchDepthDb);  // uniform extra cut (s172)
+
         // [ENG] level-dependent treble tilt — see OdDriveTilt.h before changing anything.
         odDriveTilt.setEnabled(f.odTiltEnabled != 0);
         odDriveTilt.setTime(f.odTiltTimeMs);
@@ -370,12 +449,50 @@ public:
         // LADDER'S SHAPE instead of the stimulus level.
         odDriveTilt.observe(buf);
         double s = jfet.process(buf);
-        s = treble.process(s);
+
+        // ---- ATTACK crossfade (item 14, S2; SwitchFade.h) -----------------------
+        // Every `active()` arm below is a branch AROUND the untouched pre-change
+        // expression, never a rewrite of it — a settled fade must run the identical
+        // code path, which is what keeps a static render bit-identical.
+        if (attackFade.active())
+        {
+            const double shadowOut = trebleShadow.process(s);
+            s = attackFade.blend(shadowOut, treble.process(s));
+            attackFade.tick();
+        }
+        else
+        {
+            s = treble.process(s);
+        }
+
         s = drive.process(s);
-        s = clipper.process(s);
+
+        // ---- GRUNT crossfade: TWO points, ONE ramp ------------------------------
+        // Read `active()` once and tick once, at the second point, so both blends in
+        // a given sample see the same mix.
+        const bool gruntFading = gruntFade.active();
+        if (gruntFading)
+        {
+            const double shadowOut = clipperShadow.process(s);
+            s = gruntFade.blend(shadowOut, clipper.process(s));
+        }
+        else
+        {
+            s = clipper.process(s);
+        }
         s = odCoupling.process(s);
         s = recovery.process(s);
-        s = odToneRestore.process(s);
+        if (gruntFading)
+        {
+            const double shadowOut = odToneShadow.process(s);
+            s = gruntFade.blend(shadowOut, odToneRestore.process(s));
+            gruntFade.tick();
+        }
+        else
+        {
+            s = odToneRestore.process(s);
+        }
+
         s = odDriveTilt.process(s);
         s = skB.process(s);
         s = skA.process(s);
@@ -414,12 +531,42 @@ public:
         // (one compare, early return) whenever the switch is not mid-stomp, which is
         // every sample of every offline render.
         levelBlend.tickSmoothing();
-        double s = levelBlend.process(cleanDelayed, odDown);
+        // OD-path makeup (FitParams::odMakeupDb, s172 — the OD:CLEAN ratio, item 10/A3).
+        // ⛔ OUTSIDE levelBlend.process() ON PURPOSE: cleanFraction() recovers its own
+        // coefficients by superposition on process() with unit inputs, so folding the
+        // makeup in there would silently re-key OdToneRestore's mix law in the same edit.
+        // See the FitParams block for why one change at a time matters here.
+        // Ships at 1.0 (0 dB) => bit-identical to every prior build.
+        double s = levelBlend.process(cleanDelayed, odMakeup.process(odDown));
         s = c21.process(s);          // C21 100n inter-stage HP (bass shaping)
         s = eqPreGain.process(s);
         s = baxandall.process(s);
-        s = loMid.process(s);
-        s = hiMid.process(s);
+
+        // ---- Mid-frequency selector crossfades (item 14, S2; SwitchFade.h) ------
+        // Base rate, unlike ATTACK/GRUNT: these two stages sit after LevelBlend and
+        // outside the oversampled region. Same branch-around-the-original shape.
+        if (loMidFade.active())
+        {
+            const double shadowOut = loMidShadow.process(s);
+            s = loMidFade.blend(shadowOut, loMid.process(s));
+            loMidFade.tick();
+        }
+        else
+        {
+            s = loMid.process(s);
+        }
+
+        if (hiMidFade.active())
+        {
+            const double shadowOut = hiMidShadow.process(s);
+            s = hiMidFade.blend(shadowOut, hiMid.process(s));
+            hiMidFade.tick();
+        }
+        else
+        {
+            s = hiMid.process(s);
+        }
+
         return masterOut.process(s);
     }
 
@@ -595,7 +742,12 @@ private:
     // result independent of that order.
     void syncOdToneMix() noexcept
     {
-        odToneRestore.setCleanFraction(levelBlend.cleanFraction());
+        // ⚠ BOTH mix-keyed stages read the SAME scalar from the SAME place. `OdMakeup`'s
+        // HF term joined them at s173; resolving it here rather than at either call site
+        // is what stops the two drifting apart (the s124 order-dependence trap).
+        const double cf = levelBlend.cleanFraction();
+        odToneRestore.setCleanFraction(cf);
+        odMakeup.setCleanFraction(cf);
     }
 
     static Clipper::Grunt gruntEnum(int idx) noexcept
@@ -646,12 +798,43 @@ private:
     SallenKeyLPF skB;          // 7a IC4_B 10.7k │
     SallenKeyLPF skA;          // 7b IC4_A 3.3k  ┘
     LevelBlend levelBlend;     // 8/9 LEVEL + BLEND (base rate)
+    // OD:CLEAN ratio correction on the OD branch at the summing node (s172, item 10/A3).
+    // Ships INERT (0 dB, no shelf cut) => bit-identical to every pre-s172 build.
+    OdMakeup odMakeup;
     C21Highpass c21;           //    C21 inter-stage coupling
     EqPreGain eqPreGain;       // 10 IC5_A/B
     Baxandall baxandall;       // 11 BASS+TREBLE
     MidBand loMid;             // 12 LO-MID IC5_D
     MidBand hiMid;             // 13 HI-MID IC6_A
     MasterOut masterOut;       // 14 MASTER + IC6_B + output HP
+
+    // ---- Selector-switch crossfade shadows (open-work item 14, S2) --------------
+    // One SHADOW per stage whose TOPOLOGY a 3-way selector changes, plus the one
+    // stage whose coefficient TABLE a selector jumps (`OdToneRestore`, keyed on the
+    // physical GRUNT position). Each is primed by memberwise copy from its live
+    // twin at the instant of a flip and then runs the OUTGOING circuit for the
+    // duration of the fade — see SwitchFade.h for why copying, rather than starting
+    // from rest, is the physically correct initial condition.
+    //
+    // ⚠ COST: a shadow doubles its own stage's per-sample work, and only while a
+    // fade is running (30 ms). The clipper is the expensive one — a bracketed
+    // Newton solve — so a GRUNT flip is the priciest transition in the chain. That
+    // is bounded, transient, and buys the click; `PerfBenchmark` measures the
+    // SETTLED chain, which is untouched (the `active()` branches are not taken).
+    //
+    // ⚠ Deliberately NOT prepared or reset anywhere: they are write-before-read by
+    // construction. `applyParams` is the only thing that starts a fade, and it
+    // primes the shadow in the same call, immediately before doing so. Preparing
+    // them separately would introduce a second configuration path that could drift
+    // from the live stage's — the failure this design exists to avoid.
+    TrebleAttack trebleShadow;
+    Clipper clipperShadow;
+    OdToneRestore odToneShadow;
+    MidBand loMidShadow, hiMidShadow;
+    SwitchFade attackFade, gruntFade, loMidFade, hiMidFade;
+    // False until the first applyParams() has reconciled the stages with `cur` —
+    // see the correctness note at the top of applyParams().
+    bool paramsApplied = false;
 
     Params cur;
     // Phase-7 capture-fit calibration (FitParams.h). Every stage that owns a fit
