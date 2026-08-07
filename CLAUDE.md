@@ -142,6 +142,18 @@ nonlinearities are the CD4049 VTC and the J201 shaper) and its other levers were
 
 #### STATUS
 
+- ✅✅ **SESSION 173's MATRIX: 9 ROWS OVER SHIP → 8, AND THE ROW THAT CLOSED IS THE THD ONE GATE Z
+  PREDICTED 45 SESSIONS AGO.** Current baseline **`analysis/reports/s173c_hfmix.json`** (162
+  captures, membership identical, **CLEAN bit-identical**). **THD (OD) full send 3.138 → 2.506,
+  under its 3.00 bar**, and `gain-n12` 2.101 — BOTH THD rows now SHIP. s128 measured that row as
+  *mostly mix DILUTION, not added distortion*, and predicted it *"closes when A3 does"*; s172/s173
+  closed most of A3 for unrelated tone reasons and the row followed. Also better: OD p99 10.701 →
+  10.469, OD 8–16.3 kHz p90 6.168 → 5.667. Worse: OD 25–100 Hz median/p90, OD 100 Hz–8 kHz
+  median/p90, OD band-RMS 2.172 → 2.338. ⚠⚠ **TWO CHANGES ARE BUNDLED (the LEVEL taper and the
+  mix-keyed HF term) — do NOT quote this as either one's price.** One attribution is FREE: the
+  **25–100 Hz rows moved and the HF term is a Q=2.0 peak at 5600 Hz that cannot reach them**, so
+  that cost is the taper, exactly as s163's precedent predicts. `docs/session-log.md` SESSION 173 §12.
+
 - ⛔⛔ **SESSION 173 = A USER-REPORTED TREBLE-NOTCH REGRESSION FROM s172, TRACED AND FIXED, PLUS THE
   LEVEL-TAPER RE-FIT (FITTED, NOT SHIPPED) (2026-08-07).** ⚠ **NOTHING IS COMMITTED**; the tree
   carries s171 + s172 + this session. **`ctest` 22/22.**

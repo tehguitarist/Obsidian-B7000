@@ -22182,3 +22182,43 @@ not resolve itself.
 immediately by `_`, so a tag with a SUFFIX LETTER (`s173b_*.json` — a second baseline within one
 session, now routine) fell outside them. Third occurrence of the same hole (s22 widened an exact
 filename to a glob; s114 found three-digit sessions falling outside a two-digit glob).
+
+
+### 12. THE MATRIX AFTER ALL THREE CHANGES — `s173c_hfmix.json`, and a row CLOSED
+
+Rendered after the shelf fix + the LEVEL taper + the mix-keyed HF term. Membership identical
+(162 captures, asserted), **CLEAN bit-identical on all four gated rows**.
+
+**9 rows over SHIP -> 8.** The row that closed is **THD (OD) level, full send: 3.138 -> 2.506,
+under its 3.00 bar** — and `gain-n12` reads 2.101, so BOTH THD rows are now SHIP.
+
+| row | s173_hfshelf | s173c_hfmix | delta |
+|---|---|---|---|
+| **THD (OD) full send** | 3.138 over | **2.506 SHIP** | **-0.632** |
+| OD ALL p99 | 10.701 | 10.469 | -0.232 |
+| OD 8-16.3 kHz p90 | 6.168 | 5.667 | -0.501 |
+| OD 100 Hz-8 kHz median | 0.578 | 0.696 | +0.118 |
+| OD 100 Hz-8 kHz p90 | 3.606 | 4.055 | +0.449 |
+| OD 25-100 Hz median | 1.043 | 1.263 | +0.220 |
+| OD 25-100 Hz p90 | 5.294 | 5.828 | +0.534 |
+| OD 8-16.3 kHz median | 0.731 | 0.908 | +0.177 |
+| OD ALL band-RMS | 2.172 | 2.338 | +0.166 |
+
+⭐⭐ **THE THD CLOSURE IS GATE Z's s128 PREDICTION ARRIVING, 45 SESSIONS LATE.** s128 measured that
+row as *mostly a MIX-DILUTION artefact, not a distortion-generation defect* (bleed-free rows read
+2.201 = SHIP; rows with bleed read 3.763), fitted a one-parameter dilution law at DF = -3.70 dB
+against GATE O's independently measured -4.38, and predicted the row *"closes when A3 does"*.
+s172 partially closed A3 (5.501 -> 3.586), s173's shelf took it to 3.138, and the taper + HF term
+take it under the bar. Nothing in any of those three changes was designed for this row.
+
+⚠⚠ **DO NOT READ THIS AS THE HF TERM's PRICE — TWO CHANGES ARE BUNDLED** (the LEVEL taper and the
+mix-keyed HF term), which is the same attribution problem s172 §8 flagged for s171+s172. One
+attribution is FREE and STRUCTURAL and should be quoted: **the 25-100 Hz rows moved, and the HF
+term is a Q = 2.0 peaking section at 5600 Hz that CANNOT REACH 25-100 Hz** — so that cost is the
+LEVEL taper, exactly as s163's own precedent predicts (a taper is not a gain; it moves the clean/OD
+MIX, which the matrix sees in full). Separating the rest is one render each and is owed before
+either change is quoted individually.
+
+⇒ the ordered prerequisites in section 11 are UNCHANGED except that step 1 is now DONE
+(`s173c_hfmix.json` is the current baseline). Step 2 (re-run GATE AY/AZ against it) is next, and
+the taper constants that shipped were fitted one epoch earlier.
