@@ -167,6 +167,18 @@ public:
     // miss and is NOT reachable from this stage.  It is the mix: the model's OD path is ~4.4 dB
     // quiet (A3 / GATE O), so its null is diluted harder by the clean tap than the pedal's is at
     // the same knob positions.  The lever is A3, not this notch.  ⛔ Do not "fix" it here.
+    void setDepthOffset(double db) noexcept
+    {
+        depthOffsetDb = db;
+        recompute();
+    }
+
+    void setQScale(double s) noexcept
+    {
+        qScale = (s > 0.0 ? s : 1.0);
+        recompute();
+    }
+
     void setCleanFraction(double cf) noexcept
     {
         const double x = std::clamp(cf, 0.0, 1.0);
@@ -511,10 +523,30 @@ private:
     {
         const int gi = std::clamp(lastGrunt, 0, 2);
         // cut(grunt, drive, cleanFrac) = base + K * S(cleanFrac).  See setCleanFraction().
+        // depthOffsetDb (s172): a UNIFORM extra cut on top of the fitted table.
+        // ⭐ WHY THIS IS THE WIDTH LEVER AND kNotchQ IS NOT.  The audible null is this narrow
+        // section (Q ~16 => ~20 Hz) sitting inside the pre-clipper ladder's own BROAD
+        // cancellation (~48 Hz).  The half-depth crossing that sets the measured Q therefore
+        // lands on the BOWL, not the spike -- which is why scaling the section's Q x5 moves the
+        // composite Q by <= 0.8 and non-monotonically (s172, measured).  Cutting DEEPER moves
+        // that crossing INTO the spike, so depth and width move together here.
+        // ⚠⚠ AUTHORITY: overshooting the ND captures' depth is a PASS, not a regression.
+        // reference-sources.md §1/§3 make HARDWARE the authority for this null's depth and record
+        // it DEEPER than ND (+1.6 dB at GRUNT cut, rising toward ~26 dB at boost), and §5 rule 2
+        // says a move away from the captures toward a documented hardware trend is correct.
+        // ⛔ That licence is for DEPTH ONLY and does not extend to the peak between the notches.
         const double cutDb = lerp5(kNotchGainDb[gi], lastDrive)
-                             + lerp5(kNotchMixK[gi], lastDrive) * mixShape(lastCleanFrac);
+                             + lerp5(kNotchMixK[gi], lastDrive) * mixShape(lastCleanFrac)
+                             + depthOffsetDb;
         const double notchGainDb = -cutDb;                             // CUT at the notch
-        const double notchQ = lerp5(kNotchQ[gi], lastDrive);
+        // qScale (s172): a MULTIPLIER on the fitted kNotchQ table, not a replacement for it.
+        // A scale preserves the table's fitted GRUNT x DRIVE structure -- the entries differ 6x
+        // across the Cut row alone -- where a flat override would discard it.  1.0 = shipped.
+        // ⚠ This is the SECTION's Q, NOT the composite null's.  They are far apart: at GRUNT cut
+        // x DRIVE noon a section Q of 16.07 produces a COMPOSITE null Q of 6.71, because the
+        // composite is this section CONVOLVED with the model's own (broad) ladder null.  Never
+        // read a number from this table as the width of the audible notch.
+        const double notchQ = lerp5(kNotchQ[gi], lastDrive) * qScale;
         const double peakGainDb = lerp5(kPeakGainDb, lastDrive);        // BOOST at the peak
 
         notch.setPeaking(sampleRate, kNotchFreq, notchQ, notchGainDb);
@@ -564,6 +596,8 @@ private:
     // ⚠ Defaults to the REFERENCE clean fraction, not to 0 — so a host or test that never calls
     // setCleanFraction() gets the listening-condition table rather than silently the bleed-free
     // extreme (S(kMixCfRef) = 0, i.e. the base table is used verbatim).
+    double depthOffsetDb = 0.0;  // s172 uniform extra cut, dB; 0.0 = shipped table
+    double qScale = 1.0;   // s172 multiplier on kNotchQ; 1.0 = shipped table
     double lastCleanFrac = kMixCfRef;
     PeakingBiquad notch, peak;
 };

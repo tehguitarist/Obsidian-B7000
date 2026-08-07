@@ -12,6 +12,7 @@
 #include "RecoveryBridgedT.h"
 #include "OdToneRestore.h"
 #include "OdDriveTilt.h"
+#include "OdMakeup.h"
 #include "SallenKeyLPF.h"
 #include "LevelBlend.h"
 #include "EqPreGain.h"
@@ -136,6 +137,7 @@ public:
         baseSampleRate = baseRate; // the ADAA OS-factor gate's denominator
         inputBuffer.prepare(baseRate);
         levelBlend.prepare(baseRate);
+        odMakeup.prepare(baseRate);   // OD:CLEAN ratio correction (s172) — base rate, OD branch
         c21.prepare(baseRate);
         eqPreGain.prepare(baseRate);
         baxandall.prepare(baseRate);
@@ -188,6 +190,7 @@ public:
         skB.reset();
         skA.reset();
         levelBlend.reset();
+        odMakeup.reset();
         c21.reset();
         eqPreGain.reset();
         baxandall.reset();
@@ -306,6 +309,16 @@ public:
                             f.levelTaperBreak3, f.levelTaperFrac3);
         syncOdToneMix();   // the LEVEL taper moves the clean fraction — see applyParams()
 
+        // [ENG] OD-path makeup — the OD:CLEAN ratio (s172, item 10/A3). See OdMakeup.h.
+        // Set here and NOT in applyParams(): these are fitted constants, not knobs.
+        odMakeup.setLaw(f.odMakeupDb, f.odMakeupLowHz, f.odMakeupLowCutDb,
+                        f.odMakeupHighHz, f.odMakeupHighCutDb,
+                        f.odMakeupLowS, f.odMakeupHighS);
+        odMakeup.setHfMix(f.odMakeupHfHz, f.odMakeupHfQ, f.odMakeupHfAtOdDb,
+                          f.odMakeupHfPeakDb, f.odMakeupHfPeakCf, f.odMakeupHfAtCleanDb);
+        odToneRestore.setQScale(f.odNotchQScale);   // notch WIDTH multiplier (s172)
+        odToneRestore.setDepthOffset(f.odNotchDepthDb);  // uniform extra cut (s172)
+
         // [ENG] level-dependent treble tilt — see OdDriveTilt.h before changing anything.
         odDriveTilt.setEnabled(f.odTiltEnabled != 0);
         odDriveTilt.setTime(f.odTiltTimeMs);
@@ -414,7 +427,13 @@ public:
         // (one compare, early return) whenever the switch is not mid-stomp, which is
         // every sample of every offline render.
         levelBlend.tickSmoothing();
-        double s = levelBlend.process(cleanDelayed, odDown);
+        // OD-path makeup (FitParams::odMakeupDb, s172 — the OD:CLEAN ratio, item 10/A3).
+        // ⛔ OUTSIDE levelBlend.process() ON PURPOSE: cleanFraction() recovers its own
+        // coefficients by superposition on process() with unit inputs, so folding the
+        // makeup in there would silently re-key OdToneRestore's mix law in the same edit.
+        // See the FitParams block for why one change at a time matters here.
+        // Ships at 1.0 (0 dB) => bit-identical to every prior build.
+        double s = levelBlend.process(cleanDelayed, odMakeup.process(odDown));
         s = c21.process(s);          // C21 100n inter-stage HP (bass shaping)
         s = eqPreGain.process(s);
         s = baxandall.process(s);
@@ -595,7 +614,12 @@ private:
     // result independent of that order.
     void syncOdToneMix() noexcept
     {
-        odToneRestore.setCleanFraction(levelBlend.cleanFraction());
+        // ⚠ BOTH mix-keyed stages read the SAME scalar from the SAME place. `OdMakeup`'s
+        // HF term joined them at s173; resolving it here rather than at either call site
+        // is what stops the two drifting apart (the s124 order-dependence trap).
+        const double cf = levelBlend.cleanFraction();
+        odToneRestore.setCleanFraction(cf);
+        odMakeup.setCleanFraction(cf);
     }
 
     static Clipper::Grunt gruntEnum(int idx) noexcept
@@ -646,6 +670,9 @@ private:
     SallenKeyLPF skB;          // 7a IC4_B 10.7k │
     SallenKeyLPF skA;          // 7b IC4_A 3.3k  ┘
     LevelBlend levelBlend;     // 8/9 LEVEL + BLEND (base rate)
+    // OD:CLEAN ratio correction on the OD branch at the summing node (s172, item 10/A3).
+    // Ships INERT (0 dB, no shelf cut) => bit-identical to every pre-s172 build.
+    OdMakeup odMakeup;
     C21Highpass c21;           //    C21 inter-stage coupling
     EqPreGain eqPreGain;       // 10 IC5_A/B
     Baxandall baxandall;       // 11 BASS+TREBLE

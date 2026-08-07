@@ -77,7 +77,12 @@ import level_taper_reshape as AY
 
 A_TAPER_LO, A_TAPER_HI = AY.A_TAPER_LO, AY.A_TAPER_HI
 TOP = AY.TOP
-SEG_RANGE = (2, 3, 4, 5)          # families tried; the last is the SATURATION control
+# BREAKPOINT counts, so the families are (n + 1) segments: 2, 3, 4, 5, 6.
+# ⚠ s173 added n = 1 (a 2-segment family).  It was absent, so the sweep could not report the
+# simplest family the MASTER pot's own precedent uses -- and with the selection rule now taking
+# the SMALLEST admissible family, a missing small family is a missing candidate, not just a
+# missing row.  n = 5 remains the richest, i.e. the saturation control.
+SEG_RANGE = (1, 2, 3, 4, 5)
 N_STARTS = 60                     # multi-start, so a landed optimum is not an initialisation
 
 
@@ -232,6 +237,24 @@ def fit_n(score, xs, n, need, seed=7):
     return list(best[:n]), list(best[n:]), bestv
 
 
+def containment(fit, need, ay):
+    """worst |fitted - required| / (that detent's own across-stimulus spread), anchor excluded.
+
+    ⭐ s173: factored out of AZ3 so AZ2 can SELECT on it.  It was previously computed only for the
+    family AZ2 had already chosen -- i.e. the one test this gate's own docstring calls "the
+    overfitting test that matters, in the constant's own units" could describe the choice but
+    never influence it.
+    """
+    spreads = {float(k): v["spread"] for k, v in ay["ay3"]["required_taper"].items()}
+    worst = 0.0
+    for x in sorted(need):
+        sp = spreads.get(x, 0.0)
+        if sp <= 0.0 or x >= TOP:        # the anchor is pinned on both sides: 0/0, not a violation
+            continue
+        worst = max(worst, abs(pwl(x, fit["breaks"], fit["fracs"]) - need[x]) / sp)
+    return worst
+
+
 def gate_az2(score, xs, need, ay, out):
     print("\n-- AZ2: the family sweep -- how many segments, decided by measurement --")
     amb = float(ay["ay3"]["ambiguity_rms_db"])
@@ -240,16 +263,19 @@ def gate_az2(score, xs, need, ay, out):
     print(f"      the target's own across-stimulus ambiguity : {amb:.4f} dB rms  (AY2's spread)")
     print(f"      the free per-detent curve, i.e. the best ANY knob-keyed taper can do "
           f": {floor:.4f} dB rms")
-    print(f"\n    {'family':<12}{'rms dB':>9}{'worst dB':>10}{'vs ambiguity':>16}{'vs floor':>10}")
+    print(f"\n    {'family':<12}{'rms dB':>9}{'worst dB':>10}{'vs ambiguity':>16}{'vs floor':>10}"
+          f"{'containment':>13}")
     fits = {}
     for n in SEG_RANGE:
         bs, fs, rms = fit_n(score, xs, n, need)
         wst = score({x: pwl(x, bs, fs) for x in xs})[1]
         fits[n + 1] = {"breaks": bs, "fracs": fs, "rms": rms, "worst": wst,
                        "slopes": slopes_of(bs, fs)}
+        fits[n + 1]["containment"] = containment(fits[n + 1], need, ay)
         print(f"    {f'{n + 1}-segment':<12}{rms:9.4f}{wst:10.4f}"
               f"{('INSIDE' if rms <= amb else f'OUTSIDE {rms / amb:.2f}x'):>16}"
-              f"{rms / floor:>9.2f}x")
+              f"{rms / floor:>9.2f}x{fits[n + 1]['containment']:>12.3f}"
+              f"{'' if fits[n + 1]['containment'] <= 1.0 else ' !'}")
 
     # ---- the SATURATION control -----------------------------------------------------------
     # The stopping rule, and it is threshold-free: if the richest family returns the same
@@ -259,36 +285,60 @@ def gate_az2(score, xs, need, ay, out):
     # measured curve, so the control exists.
     ns = sorted(fits)
     gains = {b: fits[a]["rms"] - fits[b]["rms"] for a, b in zip(ns, ns[1:])}
+    sat = [b for b, g in gains.items() if abs(g) < 1e-6]
+
+    # ⛔⛔ s173 -- THE SELECTION RULE IS REBUILT, AND THE OLD ONE SHIPPED THE LARGEST FAMILY.
+    # It was: saturate (|gain| < 1e-6) -> take the smallest family reaching that limit;
+    # otherwise -> `max(n for n in ns if inside_ambiguity)`.  Two things wrong with that.
+    #   (a) `1e-6 dB` is a GUESSED bar and it is at float-noise, not at any scale the requirement
+    #       is measured on.  s163's 5-segment control happened to return EXACTLY 0.0000, so the
+    #       test fired and nobody noticed it could not survive a merely-negligible gain.  On this
+    #       epoch the marginal gains are +0.0012 and +0.0002 dB against a 1.213 dB ambiguity --
+    #       obviously nothing, and comfortably above 1e-6.
+    #   (b) and when it does not fire, the fallback ships the MOST COMPLEX family available.  A
+    #       stopping rule whose failure mode is "pick the largest" is not a stopping rule; it is
+    #       an overfitting rule with a guard in front of it.  It duly chose 6 segments (10
+    #       constants) for +0.0014 dB over 4, on 7 measurable detents.
+    # ⇒ the choice now uses only the TWO IMPORTED BARS, and takes the SMALLEST family that meets
+    # both: inside the target's own across-stimulus ambiguity (AY2's spread, in dB of delivered
+    # level) AND inside the requirement's own per-detent spread (AZ3's containment, in units of
+    # L).  Saturation is REPORTED as a diagnostic and no longer decides anything, so no guessed
+    # threshold sits in the decision path at all.
+    inside = {n: bool(fits[n]["rms"] <= amb) for n in ns}
+    contained = {n: bool(fits[n]["containment"] <= 1.0) for n in ns}
     print("\n    marginal gain per added segment (dB rms):")
     for b, g in gains.items():
         print(f"      -> {b}-segment : {g:+.4f}")
-    sat = [b for b, g in gains.items() if abs(g) < 1e-6]
-    if not sat:
-        print("    ⚠ NO SATURATION inside the swept range -- every added segment still buys "
-              "something,\n      so the choice below is a JUDGEMENT and not a measured limit. "
-              "Say so when quoting it.")
-        chosen = max(n for n in ns if fits[n]["rms"] <= amb) if any(
-            fits[n]["rms"] <= amb for n in ns) else max(ns)
+    if sat:
+        print(f"    (the family saturates at {min(sat)} segments -- REPORTED, and it does not "
+              f"decide\n      the choice: see the selection rule below.)")
     else:
-        # The chosen family is the SMALLEST that reaches the floor the saturation exposes.
-        limit = min(fits[b]["rms"] for b in sat)
-        chosen = min(n for n in ns if fits[n]["rms"] <= limit + 1e-6)
-        print(f"    ⇒ the family SATURATES at {min(sat)} segments (adding one buys "
-              f"{gains[min(sat)]:+.4f} dB),\n      so {chosen} segments is the family's own LIMIT, "
-              f"not the start of an overfitting slope.")
-    inside = {n: bool(fits[n]["rms"] <= amb) for n in ns}
-    print(f"\n    VERDICT: families INSIDE the target's own ambiguity: "
+        print("    (no exact saturation inside the swept range -- REPORTED, and it does not "
+              "decide\n      the choice: see the selection rule below.)")
+
+    print(f"\n    VERDICT, on the two imported bars:")
+    print(f"      inside the ambiguity ({amb:.3f} dB rms) : "
           f"{', '.join(f'{n}-seg' for n in ns if inside[n]) or 'NONE'}")
-    if not inside.get(chosen):
-        sys.exit(f"GATE AZ2 FAIL: the chosen {chosen}-segment family is OUTSIDE the target's own "
-                 f"ambiguity ({fits[chosen]['rms']:.4f} vs {amb:.4f} dB) -- nothing here is "
-                 f"shippable and GATE K's closure stands for this family too")
-    print(f"    ⇒ SHIP the {chosen}-SEGMENT curve: {fits[chosen]['rms']:.4f} dB rms, "
-          f"{fits[chosen]['rms'] / floor:.2f}x the architectural floor, inside a "
-          f"{amb:.3f} dB ambiguity.")
+    print(f"      inside the requirement's own spread     : "
+          f"{', '.join(f'{n}-seg' for n in ns if contained[n]) or 'NONE'}")
+    ok = [n for n in ns if inside[n] and contained[n]]
+    if not ok:
+        sys.exit(f"GATE AZ2 FAIL: NO family in the swept range is both inside the target's own "
+                 f"ambiguity and inside its per-detent spread -- nothing here is shippable and "
+                 f"GATE K's closure stands for this family too")
+    chosen = min(ok)
+    print(f"    ⇒ SHIP the SMALLEST family meeting BOTH: the {chosen}-SEGMENT curve -- "
+          f"{fits[chosen]['rms']:.4f} dB rms,\n      {fits[chosen]['rms'] / floor:.2f}x the "
+          f"free-curve reference, containment {fits[chosen]['containment']:.3f}.")
+    richest = max(ok)
+    if richest != chosen:
+        print(f"      (the richest admissible family, {richest}-seg, buys "
+              f"{fits[chosen]['rms'] - fits[richest]['rms']:+.4f} dB rms for "
+              f"{2 * (richest - chosen)} more constants -- declined.)")
     out["az2"] = {"fits": {str(k): v for k, v in fits.items()}, "chosen": chosen,
                   "gains": {str(k): v for k, v in gains.items()},
-                  "saturates_at": (min(sat) if sat else None), "inside_ambiguity": inside}
+                  "saturates_at": (min(sat) if sat else None), "inside_ambiguity": inside,
+                  "contained": contained, "admissible": ok}
     return chosen, fits[chosen]
 
 

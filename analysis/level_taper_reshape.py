@@ -116,6 +116,15 @@ NOON = K.NOON
 TOP = 1.0                       # the anchor: L(1) = 1 exactly, so b(1) = 0 exactly
 SWEEPS = L.SWEEPS
 
+# ⚠ s163 made the shipped taper a CALLABLE (a segmented PWL), not an exponent, so it has no
+# printable or JSON-serialisable value.  Three sites still carried an f-string that assumed a
+# float: two printed `p = <function level_taper at 0x...>` into the verdict text, and the third
+# put the function object into the report, where `json.dump` CRASHED -- so this gate has been
+# unable to write its own artefact since s163, and the crash sits after every verdict has
+# printed, which is exactly why nobody noticed.  One name, DERIVED from the shipped parameter
+# list rather than transcribed, so it cannot go stale again when the segment count next moves.
+P_LABEL = f"{len(K.LEVEL_TAPER_NAMES) // 2 + 1}-seg PWL"
+
 # Textbook audio-taper band at half rotation, as used by s146 for the MASTER pot
 # (`analysis/master_taper_makeup.py`).  A BAND, not a target: nothing here is fitted to it, which
 # is exactly what makes it usable as outside corroboration.
@@ -144,6 +153,11 @@ def gate_ay1(out):
     # read with THAT epoch's curve instead (`K.power_taper`), which AY1b's guard enforces by
     # refusing a stale report outright.
     p = K.level_taper
+    # ⚠ s173: and because it is a callable, it has no printable/serialisable VALUE.  Three sites
+    # inherited an f-string that assumed a float and were emitting `p = <function level_taper at
+    # 0x...>` into the report text -- and the JSON dump CRASHED on it, so this gate had not been
+    # able to write its own artefact since s163 (the crash is at the very end, after every verdict
+    # has printed, which is exactly why it went unnoticed).  One name, used everywhere.
 
     worst = 0.0
     for Lv in np.linspace(0.0, 1.0, 1001):
@@ -393,7 +407,8 @@ def gate_ay3(res, ladder, p, rows, out):
                  f"the recovered taper below is not a measurement")
     # Say how many points and WHICH columns, rather than 'all 4 stimulus levels' -- a refused
     # column contributes nothing here and the first draft claimed it anyway.
-    print(f"    AY3 OK  recovers L = x^{p} to {worst_ka:.2e} over {n_ka} (detent x stimulus) "
+    print(f"    AY3 OK  recovers the shipped {P_LABEL} to {worst_ka:.2e} over {n_ka} "
+          f"(detent x stimulus) "
           f"points\n            in {len(ka_sweeps)} of {len(SWEEPS)} columns: "
           f"{', '.join(s.replace('sweep_', '') for s in ka_sweeps)}")
 
@@ -503,7 +518,7 @@ def gate_ay3(res, ladder, p, rows, out):
     floor_worst = float(max(sp)) if sp else 0.0
 
     print(f"\n    {'family':<34}{'rms dB':>9}{'worst dB':>10}")
-    print(f"    {'shipped, p = ' + f'{p}':<34}{ship_rms:9.3f}{ship_worst:10.3f}")
+    print(f"    {'shipped (' + P_LABEL + ')':<34}{ship_rms:9.3f}{ship_worst:10.3f}")
     print(f"    {'best single exponent, p = ' + f'{best_exp:.4f}':<34}{best_rms:9.3f}{best_worst:10.3f}")
     print(f"    {'free monotone curve (the solve)':<34}{curve_rms:9.3f}{curve_worst:10.3f}")
     print(f"    (n = {n_err} (detent x usable stimulus) errors per family, "
@@ -555,7 +570,7 @@ def gate_ay3(res, ladder, p, rows, out):
         print("      (`THE TAPER CANNOT FIX IT`) STANDS on this epoch, for the free curve too.")
     out["ay3"] = {"known_answer": worst_ka, "required_taper": {str(k): v for k, v in need_tap.items()},
                   "monotone": bool(mono), "unreachable": [(x, s) for x, s in unreach],
-                  "shipped": {"exp": p, "rms": ship_rms, "worst": ship_worst},
+                  "shipped": {"family": P_LABEL, "rms": ship_rms, "worst": ship_worst},
                   "best_exp": {"exp": best_exp, "rms": best_rms, "worst": best_worst},
                   "free_curve": {"rms": curve_rms, "worst": curve_worst},
                   "spread_floor_rms": floor, "spread_floor_worst": floor_worst,
@@ -712,11 +727,29 @@ def gate_ay5(Lm, p, out):
         else:
             print(f"      ⇒ {len(reaches)} of {len(short)} reach at the supremum -- the lever is not")
             print( "        bounded out, so the fit is worth running.")
-        print(f"\n      ⚠⚠ AND THE TWO JOBS PULL OPPOSITE WAYS.  The taper that closes the LEVEL LAW")
+        # ⚠⚠ s173: this verdict was NARRATED, not computed -- it read "the two jobs pull OPPOSITE
+        # ways ... a SMALLER mix sweep" unconditionally, which was true of the s162 epoch it was
+        # written on (fold 0.625x) and is FALSE the moment the shipped taper or the OD:CLEAN ratio
+        # moves.  Both have since moved (s163's PWL, s172's `OdMakeup`).  Direction is now read off
+        # `fold`, and the two branches say opposite things (`computed-verdicts-not-narrated`, the
+        # 5th occurrence).  Item 9's targets are all > 1x, i.e. they always want a LARGER sweep.
+        want = "LARGER" if fold > 1.0 else "SMALLER"
+        same_way = fold > 1.0
+        head = ("AND THE TWO JOBS NOW PULL THE SAME WAY" if same_way
+                else "AND THE TWO JOBS PULL OPPOSITE WAYS")
+        print(f"\n      ⚠⚠ {head}.  The taper that closes the LEVEL LAW")
         print(f"         wants fold {fold:.3f}x (span {span_ship:.4f} -> {span_req:.4f}), i.e. a")
-        print( "         SMALLER mix sweep, where the sensitivity gap needs a LARGER one.  So even")
-        print( "         inside the bound they are not one correction: `one-knob-two-jobs-is-")
-        print( "         compensating`.")
+        print(f"         {want} mix sweep, where the sensitivity gap needs a LARGER one.")
+        if same_way:
+            print(f"         ⇒ this taper move goes {fold:.3f}x of the way toward item 9's own")
+            print( "           target as a SIDE EFFECT, so it is not `one-knob-two-jobs-is-")
+            print( "           compensating` on this epoch.  ⛔ NOT a claim that it CLOSES item 9 --")
+            print( "           AY5(b)'s own caveat still binds (this is the mix ratio that drives")
+            print( "           the feature, not the feature measurement), and the fold is short of")
+            print(f"           both targets ({', '.join(f'{v:.3f}x' for v in targets.values())}).")
+        else:
+            print( "         So even inside the bound they are not one correction:")
+            print( "         `one-knob-two-jobs-is-compensating`.")
         out.setdefault("ay5", {})["headroom"] = {
             "span_shipped": span_ship, "span_required": span_req, "fold_required": fold,
             "sup_fold": sup_fold, "targets": targets,

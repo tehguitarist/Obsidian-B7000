@@ -259,20 +259,24 @@ def mix_shape(cf, T):
     return float(np.interp(cf, cfs, ss))
 
 
-def clean_frac_of(fname):
+def clean_frac_of(fname, taper=None):
     """The capture's clean fraction, from the SHIPPED mix algebra (GATE K's `coef_closed`,
-    imported) fed the TAPERED level (s113).  ⚠ The taper exponent is FitParams::levelTaperExp,
-    which OVERRIDES LevelBlend.h's own default at runtime — reading the header default would be
-    the s149 ladder-epoch trap."""
-    import re as _re
+    imported) fed the TAPERED level (s113).
+
+    ⚠⚠ RE-POINTED s172.  This read `FitParams::levelTaperExp` and rebuilt `L = x ** p`.  That
+    constant was RETIRED at s163 (the LEVEL law is now a 4-segment PWL) and DELETED rather than
+    aliased, precisely so a missed consumer would fail loudly instead of silently rebuilding the
+    old curve — which is what happened: this function has hard-exited since s163, taking every
+    `--set`/`--fit` path that needs a mix with it, and nobody re-pointed it.  ⇒ call
+    `level_law_gate.level_taper(x)`, the ONE implementation both languages are checked against.
+
+    `taper` exists so a caller can evaluate a capture at a RETIRED epoch's curve (pass
+    `level_law_gate.power_taper(2.25)`) — which is what a pre-s163 fit's numbers must be read at
+    if they are to reproduce.  Default is always the shipped law."""
     import level_law_gate as _LL
-    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "dsp",
-                            "FitParams.h")).read()
-    m = _re.search(r"levelTaperExp\s*=\s*([0-9.]+)\s*;", src)
-    if not m:
-        sys.exit("od_tone_restore_fit: cannot parse levelTaperExp out of FitParams.h")
+    tf = _LL.level_taper if taper is None else taper
     p = C.parse_capture(fname)
-    od, cl = _LL.coef_closed(p["blend"], p["level"] ** float(m.group(1)))
+    od, cl = _LL.coef_closed(p["blend"], tf(p["level"]))
     return (cl / (od + cl)) if (od + cl) > 0 else 1.0
 
 

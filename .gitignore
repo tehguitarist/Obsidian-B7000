@@ -27,6 +27,13 @@ analysis/reports/s[0-9][0-9]_*.json
 # s114) silently fell outside it and showed up as untracked. Three-digit sessions, same rule.
 analysis/reports/s[0-9][0-9][0-9]_*.json
 analysis/reports/s[0-9][0-9][0-9]_*/
+# ⚠ session 173: the SAME hole a third time. These globs require a digit run followed
+# immediately by '_', so a session tag with a SUFFIX LETTER (`s173b_level_taper.json` — a
+# second baseline within one session, which is now routine) falls outside them exactly as
+# three-digit sessions fell outside the two-digit glob at s114. Match the suffix form too.
+analysis/reports/s[0-9][0-9][0-9][a-z]_*.json
+analysis/reports/s[0-9][0-9][0-9][a-z]_*.log
+analysis/reports/s[0-9][0-9][0-9][a-z]_*/
 # ...and the stdout logs those background renders are launched with (session 49;
 # `python3 -u ... > analysis/reports/sNN_*.log`, per the session-43 buffering note).
 analysis/reports/s[0-9][0-9]_*.log
