@@ -20384,6 +20384,9 @@ not a measured limit" caveat, i.e. the segment choice does track the measurement
 
 ## SESSION 164 (2026-08-06) — task E opens, and GATE BA refutes the architecture it was scoped to reuse before a line of DSP is written
 
+**Stored artefact (regenerable, gitignored):** `analysis/reports/s164_task_e_placement.json` — GATE
+BA's own report (`analysis/task_e_placement_gate.py`).
+
 Sessions 162–163 committed first (`289976e`). Task E is next on the session-160 order (A → D → E →
 ship) and carries a **hard cap of 3 sessions**; this is the first.
 
@@ -20536,6 +20539,10 @@ unaffected because it bounds only `dgamma`.
 
 User instruction: *"Lets screen route I, and then if that fails, implement route ii"*. This is task
 E's **second** capped session. Nothing shipped, no `src/` edit.
+
+**Stored artefacts (regenerable, gitignored):** `analysis/reports/s165_preclip_preemph.json` (GATE
+BB's own report) and `analysis/reports/s164_drive_tilt_current.json` (the current-epoch re-verify of
+the target — pedal side bit-identical at all 23 centres; model side moved only at 160–640 Hz).
 
 ### 1. GATE BB (`analysis/preclip_preemph_gate.py`, `_mutate_gate_bb.py`, **9/9 arms**)
 
@@ -22507,3 +22514,79 @@ than curated history, and it bundled two sessions' work under one meaningless li
 was restructured into two described commits (s174, s175) off `a1d4b3d`; the original is recoverable
 from the reflog. Nothing else about it was changed — no file content was touched in the restructure,
 verified by diffing the resulting tree against `052138d`.
+
+---
+
+## SESSION 176 (2026-08-07) — the mandated re-archive (sixth pass), and the current baseline turns out to be missing under its own name
+
+CLAUDE.md's own trigger had fired and the previous session's STATUS made the re-archive the next
+session's first job. **1412 → 799 lines**, on a 1200-line trigger with an under-800 target.
+
+### 1. What was compressed, and what was not
+
+⛔ **NARRATIVE only.** The **SHIPPED CONSTANTS** and **CLOSED / REFUTED** tables were not touched —
+asserted, not assumed: the 174-line span between the two headings is **byte-identical to `HEAD`**
+(162 table rows), checked before and after every splice.
+
+Compressed:
+
+| block | before | after |
+|---|---|---|
+| STATUS (13 per-session narrative bullets, s163–s175) | 380 | ~60 + a 12-row index |
+| open work, items 0–18 + the two completed plans | 557 | ~280 |
+| release gate | 52 | 40 |
+| preamble (build sequence, current step, doc discipline, where-we-are) | 142 | 118 |
+| standing rules / uncommitted work / carry-forwards | 107 | 80 |
+
+Structural moves, not just rewrapping: the per-session STATUS bullets became **one ledger table**;
+the five items with nothing live in them (**1, 3, 4, 7, 11**) became **one line each** under a shared
+heading, so the numbers other files cite still resolve; **items 2, 6, 9, 10, 13 and 14** were reduced
+to what a future session must not re-derive, with everything else pointed at its table row.
+
+### 2. ⚠⚠ THE PROCESS FAILURE WORTH RECORDING: A SPLICE ATE FOUR LIVE CARRY-FORWARDS — TWICE
+
+Compressing by line-range splice, the range `[ledger heading … "#### SHIPPED CONSTANTS")` silently
+included the four **"SESSIONS 129–162 carry-forwards, all live"** bullets and the GATE BD block,
+because they sat *between* the ledger and the table. The splice's own assertions all passed — they
+checked the range's **endpoints**, which were exactly right, and said nothing about what was inside.
+
+⭐ **It was caught by a token audit, not by reading**: extract every `GATE X` / backticked identifier
+and every number with ≥2 decimals from `HEAD:CLAUDE.md`, and require each to be present in either the
+new CLAUDE.md **or** `docs/session-log.md`. That is the rule's *"verify each compressed passage is
+present verbatim in the session log first"* made mechanical, and it is cheap.
+
+⚠⚠ **And it happened a SECOND time.** After restoring the bullets *after* the ledger, a later cut to
+the ledger consumed them again — same range, same silent success. Fixed by moving them **before** the
+ledger heading and re-running the audit. ⭐ GENERAL: **a range splice must assert what it is REMOVING,
+not only where it starts and stops** — and after any content-removing edit, re-run the audit rather
+than trusting that the last one still holds.
+
+The audit's residue was three genuinely-orphaned identifiers, all fixed rather than waved through:
+`s164_task_e_placement.json` and `s165_preclip_preemph.json` (GATE BA/BB's stored reports, named in
+no session-log block) were recorded in SESSION 164/165 above; `K_INPUT_REF_SHIPPED` was already there.
+Final audit: **0 numbers and 0 identifiers lost from both files.**
+
+### 3. ⛔⛔ THE CURRENT BASELINE WAS NOT ON DISK UNDER ITS OWN NAME
+
+Sanity-checking the documented gate command found `analysis/reports/s173c_hfmix.json` **absent** — the
+name CLAUDE.md, SESSION 173 §12 and SESSION 174 all cite. `analysis/reports/*.json` is gitignored, so
+only `comprehensive_data.json` (the unnamed working copy `comprehensive_report.py` always writes)
+had survived.
+
+⭐ **Recovered and VERIFIED, not assumed.** Running `release_gate.py` on the surviving file reproduces
+SESSION 173 §12's published table cell for cell — **THD full send 2.506 SHIP, `gain-n12` 2.101 SHIP,
+OD band-RMS 2.338, OD 25–100 Hz median 1.26 / p90 5.83, OD 100 Hz–8 kHz median 0.70 / p90 4.05,
+OD 8–16.3 kHz median 0.91 / p90 5.67, 162 captures, the same two named reference dropouts, 8 ROWS
+OVER SHIP** — so it *is* the s173c run, and it was restored under the documented name.
+
+⚠ GENERAL, and it is the reusable half: **a report filename cited across three documents is not an
+artefact anyone is keeping.** The reports directory is regenerable by design, so every named baseline
+in the superseded list should be expected to be absent; CLAUDE.md now says so at the list. What makes
+the recovery legitimate is that the published table was detailed enough to re-identify the file —
+which is an argument for keeping those tables in the session log rather than only a headline.
+
+### 4. State
+
+**`ctest` 22/22.** No `src/` edit, no rebuild, no render, no constant moved — the cache is still
+re-armed from s174/s175 and the next matrix run still pays ~25 min. Open work is unchanged: the
+agreed order is **16 → 17 → 18, then 12**, and item 16 (C31) is next.
