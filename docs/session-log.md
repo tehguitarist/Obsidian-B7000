@@ -23000,3 +23000,216 @@ n went 19 → 15 with its median 0.02 → 0.03. Thirteenth occurrence.
    it 0.0000) — any successor must re-assert that invariance.
 3. **The treble null is blocked on the frontier**, not on effort (§7).
 4. ⚠ **Item 18 is entangled with both** and item 17 says so: do not fit them independently.
+
+## SESSION 179 (2026-08-08) — open-work item 18: the number is real, the attribution is refuted, and it is item 17's 320 Hz half wearing a different name
+
+**Nothing shipped. No `src/` edit, no constant moved, ctest untouched, no re-baseline owed.** New
+`analysis/grunt_mix_gate.py` (**GATE BI**) + `analysis/_mutate_gate_bi.py` (**12/12 arms**), report
+`analysis/reports/s179_grunt_mix.json`.
+
+### 1. The item is ONE measurement and ONE attribution, and only the measurement had been taken
+
+s172 §6 recorded, as an unowned by-product: *"at makeup 0 the model's GRUNT spread at the listening
+mix is 4.4 dB against the pedal's 1.08 — the model's MIX responds to the GRUNT switch ~4x too
+strongly."* The user promoted that to item 18 on 2026-08-07.
+
+The measured thing is a spread of `C1 = mid_peak − mid_notch` on the **composite** curve. The word
+*MIX* is an attribution nothing in s172 isolated (`an-attribution-is-not-a-measurement`, s125), and
+C1 can move with GRUNT for three reasons living in three different places with three different
+remedies:
+
+| | candidate | where it would be fixed |
+|---|---|---|
+| (a) | the **OD:CLEAN RATIO** changes with GRUNT more than the pedal's | `OdMakeup` |
+| (b) | the **OD BRANCH's own contrast** changes with GRUNT more than the pedal's | the clipper's GRUNT cap bank |
+| (c) | the two **COMBINE** differently — same levels, same shapes | nowhere in the magnitude domain |
+
+GATE BI separates them, using two ends of a ladder the capture set already contains: **bleed-free**
+(LEVEL max AND BLEND max, GATE K2's only corner) is the OD branch ALONE, and **BLEND = 0** is the
+clean branch alone with the OD branch out of circuit. So `(OD − CLEAN)` per GRUNT, each side
+differenced against ITSELF, is s172's own ratio construction with every per-side capture-chain
+scalar cancelling exactly — question (a), directly, with no model of the mix law in it anywhere.
+
+### 2. Membership, and the free known answer
+
+A matched **3 GRUNT × 5 MIX** ladder (15 captures) plus the clean control. ⚠⚠ Every capture without
+a `grunt-` token is GRUNT = **CUT** (`captures.py` defaults `gruntIdx`) — the trap that cost s151 a
+whole fit and that s172 §6 itself nearly repeated — so BI0a reads every capture's position out of
+`parse_capture` and refuses on a label/settings mismatch (15/15), asserts the mix ladder is
+increasing in clean fraction, and asserts `bleedfree` really is cf = 0.
+
+⭐ **The known answer is CROSS-SESSION and PEDAL-SIDE, so no build enters it:** the pedal's
+bleed-free GRUNT-cut C1 reads **13.92 dB against s172 §1's recorded 13.92**. That is what licenses
+comparing anything here to s172/s178 — without it this gate's C1 is simply not s172's C1.
+⭐ And BI0d is free and load-bearing: at BLEND = 0 every OD-path `[ENG]` term is **bit-identical**
+(worst 0.00e+00 dB), so the curve every ratio below is differenced against is genuinely clean.
+
+### 3. The statistic reproduces — and it has GROWN
+
+C1 at the listening mix (LEVEL noon, BLEND max), `sweep_drv_-12`:
+
+| GRUNT | pedal | model @ makeup 0 | model @ shipped |
+|---|---|---|---|
+| cut | 3.09 | 1.69 | 3.33 |
+| flat | 3.92 | 5.68 | 8.43 |
+| boost | 4.17 | 6.36 | 9.55 |
+| **SPREAD** | **1.08** | **4.67 (4.3x)** | **6.22 (5.8x)** |
+
+s172 §6 recorded 4.40 / 1.08 on its own epoch, so **item 18's number is real and reproduces**; the
+shipped figure has moved to 5.8x because s173's HF term and taper re-fit and s177's C31 have landed
+since. ⇒ quote 6.22, not 4.4.
+
+### 4. ⛔⛔ (a) THE ATTRIBUTION IS REFUTED — the mix ratio tracks the pedal to 1.9x, not 4x
+
+OD:clean ratio, bleed-free OD minus BLEND=0 clean, each side against itself:
+
+| GRUNT | 40–100 | 100–250 | 250–900 | 900–2.8k | 2.8–8k |
+|---|---|---|---|---|---|
+| | ped / mod / m−p | ped / mod / m−p | ped / mod / m−p | ped / mod / m−p | ped / mod / m−p |
+| cut | −7.49 / −6.42 / +1.08 | −0.30 / +1.49 / +1.79 | −10.79 / −10.55 / **+0.24** | −4.33 / −3.10 / +1.23 | −9.41 / −6.25 / +3.16 |
+| flat | +3.74 / +7.80 / +4.06 | +2.81 / +4.96 / +2.15 | −10.25 / −9.61 / **+0.64** | −4.03 / −3.12 / +0.91 | −7.28 / −6.23 / +1.05 |
+| boost | +5.54 / +8.07 / +2.53 | +2.80 / +5.08 / +2.28 | −9.99 / −9.06 / **+0.93** | −4.16 / −3.11 / +1.05 | −7.67 / −6.23 / +1.44 |
+
+GRUNT dependence of that ratio (boost − cut), which is **the quantity item 18 names**:
+**40–100 Hz 13.03 / 14.48 = 1.11x · 100–250 Hz 3.10 / 3.59 = 1.16x · 250–900 Hz 0.80 / 1.50 =
+1.86x** (900 Hz–2.8 kHz refused, denominator 0.17 dB — `ratio-statistics-need-a-denominator-guard`).
+
+⇒ **the mix — the actual OD:clean balance — tracks the pedal's GRUNT dependence at worst 1.86x, and
+its ABSOLUTE error in the feature band is 0.24–0.93 dB across the whole switch.** Whatever produces
+a 4–6x C1 spread, it is not the OD:clean balance. Item 18's attribution is false as written.
+
+⭐ **By-product, opposite sign, recorded not absorbed:** over 2.8–8 kHz the pedal's ratio moves
++1.74 dB across GRUNT and the model's **+0.02 (0.01x)** — there the model **under**-responds to the
+switch. Nothing owns it.
+
+### 5. (b) THE OD BRANCH — right at flat and boost; cut is s172's own accepted price
+
+C1 **bleed-free**, i.e. the OD branch alone with no clean tap anywhere in the sum:
+
+| GRUNT | pedal | model | m−p |
+|---|---|---|---|
+| cut | 13.92 | 17.01 | **+3.08** |
+| flat | 26.40 | 26.56 | **+0.16** |
+| boost | 25.19 | 25.24 | **+0.06** |
+| SPREAD | 12.48 | 9.55 | **0.77x** |
+
+Two things fall out. The branch's own contrast is **essentially exact at flat and boost**; and
+bleed-free the model's GRUNT spread is **0.77x** the pedal's — *smaller*, the opposite sign of the
+defect. The cut cell's +3.08 is `odNotchDepthDb = +3.0`, s172's own priced and accepted decision
+(CLAUDE.md already records ~1.5 dB beyond the hardware licence at this one cell, accepted) — not a
+new finding.
+
+⇒ (a) and (b) are both refuted, and between them they account for the branch levels and the branch
+shapes. What is left is (c).
+
+### 6. ⭐⭐ (c) THE COMBINATION — and the signature is threshold-free
+
+A **cancellation** between two branches has a frequency set by their balance; a **branch's own
+null** does not move when the balance moves. The GRUNT switch changes level into the clipper, so it
+moves the balance. Where each side's composite notch sits, against its own bleed-free null:
+
+| GRUNT | side | bleed-free f | composite f | shift |
+|---|---|---|---|---|
+| cut | ped | 322.8 | 318.2 | −4.6 |
+| cut | mod | 322.8 | **352.0** | **+29.2** |
+| flat | ped | 327.5 | 327.5 | 0.0 |
+| flat | mod | 322.8 | **291.8** | **−31.0** |
+| boost | ped | 327.5 | 318.2 | −9.3 |
+| boost | mod | 322.8 | **300.3** | **−22.5** |
+
+⇒ **the model's composite notch wanders 20.7 % across the GRUNT switch and the pedal's 2.9 %**,
+while both sides' branch nulls are pinned (model 0.0 %, pedal 1.5 %). The model's composite notch is
+therefore **not its OD null showing through — it is a cancellation between the branches**, and the
+pedal does not have one there. No threshold, no fit, no coefficients.
+
+**BI4b, the mechanism, exact for the model.** Given both branch magnitudes and the model's own mix
+coefficients, the composite is determined **up to the relative phase**, bounded by
+`||clean| ± |OD||`. Where in that envelope the composite lands (`pos`; 1 = maximally constructive,
+0 = fully cancelling): **at its composite peak 0.88 / 0.98 / 1.01, at its composite notch 0.47 /
+0.22 / 0.12.** So the model's two branches are near-perfectly phase-aligned at ~400–500 Hz and
+strongly cancelling at ~292–352 Hz, and **both push C1 up**. That is a phase fact about the model,
+derived rather than assumed.
+
+⚠⚠ **The pedal's `pos` is NOT graded, and the gate proves why rather than assuming it:** evaluated
+with the model's coefficients the pedal lands at **pos = −1.326** at flat/notch, i.e. **outside its
+own envelope**, which is arithmetically impossible for a two-source coherent sum ⇒ **the pedal's mix
+coefficients are demonstrably not the model's** (`a-recovered-quantity-that-must-be-invariant-and-
+isnt-is-a-refutation`, s104). Small, real, and owned by nothing; it is item 9's territory, and item
+9 is closed on the LEVEL *law*, not on the coefficient pair.
+
+⇒ the comparison to the pedal rests on §6's frequency-wander argument, which needs no coefficients,
+and the phase statement is scoped to the model.
+
+### 7. ⭐⭐⭐ AND IT IS ITEM 17's 320 Hz HALF, NUMERICALLY — WHICH CLOSES IT
+
+| GRUNT | model − pedal (here) | s178 §3's model − ND | diff | HW licence | verdict |
+|---|---|---|---|---|---|
+| cut | **+0.24** | +0.24 | −0.00 | +1.6 | **under** |
+| flat | **+4.51** | +4.51 | +0.00 | +3.5–4.8 | **inside** |
+| boost | **+5.38** | +5.38 | +0.00 | much deeper | **far under** |
+
+**Identical at all three positions, on an independently written probe.** ⇒ item 18's C1 statistic
+and item 17's ~320 Hz null depth are **one measurement wearing two names** — C1 is that null's depth
+referred to its RIGHT shoulder, the ~450 Hz recovery peak, which is the same physical quantity
+`reference-sources.md` §3 describes.
+
+And §3 is the **only per-condition depth licence in the whole reference set**, with **HARDWARE** the
+authority for this null (§1). Measured against it the model is **inside at flat and UNDER at cut and
+boost**, monotone in GRUNT with the same sign as hardware's ⇒ **§5 rule 2 PASS**, exactly as s178
+concluded for item 17's 320 Hz half.
+
+⇒ ⭐⭐ **item 18's "4x too strongly" is a distance from ND on an axis where ND is not the authority,
+and hardware's own GRUNT progression runs further in the same direction than the model does.** The
+model is not over-responding to GRUNT; relative to the governing reference it is **under**-responding.
+⛔ **Not a fit target.** ⛔ And the only wrong direction here remains *shallower*: `odMakeupDb = 0`
+takes GRUNT cut to 1.69 dB, below ND *and* below hardware.
+
+⚠ §3 is a PNG read and s170 established the images are off disk — BI5 grades **direction and
+containment only**, never distance, and the boost licence is carried as *"much deeper"* rather than
+as "~26 dB" because s178's own knife-edge finding forbids quoting a near-total cancellation's depth
+as a number.
+
+### 8. The link to item 17's bass half: ONE OPERAND, TWO DEFECTS
+
+Item 17's hand-over says the two items are entangled and ⛔ must not be fitted independently. They
+share an **operand** and not a **defect**. Over 40–100 Hz, where item 17's actionable bass null
+lives, the model's OD branch is hotter than the pedal's re its own clean path at **+1.08 / +4.06 /
++2.53 dB** (cut / flat / boost) — item 17's bass finding measured as a LEVEL rather than as a depth,
+and it is GRUNT-dependent over a 2.98 dB span, largest at flat.
+
+⇒ **a band-limited LF correction for item 17 is not blocked by item 18, and cannot fix it either**:
+item 18's own residual is a phase relationship at 290–330 Hz that an LF level term does not set.
+The instruction stands in a weaker form — measure both when either moves — rather than as a
+blocking dependency.
+
+### 9. The objection BI4 had to survive, and it is why BI4a exists
+
+Two of the six composite notches land **1 and 3 cells** from GATE W's own window bounds (291.8 Hz
+against a 285 Hz bound; 352.0 against 358). s151: *a minimum resting on a bound is a REFUSAL, not a
+reading*, and s126: an extremum-finder always returns something. So the wander could have been the
+window. BI4a widens the notch window **73 Hz → 230 Hz in four steps** and re-reads: all six
+frequencies are **BIT-IDENTICAL at every width and interior at every width**. ⇒ the wander is a
+measurement. ⭐ This is GATE AV's widening test (s158) reused on a different feature, and it cost
+one extra loop.
+
+### 10. The mutation runner — 12/12, first run
+
+`_mutate_gate_bi.py`: an unmutated control, one arm proving a guard's own reachability, five
+validity arms (GRUNT label from settings, mix ordering, the cross-session known answer, non-vacuity,
+the clean control), and **six computed-verdict arms** at `expect_rc = 0` that break the data behind
+a conclusion and require the OPPOSITE verdict to print — including the two the session rests on
+(inflate the mix ratio's GRUNT dependence 5x and BI2 must SUPPORT item 18; tighten the flat licence
+and BI5 must print OVER and withdraw the PASS). No arm needed repair.
+
+### 11. ▶ NEXT
+
+1. ✅ **Item 18 CLOSES as a PASS.** ⛔ Do not re-open it from a distance-to-ND statistic; the
+   statistic is real and the reference it is measured against is not the authority for it.
+2. **Item 17's bass half is the only actionable thing left in the 17/18 pair** — unambiguous
+   direction, stable depth, one attributable constant, and §8 shows item 18 does not block it.
+   `odMakeupLowCutDb` is refuted as the lever (s178 §8) and a BELL must re-assert s172's
+   bleed-free-invariance measurement.
+3. **Unowned, small, named here so it is not re-discovered:** the pedal's mix coefficients are
+   demonstrably not the model's (§6's envelope violation), and the model under-responds to GRUNT by
+   ~100x at 2.8–8 kHz (§4).
+4. Item 12 (the LEVEL-min mute) is the remaining agreed item and is untouched by any of this.
