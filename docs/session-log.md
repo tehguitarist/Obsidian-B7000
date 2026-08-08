@@ -24870,9 +24870,22 @@ this session took.**
   cut C1 model−pedal reads −1.45/−0.94/−0.15/+0.21 dB across the ladder, against −1.44/−0.87/
   −0.00/+0.24 pre-session — within 0.15 dB, i.e. s180's own decision on this null is undisturbed.
 * **`ctest` 22/22.**
-* **Matrix**: full 172-capture re-render, `analysis/reports/s187_grunt_lf.json`. Graded against
-  `analysis/release_gate.py` — [numbers pending; render was in flight when this entry was
-  written — see the STATUS block for the final read].
+* **Matrix**: full 172-capture re-render, `analysis/reports/s187_grunt_lf.json` (162/162 analysed,
+  matching the standing 172-attempted/162-graded split). Graded against `analysis/release_gate.py`,
+  **membership verified IDENTICAL to the s185 baseline (162/162, both directions empty)** — so this
+  diff needs no membership caveat. **7 rows over SHIP → 6.** ⭐ **CLEAN bit-identical on all four
+  gated rows** (0.196/0.666/0.279/1.097, exactly matching s185 to the digit) — the GRUNT=Cut-only
+  scoping holds at matrix scale, not just on scratch probes. ⭐⭐ **OD band-RMS CROSSED into SHIP:
+  2.088 → 1.896** (bar 2.00). The 25-100 Hz region — where the defect actually lived — improved
+  most: **median 1.123 → 0.887, p90 5.784 → 3.537 (−2.25 dB)**. Also improved: OD 100 Hz–8 kHz p90
+  3.439 → 3.117; OD 8-16.3 kHz p90 5.544 → 5.210; OD ALL p99 10.421 → 9.548; OD 8-16.3 kHz median
+  stays SHIP either side (0.547 → 0.635, bar 0.70). THD full-send 2.409 → 2.434 (still SHIP). ⚠ One
+  tiny regression, inside its bar: OD 100 Hz–8 kHz median +0.011 dB (0.563 → 0.574, still over —
+  it was already over at s185). **`s187_grunt_lf.json` is now the CURRENT BASELINE**, superseding
+  `s185_reanchor_matrix.json`. ⚠ Not independently re-checked with a per-row re-level of the matrix
+  statistic itself (the standard check for "is this a level leak" — s177/s180's own discipline);
+  the mechanism (a null-position correction) argues against it being one, but that argument has not
+  been converted into a measurement the way it was for those two sessions. Open.
 
 ### 8. What is NOT done
 
@@ -24889,5 +24902,8 @@ have made them worse than leaving them alone.
   need re-deriving from scratch probes next time the LF axis is touched.
 * Flat/boost's own smaller 63–100 Hz residuals, if worth a session on their own terms.
 * Item 19's P4/P5 (owed since s183/s182) — untouched by this session.
+* Re-level the matrix's OD 25-100 Hz / band-RMS improvement per row (s177/s180's own discipline)
+  to confirm it is not a level leak — this session argues it shouldn't be (a null-position
+  correction, not a flat gain) but has not measured it the way those two sessions did.
 * ⚠ **Sessions 181–187 are all uncommitted** (last `git commit` is session 180) — a standing
   question for the user, not something to act on unilaterally.
