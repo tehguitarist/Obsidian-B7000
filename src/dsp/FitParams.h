@@ -1385,8 +1385,35 @@ struct FitParams
     // A bare flat gain over-boosts the OD path's extremes because the deficit is not flat
     // there (-1.4 dB at 101 Hz, -0.8 at 4 kHz, POSITIVE above 5 kHz).
     // Cuts of 0 make the shelves exact identities (branch, not arithmetic -- see OdMakeup.h).
-    double odMakeupLowHz = 130.0;      // below this the boost is reduced by odMakeupLowCutDb
-    double odMakeupLowCutDb = 3.5;
+    // ⛔⛔ RE-SHAPED s180 ON OPEN ITEM 17's BASS HALF (was 130.0 / 3.5, s172).  USER DECISION.
+    // At 130/3.5 this shelf leaves the makeup contributing **+2.5 to +2.8 dB over 40-80 Hz**,
+    // where s172 never measured a deficit — the OD:clean ratio there was already right. That
+    // extra LF drives the ~40-70 Hz OD-vs-clean cancellation deeper: GATE BH (s178) measured the
+    // model's bass null deeper than ND in **15 of 15** matched cells (median +2.34 dB) where the
+    // pre-s172 build tracks ND to 0.31 dB, and `reference-sources.md` §3 puts HARDWARE SHALLOWER
+    // than ND there ⇒ shipped was away from BOTH references.  At 200/6.0/S1.0 the makeup is
+    // **0.01-0.16 dB over 40-80 Hz** and still **+4.20 at 250 Hz / +5.59 at 400**, and the error
+    // goes **2.29 -> 0.65 dB median, better at 14 of 15 cells** (GATE BJ).
+    // ⛔⛔ THE OBVIOUS CANDIDATE IS THE WORST ONE, AND IT IS WHY THE CORNER MOVED RATHER THAN JUST
+    // THE CUT.  130/6.0 zeroes the LF magnitude even better (0.06 dB at 40 Hz) and is the WORST
+    // arm measured — worst cell 3.92 -> 7.69.  A null is a CANCELLATION, so its depth is a
+    // COMPLEX property of the branch, and a minimum-phase shelf inserts PHASE two octaves below
+    // its own corner where its magnitude has already gone to zero.  Measured against a flat
+    // (zero-phase) gain matched to each shelf's own dB at the null, the shelves miss the
+    // prediction by -2.3 … +6.5 dB, IN BOTH DIRECTIONS (GATE BJ's BJ5).
+    // ⇒ ⛔ DO NOT CHOOSE THIS CORNER FROM A MAGNITUDE TABLE.  Render it.
+    // ⚠⚠ PRICED, AND IT IS A TRADE THE USER TOOK KNOWINGLY: both nulls are ONE mechanism, so the
+    // ~320 Hz null shallows too — GRUNT flat goes +4.51 -> +2.29 dB re ND, i.e. from INSIDE §3's
+    // +3.5-4.8 licence to 1.2 dB UNDER it (still the same PASS class as cut and boost, which are
+    // under and far under).  s172's midrange fix retains 97 % (rms 1.91 -> 2.03 against the
+    // makeup-off build's 5.52) and the bleed-free contrast moves 0.48 dB — a third of the ~1.5 dB
+    // that got a BELL rejected at s172.  Re-assert that invariance after ANY further change.
+    // ⚠ The 15th cell (`blend 1430`) is 0.95 dB worse, and it is the one where ND's own null
+    // bottom sits 13.3 dB BELOW the deconvolution residue, i.e. a lower bound rather than a
+    // reading.  Graded on the AREA depth for that reason; the point depth inflates that column
+    // up to 2.7x (GATE BJ's BJ0d/BJ1).
+    double odMakeupLowHz = 200.0;      // below this the boost is reduced by odMakeupLowCutDb
+    double odMakeupLowCutDb = 6.0;
     // ⛔⛔ RE-SHAPED s173 ON A USER REPORT (was 2800.0 / 6.0, s172) — the treble notch had walked
     // from ~5.3 kHz to ~4 kHz and it was this shelf. s172 sized the corners on a ONE-SIDED
     // constraint ("outside the 285-905 Hz feature span"), i.e. it checked the side facing the
@@ -1426,7 +1453,12 @@ struct FitParams
     // compensating`).
     // ⚠ RBJ shelves need `(A + 1/A)(1/S - 1) + 2 >= 0` or `alpha` goes imaginary; OdMakeup
     // clamps S to the range where that holds rather than emitting NaN.
-    double odMakeupLowS = 0.9;
+    // ⚠ `odMakeupLowS` 0.9 -> 1.0 at s180, with the corner move above and for the same reason:
+    // S = 1.0 is the steepest an RBJ shelf goes without overshoot, so it buys transition width
+    // (and therefore midrange retention) at no cost in ripple.  It is NOT an independent lever
+    // here — swept alone it moves the bass error a fraction of what the corner does; it ships as
+    // part of the (corner, cut, S) point GATE BJ graded, not as a fit of its own.
+    double odMakeupLowS = 1.0;
     double odMakeupHighS = 0.9;
 
     // ---- the MIX-KEYED HF term (s173) ----------------------------------------------

@@ -23213,3 +23213,177 @@ and BI5 must print OVER and withdraw the PASS). No arm needed repair.
    demonstrably not the model's (§6's envelope violation), and the model under-responds to GRUNT by
    ~100x at 2.8–8 kHz (§4).
 4. Item 12 (the LEVEL-min mute) is the remaining agreed item and is untouched by any of this.
+
+## SESSION 180 (2026-08-08) — item 17's bass half SHIPS, and the "obvious" candidate turns out to be the worst one
+
+**SHIPPED: `odMakeupLowHz` 130 → 200, `odMakeupLowCutDb` 3.5 → 6.0, `odMakeupLowS` 0.9 → 1.0.**
+USER DECISION, priced on five axes first. New `analysis/bass_null_frontier_gate.py` (**GATE BJ**) +
+`analysis/_mutate_gate_bj.py` (**10/10**), report `analysis/reports/s180_bass_frontier.json`.
+New matrix baseline `analysis/reports/s180_bassshelf.json`. **ctest 22/22.**
+
+### 1. The decomposition that made the target real
+
+s178 measured the defect but graded it as one number. `notch_geometry`'s depth is
+`min(left shoulder, right shoulder) − bottom` — two operands, and only their difference had been
+printed (s117). Split, the shipped error is **median −2.95 dB of BOTTOM against −0.51 dB of
+SHOULDER**, i.e. **85 % is the cancellation genuinely getting deeper**, not the makeup tilting the
+measurement window. That is what licensed treating it as a physical target rather than an artefact
+of where the shoulders land.
+
+### 2. ⛔⛔ THE OBVIOUS CANDIDATE IS THE WORST ARM MEASURED — AND THAT IS THE SESSION'S FINDING
+
+`OdMakeup` is flat +6 with a low shelf at 130 Hz cutting 3.5, so it contributes **+2.5…+2.8 dB over
+40–80 Hz** where s172 never measured a deficit, and **+5.7…+5.9 over 250–900** where it does its
+job. On paper the fix is one constant: deepen the shelf to 6.0 and the LF contribution goes to
+**0.06–0.47 dB** while 250–900 stays at 5.4–5.8. Ideal separation.
+
+Measured, `130 Hz / 6.0` takes the **worst cell from 3.92 to 7.69 dB** — the worst of every arm
+tried, including shipped.
+
+**BJ5 discriminates why, against a lever with no phase in it.** A FLAT OD-branch gain is zero-phase
+by construction, so if the null's depth were a function of the branch's MAGNITUDE at the null, a
+flat gain matched to each shelf's own dB there would reproduce that shelf's depth. It does not:
+
+| arm | \|makeup\| at the null | flat-equivalent | measured | departure |
+|---|---|---|---|---|
+| ship 130/3.5/S0.9 | 2.58 | 6.24 | 3.92 | **−2.33** |
+| 130/6.0/S1.0 | 0.14 | 1.17 | 7.69 | **+6.52** |
+| 200/6.0/S1.0 | 0.04 | 0.95 | 4.87 | +3.92 |
+| 300/6.0/S0.9 | 0.02 | 0.88 | 2.99 | +2.11 |
+
+⇒ ⭐⭐ **MAGNITUDE DOES NOT DETERMINE THE DEPTH — the shelves miss the zero-phase prediction by
+−2.3 … +6.5 dB, IN BOTH DIRECTIONS.** A null is a CANCELLATION, so its depth is a **complex**
+property of the branch, and a minimum-phase shelf inserts PHASE two octaves below its own corner
+where its magnitude has already gone to zero. ⛔ **Do not choose this corner from a magnitude
+table.** This is GATE BI's s179 finding (the model's branches are too phase-coherent at 290–500 Hz)
+reproduced at the other band edge, on a lever we control.
+
+### 3. ⚠⚠ AN ESTIMATOR CORRECTION TO s178 — 15 OF 15 ND READINGS ARE CENSORED
+
+BJ0d audits what s178's own estimator could see: **ND's null bottom is at or below the sub-20 Hz
+deconvolution residue in 15 of 15 cells** (margins −0.16 … −13.43 dB), so every POINT depth on the
+reference side is a **lower bound**. That is precisely the situation GATE AP was built for at s152
+on the 320 Hz notch, where the AREA (power-integrated) depth measured **4.1×** less sensitive to
+censoring — and `notch_geometry` has returned both all along.
+
+Re-graded on `depth_area`, with `depth_point` kept as the superseded control:
+
+| arm | median\|err\| area (point) | worst cell area (point) |
+|---|---|---|
+| ship 130/3.5/S0.9 | **2.29** (2.34) | **3.92** (6.52) |
+| 130/6.0/S1.0 | 1.42 (1.41) | 7.69 (**20.69**) |
+| 200/6.0/S1.0 | **0.65** (0.64) | 4.87 (6.91) |
+| 300/6.0/S0.9 | 0.41 (0.40) | 2.99 (4.46) |
+
+⭐ **s178's SIZE stands (2.34 → 2.29) and its worst-cell column does not — the censored estimator
+inflates it by up to 2.7×, and the worst-cell column is the one that chooses the arm.**
+
+### 4. The frontier, and why it is a trade rather than a tuning job
+
+⚠⚠ **Both nulls are ONE mechanism** (item 17's own finding: OD-vs-clean cancellations whose depth
+peaks where \|OD\| = \|clean\|), so one OD low-mid gain moves both — and hardware wants the ~320 Hz
+null **deeper** than ND while it wants the ~40–60 Hz one **shallower**. BJ4 exists so that cannot
+happen silently, and it fires:
+
+| arm | bass med | bass worst | MID cost | LF | C1 move | 320 flat |
+|---|---|---|---|---|---|---|
+| ship 130/3.5/S0.9 | 2.29 | 3.92 | 1.91 | 2.61 | 0.00 | +4.51 **inside** |
+| 130/6.0/S1.0 | 1.42 | 7.69 | 1.92 | 1.48 | 0.03 | +3.61 inside |
+| **200/6.0/S1.0** | **0.65** | 4.87 | **2.03** | 1.32 | **0.48** | **+2.29 under** |
+| 250/6.0/S1.0 | 0.48 | 3.40 | 2.28 | 1.64 | 0.99 | +1.63 under |
+| 300/6.0/S0.9 | 0.41 | 2.99 | 2.60 | 1.83 | 1.37 | +1.30 under |
+| pre-s172 | 0.10 | 0.85 | 5.52 | 2.35 | 0.06 | +1.84 under |
+
+**NO ARM DOMINATES**, and BJ6 computes that rather than asserting it. ⭐ Two things nothing was
+tuned against: the **LF 40–250 Hz OD:clean rms has an interior minimum** in this family (1.24 at
+160/6.0, better than pre-s172's 2.35), and the **HF column is unmoved at every arm** (2.28) ⇒ the
+change is scoped, which is also provable from the makeup arithmetic — the low shelf's response
+above 900 Hz is unchanged to <0.01 dB, so GATE BF's treble-notch axis cannot have moved.
+
+✅ **USER DECISION 2026-08-08: `200/6.0/S1.0`.** Bass **2.29 → 0.65 dB median, better at 14 of 15
+cells**; s172's midrange fix **retains 97 %** (rms 1.91 → 2.03 against the makeup-off 5.52); the
+bleed-free contrast moves **0.48 dB**, a third of the ~1.5 dB that got a BELL rejected at s172. The
+15th cell is 0.95 dB worse and is the one where ND's own bottom sits **13.3 dB below the residue**.
+⚠ The price is the ~320 Hz null at GRUNT flat going **+4.51 → +2.29 dB re ND**, i.e. from INSIDE
+§3's +3.5–4.8 licence to 1.2 dB UNDER it — still the same PASS class as cut and boost, which are
+already under and far under.
+
+### 5. ⛔ CAN THE NOTCH STAGE BUY THE ~320 Hz NULL BACK?  NO — AND s156 ALREADY SAID SO
+
+Asked directly by the user mid-session, and it is the right question because `OdToneRestore` has a
+dedicated depth knob. Swept on the shipped build:
+
+| `odNotchDepthDb` | cut | flat | boost |
+|---|---|---|---|
+| 0.0 | +0.22 | +2.02 | +2.47 |
+| **3.0 (shipped)** | **+0.37** | **+2.29** | **+2.91** |
+| 6.0 | +0.48 | +2.49 | +3.26 |
+| 7.5 | +0.51 | +2.59 | +3.48 |
+
+⇒ **a 7.5 dB sweep of the notch depth moves the listening-mix null 0.57 dB, and it saturates** —
+3.0 → 7.5 buys 0.30. Recovering the 2.22 dB lost needs ~4× the authority the whole knob has.
+⭐ That is **s156's DEPTH CEILING measured a second time on a different constant**: at the listening
+mix the composite null's bottom is floored by the CLEAN tap, so deepening the OD path's own notch
+does not deepen the composite. The 320 Hz null at the mix is governed by the OD:clean RATIO — which
+is exactly what the shelf changed — and not by the notch stage.
+⚠ **The ONE route that could recover it is a co-moved flat gain** (`odMakeupDb` 6.0 → 6.7 with the
+shelf cut raised to match restores 320 Hz to 5.74 dB of makeup against ship's 5.82 while keeping LF
+at 0.01–0.18). ⛔ NOT taken: it also lifts the OD branch **+0.7 dB across 400 Hz–8 kHz**, which moves
+s172's midrange optimum (measured interior minimum at +5, already past at +6), GATE BF's treble-notch
+axis and the mix-keyed HF term's operating point. That is a second front and it needs its own pricing.
+
+### 6. What shipped, and the matrix price — ⛔ MOSTLY A LEVEL LEAK, s177 REPRODUCED
+
+Verified before anything was read: compiled **defaults bit-identical to the explicit `--fit` list at
+6/6 OD captures**, mutation control (S 1.0 → 0.999999) **fires at all six**, and **2 scope controls
+with the OD branch out of circuit are correctly inert** (BLEND = 0 and `ref-clean`). ⚠ A first draft
+of that check demanded the mutation fire everywhere and duly reported the two scope rows as broken —
+`suspect the mutation before the guard` (s110).
+
+Release gate, `s177_c31on.json` → `s180_bassshelf.json`: **8 rows over SHIP → 7.** OD 8–16.3 kHz
+median **0.828 → 0.614 CROSSES to SHIP**; OD band-RMS 2.347 → 2.257; OD 25–100 median 1.35 → 1.22;
+OD 100 Hz–8 kHz median 0.67 → 0.60. **CLEAN is bit-identical on all four gated rows** — the free
+scope check, and exactly what an OD-branch constant must do.
+
+⛔⛔ **DO NOT QUOTE THAT ROW CLOSING AS FIDELITY.** The change removes ~2.5 dB of LF from the OD
+branch and `comprehensive_report` fits a per-row broadband null gain the log sweep's LF octaves
+dominate (s170/GATE BE), so removing LF energy shifts that gain and lifts every band. Re-levelled
+per row by its own band-domain mean — **s177's own method, applied to a second constant**:
+
+| region | as graded | re-levelled (shape only) |
+|---|---|---|
+| 25–100 Hz | −0.151 | **−0.080** (53 % survives — the band the change targets) |
+| 100 Hz–8 kHz | −0.071 | **+0.052 (WORSE)** — 100 % leak, and the shape slightly degrades |
+| 8–16.3 kHz | −0.211 | −0.033 (**84 % is leak**) |
+| band-RMS | −0.102 | **−0.002 (a wash)** |
+
+⇒ **the only genuine shape improvement is in 25–100 Hz, which is the band the change is for.** It
+ships on GATE BJ's bass-null measurement — shape-normalised and per-side self-differenced, so immune
+to the null gain — and explicitly **not** on the matrix. The 100 Hz–8 kHz shape degrading 0.052 dB is
+the ~320 Hz trade showing up on a second instrument, and it is small.
+
+### 7. ▶ NEXT
+
+1. ⛔ **Item 17's bass half is CLOSED.** Do not re-open it from a magnitude table (BJ5), and do not
+   try to buy the ~320 Hz null back with `odNotchDepthDb` (§5, and s156's ceiling).
+2. **Item 17's treble half is UNCHANGED and still blocked on the ordering-vs-centre frontier**
+   (s178 §7). ⚠ Nothing this session touched it — the low shelf is inert above 900 Hz — so any
+   impression that "the treble notch was fixed too" is wrong.
+3. ⚠ **The co-moved flat gain (§5) is the one live route to recovering the ~320 Hz null.** It is a
+   broadband +0.7 dB OD lift above 400 Hz and needs GATE BF, s172's midrange optimum and the HF term
+   all re-priced. Unowned; do not start it as a tuning change.
+4. Item 12 (the LEVEL-min mute) is the remaining agreed item.
+
+### 8. ⚠ THE EPOCH TRAP, CAUGHT BY THE GATE'S OWN NON-VACUITY GUARD
+
+GATE BJ was written with `()` meaning "the s173 incumbent". The moment s180 shipped
+`200/6.0/S1.0` that arm became a duplicate of the compiled defaults and **BJ0b correctly refused
+the whole gate** (*"arms inert against ship in the LF band: ['200/6.0/S1.0']"*). Repaired by naming
+every arm by its CONSTANTS — `s173 130/3.5/S0.9` is now an explicit `--fit` arm and
+`s180 SHIP 200/6/1` is `()` — with `INCUMBENT` carrying the known answer, BJ3's baseline and BJ6's
+dominance reference so every number the decision was taken on still reproduces (verified: identical
+frontier after the rename, and the mutation runner back to **10/10**).
+⭐ GENERAL: **s146's rule that a guard naming an epoch must be extended when the epoch ends applies
+to an ARM TABLE too** — an arm defined as "whatever ships" silently becomes a duplicate of the
+baseline the day the thing it advocated is adopted, and the gate that justified a change stops
+being able to reproduce it.
