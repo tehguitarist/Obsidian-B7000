@@ -23,6 +23,51 @@
 
 ## 1. Before you trust an instrument
 
+- ⭐⭐⭐ **BEFORE MODELLING A SYSTEM AS `a*A + b*B`, GREP FOR ANYTHING DOWNSTREAM THAT *READS* THE
+  MIX — A MIX-KEYED STAGE MAKES THE "BRANCHES" NON-INDEPENDENT, AND EVERY DIFFERENCE YOU ATTRIBUTE
+  TO THE COEFFICIENTS IS THEN TWO EFFECTS.** A gate measuring what a mixer-coefficient change costs
+  carried the obvious known answer: the mixed output must be the two BRANCH renders combined with the
+  stage's own coefficients, testable as a **triangle inequality** (`||a·A| − |b·B|| ≤ |mix| ≤
+  |a·A| + |b·B|`) with no threshold in it. It **FAILED — 70979 of 517248 points outside the envelope,
+  worst excursion 20.6×** — and the guard was right: a stage further down the chain is keyed on the
+  mix ratio itself (`cleanFraction()`), so branch A's own response is a function of the very
+  coefficients under test. ⇒ the difference being measured was **two mechanisms**, and the previous
+  session had attributed all of it to one. ⭐ **The split usually needs no code change**: look for an
+  existing knob that moves the coupled stage by a known amount (here a uniform dB offset already
+  exposed as a fit param), set it to exactly cancel the coupling, and render a THIRD arm — you then
+  have `A + B` and `A` and `B` separately. ⭐⭐ And the split is worth doing even when you expect it
+  to be small, because it is what says which mechanism owns which axis: here the coefficients reached
+  **24.83 dB** and the coupled stage **never exceeded 1.55 dB anywhere**, so the second matters only
+  at the one feature where they are comparable. ⚠ A gate whose guards are all of the form "these must
+  be EQUAL" cannot find this; only the one asserting a CONTAINMENT could (s119's defence in depth).
+  (s184, GATE BM's BM0g)
+
+- ⭐⭐ **A BIT-IDENTITY CHECK THAT INDEXES THE WRONG THING PASSES VACUOUSLY, AND ONLY THE ARM THAT
+  REQUIRES A *DIFFERENCE* CAN CATCH IT.** A new gate's scope controls compared two renders with
+  `A.load(p)[1]` in four places. `A.load` returns the **array**, so `[1]` is **sample 1** — leading
+  silence — and both checks printed `worst |diff| 0.0e+00` while comparing nothing. Nothing about
+  the output looked wrong; a zero is what a passing bit-identity check is supposed to print. What
+  went red was the NON-VACUITY arm, which requires the two arms to DIFFER: with the comparison
+  broken they looked identical and the gate refused. ⭐ GENERAL: **a gate whose guards are all of
+  the form "these must be equal" cannot detect a broken comparison, because breaking it satisfies
+  every one of them.** Pair every equality guard with at least one arm that requires an
+  INEQUALITY, on the same comparison function — defence in depth (s119), and here it is the only
+  thing standing between a vacuous check and a published claim of correct scoping. ⚠ Then put the
+  comparison in ONE helper with a length check, and add a mutation arm that reproduces the defect
+  (`bl0d-one-sample`) so it cannot come back. (s183)
+- ⚠⚠ **"GUARD DEAD" IS A HYPOTHESIS ABOUT THE MUTATION FIRST (s110) — AND DIAGNOSING ONE OF THEM
+  PRODUCED A FINDING THE GATE HAD MISSED.** Two of nine arms failed on their first run and both
+  were VACUOUS. (a) One perturbed a piecewise-linear table at **node 1** to break a pinning
+  evaluated between **nodes 3 and 4** — arithmetically incapable of moving it. (b) The other
+  dropped a membership gate's prominence bar, on the stated premise that it was *"the only
+  mechanism by which membership can move"*. ⭐⭐ **The premise was wrong, not the guard: the
+  admission rule has TWO conditions, and the EDGE test flips too** — a feature that rested on its
+  window bound on one arm becomes an interior minimum on the other in 4 of 4 sweeps, because the
+  added path floors a curve that used to run monotonically into the bound. It changes no
+  membership only because the prominence bar refuses it on both arms, i.e. **it is masked** and
+  would surface the instant that window widened. ⇒ **when an arm reads GUARD DEAD, ask what else
+  the verdict depends on before touching the gate** — the answer is sometimes a second mechanism
+  nobody had counted, and it belongs in the gate's own output as a separate column. (s183)
 - **Verify the baseline reproduces BEFORE ranking anything.** Every tool that ranks candidates must
   first re-score the shipped point against its own recorded value and REFUSE to print if it moves.
   (`SHIP_RECORD` pattern, s77.) A baseline that has silently moved makes every comparison a fiction.
@@ -1069,6 +1114,25 @@
     analytic, so both were BIT-IDENTICAL** — so *"nothing that was gated on moved"* is precisely how
     a wrong shared input goes ten sessions without a symptom, and it is an argument for auditing the
     inputs rather than waiting for a gate to go red. (s149, GATE AO)
+  - ⭐⭐⭐ **FOURTH OCCURRENCE, s184 — AND THIS TIME THE *MUTATION ARM* MOVED BOTH SIDES, SO IT
+    REPORTED `GUARD DEAD` AGAINST A GATE WHOSE **CLAIM** WAS THE THING THAT WAS WRONG.** GATE BM's
+    third arm computes `odNotchDepthDb` from `K[g][d]`, and its guard checks the arm's SIGN against
+    `−K[g][d]`. The gate's own output asserted this was *"a mixed-sign test that a permuted row could
+    not pass"* — the APVTS GRUNT order `{Boost, Cut, Flat}` differs from the enum's `{Cut, Flat,
+    Boost}` and the K rows differ in SIGN across that permutation, so the claim reads as airtight.
+    It is false: permuting the mapping changes the **INTERVENTION** and the **PREDICTION** through
+    the same table, so the arm moves both sides together and the test still passes **539/539**.
+    ⭐ **The remedy is to find a handle neither side of the check already contains**, and there
+    usually is one: here the OTHER table (`kNotchGainDb`, whose DRIVE-0 column cuts 1.16 dB on Cut
+    against 18.33 on Flat) plus the **RENDER**, which the C++'s own `gruntEnum()` produces, so the
+    measured notch depths keep the true order (**10.78 / 20.20 / 21.75 dB**) while a permuted gate's
+    row assignment does not. ⇒ a new sub-gate that CAN fail, a mutation arm re-pointed at it, and the
+    false sentence withdrawn from the gate's output. ⚠ Pin the new table's ROW LABELS to the header's
+    own comments as well, or the guard that catches the permutation can itself go stale. ⭐ GENERAL:
+    when a mutation arm reads GUARD DEAD, s110 says suspect the mutation — and the third possibility,
+    after "the mutation is vacuous" and "the guard is fine", is that **the gate's CLAIM about what
+    the guard covers is wrong**. That is the most expensive of the three, because the claim is what a
+    later session will quote. (s184, GATE BM's BM0g/BM0h)
 - ⭐⭐⭐ **A STORED BAND THAT IS A *UNION OVER A NUISANCE PARAMETER* CANNOT GRADE A SINGLE INSTANCE —
   AND THE TELL IS THAT IT CONTRADICTS THE GATE IT CAME FROM.** GATE AL published an admissible
   band for item 6's carrier, computed by sweeping five trial Q values and taking the **union** of
@@ -1594,6 +1658,25 @@
     exists does not immunise a session against it **within days** — the check (restrict to the
     shared-membership subset, confirm byte-identity, then decompose the new rows' own contribution)
     has to be run every time captures change, not recalled from memory as "already learned". (s113)
+- ⭐⭐⭐ **A BAR QUANTIFIED OVER "EVERY REACHABLE SETTING" IS NOT THE SAME BAR AS ONE OVER "EVERY
+  CAPTURED SETTING", AND WHEN A CANDIDATE'S EFFECT LIVES IN A GAP BETWEEN DETENTS THE TWO GIVE
+  OPPOSITE VERDICTS — WITH THE FLATTERING ONE LOOKING LIKE A PERFECT PASS.** A one-node re-anchor
+  was graded against a user-agreed bar of *"<= 0.05 dB at every REACHABLE mixed cell"*. On the
+  agreed verification sets (a 20-cell mix grid plus every capture in eight fit groups) the worst
+  cell moved by **exactly 0.000000 dB** and three rendered cells came back **bit-identical** — as
+  clean a pass as a gate can print. It is a **membership** result: the candidate only moves the law
+  on one interpolation segment, and the capture matrix has **no cell on that segment at all** (its
+  LEVEL detents jump from clean fraction 0.244 straight to 0.024). Swept over the CONTINUUM of knob
+  positions the same candidate is over the bar on **7.5 % of one knob's travel**, by up to **1.64
+  dB** — 33x the bar. ⭐ GENERAL: **a control is continuous and a capture matrix is not.** Before
+  reporting a bar met, ask *"what values can the user dial that I did not evaluate?"* and sweep the
+  control surface, not the detents — it costs one loop when the statistic is arithmetic. ⚠ And when
+  the two disagree, **neither is wrong and the gate must print both**: the captured reading answers
+  "does this move anything we can compare against a reference?", the continuum reading answers
+  "does this change what a player hears?", and only the first has any reference data behind it.
+  ⛔ Quoting the captured half alone is `aggregate-moved-check-membership-first` in its most
+  flattering form — the population did not merely shift, it never covered the effect. (s185, GATE BN)
+
 - ⭐⭐ **A CONTAMINATED MEMBERSHIP CAN LEAVE THE AGGREGATE EXACTLY RIGHT AND ONLY SHOW UP ONE LEVEL
   DOWN — SO "the headline still reproduces" IS NOT A MEMBERSHIP CHECK.** Building the LEVEL ladder
   by hand with a 4-key settings match (instead of GATE K's 13-key `find_level_groups`) pulled in
@@ -1776,6 +1859,24 @@
   which targets look unreliable.** My "robust" subset dropped exactly the two statistics a second
   reference corroborated — and exactly where the candidate paid its cost. It inverted the verdict.
   (s77)
+- ⭐⭐⭐ **AN EXTREMUM AT THE EDGE OF A SAMPLED RANGE IS NOT A MEASUREMENT OF THE EXTREMUM — AND AN
+  ANALYTIC COMPANION USUALLY TELLS YOU WHICH WAY TO EXTEND, FOR FREE.** A gate swept a 4x4 grid of two
+  mix controls and reported its worst perturbation at **the lowest LEVEL it had sampled**. That is the
+  shape of a result that is about the grid, not the device — and here it was: the same gate's own
+  ANALYTIC bracket width kept **growing monotonically** past the edge (+2.66 dB at the sampled corner
+  of the range, +3.77 / +5.11 / **+8.22** at the three settings below it), because the two branch
+  coefficients approach EQUALITY there and a near-perfect cancellation is where a small coefficient
+  change does the most. So the extreme was outside the grid, and it cost one arithmetic loop and no
+  renders to find that out. ⭐ Extending it used four capture detents that were **already on disk**
+  (`check-for-unread-data-first`) and completed the ladder the task had asked for in the first place.
+  ⭐ GENERAL: after any grid sweep, check whether the winner sits on a boundary; if it does, evaluate
+  whatever CLOSED-FORM quantity the gate already computes one or two steps beyond it before publishing
+  the maximum. ⚠ And when you extend, ask what happens at the actual END of the axis: here LEVEL = 0
+  had to be **excluded BY NAME**, because the comparison arm is digital silence there (the mute that
+  is another open item's defect) and differencing against silence is s162's 214 dB "requirement".
+  Excluding it silently would have poisoned every pooled statistic; naming it is one line.
+  (s184, GATE BM)
+
 - **`self-selecting-scores`.** A scan that scores candidates on "the points that fit" lets the worst
   one win by shrinking its own scoring set. Freeze the band/row set at the shipped baseline. (s33)
 - **Check `n` before reading a trend.** A smooth, physical-looking V-shaped curve turned out to rest
@@ -1918,6 +2019,25 @@
   head item — and only the impossible share gave it away. (s108; the third occurrence of
   `an implausible coincidence is a bug report`)
 
+- ⭐⭐⭐ **A CAPTURE GROUP IS NAMED FOR THE AXIS IT *SWEEPS* AND SAYS NOTHING ABOUT WHAT IT *HOLDS* —
+  SO AN ENTIRE AXIS CAN SIT AT ONE OPERATING POINT FOR 35 SESSIONS WITH NOTHING ANYWHERE SAYING SO.**
+  A fit tool's `SETS` had eight groups — `bleedfree`, `listen`, `blend`, `grunt_flat`, `grunt_boost`,
+  `grunt_hot`, `grunt_cold`, `blend_hot` — every one correctly named for the control it varies.
+  Measured, **17 of 29 rows sit at ONE clean fraction**, and far sharper, **the four GRUNT groups are
+  12 of 12** ⇒ the stage's GRUNT-ROWED tables had only ever been graded at a single mix, on the axis
+  that has three rows to choose between. ⭐ **The reason it was invisible is the naming:**
+  `grunt_flat` reads as *"the GRUNT flat condition"*, not as *"the GRUNT flat condition at the one
+  clean fraction the pot cannot reach in normal use"*. ⇒ **give every group a declared INVARIANT
+  (what it holds, and at what), resolve it from each row's own parsed SETTINGS, and ASSERT it** —
+  s114's rule applied to the group rather than to the row — then print the audit so the imbalance is
+  visible in the tool instead of in a session log. ⚠ And it spreads: three other gates indexed those
+  groups by name through a shared `ROWS` constant, so one bleed-free-only mapping was adjudicating an
+  axis in all of them. **Grep for who imports a membership table before assuming the imbalance is
+  local.** ⭐ When you fix it, make the fix **ADDITIVE and PROVE it** — parse the old table out of
+  `git show HEAD:` and diff (here: 0 groups changed contents, 0 removed, 6 added) — and then PIN the
+  frozen groups by content, so a later edit refuses instead of silently shifting five gates'
+  stored numbers. (s186, GATE BO)
+
 ## 3. Gates, controls and verdicts
 
 - ⭐⭐⭐ **WHEN A NEW FEATURE DELIBERATELY BREAKS AN INVARIANT AN OLD GUARD ASSERTS, HOLD THE
@@ -1973,6 +2093,35 @@
   shape — this is `an-implausible-coincidence-is-a-bug-report` inverted: a coincidence in the *test's*
   own numbers made a broken gate look tested, and nothing about the output looked odd. **When an
   assertion is a count, ask what else could produce that count.** (s130, `_mutate_gate_ab.py` arm 6)
+- ⭐⭐⭐ **A SUB-GATE WHOSE ARMS ALL CARRY *ZERO INTERVENTION* CANNOT MEASURE THE EFFECT OF AN
+  INTERVENTION — AND IT WILL PRINT A CONFIDENT PASS SAYING IT DID.** A rendered check was added for
+  a good reason: the arithmetic bounded a candidate's change to a filter's CUT, and a prior session
+  had established that the cut and the RENDERED response are different quantities (a small branch
+  change can be amplified near a cancellation). It rendered the four verification cells, found the
+  three mixed ones bit-identical, and printed `RENDERED BAR: MET`. **Vacuous**: those three cells'
+  predicted change is *identically zero*, so the check confirmed `0 -> 0` and bounded no
+  amplification whatsoever. The only cells where the candidate does anything were the UNCAPTURED
+  ones — which is also the region the whole finding was about. ⭐ GENERAL: for any check of the form
+  *"does effect X stay small?"*, **print the INTERVENTION beside the RESPONSE at every cell**, and
+  make the gate SAY SO when the intervention column is all zeros. A response column of zeros is
+  equally consistent with "the effect is small" and "there was no effect to measure", and only the
+  intervention column tells them apart. ⚠ Rendering the cells where the intervention IS non-zero
+  then turned the tautology into a real measurement — a monotone dose-response with a
+  rendered/predicted ratio of **0.304 .. 0.689**, i.e. the cut bound was CONSERVATIVE — which is a
+  quotable result the vacuous version could never have produced in either direction. (s185, GATE BN)
+
+- ⭐⭐ **`computed-verdicts-not-narrated`, SEVENTH OCCURRENCE — AND THE CHEAPEST TO COMMIT: A SORT
+  WHOSE *KEY* AND *LABEL* MEAN DIFFERENT THINGS.** A gate ranked three conditions by "how far off the
+  model is" and printed the result as *"furthest off → closest"*, sorting by the **signed** residual.
+  Every residual was negative, so it ranked **−2.1 dB ahead of −9.8** — the label said magnitude and
+  the key said sign, in the one line the whole gate was graded on. ⭐ The durable fix is not care but
+  an **assertion of the property the LABEL claims**: the gate now checks its own ordering is sorted
+  by |residual| descending and FAILS if it is not, which costs one line, can never be "nearly" true,
+  and stops the two drifting apart again. ⭐ And keep the discarded coordinate: the SIGN is a real,
+  separate fact (here: *the model's null is already too deep*), so it is printed as its own column
+  rather than folded into the ordering. ⚠ The mutation arm that reproduces this defect is worth
+  writing even though the defect is now impossible — it is what proves the assertion fires. (s186)
+
 - ⭐⭐ **A GUARD PROVING A MECHANISM IS *LIVE* SAYS NOTHING ABOUT WHETHER IT IS *WORTH HAVING* —
   MEASURE THE BENEFIT TOO, ASSERT THE SIGN, AND PRINT THE SIZE.** Session 124's gate check proves
   ADAA is on at 1×/2× and correctly scoped; a separate check measures what that buys on the full
@@ -2150,9 +2299,28 @@
   honest mutation biases the *reported* vertex — and it cleanly separates the two known answers,
   breaking the ABSOLUTE comparison while leaving the RATIO one untouched, which is exactly the
   division of labour those two guards exist to have. (s122)
-- **`computed-verdicts-not-narrated` — FOUR occurrences.** A conclusion hard-coded into a tool's
+- **`computed-verdicts-not-narrated` — SIX occurrences.** A conclusion hard-coded into a tool's
   output outlives the condition it described and prints above a table contradicting it. Derive every
   verdict line from the data, and make it state the opposite when the data says so. (s34, s61, s68)
+  - ⚠⚠ **THE FIFTH, s183, AND IT IS THE CHEAPEST ONE TO COMMIT: A VERDICT INFERRED FROM THE ONE
+    CELL THE GATE PRINTED IN DETAIL.** The gate printed a 7-feature membership comparison for one
+    reference (DRIVE, GRUNT) cell and the verdict block said *"membership is unchanged"*. Computed
+    over all 36 readings per feature it is FALSE — one feature loses **9 of 36**. ⭐ The tell is
+    structural and worth generalising: **whenever a gate prints DETAIL for a subset and a VERDICT
+    about the whole, the verdict has to be tallied over the whole**, and if it is not, the printed
+    subset is doing the reasoning. Committed in a session whose entire subject was that announcing
+    a change is not the same as measuring it.
+  - ⛔⛔ **THE SIXTH, s184, AND IT IS THE MOST EXPENSIVE PLACE FOR IT: THE ONE SENTENCE A SESSION'S
+    PRIORITY ORDERING IS DRAWN FROM.** A gate built to check whether an inherited direction survived
+    off its original operating point printed **"THE CORNER OVERSTATES THE WORST PLAYED CELL BY 0.5x"**
+    — directly above the two numbers that refute it (12.25 dB at the corner against 25.03 dB played,
+    i.e. the corner UNDERSTATES by 2×). The `0.5x` was computed; the word "OVERSTATES" was not, and
+    the two were printed in the same line. ⭐ The tell is grammatical rather than numerical: **a ratio
+    below 1 beside a word meaning "larger"**. ⭐⭐ The fix is to branch on the sign of the comparison
+    and write BOTH sentences, so the direction is a RESULT — and doing that here promoted the finding
+    from a footnote to the session's headline, because the direction was the opposite of the one the
+    handover led a reader to expect. ⚠ Committed while writing a gate whose entire purpose was to
+    stop a previous session's direction being inherited unchecked. (s184, GATE BM's BM2)
 - ⭐⭐ **A MUTATION TEST MUST RUN WHERE THE TOOL RUNS, AND IT NEEDS AN UNMUTATED CONTROL — OR EVERY
   MUTATION "PASSES" FOR A REASON THAT HAS NOTHING TO DO WITH THE GUARDS.** Mutation-testing GATE O's
   five guards by writing patched copies to `/tmp` returned a clean **5 of 5 PASS**. All five were
@@ -2177,6 +2345,33 @@
 - **`gate-domain-must-cover-candidate-reach`.** A score computed over bands ≤806 Hz preferred a
   candidate whose cost landed at 3–13 kHz — it measured the benefit and was blind to the cost *by
   construction*. (s49)
+- ⭐⭐ **AN ANALYTIC BOUND THAT HOLDS ONLY UNDER AN ASSUMPTION YOU CANNOT MEASURE IS A *RANKING
+  HEURISTIC* — MEASURE HOW WELL IT PREDICTS BEFORE QUOTING IT, OR THE NEXT SESSION QUOTES IT AS A
+  BOUND.** A mixing law gave, per cell, two exact limits bracketing the perturbation, with a width
+  computable from the coefficients alone and no render needed. It bounds the response only where the
+  two branches are **CO-PHASED**, and phase was not measured. Checked against the renders it turns out
+  to **rank** the cells' realised worst excursion well (Spearman **+0.761**) and to **under-predict
+  its SIZE by a median 14.4×** — worst cell 2.66 dB of bracket against **25.03 dB realised** — while
+  at the one cell where the bracket is `+inf` it grossly over-predicts. **20–37 % of the graded band
+  leaves the bracket at EVERY cell**, so the "escape" is not a correction to the bound, it is the
+  dominant term. ⭐ GENERAL: whenever a derivation yields a bound under an unverified premise, print
+  the measured RANK CORRELATION and the median PREDICTION RATIO beside it, in the tool, every run —
+  a bound stated without them will be re-quoted as though the premise held. (s184, GATE BM's BM1/BM2)
+
+- ⭐⭐ **THE CONSTRUCTIVE FORM OF `ratio-statistics-need-a-denominator-guard`: WHEN YOU ARE GRADING AN
+  INTERVENTION, PUT THE INTERVENTION'S *ANALYTIC SIZE* IN AS THE REGRESSOR — NEVER AS THE DIVISOR.**
+  A localisation test asked whether a perturbation stayed inside the band it was supposed to affect,
+  as `out-of-window peak / in-window peak < 1`. It **failed at 3.38× against correct code**, on a cell
+  whose in-window peak is **0.0020 dB** because the intervention there is 0.017 dB — all 37 offending
+  cells had in-window peaks ≤ 0.0137 dB, i.e. the statistic was dividing noise by noise. Re-posed as
+  two least-squares slopes **against |intervention|** (in-window **0.828 dB/dB**, out-of-window
+  **0.050**, ratio **6.1 %**) it uses every reading, needs no threshold, and a near-inert cell
+  contributes nothing to either slope because it sits near the origin of both. ⭐ Two further habits
+  that came free: **print the count of uninformative cells** so the trap stays on the record rather
+  than being re-derived, and **print WHERE the out-of-band residue is** — here a median of 209 Hz
+  against a window bound at 210 Hz, which identified the 6 % as the feature's own skirt crossing a
+  bound chosen for a different purpose, rather than a broadband leak. (s184, GATE BM's BM0g)
+
 - **`ratio-statistics-need-a-denominator-guard`.** Searches kill the denominator; gates manufacture
   failures by differencing floor-level numerators. A dB number computed from something at the
   numerical floor is not a measurement. (s40, s54, s72)
@@ -2689,6 +2884,18 @@
   instrument defect: a guard CRASHED (`None` subscripted) where it should have REFUSED — s117's
   rule, that a gate handing the next session a stack trace has handed them a symptom instead of a
   reason. Both are recorded at their arms. (s159, GATE AW)
+- ⭐⭐ **A CACHE TAG MUST BE INJECTIVE IN THE CONDITION IT NAMES — AND A LOSSY ONE CORRUPTS THE
+  REPORT TABLE, NOT THE CACHE.** Render cells swept over a knob at 0.94/0.96/0.98/0.99/0.995/0.999
+  were tagged `f"band{int(lk*100)}"`, which maps the **last three onto ONE tag**. Two consequences,
+  and the second is the expensive one: the cache thrashed (each cell re-rendered over the last —
+  wasteful, but the entries were saved from being silently WRONG only by the argv stamp the cache
+  already checked, s117), and the report's ratio table looked its rows back up **by tag**, so three
+  rows were printed against the FIRST cell's condition. ⭐ The tell was arithmetic, not a guard:
+  **three consecutive rows showing identical inputs but different ratios is impossible**, and
+  reading the printed table is what caught it. ⇒ derive a cache tag from the value with enough
+  precision to be injective, **assert the injectivity** (one `len(set(tags)) != len(tags)` line),
+  and index report rows by the RECORD, never by a re-looked-up key. (s185)
+
 - **`rebaseline-all-derived-artefacts`.** Changing an upstream global expires the intermediate CSVs
   and the fixed-amplitude gates too, not just the headline baseline. Three occurrences (s35, s45,
   s65). Fix: every render writes a `.args.json` stamp of its exact argv; every read checks it.
@@ -2700,6 +2907,31 @@
 - **A cache key that omits the thing you changed makes the change a silent no-op.** `_cache_key`
   hashes bands but not anchors: editing `THD_ANCHORS` and re-running returns the OLD records and
   prints a plausible table. Probe the key live, with a control that confirms it *does* move. (s88)
+- ⚠⚠ **AND THE SAME RULE FOR A *SOURCE FILE* AND ITS MUTATION RUNNER: DO NOT EDIT THE TOOL WHILE ITS
+  RUNNER IS EXECUTING.** A mutation runner re-reads the gate's source **once per arm** (it has to — it
+  patches a fresh copy each time), so an edit made mid-run puts the early arms on the old source and
+  the later ones on the new one. The tally is then **mixed-epoch and unattributable**, exactly like
+  s124's mixed-binary matrix report, and it looks completely normal: every line still says PASS.
+  ⭐ It is also silently EXPENSIVE — the arms after the edit re-render whatever the edit added, in a
+  cache the early arms never populated. ⛔ The remedy is the same as for the binary: let the run
+  finish, or kill it, sweep its artefacts, and re-run against the final source — and `pgrep` for a
+  running runner before editing the gate it tests, not just before a build. (s184)
+
+- ⭐⭐ **AN EDIT→BUILD→EDIT→BUILD CYCLE COMPLETED INSIDE ONE FILESYSTEM SECOND CAN LEAVE A STALE
+  BINARY, AND THE STALE BINARY THEN "FAILS" A TEST THE SOURCE PASSES.** Mutation-controlling a new
+  assertion by hand — perturb the constant, rebuild, run (must go red), restore, rebuild, run (must
+  go green) — the *restore* build printed `Built target` **without recompiling**, so the final run
+  used the MUTATED binary and reported FAIL against a source that `grep` showed was correct. Two
+  minutes went into suspecting the assertion. The cause is make's one-second mtime granularity: the
+  whole cycle ran in under a second (the intermediate runs had failed instantly on a wrong binary
+  path), so the restored header was not *newer* than the object. ⭐ GENERAL: **when a test's verdict
+  disagrees with what the source says, check the BINARY before the logic** — `touch` the translation
+  unit and rebuild, or put a `sleep 1` between an edit and its build in any scripted
+  mutate/restore loop. ⚠ And the tell was available: the pre-mutation run ALREADY printed the
+  mutated value, i.e. the binary was wrong before the mutation was applied — a "before" reading that
+  shows the "after" value is a staleness report, not a result. Same family as s152's uncompiled
+  shipped header, arriving from timing rather than from ordering. (s185)
+
 - ⭐ **NEVER REBUILD THE RENDER BINARY WHILE A MATRIX RENDER IS IN FLIGHT** — not even for a
   comment-only edit. `_cache_key` hashes `_file_sig(binpath)` (size + mtime_ns), so a relink
   mid-run splits the run's cache entries across two binary signatures and swaps the executable
@@ -2828,6 +3060,40 @@
 
 ## 6. Reading physical measurements
 
+- ⭐⭐⭐ **A PERTURBATION THAT IS "N dB DOWN" RELATIVE TO A *COEFFICIENT* IS NOT N dB DOWN RELATIVE
+  TO THE *SIGNAL* — AND WHERE THE THING IT IS ADDED TO IS SMALL, IT DOMINATES.** Session 181 gave
+  the BLEND stage a wiper end stop, which puts a clean term at **−32.12 dB re the OD coefficient**
+  into the bleed-free corner. Everything about that number invites "negligible, 0.2 dB at worst",
+  and the project's own handover said as much for two sessions. Measured, the shape perturbation
+  reaches **12.25 dB**. The reason is one line of arithmetic nobody did: the two branches have
+  *different transfer functions*, so the honest quantity is `r(f) = e·|CLEAN(f)| / ((1−e)·|OD(f)|)`
+  — and `r` reaches **+11.21 dB at the 320 Hz null** and **+7.56 dB at 25 Hz**, i.e. **the "32 dB
+  down" term is the LARGER of the two** at both band edges and at every cancellation. Structural,
+  not a coincidence: the OD path is high-passed into the clipper and low-passed by two Sallen-Keys
+  and the clean tap is neither, so `r` is largest exactly where the OD branch has rolled off or
+  cancelled. ⭐ GENERAL: **before dismissing an added path by the size of its coefficient, divide
+  it by the branch it is added to, PER FREQUENCY** — the ratio, not the coefficient, is what the
+  measurement sees, and the places it is largest are precisely the nulls and edges that features
+  are made of. ⭐⭐ **The constructive half is that this SPLITS cleanly and the two halves need
+  opposite treatment**: at an endpoint where the mix coefficients are CONSTANTS, the change is
+  exactly (a) a flat gain, which corrects a list of published numbers by subtraction and needs no
+  render at all, plus (b) a shape term that cannot be corrected on paper and must be rendered.
+  Compute (a) and assert it; measure (b). Reporting one pooled "the anchor moved by X" would have
+  been wrong in both directions at once. (s183, GATE BL)
+- ⭐⭐ **AND THE COROLLARY: AN ADDITIVE PATH THAT DOES NOT GO THROUGH THE CANCELLING NETWORK PUTS
+  A FLOOR UNDER EVERY CANCELLATION — SO A CENSORING FLOOR CAN LIVE INSIDE THE MODEL, NOT ONLY IN
+  THE INSTRUMENT.** The same change moved a null's **POINT** depth by **−4.07 dB** and its **AREA**
+  (1/6-oct power-integrated) depth by **−0.24 dB** — a **17×** disagreement, with Q broadening
+  18.6 %. That is not noise and it is not two measurements of one thing: GATE AP (s152) built the
+  area estimator precisely because a point depth is censored wherever the bottom sits at a floor,
+  and measured it 4.1× less sensitive. Here the floor is the model's own bleed, which **cannot
+  cancel because it does not pass through the network doing the cancelling**, so it floors the
+  bottom and leaves the flanks — which is the point/area signature exactly. ⭐ GENERAL: when a
+  model gains a parallel path, ask which of its measurements are **cancellations**; those are
+  censored by the new path in a way a broadband reading never shows, and **the disagreement
+  between a point and an area estimator is the diagnostic**, not a nuisance. ⚠ And check what the
+  censored metric was being used FOR: here it is the metric a standing USER DECISION selected, at
+  the exact operating point the affected table was fitted at. (s183, GATE BL's BL4)
 - ⭐⭐⭐ **A FEATURE'S CENTRE FREQUENCY IS ONLY A *CORNER* IF THE FEATURE IS MADE BY A NETWORK — AND
   IN A MIXED-PATH CHAIN MOST OF THEM ARE NOT.** Six peak/notch centre mismatches were flagged off
   FR overlays and read as "the model's filters are in the wrong place". This chain's output is
@@ -3075,6 +3341,25 @@
 - **Removing a confound can destroy sensitivity.** The extreme setting that idles the clipper also
   buries the signal 15 dB under the bleed. Prefer a knob that decouples the two — drive noon is the
   sweet spot, not an unfortunate compromise. (s59)
+
+- ⭐⭐⭐ **WHEN TWO ESTIMATORS OF ONE QUANTITY DISAGREE ABOUT ITS *SIGN*, THAT IS NOT A PRECISION
+  QUIBBLE — THEY ARE RECOMMENDING OPPOSITE CORRECTIONS, AND WHERE IT HAPPENS IS THE DIAGNOSIS.**
+  Grading a notch stage's remaining correction on both a POINT depth and a 1/6-oct AREA depth, the
+  two agreed to ≤0.33 dB at every MIXED cell and **had opposite signs at 4 of 6 BLEED-FREE cells**
+  (`+1.689 / −3.501`, `+4.420 / −4.402`, `+2.951 / −6.105`, `+3.258 / −4.106`). ⭐⭐ **The
+  attribution is threshold-free because the populations SEPARATE COMPLETELY on the null bottom's
+  margin below the deconvolution residue**: the sign-opposed cells sit at **−13.1, −11.7, −7.3,
+  −6.2 dB** and every agreeing cell at **−0.18 … +0.98** — a **6.02 dB gap with nothing in it**, so
+  no bar is being chosen (s109's "find the gap, put the bar in it, ASSERT the separation"). ⇒ where
+  a null's bottom is far below the residue its POINT depth is a lower bound and the estimators
+  diverge; where something floors the null near the residue they agree. ⭐ GENERAL: **run every
+  depth-like statistic through BOTH a bottom-referred and an area-referred estimator and print the
+  gap, then check whether the DISAGREEMENT correlates with a censoring margin** — the correlation is
+  the mechanism, and the region where they disagree is the region no decision may be taken in.
+  ⚠⚠ **A censoring COUNT is usually the wrong statistic for this**: the imported "within 3 dB of the
+  residue" bar flagged **11 of 11** cells here, so a draft's verdict fired on `6 > 5` — a difference
+  in how many cells each arm has, not a rate (`check-n-before-reading-a-trend`). The MARGIN
+  separates; the bar does not. (s186, GATE BO's BO5)
 
 ## 7. Process
 

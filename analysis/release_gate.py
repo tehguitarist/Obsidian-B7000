@@ -212,6 +212,25 @@ def subsets(rows, drops=frozenset(), ex_n12=None):
     it is labelled `[control]` for exactly that reason. Do not sum the subsets."""
     ex_n12 = MG.EXCLUDE_GAIN_N12 if ex_n12 is None else ex_n12
     n12_lbl = "OD gain-n12 [bad]" if ex_n12 else "OD gain-n12 [control]"
+
+    # ⛔⛔ s181: captures PROVEN defective are excluded by NAME and get their own labelled
+    # subset, so they are visible in the printout rather than silently missing from the
+    # totals (s40). `level-0700_gain-n12_base-od.wav` was invisible until now because the
+    # model rendered digital silence at LEVEL min and the row fell under SILENT_DB; the
+    # BLEND end stop ends that, so without this it would START being graded — against a
+    # capture that is ~20 dB mis-dialled. See captures.py::DEFECTIVE_CAPTURES for the
+    # evidence.
+    # ⛔ NOT wrapped in a try/except. A guard that silently disables itself when its import
+    # fails is worse than no guard — it would drop back to grading the defective row with
+    # nothing printed. If this import can't resolve, the gate must die.
+    import captures as CAPS
+    bad_named = {k for k in rows if CAPS.is_defective(k[0])}
+    if bad_named:
+        for f in sorted({k[0] for k in bad_named}):
+            print(f"  [excluded by name] {f} — proven defective, see "
+                  f"captures.py::DEFECTIVE_CAPTURES")
+    drops = set(drops) | bad_named
+
     od = {k: v for k, v in rows.items()
           if v[1] and k not in drops and not (ex_n12 and MG.is_gain_n12(k[0]))}
     n12 = {k: v for k, v in rows.items()

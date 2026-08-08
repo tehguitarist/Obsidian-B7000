@@ -244,11 +244,19 @@ public:
             trebleShadow = treble;
         if (gruntMoved)
         {
-            // GRUNT moves TWO stages, and only one of them is the switch itself:
-            // the clipper's cap network, and `OdToneRestore`'s grunt-keyed (gain, Q)
-            // table, which jumps a whole row. Both are crossfaded, off the one ramp.
+            // GRUNT moves FOUR stages now, not two (session 187 added the other two):
+            // the clipper's cap network, `OdToneRestore`'s grunt-keyed (gain, Q) table,
+            // `odCoupling`'s C15 (5.2n <-> 2200n at Cut) and `OdMakeup`'s low-shelf cut
+            // (6.0 <-> 2.2 dB at Cut) -- all FOUR crossfaded, off the SAME one ramp.
+            // ⛔⛔ THE COST OF FORGETTING ONE: SwitchTransitionTest caught it directly
+            // when odCoupling/odMakeup were first wired GRUNT-keyed with no shadow --
+            // "click" failures at grunt/mids-boost, grunt/mids-cut, grunt/mixed,
+            // grunt/blend-noon.  Snapshot BEFORE syncGruntKeyedOd() (below, and again
+            // in applyFitParams()) moves the LIVE instances to the new position.
             clipperShadow = clipper;
             odToneShadow = odToneRestore;
+            odCouplingShadow = odCoupling;
+            odMakeupShadow = odMakeup;
         }
         if (loMidMoved)
             loMidShadow = loMid;
@@ -271,6 +279,7 @@ public:
         // {Boost, Cut, Flat}, which is NOT the enum's order.
         odToneRestore.setGrunt(static_cast<int>(gruntEnum(p.gruntIdx)));
         clipper.setGrunt(gruntEnum(p.gruntIdx));
+        syncGruntKeyedOd();    // GRUNT moved (or this is the bootstrap call) -- re-pick C15/shelf
         treble.setAttack(attackEnum(p.attackIdx));
 
         levelBlend.setLevel(p.level);
@@ -364,7 +373,8 @@ public:
         treble.setLadder(f.trebleR7, f.trebleLadderR12, f.trebleLadderR14,
                          f.trebleC9, f.trebleC6);
         treble.setC7(f.trebleC7);                 // session-34: A3 step-3a, IC2_A LF headroom
-        odCoupling.setC(f.clipC15);                // session-36: A3 step-3b, C15 coupling into IC2_B
+        // odCoupling's C15 is now GRUNT-keyed (session 187) -- set below via syncGruntKeyedOd(),
+        // NOT here, so a single call site can't drift from the one in applyParams().
 
         drive.setTaperExp(f.driveTaperExp);
         // ⚠ s163: LEVEL is a 4-segment PWL, not an exponent. `setTaperExp` no longer exists on
@@ -373,13 +383,19 @@ public:
         levelBlend.setTaper(f.levelTaperBreak1, f.levelTaperFrac1,
                             f.levelTaperBreak2, f.levelTaperFrac2,
                             f.levelTaperBreak3, f.levelTaperFrac3);
+        // ⚠ ORDER MATTERS AND IS ASSERTED, NOT ASSUMED: setBlendEndStop() re-applies the
+        // stored knob, and setBlend() reads the end stops, so whichever runs last wins.
+        // Calling it here (applyFitParams) and setBlend() in applyParams() is safe ONLY
+        // because both re-derive B from `blendKnob` — s124's two-setters-two-orders trap,
+        // made unreachable rather than documented.
+        levelBlend.setBlendEndStop(f.blendEndStop, f.blendEndStopClean);
         syncOdToneMix();   // the LEVEL taper moves the clean fraction — see applyParams()
 
         // [ENG] OD-path makeup — the OD:CLEAN ratio (s172, item 10/A3). See OdMakeup.h.
-        // Set here and NOT in applyParams(): these are fitted constants, not knobs.
-        odMakeup.setLaw(f.odMakeupDb, f.odMakeupLowHz, f.odMakeupLowCutDb,
-                        f.odMakeupHighHz, f.odMakeupHighCutDb,
-                        f.odMakeupLowS, f.odMakeupHighS);
+        // The low-shelf half is now GRUNT-keyed (session 187, item 17's bass half PART 2);
+        // syncGruntKeyedOd() sets BOTH odCoupling's C15 and this shelf from the SAME GRUNT
+        // read, so they cannot drift apart the way two independent call sites could.
+        syncGruntKeyedOd();
         odMakeup.setHfMix(f.odMakeupHfHz, f.odMakeupHfQ, f.odMakeupHfAtOdDb,
                           f.odMakeupHfPeakDb, f.odMakeupHfPeakCf, f.odMakeupHfAtCleanDb);
         odToneRestore.setQScale(f.odNotchQScale);   // notch WIDTH multiplier (s172)
@@ -482,12 +498,18 @@ public:
         {
             const double shadowOut = clipperShadow.process(s);
             s = gruntFade.blend(shadowOut, clipper.process(s));
+            // odCoupling's C15 is GRUNT-keyed at Cut (session 187) -- crossfade it on
+            // the SAME ramp, at the SAME point in the chain it always ran at. Two
+            // blends between one tick() is fine, same as clipper+odToneRestore below;
+            // `tick()` still fires exactly once, at the LAST blend point in the sample.
+            const double coupShadowOut = odCouplingShadow.process(s);
+            s = gruntFade.blend(coupShadowOut, odCoupling.process(s));
         }
         else
         {
             s = clipper.process(s);
+            s = odCoupling.process(s);
         }
-        s = odCoupling.process(s);
         s = recovery.process(s);
         if (gruntFading)
         {
@@ -544,7 +566,24 @@ public:
         // makeup in there would silently re-key OdToneRestore's mix law in the same edit.
         // See the FitParams block for why one change at a time matters here.
         // Ships at 1.0 (0 dB) => bit-identical to every prior build.
-        double s = levelBlend.process(cleanDelayed, odMakeup.process(odDown));
+        // ⚠ The low-shelf half is GRUNT-keyed at Cut (session 187) — this is the THIRD
+        // GRUNT crossfade point and the only one at BASE rate. `gruntFade` is read, not
+        // ticked, here: `runOdSample()` already ticks it once per OVERSAMPLED sample, at
+        // a rate far higher than this base-rate call, so by the time a given base
+        // sample's oversampled sub-block has fully run, `mix` already reflects that
+        // sub-block's progress — reading it again here (without a second tick) picks up
+        // that same, still-current value.
+        double odMakeupOut;
+        if (gruntFade.active())
+        {
+            const double shadowOut = odMakeupShadow.process(odDown);
+            odMakeupOut = gruntFade.blend(shadowOut, odMakeup.process(odDown));
+        }
+        else
+        {
+            odMakeupOut = odMakeup.process(odDown);
+        }
+        double s = levelBlend.process(cleanDelayed, odMakeupOut);
         s = c21.process(s);          // C21 100n inter-stage HP (bass shaping)
         s = eqPreGain.process(s);
         s = baxandall.process(s);
@@ -757,6 +796,35 @@ private:
         odMakeup.setCleanFraction(cf);
     }
 
+    // Push the GRUNT-keyed OD-branch LF correction (session 187, open item 17's bass half
+    // PART 2 -- the bass-null CENTRE, never graded until now; s180 shipped the DEPTH only).
+    // Called from BOTH applyParams() and applyFitParams(), same reason as syncOdToneMix(): the
+    // choice depends on GRUNT (a `p.` param, live in `cur` once applyParams() has run once) AND
+    // on the fitted override values (`fit.`, set independently by setFitParams()) -- two inputs
+    // from two different entry points in caller-dependent order (s124's two-setters trap).
+    // Resolving both from stored state in ONE place is what makes the result order-independent,
+    // and what keeps odCoupling's C15 and OdMakeup's low shelf from being set by the SAME GRUNT
+    // read but at two DIFFERENT moments (which is how the two could silently disagree).
+    //
+    // ⛔⛔ ONLY CUT DIFFERS. Measured: `ref-od`'s bass-null centre sits at 1.374x the pedal's
+    // (66.9 vs 48.7 Hz, frozen across all four stimulus rungs) and the shelf alone cannot reach
+    // it (best case, fully off, is still 1.189x -- s126's "a locus that cannot contain the
+    // target refutes the LEVER"). A second axis, `clipC15`, closes it -- but ONLY at GRUNT=Cut:
+    // applying the same correction at Flat/Boost was rendered and REFUTED (it drives their
+    // already-small 63-100 Hz error to +3..+9.7 dB and blows out the ~320 Hz null's depth by up
+    // to 5.8 dB), because GRUNT switches the clipper's OWN input coupling bank (a ~47x swing in
+    // the OD branch's own LF corner) and a shared post-clipper element cannot serve all three.
+    // See FitParams::clipC15Cut / odMakeupLowCutDbCut for the full derivation.
+    void syncGruntKeyedOd() noexcept
+    {
+        const bool isCut = (gruntEnum(cur.gruntIdx) == Clipper::Grunt::Cut);
+        odCoupling.setC(isCut ? fit.clipC15Cut : fit.clipC15);
+        odMakeup.setLaw(fit.odMakeupDb, fit.odMakeupLowHz,
+                        isCut ? fit.odMakeupLowCutDbCut : fit.odMakeupLowCutDb,
+                        fit.odMakeupHighHz, fit.odMakeupHighCutDb,
+                        fit.odMakeupLowS, fit.odMakeupHighS);
+    }
+
     static Clipper::Grunt gruntEnum(int idx) noexcept
     {
         // APVTS {Boost, Cut, Flat} → enum {Cut, Flat, Boost}
@@ -837,6 +905,8 @@ private:
     TrebleAttack trebleShadow;
     Clipper clipperShadow;
     OdToneRestore odToneShadow;
+    OdCoupling odCouplingShadow;   // session 187: GRUNT-keyed C15, 3rd crossfade point
+    OdMakeup odMakeupShadow;       // session 187: GRUNT-keyed low shelf, 4th (base-rate) point
     MidBand loMidShadow, hiMidShadow;
     SwitchFade attackFade, gruntFade, loMidFade, hiMidFade;
     // False until the first applyParams() has reconciled the stages with `cur` —

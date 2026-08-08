@@ -231,6 +231,8 @@ static const FitField kFitFields[] = {
     {"levelTaperBreak2", &FitParams::levelTaperBreak2},
     {"levelTaperFrac2", &FitParams::levelTaperFrac2},
     {"levelTaperBreak3", &FitParams::levelTaperBreak3},
+    {"blendEndStop", &FitParams::blendEndStop},
+    {"blendEndStopClean", &FitParams::blendEndStopClean},
     {"levelTaperFrac3", &FitParams::levelTaperFrac3},
     {"masterTaperBreak", &FitParams::masterTaperBreak},
     {"masterTaperFrac", &FitParams::masterTaperFrac},
@@ -240,6 +242,7 @@ static const FitField kFitFields[] = {
     {"odMakeupDb", &FitParams::odMakeupDb},
     {"odMakeupLowHz", &FitParams::odMakeupLowHz},
     {"odMakeupLowCutDb", &FitParams::odMakeupLowCutDb},
+    {"odMakeupLowCutDbCut", &FitParams::odMakeupLowCutDbCut},   // session 187, GRUNT=Cut only
     {"odMakeupHighHz", &FitParams::odMakeupHighHz},
     {"odMakeupHighCutDb", &FitParams::odMakeupHighCutDb},
     // Shelf SLOPE (s173). 0.9 = the s172 shipped value, so a default render is unchanged.
@@ -275,6 +278,7 @@ static const FitField kFitFields[] = {
     {"trebleC6", &FitParams::trebleC6},
     {"trebleC7", &FitParams::trebleC7},
     {"clipC15", &FitParams::clipC15},
+    {"clipC15Cut", &FitParams::clipC15Cut},   // session 187, GRUNT=Cut only
     {"btR22", &FitParams::btR22},
     {"btR23", &FitParams::btR23},
     {"btC16", &FitParams::btC16},

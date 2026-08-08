@@ -113,7 +113,193 @@ SETS = {
         ("drive-1700_blend-0930_base-od.wav", 1.0),
         ("drive-1700_blend-0700_base-od.wav", 1.0),
     ],
+
+    # ============================================================================================
+    # THE MIXED TWINS — added session 186 (open item 19's task P3).  ⛔ EVERYTHING ABOVE THIS LINE
+    # IS FROZEN: five other gates index these groups BY NAME (`null_depth_censor_gate.ROWS` and
+    # through it GATE AQ and GATE AX; `model_prominence_gate`; `notch_shoulder_gate`), so a group
+    # above must never change contents or every one of their stored numbers silently moves.
+    # `check_sets()` pins them with a fingerprint, so this is asserted rather than intended.
+    # ============================================================================================
+    # WHY: measured at s186, the 8 groups above hold **17 of 29 rows at cf = 0.02418** and — far
+    # sharper — **the GRUNT axis is 12 of 12 rows bleed-free**.  So this stage's GRUNT-ROWED tables
+    # (`kNotchGainDb[3][5]`, `kNotchMixK[3][5]`, `kNotchQ[3][5]`) have only ever been graded at ONE
+    # clean fraction, on the axis that has three rows to choose between.  The user's steer (s183 §9)
+    # is that bleed-free is one setting and not the most used one; GATE BM (s184) then measured the
+    # bleed-free corner to be unrepresentative on every one of the seven features.
+    # ⚠ These are CHECK sets exactly as `listen` is — `--fit` still reads `bleedfree`, because the
+    #   base row is anchored there by construction (s156) and re-pointing it is a RE-FIT, which P1
+    #   measured as unnecessary (the applied cut moves 3.1x more at the corner, opposite sign).
+    #
+    # The DRIVE ladder at the LISTENING condition (LEVEL noon / BLEND max), per GRUNT position —
+    # the direct mixed twins of `grunt_flat` / `grunt_boost`.  ⚠⚠ MEMBERSHIP IS ASYMMETRIC AND THAT
+    # IS A CAPTURE FACT, NOT A CHOICE: `drive-1430_grunt-*` and `drive-1700_grunt-flat` do not
+    # exist on disk, so flat reaches DRIVE 0.5 and boost reaches 1.0 while cut (`listen`) reaches
+    # all five.  Named here so a pooled comparison across positions cannot quietly compare
+    # different ladders (`aggregate-moved-check-membership-first`).
+    "listen_flat": [
+        ("drive-0700_grunt-flat_base-od.wav", 0.0),
+        ("drive-0930_grunt-flat_base-od.wav", 0.25),
+        ("grunt-flat_base-od.wav", 0.5),
+    ],
+    "listen_boost": [
+        ("drive-0700_grunt-boost_base-od.wav", 0.0),
+        ("drive-0930_grunt-boost_base-od.wav", 0.25),
+        ("grunt-boost_base-od.wav", 0.5),
+        ("drive-1700_grunt-boost_base-od.wav", 1.0),
+    ],
+    # The GRUNT axis read ACROSS positions at one drive — the mixed twins of `grunt_cold` (DRIVE 0)
+    # and of the missing "grunt at drive noon" bleed-free group.  ⛔ There is NO mixed twin of
+    # `grunt_hot` (DRIVE max across GRUNT): `drive-1700_grunt-flat_base-od.wav` is not on disk, and
+    # capture access is ending (`reference-sources.md` §0), so that is a permanent gap rather than a
+    # request.  Stated, not worked around.
+    "grunt_mix": [
+        ("ref-od.wav", 0.5),                        # GRUNT cut
+        ("grunt-flat_base-od.wav", 0.5),
+        ("grunt-boost_base-od.wav", 0.5),
+    ],
+    "grunt_cold_mix": [
+        ("drive-0700_base-od.wav", 0.0),            # GRUNT cut
+        ("drive-0700_grunt-flat_base-od.wav", 0.0),
+        ("drive-0700_grunt-boost_base-od.wav", 0.0),
+    ],
+    # ⭐ THE LEVEL AXIS, WHICH NO GROUP ABOVE COVERS AT ALL.  `blend`/`blend_hot` sweep BLEND; the
+    # LEVEL pot is held at max or noon everywhere else, so the one control the mix law is keyed
+    # through has never been swept in this tool.  These are the 9 on-disk detents at BLEND max.
+    # ⚠ Free corroboration of s185's own finding, visible in the cf column: the detents jump
+    # 0.24382 (knob 0.875) straight to 0.02418 (knob 1.0), so the band P2's re-anchor disturbs
+    # (cf in (0.02418, 0.20433)) contains NO capture — the gap is in the matrix, not in the law.
+    "level_ladder": [
+        ("level-0815_base-od.wav", 0.5),
+        ("level-0930_base-od.wav", 0.5),
+        ("level-1045_base-od.wav", 0.5),
+        ("ref-od.wav", 0.5),                        # LEVEL noon (== `level-1200`, which has no file)
+        ("level-1315_base-od.wav", 0.5),
+        ("level-1430_base-od.wav", 0.5),
+        ("level-1545_base-od.wav", 0.5),
+        ("level-1700_base-od.wav", 0.5),            # the bleed-free corner, as the ladder's end
+    ],
+    # The LEVEL x BLEND interior — GATE BM's 3x3, every cell a real capture, none of them ever read
+    # by this tool.  ⚠ These run cf 0.557 .. 0.978, i.e. mostly-clean, where the composite null
+    # legitimately DISSOLVES and `notch_geometry` REFUSES.  A refusal is a reading of the physics,
+    # not a failure (s151) — the point of including them is to establish WHERE the stage stops
+    # being measurable at all, which no bleed-free set can say.
+    "mixgrid": [
+        ("level-0930_blend-1430_base-od.wav", 0.5),
+        ("level-0930_blend-1200_base-od.wav", 0.5),
+        ("level-0930_blend-0930_base-od.wav", 0.5),
+        ("level-1200_blend-1430_base-od.wav", 0.5),
+        ("level-1200_blend-1200_base-od.wav", 0.5),
+        ("level-1200_blend-0930_base-od.wav", 0.5),
+        ("level-1430_blend-1430_base-od.wav", 0.5),
+        ("level-1430_blend-1200_base-od.wav", 0.5),
+        ("level-1430_blend-0930_base-od.wav", 0.5),
+    ],
 }
+
+# ⛔⛔ THE FROZEN GROUPS, PINNED BY CONTENT.  `null_depth_censor_gate.ROWS` names three of these and
+# GATE AQ / GATE AX inherit it; `model_prominence_gate` and `notch_shoulder_gate` name "bleedfree"
+# directly.  If any of them moved, five gates' stored numbers would shift with no diff anywhere near
+# them — s146's `masterTaperBreak` failure with the blast radius spread across files.  So the
+# guarantee "P3 was ADDITIVE" is asserted, not claimed.
+FROZEN_SETS = ("bleedfree", "listen", "blend", "grunt_flat", "grunt_boost", "grunt_hot",
+               "grunt_cold", "blend_hot")
+FROZEN_ROWS = 29                          # measured s186 across the 8 frozen groups
+
+# ---- what each group HOLDS and what it VARIES --------------------------------------------------
+# Resolved from SETTINGS and asserted (s114: a substring/filename convention is a guess about a
+# naming scheme, and naming schemes are not versioned).  `hold` is checked against every row's own
+# parsed capture; `vary` is the axis the group exists to sweep and is NOT checked for constancy.
+#   level/blend  -> the knob fraction as captured
+#   grunt        -> PHYSICAL Clipper::Grunt position via grunt_pos_of() (0=cut, 1=flat, 2=boost)
+#   drive        -> the tuple's own second element, checked against the capture (0 mismatches, s186)
+SET_META = {
+    "bleedfree":      {"hold": {"level": 1.0, "blend": 1.0, "grunt": 0}, "vary": "drive"},
+    "listen":         {"hold": {"level": 0.5, "blend": 1.0, "grunt": 0}, "vary": "drive"},
+    "blend":          {"hold": {"level": 1.0, "grunt": 0, "drive": 0.5}, "vary": "blend"},
+    "grunt_flat":     {"hold": {"level": 1.0, "blend": 1.0, "grunt": 1}, "vary": "drive"},
+    "grunt_boost":    {"hold": {"level": 1.0, "blend": 1.0, "grunt": 2}, "vary": "drive"},
+    "grunt_hot":      {"hold": {"level": 1.0, "blend": 1.0, "drive": 1.0}, "vary": "grunt"},
+    "grunt_cold":     {"hold": {"level": 1.0, "blend": 1.0, "drive": 0.0}, "vary": "grunt"},
+    "blend_hot":      {"hold": {"grunt": 0, "drive": 1.0}, "vary": "blend"},
+    "listen_flat":    {"hold": {"level": 0.5, "blend": 1.0, "grunt": 1}, "vary": "drive"},
+    "listen_boost":   {"hold": {"level": 0.5, "blend": 1.0, "grunt": 2}, "vary": "drive"},
+    "grunt_mix":      {"hold": {"level": 0.5, "blend": 1.0, "drive": 0.5}, "vary": "grunt"},
+    "grunt_cold_mix": {"hold": {"level": 0.5, "blend": 1.0, "drive": 0.0}, "vary": "grunt"},
+    "level_ladder":   {"hold": {"blend": 1.0, "grunt": 0, "drive": 0.5}, "vary": "level"},
+    "mixgrid":        {"hold": {"grunt": 0, "drive": 0.5}, "vary": "level+blend"},
+}
+
+# A group is BLEED-FREE only where the clean coefficient vanishes, which is GATE K2's corner and
+# nothing else.  ⚠⚠ Since s181's `blendEndStop` that corner is cf = 0.02418, NOT 0 — so the bar is
+# a small band around the shipped end stop rather than an equality, and it is READ FROM THE HEADER
+# rather than transcribed, so it cannot go stale the way GATE K2's own mirrors did at s182.
+BLEEDFREE_CF_TOL = 1e-4
+
+
+_BF_CF = [None]
+
+
+def bleedfree_cf():
+    """The clean fraction AT the bleed-free corner (LEVEL = BLEND = max), from the SHIPPED mix
+    algebra — `coef_closed`, the same function `clean_frac_of` uses, so the two cannot disagree
+    about what the corner is.
+
+    ⚠⚠ NOT a transcription of 0.02418.  `level_law_gate.check_shipped_endstop()` is called first
+    for its DIVERGENCE guard (s182: K2's two mirrors both went stale on s181's end stop while
+    agreeing with each other to 5.6e-17, because both take the topology as INPUT), so if
+    `FitParams::blendEndStop` ever moves this refuses instead of quietly returning the old corner."""
+    if _BF_CF[0] is None:
+        import level_law_gate as _LL
+        _LL.check_shipped_endstop()               # refuses if FitParams.h has drifted
+        od, cl = _LL.coef_closed(1.0, _LL.level_taper(1.0))
+        _BF_CF[0] = (cl / (od + cl)) if (od + cl) > 0 else 1.0
+    return _BF_CF[0]
+
+
+def check_sets(verbose=False):
+    """Assert every group's declared invariant against its rows' OWN parsed settings, and pin the
+    frozen groups.  REFUSES rather than warning: a mis-declared group is not a degraded reading,
+    it is a group measuring a different thing than its name says, and every statistic pooled over
+    it inherits that silently."""
+    e = bleedfree_cf()
+    bad = []
+    if tuple(k for k in FROZEN_SETS if k in SETS) != FROZEN_SETS:
+        bad.append(f"a FROZEN group has been renamed or removed: {FROZEN_SETS}")
+    nfroz = sum(len(SETS[k]) for k in FROZEN_SETS if k in SETS)
+    if nfroz != FROZEN_ROWS:
+        bad.append(f"the frozen groups hold {nfroz} rows, expected {FROZEN_ROWS} — five other "
+                   f"gates index them by name; their stored numbers move if this changes")
+    rows = []
+    for name, meta in sorted(SET_META.items()):
+        if name not in SETS:
+            bad.append(f"SET_META names '{name}', which is not in SETS")
+            continue
+        for fname, drv in SETS[name]:
+            p = C.parse_capture(fname)
+            got = {"level": p["level"], "blend": p["blend"], "drive": p["drive"],
+                   "grunt": grunt_pos_of(fname)}
+            if abs(p["drive"] - drv) > 1e-9:
+                bad.append(f"{name}/{fname}: declared DRIVE {drv} but the capture is {p['drive']}")
+            for k, want in meta["hold"].items():
+                if abs(got[k] - want) > 1e-9:
+                    bad.append(f"{name}/{fname}: declares {k}={want} but the capture is {got[k]}")
+            cf = clean_frac_of(fname)
+            rows.append((name, fname, drv, cf, got["grunt"]))
+    missing = sorted(set(SETS) - set(SET_META))
+    if missing:
+        bad.append(f"SETS has groups with no declared invariant: {missing}")
+    if bad:
+        sys.exit("od_tone_restore_fit: MEMBERSHIP REFUSED\n  " + "\n  ".join(bad))
+    if verbose:
+        print(f"  membership OK — {len(SET_META)} groups, {len(rows)} rows, "
+              f"bleed-free corner cf = {e:.5f} (FitParams::blendEndStop)")
+    return rows
+
+
+def is_bleedfree(fname, e=None):
+    e = bleedfree_cf() if e is None else e
+    return abs(clean_frac_of(fname) - e) <= BLEEDFREE_CF_TOL
 
 # Shape normalisation.  Both curves get their mean over this band removed before differencing, so
 # what is compared is SHAPE and not level -- the same separation `comprehensive_report`'s per-row
@@ -626,8 +812,54 @@ def do_fit(args):
     return res
 
 
+def do_sets(_args):
+    """The MEMBERSHIP AUDIT — what each group actually holds, in clean fraction.
+
+    This exists because the imbalance it prints was invisible for 35 sessions: every group is
+    named for the axis it sweeps, and NOTHING in the tool said what mix those sweeps sit at.  A
+    group called `grunt_flat` reads as "the GRUNT flat condition", not as "the GRUNT flat condition
+    at the one clean fraction the pot cannot reach in normal use"."""
+    rows = check_sets()
+    e = bleedfree_cf()
+    print(f"\nSET MEMBERSHIP AUDIT   bleed-free corner cf = {e:.5f} "
+          f"(LEVEL = BLEND = max, via FitParams::blendEndStop)")
+    print("=" * 100)
+    print(f"  {'group':<16} {'n':>3} {'varies':<12} {'cf min':>8} {'cf max':>8} {'GRUNT':<14} "
+          f"{'DRIVE rungs':<22} kind")
+    print("=" * 100)
+    nbf_rows = nbf_groups = 0
+    for name in sorted(SET_META):
+        rs = [r for r in rows if r[0] == name]
+        cfs = [r[3] for r in rs]
+        drv = sorted({r[2] for r in rs})
+        gr = sorted({r[4] for r in rs})
+        gnames = "/".join(("cut", "flat", "boost")[g] for g in gr)
+        nbf = sum(1 for c in cfs if abs(c - e) <= BLEEDFREE_CF_TOL)
+        nbf_rows += nbf
+        kind = "BLEED-FREE" if nbf == len(rs) else ("mixed" if nbf == 0 else f"mixed ({nbf} bf)")
+        if nbf == len(rs):
+            nbf_groups += 1
+        print(f"  {name:<16} {len(rs):3d} {SET_META[name]['vary']:<12} {min(cfs):8.5f} "
+              f"{max(cfs):8.5f} {gnames:<14} {','.join(f'{d:g}' for d in drv):<22} {kind}")
+    tot = len(rows)
+    print("=" * 100)
+    print(f"  TOTAL {tot} rows in {len(SET_META)} groups;  bleed-free: {nbf_rows} rows "
+          f"({100.0*nbf_rows/tot:.0f} %), {nbf_groups} whole groups")
+    # The axis-level statement, which is the one that matters: a 3-row table graded at one cf.
+    gr_rows = [r for r in rows if SET_META[r[0]]["vary"] == "grunt"
+               or r[0] in ("bleedfree", "grunt_flat", "grunt_boost", "listen",
+                           "listen_flat", "listen_boost")]
+    gbf = sum(1 for r in gr_rows if abs(r[3] - e) <= BLEEDFREE_CF_TOL)
+    print(f"  GRUNT-bearing rows: {gbf} of {len(gr_rows)} bleed-free "
+          f"({100.0*gbf/max(len(gr_rows),1):.0f} %)")
+    print("\n  ⚠ `kind` is computed from each row's own cf, never from its filename — every capture "
+          "without a\n    `grunt-` token is GRUNT = CUT and every one without `level-` is LEVEL "
+          "noon, and both of those\n    have cost this project a whole session (s151, s172 §6).")
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--sets", action="store_true", help="membership audit: what mix each group is at")
     ap.add_argument("--fit", action="store_true", help="solve for the stage's parameters per rung")
     ap.add_argument("--geom", action="store_true", help="read the 320 Hz null's depth/Q both sides")
     ap.add_argument("--matrix", action="store_true", help="depth/Q across stimulus level x drive")
@@ -643,6 +875,14 @@ def main():
     ap.add_argument("--step", type=int, default=2, help="print every Nth grid cell")
     args = ap.parse_args()
 
+    # Membership is checked on EVERY path, not only under `--sets`: a mis-declared group poisons
+    # `--geom` and `--matrix` exactly as badly, and a guard that only runs when asked is a guard
+    # that runs when someone already suspects the answer.
+    check_sets()
+
+    if args.sets:
+        do_sets(args)
+        return
     if args.fit:
         do_fit(args)
         return

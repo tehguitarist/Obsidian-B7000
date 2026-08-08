@@ -195,6 +195,17 @@ public:
         return x;
     }
 
+    // ---- mix-law anchor, exposed for ONE assertion --------------------------
+    // ⭐ These three are public for a single reason, and it is not convenience: `kMixCf[0]` is
+    // NOT a free constant — it is the bleed-free corner's clean fraction, which is
+    // `FitParams::blendEndStop` (s185, item 19's task P2).  Nothing in this header can see
+    // FitParams, so the tie is asserted in tests/LevelBlendTest.cpp Test 9 and these are what
+    // let it reach.  ⛔ Not a general-purpose accessor set — do not read the mix law through
+    // them in DSP code; `recompute()` is the only consumer that should.
+    static constexpr double mixAnchorCf() noexcept { return kMixCf[0]; }
+    static constexpr double mixAnchorS() noexcept { return kMixS[0]; }
+    static double mixShapeAt(double cf) noexcept { return mixShape(cf); }
+
 private:
     // ---- breakpoint tables (drive knob 0/.25/.5/.75/1.0) --------------------
     static constexpr double kX[5] = { 0.0, 0.25, 0.5, 0.75, 1.0 };
@@ -406,9 +417,53 @@ private:
     // constant, and the clamp is reproducible by setting it to 0.21 if anyone wants to re-measure
     // it).  ⚠ The censoring itself is NOT refuted — the bleed-free corner is still the least
     // resolvable reading in the set; what is refuted is clamping as the response to it.
+    // ⭐⭐⭐ NODE 0's ABSCISSA WAS RE-ANCHORED 0.000 -> 0.02418 AT SESSION 185 (open item 19's task
+    // P2, GATE BN `analysis/mix_anchor_reanchor_gate.py`, USER DECISION 2026-08-08).  This is a
+    // CHANGE OF COORDINATE, NOT A RE-FIT: `kMixS[0] = 0.951` is a MEASUREMENT taken at the
+    // bleed-free corner (LEVEL = BLEND = max), and s181's `blendEndStop` moved that corner's clean
+    // fraction from exactly 0 to `e = 0.02418`.  The measured ordinate is untouched; only the
+    // coordinate it is filed under moved, which is why the ABSCISSA is what was edited — writing
+    // the equivalent `kMixS[0] = 1.143066` would have replaced a measured number with a derived
+    // one and lost the provenance.  (The two are the SAME line: GATE BN's BN0e asserts them equal
+    // to 3.3e-16 over cf in [e, 1], so which constant is edited is cosmetic.)
+    //
+    // ⭐⭐ WHY IT WAS NEEDED AT ALL — THE NODE IS DEAD BUT THE SEGMENT IS NOT.  `mixShape` is
+    // piecewise-linear, so `kMixS[0]` still reaches every cell on the first segment through
+    // interpolation, and the corner sits ON that segment.  Left at 0.000 the law evaluated
+    // S(e) = 0.781 where the measurement says 0.951 -- i.e. "the node is unreachable" did NOT make
+    // the constant inert, and reading it that way would have found nothing to do.
+    // ⇒ it RESTORES THE PRE-s181 LAW AT THE CORNER EXACTLY: 0.00e+00 dB over 15 (GRUNT x DRIVE)
+    // readings, an identity rather than a fit landing well.  It undoes s183's +1.6400 dB.
+    //
+    // ⚠⚠ WHAT IT COSTS, AND THE BAR IT WAS JUDGED AGAINST (<= 0.05 dB at every REACHABLE mixed
+    // cell) SPLIT IN TWO -- the pass is a MEMBERSHIP result and must never be quoted alone:
+    //   REACHABLE = CAPTURED  -> MET.  Worst mixed |dcut| EXACTLY 0.000000 dB over GATE BM's 20
+    //                            mix cells + all 8 `--set` groups; 3 rendered cells bit-identical.
+    //   REACHABLE = DIALLABLE -> EXCEEDED.  7.52 % of the LEVEL knob's travel at BLEND max (knob
+    //                            [0.9248, 0.9998]) moves, worst 1.64 dB of cut / 0.90 dB rendered.
+    // The two differ because the disturbed band (cf in 0.02418 .. 0.20433) is a GAP IN THE CAPTURE
+    // MATRIX: the LEVEL detents jump from cf 0.24382 straight to the corner's 0.02418.  ⇒ s183
+    // section 10's "every reachable clean fraction lands on the FLAT part of S" is TRUE OF THE
+    // DETENTS AND FALSE OF THE CONTROL SURFACE.
+    // ⭐ Rendered/predicted ratio is 0.304 .. 0.689 at all 7 cells that move (monotone toward the
+    // corner), so the composite DILUTES the change rather than amplifying it and the cut bound is
+    // conservative -- measured, not assumed; at a near-cancellation it could exceed 1.
+    //
+    // ⛔ DO NOT "FINISH THE JOB" BY RE-MAPPING THE OTHER SEVEN NODES.  Their abscissae are stale by
+    // the same mechanism (the listening condition's cf moved 0.43263 -> 0.46434), but re-mapping
+    // them is NOT a coordinate change: the required cut genuinely changes when `e` adds bleed to
+    // the composite null, so it would be a RE-FIT wearing a re-anchor's name.  s184 measured the
+    // law's error off the corner at <= 0.508 dB, so there is no defect there to chase.
+    // ⛔ SETTING kMixCf[0] BACK TO 0.000 REPRODUCES EVERY PRE-s185 NUMBER EXACTLY -- keep it
+    // reachable (s124), and note that `analysis/od_notch_mix_law.py`'s paste-ready emitter still
+    // prints 0.000 because it fits in the PRE-END-STOP coordinate; re-anchor its node 0 by hand.
     static constexpr int kMixNodes = 8;
     static constexpr double kMixCfRef = 0.441;
-    static constexpr double kMixCf[kMixNodes] = { 0.000, 0.210, 0.320, 0.440, 0.560,
+    // ⚠⚠ kMixCf[0] MUST EQUAL `FitParams::blendEndStop` -- it IS the corner's clean fraction, not
+    // a free constant.  Nothing here can see FitParams (this is a DSP stage, the fit bag is applied
+    // BY PedalChain), so the tie is asserted in tests/LevelBlendTest.cpp Test 9, mutation-controlled
+    // -- the s174 pattern that caught the compiled LEVEL taper drifting from its shipped one.
+    static constexpr double kMixCf[kMixNodes] = { 0.02418, 0.210, 0.320, 0.440, 0.560,
                                                   0.730, 0.870, 1.000 };
     static constexpr double kMixS[kMixNodes] = { 0.951, -0.525, -0.195, 0.000, 0.017,
                                                   0.177, 0.224, 0.252 };

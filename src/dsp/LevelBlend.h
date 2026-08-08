@@ -61,6 +61,56 @@
 // equivalent Thevenin impedance is Rup||Rdn = L*(1-L)*100k, maximal (~25k) at
 // mid-rotation. This is why the crossfade law is asymmetric.
 //
+// ---- BLEND wiper end stop (session 181, open-work item 12) -------------------
+// ⭐⭐ [ENG], NON-SCHEMATIC, USER-DECIDED 2026-08-08. The ideal network above makes the
+// output EXACTLY zero at LEVEL min / BLEND max — Rdn = L*Rp = 0 shorts the LEVEL wiper
+// to VD, and BLEND at max reads that wiper alone. The reference does not mute there: it
+// delivers a real signal ~32 dB below its own clean tap.
+//
+// GATE BK (`analysis/level_min_residual_gate.py`) named the source with no threshold and
+// no fit, on the STIMULUS DOSE-RESPONSE. The two candidate sources have completely
+// different ones, measured on this capture set: the OD path COMPRESSES (9.8 dB out per
+// 24 dB in) and the clean tap is LINEAR (24.0). The residual holds a constant ratio
+// against the CLEAN tap (span 1.9 dB across the ladder) and not against the OD path
+// (span 16.0) ⇒ it is a CLEAN-SIDE BLEED. ⛔ And the LEVEL-pot end-stop hypothesis is
+// REFUTED, not merely unsupported: the shipped taper is linear through the origin, so a
+// small LEVEL KNOB *is* that model, and rendered at four values its residual is a MIX of
+// both sources (both reach the wiper through ~Rp) and inherits the OD path's compression
+// — 14.5-14.9 dB out per 24 dB in against the pedal's 25.8, short by ~11 dB at every L.
+//
+// THE MODEL, and it is a pot end stop expressed the way a pot actually has one: the
+// wiper traverses Rp of a track whose total is Rl + Rp + Rh, so it reaches neither lug.
+// With `endHi = Rh/total` (the pin3/OD end), `endLo = Rl/total` (the pin1/clean end) and
+// `k = 1 - endLo - endHi` (the traversable span, which is also the body's normalised
+// conductance seen from the LEVEL wiper):
+//
+//     B_eff  = endLo + x*k                       (x=0 -> endLo, x=1 -> 1-endHi)
+//     KCL    : Vw*[1/(1-L) + 1/L + k] = Vo/(1-L) + Vc*k
+//     Vout   = (1 - B_eff)*Vc + B_eff*Vw
+//
+// which at endLo = endHi = 0 (k = 1) reduces TERM BY TERM to the expressions above —
+// asserted, not argued: `LevelBlendTest` Test 8(a) requires BIT-identity against the
+// pre-s181 oracle across an 81-cell pot sweep, and a `--fit blendEndStop=0` render puts
+// LEVEL min back to exact digital zero.
+// At LEVEL min / BLEND max it gives Vout = endHi*Vc exactly: a pure clean bleed, no OD.
+//
+// ⚠⚠ THE PRICE, AND IT IS THE REASON THIS WAS A USER DECISION RATHER THAN A FIX. The same
+// end stop is present at BLEND max whatever LEVEL does, so the clean coefficient at
+// LEVEL = BLEND = max goes 0 -> e. That EXACT ZERO is the bleed-free corner every absolute
+// instrument in the project anchors on (GATE K7's ratio, GATE O's A3 ledger, GATE L's
+// |rho|, `OdToneRestore`'s base row, GATE W/AE's bleed-free membership, and
+// `cleanFraction()` itself). ⛔ There is no way around it inside this topology, and that
+// is structural rather than a failure of imagination: at LEVEL min the wiper is 0 ohm to
+// VD, so ANY bleed arriving at or before that node is shorted out — a clean bleed that
+// survives there must arrive AFTER it, i.e. at the BLEND wiper, i.e. at every LEVEL.
+//
+// ⚠ ONE-SIDED ON PURPOSE. A real pot has an end stop at BOTH ends, and the pin1 (clean)
+// end would put a matching OD leak at BLEND min. It is NOT shipped: at e = 0.0242 that
+// leak sits >= 27 dB below the clean tap at every rung and contributes < 0.02 dB of
+// level, so THIS CAPTURE SET CANNOT CONFIRM OR REFUTE IT. `blendEndStopClean` exists,
+// defaults to 0, and is the place to test it if a capture ever can. Shipping it on
+// physical symmetry alone would move every interior BLEND setting for no measured reason.
+//
 // ---- dist_engage override ---------------------------------------------------
 // When dist_engage = false, the output is forced to 100% clean (Vc), ignoring
 // the BLEND knob. This implements the [ENG] DIST footswitch behaviour per
@@ -263,7 +313,29 @@ public:
     {
         // x ∈ [0,1], B-taper = linear.
         // B = 0 → output = clean, B = 1 → output = leveled OD.
-        B = x;
+        blendKnob = x;
+        // The wiper traverses Rp of a track whose total is Rl + Rp + Rh, so with
+        // endLo = Rl/total and endHi = Rh/total the traversable span is k = 1-endLo-endHi:
+        //   B_eff = endLo + x*k    (x=0 -> endLo, x=1 -> 1-endHi)
+        B = endLo + x * (1.0 - endLo - endHi);
+    }
+
+    // ⚠⚠ These MUST equal FitParams' shipped values — `LevelBlendTest` Test 0(e) asserts
+    // it exactly, for the s174 reason: the compiled defaults are read by `setLevel()`'s
+    // invalid-set fallback and by the test oracle, and a FitParams edit that misses them
+    // leaves those two consumers modelling a stage nothing runs, silently and passing.
+    static constexpr double kBlendEndStop = 0.02418;
+    static constexpr double kBlendEndStopClean = 0.0;
+
+    // BLEND wiper end stop at the pin3 (OD) end, as a fraction of the whole track:
+    // e = Rh/(Rp + Rh). 0 restores the pre-s181 ideal pot EXACTLY. See the block above.
+    void setBlendEndStop(double e, double eClean = 0.0) noexcept
+    {
+        // Guard the range rather than trusting a fit: e >= 1 would invert the pot and a
+        // negative one would make the bleed a subtraction, neither of which is a pot.
+        endHi = (e > 0.0 && e < 0.5) ? e : 0.0;
+        endLo = (eClean > 0.0 && eClean < 0.5) ? eClean : 0.0;
+        setBlend(blendKnob);
     }
 
     void setDistEngage(bool engage) noexcept { distTarget = engage ? 1.0 : 0.0; }
@@ -354,11 +426,16 @@ private:
         }
         else
         {
+            // `k` is the BLEND body's normalised CONDUCTANCE seen from the LEVEL wiper:
+            // the body is Rp/k ohms, so k = 1 at the ideal pot and falls as the end stops
+            // add track the wiper cannot reach. At k = 1 every term below is bit-identical
+            // to the pre-s181 expression, which Test 8(a) asserts rather than assumes.
+            const double k = 1.0 - endLo - endHi;
             const double invRup = 1.0 / (1.0 - L);
             const double invRdn = 1.0 / L;
-            const double invTotal = invRup + invRdn + 1.0;
-            // Vw = (odIn/(1-L) + cleanIn) / (1/(1-L) + 1/L + 1)
-            vw = (odIn * invRup + cleanIn) / invTotal;
+            const double invTotal = invRup + invRdn + k;
+            // Vw = (odIn/(1-L) + k*cleanIn) / (1/(1-L) + 1/L + k)
+            vw = (odIn * invRup + cleanIn * k) / invTotal;
         }
 
         // BLEND wiper voltage = linear crossfade. Branch at the extremes instead of
@@ -374,7 +451,12 @@ private:
     }
 
     double L = 1.0; // LEVEL taper-mapped position [0,1] (default = max OD)
-    double B = 0.0; // BLEND position [0,1] (default = 100% clean)
+    double B = 0.0; // BLEND wiper position [0,1] AFTER the end stops (default = 100% clean)
+    double blendKnob = 0.0;  // the raw knob, kept so setBlendEndStop() can re-apply it
+    // BLEND pot end stops as fractions of the WHOLE track (s181, item 12). endHi is the
+    // pin3/OD end and is what produces the LEVEL-min clean bleed; endLo is the pin1/clean
+    // end and ships at 0 — see the block above for why it is exposed but not shipped.
+    double endHi = kBlendEndStop, endLo = kBlendEndStopClean;
     // dist_engage footswitch: 1 = OD engaged (normal BLEND behaviour), 0 = forced
     // clean. `distMix` is where the crossfade (`kDistFadeSeconds`) currently is; `distTarget` is
     // where the switch says it should be.

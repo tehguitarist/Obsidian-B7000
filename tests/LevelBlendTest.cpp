@@ -14,6 +14,7 @@
 
 #include "../src/dsp/FitParams.h"
 #include "../src/dsp/LevelBlend.h"
+#include "../src/dsp/OdToneRestore.h"
 
 #include <cmath>
 #include <cstdio>
@@ -38,13 +39,20 @@ static double levelTaperShipped(double x)
                                   LevelBlend::kLevelTaperBreak3, LevelBlend::kLevelTaperFrac3);
 }
 
+// ⚠ s181: the oracle carries the BLEND end stops too, defaulting to the SHIPPED values.
+// Passing eHi = eLo = 0 recovers the pre-s181 network term for term, which is what Test
+// 8(a) uses as a bit-identity check — so this one function is both the current reference
+// implementation AND the archived previous one, and they cannot drift apart.
 static double levelBlendOracle(double level, double blend,
-                               double vo, double vc)
+                               double vo, double vc,
+                               double eHi = LevelBlend::kBlendEndStop,
+                               double eLo = LevelBlend::kBlendEndStopClean)
 {
     const double L = (level <= 0.0) ? 0.0
                    : (level >= 1.0) ? 1.0
                    : levelTaperShipped(level);
-    const double B = blend;
+    const double k = 1.0 - eLo - eHi;      // the wiper-traversable span / body conductance
+    const double B = eLo + blend * k;
 
     double vw;
     if (L <= 0.0)
@@ -55,9 +63,13 @@ static double levelBlendOracle(double level, double blend,
     {
         const double invRup = 1.0 / (1.0 - L);
         const double invRdn = 1.0 / L;
-        const double invTotal = invRup + invRdn + 1.0;
-        vw = (vo * invRup + vc) / invTotal;
+        const double invTotal = invRup + invRdn + k;
+        vw = (vo * invRup + vc * k) / invTotal;
     }
+    if (B <= 0.0)
+        return vc;
+    if (B >= 1.0)
+        return vw;
     return (1.0 - B) * vc + B * vw;
 }
 
@@ -198,6 +210,11 @@ int main()
             {"Frac2",  LevelBlend::kLevelTaperFrac2,  fp.levelTaperFrac2},
             {"Break3", LevelBlend::kLevelTaperBreak3, fp.levelTaperBreak3},
             {"Frac3",  LevelBlend::kLevelTaperFrac3,  fp.levelTaperFrac3},
+            // s181: the BLEND end stops join the same assertion for the same reason.
+            // Naming them here is the whole point — a new constant that is NOT in this
+            // list is a new instance of the s174 defect waiting to happen.
+            {"BlendEndStop",      LevelBlend::kBlendEndStop,      fp.blendEndStop},
+            {"BlendEndStopClean", LevelBlend::kBlendEndStopClean, fp.blendEndStopClean},
         };
         bool inStep = true;
         for (const auto& p : pairs)
@@ -251,10 +268,25 @@ int main()
         const double r = measureVout(1.0, 1.0, 0.0, 1.0);
         const double exp = levelBlendOracle(1.0, 1.0, 1.0, 0.0);
         check("LEVEL=1 BLEND=1 (OD only)", r, exp, tol);
-        const bool odOnly = std::abs(r - 1.0) < 1e-9;
-        std::printf("  %-50s %s\n", "output = OD (1.0):",
-                     odOnly ? "PASS" : "FAIL");
+        // ⚠⚠ s181 REPAIR — the s118/s124 pattern: this asserted `output == 1.0 exactly`,
+        // which was the whole content of "no loading at LEVEL=1". The BLEND end stop
+        // (item 12) deliberately inverts it: the wiper cannot reach pin3, so the corner
+        // now delivers (1-e)*OD + e*clean. The bar is NOT loosened — it is re-pointed at
+        // the same claim, EXACTLY, with e in it. `e = 0` reproduces the old assertion.
+        const double odOnlyWant = 1.0 - LevelBlend::kBlendEndStop;
+        const bool odOnly = std::abs(r - odOnlyWant) < 1e-9;
+        std::printf("  %-50s %s (want %.6f = 1 - e)\n", "output = (1-e) * OD:",
+                     odOnly ? "PASS" : "FAIL", odOnlyWant);
         if (!odOnly)
+            ++failures;
+        // And the OTHER half of the same corner, which is the price this change accepted
+        // and must never go silent: the clean coefficient here is EXACTLY e, not 0.
+        const double rCleanAtCorner = measureVout(1.0, 1.0, 1.0, 0.0);
+        const bool anchorBreak = std::abs(rCleanAtCorner - LevelBlend::kBlendEndStop) < 1e-9;
+        std::printf("  %-50s %s (%.6f)\n",
+                    "bleed-free corner clean coeff == e (NOT 0 — the s181 price):",
+                    anchorBreak ? "PASS" : "FAIL", rCleanAtCorner);
+        if (!anchorBreak)
             ++failures;
     }
 
@@ -295,7 +327,14 @@ int main()
         // stale — it is a property of the topology, not of the pot law.
         // vw = (1/(1-L)) / (1/(1-L) + 1/L + 1) with the clean input grounded, and
         // the BLEND wiper then delivers B = 0.5 of it.
-        const double predicted = (1.0 / (1.0 - L)) / (1.0 / (1.0 - L) + 1.0 / L + 1.0) * 0.5;
+        // ⚠ s181: `k` is the BLEND body's normalised conductance (1 at the ideal pot,
+        // 1-e-eLo with the end stops), and it enters BOTH the wiper solve and the BLEND
+        // split. Carrying it here rather than deleting the check keeps this the strictly
+        // stronger, taper-independent assertion the s163 comment above argues for.
+        const double kBody = 1.0 - LevelBlend::kBlendEndStop - LevelBlend::kBlendEndStopClean;
+        const double bEff = LevelBlend::kBlendEndStopClean + 0.5 * kBody;
+        const double predicted =
+            (1.0 / (1.0 - L)) / (1.0 / (1.0 - L) + 1.0 / L + kBody) * bEff;
         const double predErr = std::abs(20.0 * std::log10(r / predicted));
         const bool loadingPresent = loadingDb < 0.0 && loadingDb > -3.5;
         const bool matchesForm = predErr < 1e-9;
@@ -349,10 +388,14 @@ int main()
             stage.tickSmoothing();
             y = stage.process(1.0, 3.0);
         }
-        // LEVEL=1, BLEND=1 -> output = OD = 3.0
-        const bool normalBlend = std::abs(y - 3.0) < 1e-9;
-        std::printf("  dist_engage=true:  output=%.6f (expect 3.0 OD): %s\n",
-                     y, normalBlend ? "PASS" : "FAIL");
+        // LEVEL=1, BLEND=1 -> (1-e)*OD + e*clean, s181's BLEND end stop. This assertion
+        // is about the dist_engage OVERRIDE, not about the pot network, so it carries the
+        // network's own answer rather than a re-typed 3.0 — same repair as Test 3.
+        const double want = (1.0 - LevelBlend::kBlendEndStop) * 3.0
+                            + LevelBlend::kBlendEndStop * 1.0;
+        const bool normalBlend = std::abs(y - want) < 1e-9;
+        std::printf("  dist_engage=true:  output=%.6f (expect %.6f = (1-e)*OD + e*clean): %s\n",
+                     y, want, normalBlend ? "PASS" : "FAIL");
         if (!normalBlend)
             ++failures;
     }
@@ -402,6 +445,137 @@ int main()
         char label[64];
         std::snprintf(label, sizeof(label), "L=%.2f B=%.2f", pt.level, pt.blend);
         check(label, r, exp, tol);
+    }
+
+    // ---- Test 8: BLEND wiper end stop (session 181, open-work item 12) ---
+    // Four separate claims, because they fail for different reasons:
+    //  (a) DISABLED IS BIT-IDENTICAL. `blendEndStop = 0` must reproduce the pre-s181
+    //      network EXACTLY, across a pot sweep — not "to a tolerance". The oracle above
+    //      is the pre-change algebra, so this is a cross-implementation bit check and it
+    //      is what lets every pre-s181 number stay reproducible.
+    //  (b) THE DEFECT IS FIXED. At LEVEL min / BLEND max the shipped stage must deliver
+    //      exactly e*cleanIn — a PURE clean bleed with no OD term, which is the mechanism
+    //      GATE BK measured (the residual tracks the linear clean tap, not the
+    //      compressing OD path).
+    //  (c) THE PRICE IS REAL AND ASSERTED. The bleed-free corner's clean coefficient goes
+    //      0 -> e. This is the anchor break the user accepted; it is asserted here so it
+    //      can never be lost silently by a later edit, in EITHER direction.
+    //  (d) NON-VACUITY. `e` must actually move the LEVEL-min output by more than the
+    //      tolerance the other checks use — otherwise (b) passes on a stage that ignores
+    //      the parameter entirely (the s177 MidBandTest Test-7 pattern).
+    std::printf("\n=== Test 8: BLEND wiper end stop (item 12) ===\n");
+    {
+        constexpr double kE = 0.02418;   // the shipped FitParams::blendEndStop
+
+        // (a) disabled == pre-s181, bit-identical over a sweep
+        int bitDiffs = 0;
+        for (double lv = 0.0; lv <= 1.0001; lv += 0.125)
+            for (double bl = 0.0; bl <= 1.0001; bl += 0.125)
+            {
+                LevelBlend s;
+                s.prepare(48000.0);
+                s.setBlendEndStop(0.0);
+                s.setLevel(lv);
+                s.setBlend(bl);
+                s.setDistEngage(true);
+                const double got = s.process(1.0, 0.7);
+                const double want = levelBlendOracle(lv, bl, 0.7, 1.0, 0.0, 0.0);
+                if (got != want)
+                    ++bitDiffs;
+            }
+        std::printf("  (a) endStop=0 vs pre-s181 oracle: %d of 81 cells differ  %s\n",
+                    bitDiffs, bitDiffs == 0 ? "PASS" : "FAIL");
+        if (bitDiffs != 0)
+            ++failures;
+
+        // (b) LEVEL min / BLEND max delivers exactly e * cleanIn, no OD term
+        LevelBlend s;
+        s.prepare(48000.0);
+        s.setBlendEndStop(kE);
+        s.setLevel(0.0);
+        s.setBlend(1.0);
+        s.setDistEngage(true);
+        const double withOd = s.process(1.0, 5.0);   // a deliberately huge OD input
+        const double noOd = s.process(1.0, 0.0);
+        std::printf("  (b) LEVEL min, BLEND max: out=%.8f (want %.8f), "
+                    "OD-independent: %s\n", withOd, kE,
+                    (withOd == noOd) ? "yes" : "NO");
+        check("    LEVEL-min bleed == e * clean", withOd, kE, tol);
+        if (withOd != noOd)
+        {
+            std::printf("      FAIL: an OD term survives at LEVEL min\n");
+            ++failures;
+        }
+
+        // (c) the accepted price: the bleed-free corner is no longer bleed-free
+        LevelBlend bf;
+        bf.prepare(48000.0);
+        bf.setBlendEndStop(kE);
+        bf.setLevel(1.0);
+        bf.setBlend(1.0);
+        bf.setDistEngage(true);
+        for (int n = 0; n < 4; ++n)
+            bf.process(0.0, 0.0);
+        const double cf = bf.cleanFraction();
+        std::printf("  (c) clean fraction at LEVEL=BLEND=max: %.6f (was exactly 0)\n", cf);
+        check("    bleed-free corner clean coeff == e", cf, kE, 0.05);
+
+        // (d) non-vacuity: e must MOVE the LEVEL-min output well past the tolerance
+        LevelBlend off;
+        off.prepare(48000.0);
+        off.setBlendEndStop(0.0);
+        off.setLevel(0.0);
+        off.setBlend(1.0);
+        off.setDistEngage(true);
+        const double zeroed = off.process(1.0, 5.0);
+        const bool nonVacuous = (zeroed == 0.0) && (std::abs(withOd) > 1e-3);
+        std::printf("  (d) NON-VACUITY: endStop=0 gives %.8f, endStop=%.5f gives %.8f  %s\n",
+                    zeroed, kE, withOd, nonVacuous ? "PASS" : "FAIL");
+        if (!nonVacuous)
+            ++failures;
+    }
+
+    // ---- Test 9: OdToneRestore's mix-law anchor tracks blendEndStop (s185) --
+    // `OdToneRestore::kMixCf[0]` is NOT a free constant: it is the clean fraction of the
+    // bleed-free corner, which is where `kMixS[0] = 0.951` was measured. s181 moved that
+    // corner from cf = 0 to cf = e, and s185 re-anchored the node to follow it (item 19's
+    // task P2, GATE BN). The two constants live in different headers and neither can see
+    // the other — OdToneRestore is a DSP stage and FitParams is the fit bag PedalChain
+    // applies — so nothing but this assertion keeps them tied.
+    //
+    // ⚠⚠ WHY EXACT RATHER THAN A TOLERANCE, and why this test exists at all: the pair is
+    // two literals of ONE quantity, so any difference is a MISSED EDIT, never rounding.
+    // This is the s174 pattern that caught the compiled LEVEL taper still holding the
+    // retired s163 values while FitParams shipped s173's — a file that spent a whole
+    // session asserting the shape of a curve nothing ran, and passing. If a future session
+    // re-fits `blendEndStop`, THIS is what stops the mix law silently keeping the old
+    // corner and evaluating S at a coordinate that no longer exists.
+    // ⛔ Do NOT "fix" a failure here by widening it. Move kMixCf[0] to the new end stop —
+    // and re-read GATE BN, because that is a re-anchor and it has a measured price.
+    std::printf("\n=== Test 9: OdToneRestore mix anchor == blendEndStop (item 19 P2) ===\n");
+    {
+        const FitParams fp;
+        const double anchor = OdToneRestore::mixAnchorCf();
+        const bool tied = (anchor == fp.blendEndStop);
+        std::printf("  kMixCf[0] = %.8f, FitParams::blendEndStop = %.8f  %s\n",
+                    anchor, fp.blendEndStop, tied ? "PASS" : "FAIL");
+        if (!tied)
+        {
+            std::printf("    ^ the mix law's node 0 is filed under a clean fraction the stage "
+                        "can no longer reach.\n");
+            ++failures;
+        }
+
+        // NON-VACUITY. An anchor equal to the end stop is only meaningful if the node
+        // actually reaches the corner — i.e. if S there is the MEASURED kMixS[0] and not
+        // an interpolated value. Assert that directly, so a future edit that moved BOTH
+        // constants to some other matching pair would still have to face this.
+        const double sAtCorner = OdToneRestore::mixShapeAt(fp.blendEndStop);
+        const bool measured = std::abs(sAtCorner - OdToneRestore::mixAnchorS()) < 1e-12;
+        std::printf("  S(corner) = %.6f, kMixS[0] = %.6f (the MEASURED ordinate)  %s\n",
+                    sAtCorner, OdToneRestore::mixAnchorS(), measured ? "PASS" : "FAIL");
+        if (!measured)
+            ++failures;
     }
 
     // ---- Summary ----------------------------------------------------------

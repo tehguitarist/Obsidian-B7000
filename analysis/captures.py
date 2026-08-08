@@ -298,6 +298,31 @@ CAPTURE_MATRIX_SECONDARY = [
 ]
 
 
+# ---- Captures proven DEFECTIVE, excluded BY NAME ---------------------------------------
+# ⚠ A defective capture is excluded by NAME and never by a settings predicate: what is wrong
+# with it is not in its settings (measurement-discipline.md, s105 M2/M3). Each entry carries
+# the evidence that convicted it, so nothing here is a matter of opinion.
+DEFECTIVE_CAPTURES = {
+    "level-0700_gain-n12_base-od.wav":
+        "GATE BK / s181 — MIS-DIALLED, ~20 dB hot (it renders as if LEVEL sat near 10:30, not "
+        "7:00). Convicted THRESHOLD-FREE on two independent readings: (1) inside its OWN capture "
+        "session the LEVEL ladder inverts — it is 5.5 dB LOUDER than level-0930_gain-n12 in 4 of "
+        "4 sweeps, and a pot law is monotone; (2) it reads 8.03 dB LOUDER than its full-send twin, "
+        "which was driven 12 dB HARDER — no monotone path does that, and every other rung of the "
+        "same ladder gives a pad of +4.9…+10.3 dB. The full-send LEVEL ladder is monotone at all "
+        "8 rungs and arbitrates. ⛔ It is in CAPTURE_MATRIX_TIER1 and was invisible for 70 "
+        "sessions only because the MODEL rendered digital silence at LEVEL min, putting the row "
+        "under release_gate's SILENT_DB; s181's BLEND end stop ends that, so it must be excluded "
+        "explicitly from here on.",
+}
+
+
+def is_defective(path_or_name):
+    """True if this capture is on the proven-defective list. Callers must PRINT the exclusion
+    (s40: every exclusion is labelled, never silent)."""
+    return os.path.basename(str(path_or_name)) in DEFECTIVE_CAPTURES
+
+
 def find_captures(directory=CAPTURE_DIR):
     """Return sorted [(path, parsed_dict), ...] for every MATRIX .wav under directory.
 

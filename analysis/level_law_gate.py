@@ -71,6 +71,7 @@ import argparse
 import collections
 import json
 import math
+import re
 import sys
 
 import numpy as np
@@ -135,6 +136,30 @@ def power_taper(p):
 R_LEVEL = 100.0e3
 R_BLEND = 100.0e3
 
+# ⛔⛔ SESSION 182 — THE BLEND WIPER END STOP (s181, item 12), AND THE REASON IT HAD TO BE ADDED
+# HERE RATHER THAN LEFT TO K2's CROSS-CHECK.  `coef_closed` and `coef_nodal` are two derivations
+# of one network and K2 requires them to agree -- which is a real check of the ALGEBRA and is
+# structurally blind to the NETWORK being the wrong one, because both sides take the same
+# topology as input (s145 AM1a / s149 AO2, third occurrence).  s181 gave the shipped stage a
+# BLEND end stop; neither mirror knew, they still agreed to 5.6e-17, and K2 went on printing
+# `clean coef is exactly 0 at LEVEL max` -- the pre-s181 value -- as its own discrimination line.
+# ⇒ both mirrors now carry the end stop, and `check_shipped_endstop()` below REFUSES if the
+# transcribed value ever drifts from FitParams.h, the way the taper already was.
+# ⚠ e = 0 restores the pre-s181 network EXACTLY in both derivations, so every pre-s181 quote off
+# this gate stays reproducible (s124: keep the retired form reachable, and say so at the option).
+SHIPPED_BLEND_END_STOP = (0.02418, 0.0)     # (endHi = pin3/OD end, endLo = pin1/clean end)
+BLEND_END_STOP_NAMES = ("blendEndStop", "blendEndStopClean")
+
+
+def _endstop(endstop):
+    """The SINGLE resolver both coefficient derivations read (the `region_sel` pattern).
+
+    One place, so a caller cannot accidentally hand the two mirrors different networks and so a
+    mutation arm can reproduce s181's defect -- both derivations ideal, the tool's constant still
+    correct -- which is the only configuration the closed-vs-nodal known answer cannot see."""
+    end_hi, end_lo = SHIPPED_BLEND_END_STOP if endstop is None else endstop
+    return end_hi, end_lo, 1.0 - end_lo - end_hi
+
 HF_HZ = 8000.0          # GATE I's split: at and above this the region is ND's artefact
 NOON = 0.5              # the ladder's reference detent
 
@@ -148,39 +173,55 @@ MATCH_KEYS = ("master", "blend", "drive", "lo", "loMid", "hiMid", "hi",
 # --------------------------------------------------------------------------------------------
 # K2 -- the LevelBlend network, two ways
 # --------------------------------------------------------------------------------------------
-def coef_closed(B, L):
-    """(OD coefficient, CLEAN coefficient) straight from src/dsp/LevelBlend.h::process.
+def coef_closed(B, L, endstop=None):
+    """(OD coefficient, CLEAN coefficient) straight from src/dsp/LevelBlend.h::engagedPath.
 
     Transcribed from the C++.  A transcription is exactly what `rebuild-targets-dont-transcribe`
     warns about, which is why `coef_nodal` below re-derives the same two numbers from the
-    resistances by a different route and K2 requires them to agree."""
+    resistances by a different route and K2 requires them to agree.
+
+    `B` is the BLEND KNOB.  The stage's own `B` member is the wiper position AFTER the end stops
+    (`B_eff = endLo + knob*k`), and the endpoint branches are on THAT -- which is why a knob at
+    max no longer takes the `>= 1.0` branch and a knob at min still does.  Getting that wrong is
+    the whole difference between a 0.024 clean coefficient at the bleed-free corner and a 0."""
+    end_hi, end_lo, k = _endstop(endstop)
+    b_eff = end_lo + B * k
+
     def vw(od, cl):
         if L <= 0.0:
             return 0.0
         if L >= 1.0:
             return od
         inv_up, inv_dn = 1.0 / (1.0 - L), 1.0 / L
-        return (od * inv_up + cl) / (inv_up + inv_dn + 1.0)
+        return (od * inv_up + cl * k) / (inv_up + inv_dn + k)
 
-    if B <= 0.0:
+    if b_eff <= 0.0:
         return 0.0, 1.0
-    if B >= 1.0:
+    if b_eff >= 1.0:
         return vw(1.0, 0.0), vw(0.0, 1.0)
-    return B * vw(1.0, 0.0), (1.0 - B) * 1.0 + B * vw(0.0, 1.0)
+    return b_eff * vw(1.0, 0.0), (1.0 - b_eff) * 1.0 + b_eff * vw(0.0, 1.0)
 
 
-def coef_nodal(B, L):
+def coef_nodal(B, L, endstop=None):
     """The same two coefficients from an explicit nodal solve of the resistor network.
 
     Nodes: Vw (LEVEL wiper) is the only unknown -- Vo and Vc are op-amp outputs (0 ohm) and the
-    BLEND wiper Vb draws no current (IC5_A's + input), so the whole BLEND pot is one 100k series
-    path from Vw to Vc with Vb tapping it.
+    BLEND wiper Vb draws no current (IC5_A's + input), so the whole BLEND pot is one series path
+    from Vw to Vc with Vb tapping it.
 
-        (Vo - Vw)/Rup = Vw/Rdn + (Vw - Vc)/R_BLEND
-        Vb = Vw + (Vc - Vw) * R_od/(R_od + R_cl) = B*Vw + (1-B)*Vc
+        (Vo - Vw)/Rup = Vw/Rdn + (Vw - Vc)/R_track
+        Vb = Vw + (Vc - Vw)*(1 - B_eff) = B_eff*Vw + (1 - B_eff)*Vc
+
+    ⭐ The end stop enters here as RESISTANCE, not as the stage's normalised `k`, which is what
+    keeps this an independent derivation rather than the closed form rearranged: the TRAVERSABLE
+    span is the nominal `R_BLEND` and the unreachable ends sit on top of it, so the whole track is
+    `R_BLEND/k` and the wiper tap fraction measured from the clean end is `endLo + knob*k`.
 
     Solved by superposition (drive Vo=1,Vc=0 then Vo=0,Vc=1), with conductances so the endpoints
     are limits rather than special cases."""
+    end_hi, end_lo, k = _endstop(endstop)
+    r_track = R_BLEND / k               # traversable Rp = R_BLEND; Rl and Rh are extra track
+    b_eff = end_lo + B * k              # (Rl + knob*Rp) / total
     r_up, r_dn = (1.0 - L) * R_LEVEL, L * R_LEVEL
 
     def vw_of(vo, vc):
@@ -188,11 +229,11 @@ def coef_nodal(B, L):
             return 0.0                      # wiper hard on ground
         if r_up <= 0.0:
             return vo                       # wiper hard on the OD op-amp output
-        g_up, g_dn, g_bl = 1.0 / r_up, 1.0 / r_dn, 1.0 / R_BLEND
+        g_up, g_dn, g_bl = 1.0 / r_up, 1.0 / r_dn, 1.0 / r_track
         return (vo * g_up + vc * g_bl) / (g_up + g_dn + g_bl)
 
-    od = B * vw_of(1.0, 0.0)
-    cl = B * vw_of(0.0, 1.0) + (1.0 - B) * 1.0
+    od = b_eff * vw_of(1.0, 0.0)
+    cl = b_eff * vw_of(0.0, 1.0) + (1.0 - b_eff) * 1.0
     return od, cl
 
 
@@ -236,9 +277,55 @@ def check_shipped_constant():
           f"(L(0.5) = {level_taper(0.5):.4f})")
 
 
+def check_shipped_endstop():
+    """K2 precondition: the transcribed BLEND end stop must still be what FitParams.h ships.
+
+    ⛔⛔ THIS GUARD EXISTS BECAUSE K2's OWN CROSS-CHECK CANNOT SUPPLY IT.  `coef_closed` and
+    `coef_nodal` agreeing proves the algebra, and both take the topology as INPUT -- so when s181
+    added the end stop to the C++ they stayed in perfect agreement with each other while both
+    modelled a stage nothing runs (s149 AO2's lesson: a divergence guard belongs at every site
+    that CONSUMES the value set, not only where the trap was first noticed)."""
+    try:
+        with open(FITPARAMS, encoding="utf-8") as fh:
+            src = fh.read()
+    except OSError:
+        print(f"  K2 WARN  cannot open {FITPARAMS} -- proceeding with the transcribed end stop "
+              f"{SHIPPED_BLEND_END_STOP}")
+        return
+    found = {}
+    for line in src.splitlines():
+        code = line.split("//")[0]
+        if "=" not in code:
+            continue
+        lhs = code.split("=")[0]
+        for nm in BLEND_END_STOP_NAMES:
+            # ⚠ WORD-BOUNDARY, not a substring: `blendEndStop` is a PREFIX of
+            # `blendEndStopClean`, so the naive `f"double {nm}" in lhs` matches both lines and
+            # the second silently overwrites the first with 0.0 -- which is exactly the value
+            # that would make this guard pass against a stage that HAS an end stop. Caught by
+            # running it; it fired with `ships (0.0, 0.0)` against a header that ships 0.02418.
+            if re.search(rf"\bdouble\s+{re.escape(nm)}\b", lhs):
+                found[nm] = float(code.split("=")[1].split(";")[0].strip())
+    missing = [n for n in BLEND_END_STOP_NAMES if n not in found]
+    if missing:
+        sys.exit(f"GATE K2 FAIL: {FITPARAMS} has no assignment for {', '.join(missing)} -- the "
+                 f"shipped BLEND network cannot be confirmed, so no coefficient below is licensed. "
+                 f"If the end stop was REMOVED, set SHIPPED_BLEND_END_STOP = (0.0, 0.0) here and "
+                 f"delete the names; do not let the mirror keep a value the stage has dropped.")
+    got = tuple(found[n] for n in BLEND_END_STOP_NAMES)
+    worst = max(abs(a - b) for a, b in zip(got, SHIPPED_BLEND_END_STOP))
+    if worst > 1e-12:
+        sys.exit(f"GATE K2 FAIL: {FITPARAMS} ships BLEND end stop {got}, this tool has "
+                 f"{SHIPPED_BLEND_END_STOP} (worst {worst:.3e}) -- update the constant, do not "
+                 f"assume. Every clean/OD coefficient this gate prints is wrong until you do.")
+    print(f"  K2 OK   BLEND end stop confirmed against {FITPARAMS} "
+          f"(endHi = {got[0]:.5f}, endLo = {got[1]:.5f})")
+
+
 def gate_k2(out):
     print("\n-- K2: the bleed premise -- is `blend = 1.0` bleed-free? --")
     check_shipped_constant()
+    check_shipped_endstop()
     xs = [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0]
 
     worst = 0.0
@@ -264,23 +351,51 @@ def gate_k2(out):
         cell = f"{r:.2f}" if math.isfinite(r) else "-inf"
         print(f"    {x:7.3f}{L:10.4f}{a:10.4f}{b:12.4f}{cell:>16}")
 
-    # Mutation control: the test is only meaningful if the coefficient it inspects CAN be zero.
+    # Mutation control.  ⚠⚠ s182: THIS USED TO ASSERT `clean coef == 0 EXACTLY at LEVEL max`, and
+    # after s181 that is false of the shipped stage -- so the guard would have fired, correctly,
+    # with the wrong diagnosis ("the bleed-free reference point does not exist ... the whole
+    # comparison is void"), which is s146's failure mode: an epoch-naming guard degrades into a
+    # puzzle exactly when it fires.  What the comparison actually needs is CONTRAST across LEVEL,
+    # not a zero; and the anchor's new value is asserted OUTRIGHT so the accepted s181 price can
+    # never go silent in either direction (`LevelBlendTest` Test 8(c), same claim, other side).
+    # ⚠⚠ READ THE CONSTANT DIRECTLY, NOT THROUGH `_endstop()`. The assertion below compares the
+    # MIRROR's coefficient against the SHIPPED value, so taking both through the same resolver
+    # makes the two sides move together and the check passes against a mirror that has dropped
+    # the end stop entirely — which is the same "both sides share the input" blindness that let
+    # s181's defect through K2's closed-vs-nodal known answer in the first place. Caught by
+    # `_mutate_gate_k.py::k2-both-mirrors-ideal`, which reported GUARD DEAD until this line
+    # stopped going through the resolver.
+    end_hi, end_lo = SHIPPED_BLEND_END_STOP
     a_max, b_max = coef_closed(1.0, 1.0)
     a_mid, b_mid = coef_closed(1.0, level_taper(NOON))
-    if b_max != 0.0:
-        sys.exit("GATE K2 FAIL: clean coefficient is not exactly 0 at LEVEL max -- the "
-                 "bleed-free reference point does not exist, so the whole comparison is void")
-    if b_mid <= 0.0:
-        sys.exit("GATE K2 FAIL: clean coefficient is 0 at LEVEL noon too -- then `blend = 1.0` "
-                 "IS bleed-free and this gate is testing nothing (empty-gate-must-fail)")
-    print(f"\n  MUTATION OK  clean coef is exactly 0 at LEVEL max and {b_mid:.4f} at LEVEL noon,")
+    if abs(b_max - end_hi) > 1e-12:
+        sys.exit(f"GATE K2 FAIL: clean coefficient at LEVEL max is {b_max:.6f}, and the shipped "
+                 f"BLEND end stop says it must be exactly endHi = {end_hi:.6f}. Those are the same "
+                 f"number by construction (at LEVEL max the wiper sits on the OD source, so the "
+                 f"only clean left is the track the wiper cannot reach), so a disagreement means "
+                 f"this mirror no longer matches src/dsp/LevelBlend.h::engagedPath.")
+    if b_mid <= b_max:
+        sys.exit("GATE K2 FAIL: clean coefficient at LEVEL noon does not exceed the LEVEL-max "
+                 "floor -- there is no bleed CONTRAST across the ladder and this gate is testing "
+                 "nothing (empty-gate-must-fail)")
+    print(f"\n  MUTATION OK  clean coef is {b_max:.4f} at LEVEL max and {b_mid:.4f} at LEVEL noon,")
     print( "               so the check discriminates rather than passing vacuously.")
-    print(f"\n  => `blend = 1.0` is bleed-free ONLY at LEVEL max.  At LEVEL noon the clean signal")
-    print(f"     sits {tbl[NOON]['clean_re_od_db']:.2f} dB below the OD signal in the output; at LEVEL 0.125 it is")
-    print(f"     {tbl[0.125]['clean_re_od_db']:.2f} dB, i.e. essentially half the output.")
+    if end_hi > 0.0:
+        print(f"\n  ⛔⛔ THE BLEED-FREE CORNER IS NO LONGER EXACT (s181, item 12). At LEVEL = BLEND =")
+        print(f"     max the clean coefficient is {b_max:.5f}, not 0 -- it is the BLEND wiper end stop,")
+        print(f"     and it is the accepted, measured price of the LEVEL-min mute being fixed.")
+        print( "     ⇒ every instrument that reads `bleed-free` as an EXACT zero (GATE K7's ratio,")
+        print( "       GATE O's A3 ledger, GATE L's |rho|, OdToneRestore's base row, GATE W/AE's")
+        print(f"       membership) is reading a corner that now carries {20.0 * math.log10(b_max / a_max):.1f} dB of clean re OD.")
+        print( "     ⚠ Pre-s181 numbers stay reproducible: pass endstop=(0.0, 0.0) to the coef")
+        print( "       functions, which restores the ideal pot term by term.")
+    print(f"\n  => `blend = 1.0` is LEAST bleedy at LEVEL max and never bleed-free.  At LEVEL noon")
+    print(f"     the clean signal sits {tbl[NOON]['clean_re_od_db']:.2f} dB below the OD signal in the output; at LEVEL")
+    print(f"     0.125 it is {tbl[0.125]['clean_re_od_db']:.2f} dB, i.e. essentially half the output.")
     print( "     GATE J's session-102 premise -- 'the clean tap is fully out of circuit' -- is")
     print( "     REFUTED, and with it the structural-impossibility argument built on it.")
-    out["k2"] = {"taper": list(SHIPPED_LEVEL_TAPER), "agreement": worst,
+    out["k2"] = {"taper": list(SHIPPED_LEVEL_TAPER),
+                 "blend_end_stop": list(SHIPPED_BLEND_END_STOP), "agreement": worst,
                  "coefs_blend_max": {str(k): v for k, v in tbl.items()}}
     return tbl
 

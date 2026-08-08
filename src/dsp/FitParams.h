@@ -426,6 +426,25 @@ struct FitParams
     double levelTaperFrac2 = 0.229938;
     double levelTaperBreak3 = 0.984417;
     double levelTaperFrac3 = 0.850908;
+    // ---- BLEND pot end stops (session 181, open-work item 12) -------------------------
+    // ⚠ [ENG], NON-SCHEMATIC, USER-DECIDED 2026-08-08. Fraction of the WHOLE BLEND track
+    // that the wiper cannot reach at the pin3 (OD) end. At 0 the stage is bit-identical to
+    // every pre-s181 build; at 0.0242 it reproduces the reference's LEVEL-min residual,
+    // which GATE BK identified as a CLEAN-side bleed on the stimulus dose-response (the
+    // residual holds a constant ratio against the linear clean tap, span 1.9 dB across the
+    // ladder, and not against the compressing OD path, span 16.0 dB).
+    // ⛔ The value is a MEASUREMENT, not a fit target: it is the median of the measured
+    // residual/clean ratio over the three lower stimulus rungs (-32.33/-32.44/-32.21 dB
+    // ⇒ 10^(-32.33/20) = 0.02418), and the three rungs agree to 0.23 dB.
+    // ⚠⚠ IT BREAKS THE BLEED-FREE ANCHOR ON PURPOSE — the clean coefficient at
+    // LEVEL = BLEND = max goes 0 -> 0.0242. That is the price the user accepted; see
+    // `LevelBlend.h`'s block for why no formulation inside this topology avoids it.
+    double blendEndStop = 0.02418;
+    // The pin1 (clean) end stop. Ships at 0: at the same size its OD leak sits >= 27 dB
+    // below the clean tap and moves level by < 0.02 dB, so this capture set can neither
+    // confirm nor refute it. Exposed so a future capture can; do NOT enable it on the
+    // physical-symmetry argument alone (it moves every interior BLEND setting).
+    double blendEndStopClean = 0.0;
     // VR8 100k A-taper [ENG]. ** SESSION-41: 2.25 -> 1.998. ** Session 17 set 2.25 by borrowing
     // LEVEL's exponent, on the grounds that the master captures "bracket it: 2.06/2.37". They no
     // longer do — `master-1700_gain-n12_base-clean.wav` was found to be a BAD TAKE and re-recorded
@@ -934,6 +953,47 @@ struct FitParams
     double clipC15 = 5.2e-9;     // farads; schematic C15 = 2u2 (2.2e-6). fc ~30.3 Hz
                                   // into R20+R21=1.01M. Gated on the NULL + the raw
                                   // captures, NOT on matrix band-RMS (see above).
+
+    // ⭐⭐ GRUNT=CUT-ONLY OVERRIDE, session 187 (open item 17's bass half, PART 2 — the CENTRE,
+    // never graded until now; s180 shipped the DEPTH only).  User report: `ref-od` (GRUNT cut,
+    // the untokened default — every capture without a `grunt-` token is this position, s151's
+    // trap) has audibly less bass than it should.  MEASURED: the bass-null CENTRE sits at
+    // 66.9 Hz against the pedal's 48.7 (ratio 1.374, frozen to 3 dp across all four stimulus
+    // rungs), which is what makes the model hot below 63 Hz and ~4 dB QUIET at 63-100 Hz at
+    // EVERY rung on `ref-od` — the report is real, and it is a MISPLACED NULL, not a shelf.
+    // ⛔⛔ THE SHELF ALONE CANNOT REACH IT — `odMakeupLowCutDb` swept 0..6 with `clipC15` held
+    // moves the centre ratio only 1.189..1.477 (best case, shelf fully OFF, still 18.9 % high;
+    // s126: a locus that cannot contain the target refutes the LEVER, not its setting).  A
+    // SECOND, independent axis was needed, and `clipC15` is it: at the SHIPPED shelf setting the
+    // ratio only reaches the pedal's when C15 is walked back toward the SCHEMATIC value (2u2 =
+    // 2200e-9, a 423x departure fitted at s36/37 -- BEFORE `OdMakeup` existed to correct A3
+    // properly, and plausibly a compensating error for the LF deficit that stage now handles).
+    // ⭐ ONE-KNOB-PER-DIMENSION, MEASURED NOT ASSUMED: with `clipC15` >= ~300e-9 its own
+    // contribution to (centre, depth, shape) SATURATES -- values from 330e-9 up to 2200e-9 give
+    // the same answer -- so this is not a knob whose exact number matters; only "toward
+    // schematic" does.  ⇒ SET TO EXACTLY 2200e-9 (the schematic value) rather than an
+    // intermediate fitted number: it removes a documented departure at zero measured cost.
+    // ⛔⛔ THIS DEFECT IS GRUNT-CUT-SPECIFIC -- MEASURED, NOT ASSUMED.  The SAME 63-100 Hz shape
+    // read at GRUNT flat/boost with the SHIPPED constants is already small (-0.10..+5.06 dB,
+    // vs cut's consistent -3.4..-4.4).  Applying this candidate GLOBALLY was tested and
+    // REFUTED: it drives flat/boost's 63-100 Hz shape error to +3..+9.7 dB (worse than the
+    // defect it fixes) and blows out the ~320 Hz null's depth (C1) at boost by up to 5.8 dB --
+    // GRUNT switches the clipper's OWN input coupling cap bank (4n7 / 4n7||47n / 4n7||220n, a
+    // ~47x swing in the OD branch's own LF corner, s38's GRUNT-cap argument again), so a shared
+    // post-clipper element cannot serve all three positions.  ⇒ Flat and Boost are UNCHANGED --
+    // they keep reading the shared `clipC15`/`odMakeupLowCutDb` above, exactly as before this
+    // session; only Cut is re-pointed to these two fields, via PedalChain's GRUNT dispatch.
+    // ⚠⚠ `odMakeupLowCutDb` CANNOT GO NEGATIVE (OdMakeup::rebuild() takes -std::abs(loCut) --
+    // it is a CUT, never a boost) -- so `odMakeupLowCutDbCut` is bounded the same way; the
+    // family's "shelf fully off" edge is 0.0, not a lower bound to search past.
+    // ⚠ Verified: rendering `ref-od.wav`/`grunt-flat_base-od.wav`/`grunt-boost_base-od.wav`/
+    // `ref-clean.wav` at these defaults vs the pre-change build gives CLEAN and GRUNT
+    // flat/boost bit-identical (0.000000 dB, guaranteed by construction -- these fields are
+    // architecturally unreachable except at GRUNT=Cut) and GRUNT=Cut matches an explicit
+    // `--fit clipC15Cut=2200e-9 --fit odMakeupLowCutDbCut=2.2` override exactly.
+    // `ctest` 22/22.  Full matrix price: see `docs/session-log.md` SESSION 187.
+    double clipC15Cut = 2200.0e-9;         // farads; = schematic C15 (2u2), GRUNT=Cut only
+    double odMakeupLowCutDbCut = 2.2;      // dB; GRUNT=Cut only (was effectively 6.0, shared)
 
     double btR22 = 100.0e3;
     double btR23 = 33.0e3;

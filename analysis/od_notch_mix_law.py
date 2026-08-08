@@ -408,6 +408,17 @@ def do_law():
     print(f"    static constexpr int kMixNodes = {len(Sc)};")
     print("    static constexpr double kMixCf[kMixNodes] = { "
           + ", ".join("%.3f" % cf for cf, _ in Sc) + " };")
+    # ⛔⛔ NODE 0's ABSCISSA IS **NOT** WHAT THIS EMITTER PRINTS, AND PASTING IT VERBATIM SILENTLY
+    # UNDOES SESSION 185's RE-ANCHOR.  This tool fits S in the PRE-END-STOP coordinate, where the
+    # bleed-free corner sits at cf = 0; the shipped stage's corner sits at `FitParams::blendEndStop`
+    # (0.02418), and `kMixS[0]` is a measurement taken AT that corner.  So the ordinate is right and
+    # the ABSCISSA must be re-anchored by hand before this block is pasted.  See item 19's task P2,
+    # `analysis/mix_anchor_reanchor_gate.py` (GATE BN), and tests/LevelBlendTest.cpp Test 9 — which
+    # is what will catch it if this warning is skipped (`a-refutation-has-to-land-where-the-thing-
+    # is-CHOSEN`: the emitter is where the value is chosen, so the warning belongs here).
+    import level_law_gate as _LL
+    print(f"    // ⛔ node 0 above is in the PRE-END-STOP coordinate — re-anchor it to "
+          f"{_LL.SHIPPED_BLEND_END_STOP[0]} before pasting (s185 / GATE BN)")
     print("    static constexpr double kMixS[kMixNodes]  = { "
           + ", ".join("%.3f" % s for _, s in Sc) + " };")
 
