@@ -233,12 +233,19 @@ public:
     // satisfies the current one. Trading that for A-taper cosmetics — a
     // property never in either fit's objective — is the worse trade, not the
     // better one.
-    static constexpr double kLevelTaperBreak1 = 0.221598;
-    static constexpr double kLevelTaperFrac1 = 0.056630;
-    static constexpr double kLevelTaperBreak2 = 0.494043;
-    static constexpr double kLevelTaperFrac2 = 0.229938;
-    static constexpr double kLevelTaperBreak3 = 0.984417;
-    static constexpr double kLevelTaperFrac3 = 0.850908;
+    // ⛔⛔ THESE MUST EXACTLY EQUAL `FitParams`' SHIPPED TAPER — `LevelBlendTest` Test 0 asserts
+    // it, and exact is the right bar because both are literals of ONE fit, so any difference is a
+    // missed edit and never a rounding (s174, where these defaults had silently kept the RETIRED
+    // s163 curve for a session while the test that exists to catch a lost convexity was asserting
+    // the shape of a curve nothing runs, and passing).
+    // Re-fitted s190 with `FitParams` (was 0.221598/0.056630, 0.494043/0.229938,
+    // 0.984417/0.850908 — s173); the derivation lives at the FitParams block, not duplicated here.
+    static constexpr double kLevelTaperBreak1 = 0.206030;
+    static constexpr double kLevelTaperFrac1 = 0.026166;
+    static constexpr double kLevelTaperBreak2 = 0.543750;
+    static constexpr double kLevelTaperFrac2 = 0.223470;
+    static constexpr double kLevelTaperBreak3 = 0.775388;
+    static constexpr double kLevelTaperFrac3 = 0.528328;
 
     // The taper itself, as a free function so tests, the oracle and any future
     // consumer read ONE implementation rather than rebuilding the curve from the

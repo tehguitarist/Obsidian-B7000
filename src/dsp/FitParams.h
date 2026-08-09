@@ -420,12 +420,34 @@ struct FitParams
     // for VR2 — i.e. the requirement moves the pot AWAY from a physical audio taper, where the
     // s163 curve sat at 15.41 % (just outside). Outside corroboration going the WRONG way, and the
     // second such sign after the treble-notch walk; recorded, not fatal.
-    double levelTaperBreak1 = 0.221598;   // rotation at which the wiper reaches levelTaperFrac1
-    double levelTaperFrac1 = 0.056630;    // fraction of full resistance at that rotation
-    double levelTaperBreak2 = 0.494043;
-    double levelTaperFrac2 = 0.229938;
-    double levelTaperBreak3 = 0.984417;
-    double levelTaperFrac3 = 0.850908;
+    //
+    // ⭐⭐ RE-FITTED AGAIN s190 (was 0.221598/0.056630, 0.494043/0.229938, 0.984417/0.850908 —
+    // s173), on the s187 epoch, USER DECISION 2026-08-09 taken against a measured price.
+    // WHY IT MOVED AGAIN: the same mechanism as s173's re-fit, one layer down. s181's `blendEndStop`
+    // put a clean path at LEVEL min, s185 re-anchored the mix law's node 0 and s187 re-pointed the
+    // GRUNT=Cut LF pair — so the delivered level at every interior detent moved under a taper that
+    // was fitted before any of them. GATE AY2 went from REFUSING at s174 ("no detent has a
+    // requirement larger than its own across-stimulus spread") to **7 of 9 detents WELL-DEFINED,
+    // worst 3.94 dB**, with the s173 curve OUTSIDE the requirement's own ambiguity by 1.24x.
+    // Still 4 segments, and the count is MEASURED not chosen: the family SATURATES there
+    // (a 5th segment buys 1.4e-04 dB rms, a 6th 5.6e-17 — GATE AZ2), and 2- and 3-segment fail
+    // containment. rms 1.152 -> 0.282 dB against a 0.931 dB membership-matched ambiguity bar.
+    // ⭐ Convex, monotone, EXACT at both endpoints (endpoint err 0.0, 0.0 — AZ4), so the anchor
+    // corner and the LEVEL-min end stop are both untouched by construction.
+    // ⚠⚠ HALF-ROTATION MOVES 23.75 % -> 19.79 %, i.e. BACK TOWARD the A-taper band it had been
+    // walking away from — ⛔ NOT evidence for the fit: s174 DELETED that bar after establishing its
+    // premise does not hold (this taper is a reparameterisation of the KNOB AXIS and absorbs every
+    // model-vs-pedal difference downstream of the pot, not VR2's physical track). Recorded as the
+    // curiosity it is, graded on nothing.
+    // ⚠⚠ AND IT MOVES `cleanFraction()` HARDER THAN s173 DID — worst |Δcf| = 0.0824 at LEVEL 0.125
+    // (AZ5), against s173's 0.1292 at 0.875 — so `OdToneRestore`'s s156 mix law is stale by
+    // construction again; item 10's acceptance table is owed across the `--set` conditions.
+    double levelTaperBreak1 = 0.206030;   // rotation at which the wiper reaches levelTaperFrac1
+    double levelTaperFrac1 = 0.026166;    // fraction of full resistance at that rotation
+    double levelTaperBreak2 = 0.543750;
+    double levelTaperFrac2 = 0.223470;
+    double levelTaperBreak3 = 0.775388;
+    double levelTaperFrac3 = 0.528328;
     // ---- BLEND pot end stops (session 181, open-work item 12) -------------------------
     // ⚠ [ENG], NON-SCHEMATIC, USER-DECIDED 2026-08-08. Fraction of the WHOLE BLEND track
     // that the wiper cannot reach at the pin3 (OD) end. At 0 the stage is bit-identical to

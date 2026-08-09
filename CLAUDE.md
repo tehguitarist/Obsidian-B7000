@@ -105,9 +105,24 @@ the third and s144 argues it should NOT be built in its template form.
 
 #### STATUS
 
-- ⭐⭐ **SESSION 190 — ITEM 9's TWO SENSITIVITY TARGETS RE-MEASURED (s189's USER DECISION, "MEASURE
-  FIRST"): BOTH SHRANK, AND THE PEDAL WAS NEVER THE THING THAT MOVED.** ⛔ **No `src/` change,
-  nothing shipped, no rebuild, no re-render, no re-baseline owed.** New **GATE BQ**
+- ⭐⭐⭐ **SESSION 190 — THE TARGETS WERE RE-MEASURED, AND THEN THE TAPER SHIPPED AND THE LEVEL LAW
+  CLOSED.** ✅✅ **USER DECISION 2026-08-09 ("if it's a net positive, let's do it"), taken against a
+  price measured FIRST** — its SHIPPED CONSTANTS row carries every number. **Worst genuine detent
+  3.94 → 0.29 dB**; the shipped curve lands within **0.003 dB** of a free monotone curve; **matrix 6
+  rows over SHIP → 6, nothing crossed, CLEAN bit-identical, OD better on 6 of 8** (band-RMS 1.896 →
+  1.801); ⭐⭐ **and the gain SURVIVES RE-LEVELLING (56–82 % retained) — the first since s177 that
+  does**, because a taper is not a gain but a move in the clean/OD MIX RATIO. ⭐⭐ **Item 9's bass
+  half closes as a side effect: need 1.744× → 0.964×.** ⚠ Costs, both in-class: OD 8–16.3 kHz p90
+  5.210 → 5.333, THD full send 2.434 → 2.544. ⚠ `OdToneRestore`'s mix law is stale by construction
+  and its **acceptance still holds** (worst −0.59 dB against ±0.83); the one over-bar cell is at
+  LEVEL max and is **proven pre-existing by bit-identity**. ⚠⚠ **STILL OWED: GATE AY5(c) grades
+  candidates against the RETIRED restated pair** (`30.0/17.2`, `24.3/9.1`, hard-coded in `gate_ay5`)
+  — re-pointing it at s190's numbers is a **USER DECISION**, not a tidy-up. Detail:
+  `docs/session-log.md` SESSION 190 §8.
+
+- ⭐⭐ **SESSION 190's MEASUREMENT HALF — ITEM 9's TWO SENSITIVITY TARGETS RE-MEASURED (s189's USER
+  DECISION, "MEASURE FIRST"): BOTH SHRANK, AND THE PEDAL WAS NEVER THE THING THAT MOVED.** New
+  **GATE BQ**
   (`analysis/level_sensitivity_gate.py`, runner **10/10**), artefact
   `analysis/reports/s190_level_sensitivity.json`; its two CLOSED/REFUTED rows carry every number.
   ⭐⭐ **THE KNOWN ANSWER IS THE LOAD-BEARING PART: the pedal side is binary-independent and it
@@ -266,9 +281,15 @@ here only so the recent arc is legible at a glance — ⛔ do NOT quote a number
   structural cause, named at s136 and hit again at s143/s147/s163/s175/s186: an open item grows a
   PARAGRAPH per session.** When an item gains a result, **edit a table row** — never append.
 
-- ⛔⛔ **CURRENT BASELINE: `analysis/reports/s187_grunt_lf.json` (rendered AND graded s187) — 6 of
-  14 gated rows over SHIP (was 7), CLEAN bit-identical, membership IDENTICAL to s185 (162/162
-  verified, no diff caveat needed).** OD band-RMS CROSSED into SHIP (2.088 → 1.896); the 25-100 Hz
+- ⛔⛔ **CURRENT BASELINE: `analysis/reports/s190_leveltaper.json` (rendered AND graded s190) — 6 of
+  14 gated rows over SHIP, CLEAN BIT-IDENTICAL, membership IDENTICAL to s187 (162/162 verified).**
+  Shipped the re-fitted LEVEL taper; **nothing crossed in either direction** and OD improves on 6 of
+  8 OD statistics (band-RMS 1.896 → 1.801). ⭐⭐ **UNLIKE (a) BELOW, THIS GAIN SURVIVES
+  RE-LEVELLING — 56–82 % retained over 644 shared rows** (the first since s177 that does), because a
+  taper is not a gain: it moves the clean/OD MIX RATIO, which is shape. ⚠ Two rows worsen and both
+  stay in class (OD 8–16.3 kHz p90 5.210 → 5.333, over either way; THD full send 2.434 → 2.544,
+  SHIP either way). ⚠ Predecessor and still valid for pre-s190 quotes:
+  `s187_grunt_lf.json` — 6 of 14 over SHIP, CLEAN bit-identical, membership identical to s185.** OD band-RMS CROSSED into SHIP (2.088 → 1.896); the 25-100 Hz
   region improved most (p90 5.784 → 3.537). ⚠ Unlike (a)'s caveat below, this session's improvement
   is a NULL-POSITION correction (the bass null moved from 66.9 → ~52 Hz-equivalent, a SHAPE change,
   not a flat gain) — confirmed re-levelled at the specific condition it was fitted against
@@ -361,6 +382,8 @@ lives in the named source file's own comment block — **not duplicated here**.
 | `OdToneRestore::kMixCf[0]` (the mix law's node-0 ABSCISSA) | 0.000 → **0.02418** | 185 | ⭐⭐ **OPEN ITEM 19's TASK P2 — A CHANGE OF COORDINATE, NOT A RE-FIT, AND s181's OWED WORK ON THIS STAGE CLOSES.** `kMixS[0] = 0.951` is a MEASUREMENT taken at the bleed-free corner; s181's `blendEndStop` moved that corner's clean fraction from exactly 0 to `e = 0.02418`, so the node was filed under a coordinate the stage can no longer reach. **The ABSCISSA was edited, not the ordinate** — the equivalent `kMixS[0] = 1.143066` would have replaced a measured number with a derived one and lost the provenance; GATE BN's BN0e asserts the two are the SAME line to **3.3e-16**, so the choice is cosmetic. ⭐⭐ **WHY IT WAS NEEDED — THE NODE IS DEAD BUT THE SEGMENT IS NOT:** `mixShape` is piecewise-linear, so `kMixS[0]` still reaches the corner through interpolation, and the shipped law evaluated **S(e) = 0.781** against a measurement of **0.951**. *"Unreachable node"* does **not** mean *"inert constant"*. ⭐⭐ **IT RESTORES THE PRE-s181 LAW AT THE CORNER EXACTLY — 0.00e+00 dB over 15 (GRUNT × DRIVE) readings, an IDENTITY rather than a fit landing well**, undoing s183's +1.6400 dB. ⚠ The played cells' **0.7792 dB** residual against pre-s181 is deliberately NOT restored: that is the end stop genuinely changing the mix, and removing it would be a re-fit. ⚠⚠ **THE BAR (≤0.05 dB at every REACHABLE mixed cell, user-agreed s183 §10) SPLIT IN TWO AND THE PASS IS A MEMBERSHIP RESULT — never quote it alone:** CAPTURED ⇒ **MET** (worst mixed |Δcut| **exactly 0.000000 dB** over 20 mixed cells × 3 GRUNT × 5 DRIVE); DIALLABLE ⇒ **EXCEEDED** (**7.52 %** of LEVEL travel at BLEND max, knob [0.9248, 0.9998], worst **1.64 dB** cut / **0.90 dB** rendered). They differ because the disturbed band `cf ∈ (0.02418, 0.20433)` is a **GAP IN THE CAPTURE MATRIX** — the LEVEL detents jump from cf 0.24382 straight to 0.02418. **USER DECISION 2026-08-08, taken against that split.** ⭐ Rendered/predicted is **0.304 … 0.689** at all 7 cells that move (monotone toward the corner) ⇒ the composite DILUTES the change and the cut bound is conservative — measured, not assumed. ✅ **Verified on renders, not only arithmetic: the three captured MIXED cells are BIT-IDENTICAL (0.000e+00) across the shipping change**, and the corner reproduces GATE BN's `odNotchDepthDb`-emulated arm to **2.1e-09 dB** (float association only) ⇒ what shipped is exactly what was measured. ⭐⭐ **MATRIX PRICE, GRADED THE SAME SESSION (`s185_reanchor_matrix.json`): 7 rows over SHIP, NOTHING CROSSED, all five SHIP rows identical to 3 dp, CLEAN bit-identical, OD band-RMS 2.089 → 2.088, THD full send 2.407 → 2.409** — i.e. essentially nil, which is what a corner-only change should cost through a per-row gain match. ⭐ **Two-sided SCOPE check: 19 of 162 captures moved, every one at LEVEL = BLEND = max; 0 outside the predicted band, 0 in-band capture unmoved**, membership identical. **`ctest` 22/22**, new `LevelBlendTest` **Test 9** ties `kMixCf[0]` to `FitParams::blendEndStop` **exactly** (mutation-controlled: a 6th-decimal perturbation turns it red) plus a NON-VACUITY arm asserting S(corner) is the measured ordinate. ⛔ **`kMixCf[0] = 0.000` reproduces every pre-s185 number exactly** — kept reachable, and GATE BN DETECTS which state ships so its comparison stays `re-anchored − retired` either way. ⛔ Do NOT "finish the job" by re-mapping the other seven nodes: their abscissae are stale by the same mechanism (listening cf 0.43263 → 0.46434) but re-mapping them is a **RE-FIT wearing a re-anchor's name** | `OdToneRestore.h` kMixCf block; `tests/LevelBlendTest.cpp` Test 9; `analysis/mix_anchor_reanchor_gate.py` (GATE BN); `docs/session-log.md` SESSION 185 |
 
 | `FitParams::clipC15Cut` / `odMakeupLowCutDbCut` (new, GRUNT=Cut only) | *(absent)* → `clipC15Cut = 2200.0e-9` (= schematic C15), `odMakeupLowCutDbCut = 2.2` | 187 | ⭐⭐ **USER REPORT ("less bass than we should" on `ref-od`) MEASURED TO A CAUSE NO GATE HAD GRADED — the bass-null CENTRE, not its depth (s180 shipped the depth only).** `ref-od`'s null sits at 66.9 Hz against the pedal's 48.7 (ratio **1.374**, frozen to 3 dp across all four stimulus rungs), producing a consistent −3.4…−4.4 dB shape deficit at 63–100 Hz. ⛔⛔ **THE SHELF ALONE CANNOT REACH IT**: `odMakeupLowCutDb` swept 0→6 dB (its whole valid range — `OdMakeup::rebuild()` is `-std::abs(loCut)`, a cut can never boost, so 0 is the family's true edge) moves the centre ratio only **1.189→1.477**; s126's "a locus that cannot contain the target refutes the LEVER" fires. A second, independent axis was needed: **`clipC15`** (5.2e-9, a documented **423×** departure from the schematic 2u2, fitted s36/37 *before* `OdMakeup` existed and plausibly a compensating error for the LF deficit that stage now handles). Swept, `clipC15`'s own contribution **SATURATES above ~300e-9** — 330e-9 through 2200e-9 give the same answer — so it ships at EXACTLY the schematic value, removing a departure at zero measured cost rather than landing on an arbitrary intermediate fit. Together: centre ratio **1.374 → 1.075**, depth error **+1.38 → +0.37 dB**, 63–100 Hz shape **−3.93 → +0.06 dB** (at `sweep_drv_-12`, the user's stated playing level), consistent across all four rungs. ⛔⛔ **GRUNT-CUT-ONLY, MEASURED NOT ASSUMED — applying it GLOBALLY was rendered and REFUTED**: it drives flat/boost's already-small 63–100 Hz error to **+3.2…+9.7 dB** and the ~320 Hz null's depth (C1) at boost by up to **5.8 dB**, because GRUNT switches the clipper's own input coupling bank (4n7 / 4n7‖47n / 4n7‖220n — a ~47× swing in the OD branch's own LF corner, s38's GRUNT-cap argument again). ⇒ Flat and Boost are UNCHANGED, reading the pre-existing shared `clipC15`/`odMakeupLowCutDb` exactly as before; only Cut is re-pointed, via `PedalChain::syncGruntKeyedOd()` keyed on `gruntEnum(cur.gruntIdx)`. ⭐⭐ **A REGRESSION FOUND AND FIXED BEFORE SHIPPING: this is a THIRD and FOURTH GRUNT crossfade point (`odCoupling`'s C15, `OdMakeup`'s low shelf) and the first draft had none** — `SwitchTransitionTest` caught 5 "click" failures (transition gain exceeding the signal's own step) immediately. Fixed by extending s175's EXACT dual-instance shadow pattern: `odCouplingShadow`/`odMakeupShadow`, snapshotted in the SAME `gruntMoved` block that already snapshots `clipperShadow`/`odToneShadow`, crossfaded on the SAME `gruntFade` ramp — `odCoupling` inside `runOdSample()` (its existing OS-rate call site) and `OdMakeup` at its own base-rate call site in `processPostBlend()` (`gruntFade.active()`/`.blend()` READ there, not re-ticked — `runOdSample()` already ticks it once per oversampled sample, far more often than the base-rate call runs). ✅ Verified: compiled defaults reproduce an explicit `--fit clipC15Cut=2200e-9 --fit odMakeupLowCutDbCut=2.2` override **exactly** (0.000000 dB); a wild mutation (`clipC15Cut=999e-9 odMakeupLowCutDbCut=99.0`) moves `ref-od.wav` and does **not** move `ref-clean.wav`/`grunt-flat_base-od.wav`/`grunt-boost_base-od.wav` AT ALL (0.000000e+00 exactly, three independent captures — architecturally unreachable, not merely defaulted to match); the ~320 Hz null (C1) is unmoved at cut (within 0.15 dB of pre-session) and untouched by construction at flat/boost. **`ctest` 22/22** (including `SwitchTransitionTest`'s 245 checks, after the crossfade fix). ⚠⚠ **A same-second stale-binary build (`measurement-discipline.md`'s own documented trap) hit for real while verifying** — caught by checking binary MD5s directly rather than trusting a green build log; fixed by deleting the `.o` and `touch`ing sources before rebuild. ⭐⭐ **MATRIX PRICED, `s187_grunt_lf.json`, MEMBERSHIP IDENTICAL TO s185 (162/162 verified) — 7 rows over SHIP → 6, NOTHING crossed the wrong way, CLEAN bit-identical on all 4 gated rows.** **OD band-RMS CROSSED into SHIP (2.088 → 1.896)**; 25-100 Hz — where the defect lived — improved most (median 1.123 → 0.887, p90 5.784 → **3.537, −2.25 dB**); OD 8-16.3 kHz median +0.088 dB is the one tiny regression, stays inside its bar. **This is now the CURRENT BASELINE, superseding `s185_reanchor_matrix.json`.** ⛔ No dedicated gate/mutation runner yet (owed); flat/boost's own smaller, real, untouched 63–100 Hz residuals are unowned | `FitParams.h` clipC15Cut/odMakeupLowCutDbCut; `src/dsp/PedalChain.h::syncGruntKeyedOd`, `odCouplingShadow`, `odMakeupShadow`; `docs/session-log.md` SESSION 187 |
+
+| LEVEL taper `levelTaperBreak1..3` / `Frac1..3` | s173's 4-seg PWL → **0.206030/0.026166, 0.543750/0.223470, 0.775388/0.528328** | 190 | ⭐⭐ **THE LEVEL LAW CLOSES — USER DECISION 2026-08-09 ("if it's a net positive, let's do it"), taken against a price measured FIRST.** Same mechanism as s173's re-fit one layer down: s181's `blendEndStop`, s185's re-anchor and s187's GRUNT-keyed LF pair all moved the delivered level under a taper fitted before any of them, so **GATE AY2 went from REFUSING at s174 to 7 of 9 detents WELL-DEFINED, worst 3.94 dB** (s189). Shipped, the requirement reads **+0.14 / +0.13 / +0.11 / +0.08 / +0.14 / +0.29 dB** across the interior detents — **worst genuine detent 3.94 → 0.29 dB**, and of the 3 detents still WELL-DEFINED **two are the clean-dominated pair AY2 itself excludes** (their `need` is A3 seen through the anchor, not a taper statement). The shipped curve scores **0.291 dB against a FREE monotone curve's 0.288** — within 0.003 dB of the best any taper can do. ⭐ **4 segments is MEASURED, not chosen**: the family SATURATES there (a 5th buys 1.4e-04 dB rms, a 6th 5.6e-17 — GATE AZ2) and 2-/3-segment fail containment. Convex, monotone, **EXACT at both endpoints** (endpoint err 0.0/0.0) so the anchor corner and the LEVEL-min end stop are untouched by construction. ⭐⭐ **MATRIX: 6 rows over SHIP → 6, NOTHING CROSSED, membership IDENTICAL to s187 (162/162 verified), CLEAN BIT-IDENTICAL on all four gated rows.** OD improves on 6 of 8 OD statistics — band-RMS **1.896 → 1.801**, 100 Hz–8 kHz median **0.574 → 0.508** / p90 **3.117 → 2.968**, 25–100 Hz median **0.887 → 0.775** / p90 **3.537 → 3.354**, 8–16.3 kHz median **0.635 → 0.582**, ALL p99 **9.548 → 9.475**. ⚠ Two rows worsen and both stay in class: OD 8–16.3 kHz p90 **5.210 → 5.333** (over either way) and THD full send **2.434 → 2.544** (SHIP either way). ⭐⭐⭐ **AND THE GAIN SURVIVES RE-LEVELLING — THE FIRST ONE SINCE s177 THAT DOES.** Standing caveat (a) says these gains are usually a LEVEL LEAK (s177's washed out entirely); re-levelled per row by its own band-domain mean over 644 shared rows, this one retains **63 / 79 / 82 / 56 / 79 %** on the five improving statistics, and the one regression shrinks **+0.143 → +0.035**. ⇒ it is genuine SHAPE, which is what a taper should be: not a gain but a move in the clean/OD **MIX RATIO** (s163 measured exactly this mechanism, in the direction of a cost). ⭐⭐ **FREE SIDE EFFECT — ITEM 9's SENSITIVITY HALF CLOSES ON THE BASS NOTCH**: GATE BQ re-run on the shipped taper reads **need 0.964 / 0.965 / 0.962 / 0.941×** across the four sweeps (published 1.744×, s190-re-measured 1.437×) ⇒ the model now moves marginally MORE than the pedal; treble notch **1.053×** at `drv_-18`. ⛔ **NOT a claim that item 9 is closed** — `treble_notch × drv_-6` needs 5.060× and is **item 6's pinning on the LEVEL axis**, unowned, and it did NOT regress (model span grew 1.3 → 2.1 %). ✅ Verified: **`ctest` 22/22**; compiled defaults **bit-identical** to the explicit `--fit` list at **6/6**, mutation fires on the 4 OD captures and the 2 controls are correctly inert (verified from their own settings); ⭐ **two-sided SCOPE, rendered:** vs the OLD taper `level-1700_base-od`, `level-1700_blend-1430_base-od` and `ref-clean` are **BIT-IDENTICAL** (L(1)=1 is pinned under both curves; clean path unreachable) while `ref-od` and `level-0930` move. ⚠⚠ **`OdToneRestore`'s mix law is stale by construction and its ACCEPTANCE STILL HOLDS**: extra cut needed is **+0.25/+0.13/−0.24/−0.59 dB** (listening set) and **−0.52/−0.20/−0.27 dB** (mixed BLEND cells), all inside s151's **±0.83 dB** residual; the one over-bar cell (−2.65 dB) is at LEVEL max and is **proven pre-existing by the bit-identity above**. A full re-fit stays item 10's owed work. ⚠ Three mirrors moved in step (`FitParams.h`, `LevelBlend.h` compiled defaults, `level_law_gate.SHIPPED_LEVEL_TAPER`) — s174's trap. ⚠ Half-rotation **23.75 % → 19.79 %**, back toward the A-taper band — ⛔ **not evidence**, s174 DELETED that bar after refuting its premise | `FitParams.h` levelTaper* block; `LevelBlend.h` `kLevelTaper*`; `analysis/level_taper_fit.py` (GATE AZ), `analysis/level_sensitivity_gate.py` (GATE BQ); `docs/session-log.md` SESSION 190 §8 |
 
 #### CLOSED / REFUTED — do not re-open without reading the pointer
 
@@ -556,17 +579,20 @@ Percentiles are over band values, OD ex `gain-n12` unless noted. **The gate is a
 transcribed table.** Run it; do not transcribe its output here:
 
 ```bash
-/opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s187_grunt_lf.json
+/opt/homebrew/bin/python3.11 analysis/release_gate.py analysis/reports/s190_leveltaper.json
 ```
 
 It exits non-zero while any gated row is over, prints `n` beside every statistic, breaks the
 reference dropouts and the `gain-n12` group out as printed subsets (never hidden), and takes
 `--method csd|h1|h1band` / `--compare` / `--ex-gain-n12`.
 
-**6 rows over SHIP as of s187 (was 7 at s185)**: OD 100 Hz–8 kHz median & p90, OD 25-100 Hz
+**6 rows over SHIP as of s190 (6 at s187, 7 at s185)**: OD 100 Hz–8 kHz median & p90, OD 25-100 Hz
 median & p90, OD 8–16.3 kHz p90, OD ALL p99. ✅ **OD band-RMS CROSSED into SHIP at s187** (2.088 →
-1.896, s187's GRUNT-keyed bass-null fix — see its SHIPPED CONSTANTS row); ✅ **both THD rows, both
-CLEAN rows, and OD 8-16.3 kHz median all SHIP.** ⚠ The over-SHIP rows have accumulated [ENG]-price
+1.896, s187's GRUNT-keyed bass-null fix — see its SHIPPED CONSTANTS row) **and improved again at
+s190 to 1.801** (the re-fitted LEVEL taper — **nothing crossed either way**, and unusually the gain
+SURVIVES re-levelling, 56–82 % retained); ✅ **both THD rows, both CLEAN rows, and OD 8-16.3 kHz
+median all SHIP.** ⚠ Every one of the six moved DOWN at s190 except **OD 8–16.3 kHz p90 (5.210 →
+5.333)**, which is the taper's one gated cost and is mostly level (+0.035 re-levelled). ⚠ The over-SHIP rows have accumulated [ENG]-price
 explanations at earlier sessions (s163's LEVEL taper, s166's `OdDriveTilt`), but which of the
 CURRENT six each one lands on has not been re-traced since s187 moved the population — do that
 before re-quoting a specific row-to-session attribution. None of these six was reverted; s167's
@@ -722,18 +748,23 @@ other files cite still resolve; detail is in the two tables and `docs/session-lo
    shipping it would still owe a ~50 min matrix render (s163's price is the precedent) and an
    `OdToneRestore` mix-law re-check. ⚠ The bottom two detents are **A3 seen through the anchor**,
    not a taper requirement.
-   ✅✅ **THAT RE-MEASUREMENT IS DONE — s190, GATE BQ (two CLOSED/REFUTED rows carry it).** ⛔ Still
-   nothing shipped. **Both targets SHRANK at every gradeable cell: bass notch 1.744× →
-   1.437…1.603×, treble notch 2.670× → 1.019…1.460×** (6 of 8 cells gradeable). ⭐⭐ **The pedal
-   side is pinned** — binary-independent, and it reproduces BOTH primary artefacts to 0.09 % /
-   0.11 % — so the whole move is the **model's own LEVEL sensitivity having grown** (bass notch
-   20.7 % → 29.8 %); ⛔ **not attributed to one change** (s181/s185/s187 confounded, and s187 moved
-   this feature by construction). ⇒ **the s189 candidate's 1.206× fold now reaches 1 of 6 graded
-   cells**, against 0 of 2 on the retired pair — ⛔ **still not a licence to ship it**: AY5(b)'s
-   necessary-not-sufficient caveat binds, most cells are short, and the price is unpaid.
+   ✅✅ **THAT RE-MEASUREMENT IS DONE — s190, GATE BQ (two CLOSED/REFUTED rows carry it).** **Both
+   targets SHRANK at every gradeable cell: bass notch 1.744× → 1.437…1.603×, treble notch 2.670× →
+   1.019…1.460×** (6 of 8 cells gradeable). ⭐⭐ **The pedal side is pinned** — binary-independent,
+   and it reproduces BOTH primary artefacts to 0.09 % / 0.11 % — so the whole move is the **model's
+   own LEVEL sensitivity having grown** (bass notch 20.7 % → 29.8 %); ⛔ **not attributed to one
+   change** (s181/s185/s187 confounded, and s187 moved this feature by construction).
+   ✅✅ **AND THEN THE TAPER SHIPPED, s190 — USER DECISION, price measured first (SHIPPED CONSTANTS).
+   THE LEVEL LAW CLOSES: worst genuine detent 3.94 → 0.29 dB**, the shipped curve within 0.003 dB of
+   a free monotone curve, matrix **6 over SHIP → 6 with nothing crossed** and the gain **surviving
+   re-levelling**. ⭐⭐ **ITEM 9's SENSITIVITY HALF CLOSES ON THE BASS NOTCH — need 0.964×** (the
+   model now moves marginally MORE than the pedal); treble notch **1.053×** at `drv_-18`.
+   ⛔ **ITEM 9 IS NOT CLOSED**: `treble_notch × drv_-6` still needs **5.060×** (model span 2.1 % vs
+   the pedal's 10.4 %) — that is **item 6's pinning on the LEVEL axis**, it did NOT regress, and
+   nothing owns it.
    ⚠⚠ **AND GATE AY STILL GRADES AGAINST THE RETIRED PAIR** (`30.0/17.2`, `24.3/9.1`, hard-coded in
    `gate_ay5`) — re-pointing it at the s190 numbers is a **USER DECISION**, not a tidy-up, because
-   it is what moves the candidate from "clearly short" to "partly reached".
+   it is what a future candidate would be judged against.
    (ii) ⛔⛔ **THE "BOUNDED OUT" ARGUMENT IS WITHDRAWN.** It read: *the mixed clean-re-OD ratio is
    exactly (1 − L) with both endpoints pinned, so the supremum fold is 1.368× against a required
    1.744×/2.670×.* That is the **pre-s181** network — with the end stop the ratio is

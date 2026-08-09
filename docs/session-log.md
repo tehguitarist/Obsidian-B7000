@@ -25442,3 +25442,120 @@ re-check, `worst |Δ cleanFraction| = 0.0304`).
 PID-unique DECOY, so a dead guard damages the decoy and never the s122 epoch that GATEs AV / AW /
 AF / AG / BC read (0 fresh / 25 stale stamps — s188). The real cache's fingerprint was **identical
 before and after every run this session** (`4aa2199c08436a76`), asserted by BQ0.
+
+### 8. THE TAPER SHIPPED — USER DECISION 2026-08-09 ("if it's a net positive, let's do it")
+
+The measurement above was the condition; this section is the price, measured before the decision was
+called. **`levelTaperBreak1..3 / Frac1..3` → 0.206030/0.026166, 0.543750/0.223470, 0.775388/0.528328**
+(was s173's 0.221598/0.056630, 0.494043/0.229938, 0.984417/0.850908).
+
+**Three mirrors moved in step**, which is the s174 trap: `FitParams.h`, `LevelBlend.h`'s **compiled
+defaults** (`LevelBlendTest` Test 0 asserts they equal `FitParams` EXACTLY — exact is right, both
+are literals of one fit so any difference is a missed edit, never a rounding), and
+`level_law_gate.SHIPPED_LEVEL_TAPER` (a **pinned epoch**, not a convenience copy).
+
+#### (a) What it closes — the LEVEL law, on GATE AY2's own refusal criterion
+
+| LEVEL | need BEFORE (s189) | need AFTER | verdict after |
+|---|---|---|---|
+| 0.000 | −3.27 | −3.27 | clean-dominated ⇒ **not a taper requirement** |
+| 0.125 | −3.94 | **−0.75** | clean-dominated ⇒ **not a taper requirement** |
+| 0.250 | −2.04 | **+0.14** | NOTHING TO DO |
+| 0.375 | −1.15 | **+0.13** | NOTHING TO DO |
+| 0.500 | −0.92 | **+0.11** | NOTHING TO DO |
+| 0.625 | −0.72 | **+0.08** | NOTHING TO DO |
+| 0.750 | −0.22 | **+0.14** | NOTHING TO DO |
+| 0.875 | +0.31 | **+0.29** | WELL-DEFINED, and it is the ONLY genuine one left |
+
+**Worst genuine detent 3.94 dB → 0.29 dB**, and 7 of 9 WELL-DEFINED → 3 of 9 of which **two are the
+clean-dominated pair AY2 itself excludes** (their `need` is A3 seen through the anchor). The shipped
+curve now scores **0.291 dB against a FREE monotone curve's 0.288** — i.e. it is within 0.003 dB of
+the best any taper can do on this requirement. Mix span **0.9346 → 1.1299**, remaining required fold
+**1.008×**.
+
+#### (b) What it costs — the matrix, 162/162, membership IDENTICAL to s187 (verified)
+
+| row | s187 | s190 | Δ |
+|---|---|---|---|
+| CLEAN ×4 (all gated rows) | 0.196 / 0.666 / 0.279 / 1.097 | **identical** | **0.000** |
+| OD 100 Hz–8 kHz median | 0.574 | **0.508** | −0.066 |
+| OD 100 Hz–8 kHz p90 | 3.117 | **2.968** | −0.149 |
+| OD 25–100 Hz median | 0.887 | **0.775** | −0.112 |
+| OD 25–100 Hz p90 | 3.537 | **3.354** | −0.183 |
+| OD 8–16.3 kHz median | 0.635 | **0.582** | −0.053 |
+| OD 8–16.3 kHz p90 | 5.210 | 5.333 | **+0.123** ⚠ |
+| OD ALL p99 | 9.548 | **9.475** | −0.073 |
+| OD ALL band-RMS | 1.896 | **1.801** | −0.095 |
+| THD full send | 2.434 | 2.544 | **+0.110** ⚠ |
+| THD gain-n12 | 1.754 | **1.637** | −0.117 |
+
+**6 rows over SHIP → 6. Nothing crossed in either direction.** CLEAN bit-identical on all four gated
+rows (the taper is OD-path only — verified by render, §8(d)). Two rows worsen slightly and both stay
+in the same verdict class.
+
+#### (c) ⭐⭐ AND THE IMPROVEMENT SURVIVES RE-LEVELLING — the first one since s177 that does
+
+Standing caveat (a) says most matrix gains since s177 are a **LEVEL LEAK** through the LF-dominated
+null gain, and s177's washed out entirely while s180's kept 16–84 %. Re-levelled per row by its own
+**band-domain** mean (s177/s180's own remedy), over the 644 shared rows:
+
+| statistic | as graded | re-levelled | retained |
+|---|---|---|---|
+| OD 25–100 Hz median | −0.123 | **−0.077** | 63 % |
+| OD 25–100 Hz p90 | −0.190 | **−0.150** | 79 % |
+| OD 100 Hz–8 kHz median | −0.066 | **−0.054** | 82 % |
+| OD 100 Hz–8 kHz p90 | −0.187 | **−0.104** | 56 % |
+| OD band-RMS | −0.094 | **−0.074** | 79 % |
+| OD 8–16.3 kHz p90 (the regression) | +0.143 | **+0.035** | (mostly level too) |
+
+⇒ **56–82 % of the gain is genuine SHAPE.** That is what a taper change *should* look like and what
+distinguishes it from the *"make the model louder"* degeneracy: a taper is not a gain, it moves the
+clean/OD **mix ratio**, which the matrix sees in full (s163 established exactly this, in the
+direction of a cost; here it lands as a gain).
+
+#### (d) Verification, before and after
+
+- **`ctest` 22/22**, including `LevelBlendTest` Test 0 and Test 9.
+- **Compiled defaults reproduce an explicit `--fit` list BIT-IDENTICALLY at 6/6 captures**, and a
+  wild mutation moves the 4 OD captures while leaving 2 controls inert — both controls verified from
+  their own settings (`--dist-engage 0`, `--blend 0`), not assumed.
+- ⭐ **SCOPE, two-sided and rendered:** against the OLD taper, `level-1700_base-od` and
+  `level-1700_blend-1430_base-od` are **BIT-IDENTICAL** (L(1) = 1 is pinned under both curves, so
+  LEVEL max is unreachable by construction) and `ref-clean` is **BIT-IDENTICAL** (clean path), while
+  `ref-od` and `level-0930_base-od` both move.
+- **`OdToneRestore`'s mix law is stale by construction but its ACCEPTANCE HOLDS**: extra cut still
+  needed is **+0.25 / +0.13 / −0.24 / −0.59 dB** across the DRIVE ladder at the listening set, and
+  **−0.52 / −0.20 / −0.27 dB** at the mixed BLEND cells — all inside s151's own **±0.83 dB** fit
+  residual. ⚠ The one over-bar cell (**−2.65 dB**, LEVEL = BLEND = max) is **proven pre-existing by
+  the bit-identity above** — the taper cannot reach it. A full re-fit stays item 10's owed work; it
+  is not triggered by this change.
+
+#### (e) Item 9's sensitivity half, re-measured ON the shipped taper (GATE BQ again)
+
+| feature | sweep | model span | pedal span | need |
+|---|---|---|---|---|
+| `bass_notch` | clean / −18 / −12 / −6 | 31.1 / 31.0 / 31.0 / 30.9 % | 30.0 / 29.9 / 29.8 / 29.1 % | **0.964 / 0.965 / 0.962 / 0.941×** |
+| `treble_notch` | drv_-18 | 26.6 % | 28.0 % | **1.053×** |
+| `treble_notch` | drv_-12 | 14.5 % | 17.8 % | **1.227×** |
+| `treble_notch` | drv_-6 | 2.1 % | 10.4 % | **5.060×** |
+
+⭐⭐ **The bass notch's LEVEL sensitivity is now MATCHED** — need 1.744× (published) → 1.437× (s190
+re-measured) → **0.964×** shipped, i.e. the model now moves marginally *more* than the pedal. The
+treble notch is close at the two rungs where it resolves. ⛔ **`drv_-6` is NOT this change's defect
+and did not regress** — the model's span there GREW 1.3 → 2.1 %; the pedal's 10.4 % gap is the
+model's features pinning at hot stimulus, which is **item 6** on the LEVEL axis, unowned.
+
+#### (f) The verdict, and what is explicitly NOT claimed
+
+**NET POSITIVE, and the user's condition is met on every axis measured**: the LEVEL law closes, the
+matrix improves with the gain surviving re-levelling, CLEAN is bit-identical, no gated row crosses,
+and item 9's bass half closes as a side effect. ⛔ **NOT claimed:** that item 9 is closed (the
+treble half's hot-stimulus cell is wide open and belongs to item 6); that a `b/a` fold *causes* a
+centre to move 1:1 (AY5(b)'s necessary-not-sufficient caveat is untouched — the feature move is
+measured here, not derived from the fold); or that the two worsened rows are free (they are small,
+in-class, and mostly level, which is a reason to accept them, not a reason to call them zero).
+
+⚠ **STILL OWED, and named rather than left to be found:** GATE AY5(c) continues to grade candidates
+against the **RETIRED restated pair** (`30.0/17.2`, `24.3/9.1`) hard-coded in `gate_ay5` — re-pointing
+it at s190's numbers is a **USER DECISION**, not a tidy-up, because it changes how the next candidate
+is judged.

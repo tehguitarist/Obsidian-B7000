@@ -94,7 +94,12 @@ import release_gate as RG
 # s163 set was fitted before `OdMakeup` shipped, so the OD:CLEAN ratio the LEVEL law reads moved
 # under it.  `check_shipped_constant()` REFUSED against the header rather than assuming, which is
 # what this literal is for -- it is a pinned epoch, not a convenience copy.
-SHIPPED_LEVEL_TAPER = (0.221598, 0.056630, 0.494043, 0.229938, 0.984417, 0.850908)
+# ⚠ RE-FITTED AGAIN s190 (was 0.221598/0.056630, 0.494043/0.229938, 0.984417/0.850908 -- s173),
+# same mechanism one layer down: s181's `blendEndStop`, s185's re-anchor and s187's GRUNT-keyed LF
+# pair all moved the delivered level under a taper fitted before any of them, and GATE AY2 went
+# from REFUSING at s174 to 7 of 9 detents well-defined.  The derivation is at the `FitParams.h`
+# block; this literal only has to STAY IN STEP, and `check_shipped_constant()` is what enforces it.
+SHIPPED_LEVEL_TAPER = (0.206030, 0.026166, 0.543750, 0.223470, 0.775388, 0.528328)
 LEVEL_TAPER_NAMES = ("levelTaperBreak1", "levelTaperFrac1", "levelTaperBreak2",
                      "levelTaperFrac2", "levelTaperBreak3", "levelTaperFrac3")
 RETIRED_LEVEL_TAPER_EXP = 2.25   # what shipped up to s162 -- for reading pre-s163 reports ONLY
