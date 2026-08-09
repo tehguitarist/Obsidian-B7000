@@ -42,6 +42,8 @@ does not, the solve is wrong and nothing below it means anything (AP3a).
 
     /opt/homebrew/bin/python3.11 analysis/null_depth_censor_gate.py
 """
+import argparse
+import json
 import os
 import sys
 
@@ -59,7 +61,39 @@ REAL = ("sweep_drv_-18", "sweep_drv_-12", "sweep_drv_-6")
 
 # GRUNT row -> (physical position index, the fit tool's capture set).  Row order is
 # Clipper::Grunt {Cut, Flat, Boost}, matching kNotchGainDb's rows.
-ROWS = (("Cut", 0, "bleedfree"), ("Flat", 1, "grunt_flat"), ("Boost", 2, "grunt_boost"))
+#
+# ⚠⚠ SESSION 191 — THIS MEMBERSHIP IS BLEED-FREE-ONLY, AND GATE AQ AND GATE AX BOTH INHERIT IT.
+# s186's GATE BO measured what that costs: the 8 pre-s186 groups hold 17 of 29 rows at the anchor
+# and **the GRUNT axis is 12 of 12**, so this stage's GRUNT-rowed tables have only ever been graded
+# at ONE clean fraction — on the axis that has three rows to choose between — and BO then found the
+# ORDERING does not survive the mix (0 of 3 readable sweeps agree) with the argmax moving from FLAT
+# to BOOST.  s186 added the mixed twins to `od_tone_restore_fit.SETS` and pointing this at them was
+# left as "a measurement nobody has taken" (item 19's second orphaned finding).
+#
+# ⇒ `ROW_SETS` below makes the membership an AXIS rather than a constant, and `ROWS` stays the
+# BLEED-FREE default EXACTLY as before, so:
+#   * every stored GATE AP / AQ / AR / AX number reproduces unchanged, and the three importers
+#     (`AP.ROWS`) keep the membership their published results were computed on;
+#   * `--rows mixed` grades the same question at the LISTENING condition (LEVEL noon / BLEND max),
+#     which is the direct mixed twin of each bleed-free group.
+# ⛔ Do NOT re-point `ROWS` itself.  A membership swapped under three importers silently moves five
+# gates' stored numbers, which is exactly the trap `od_tone_restore_fit.FROZEN_SETS` was added to
+# make impossible one layer down.
+#
+# ⚠⚠ MEMBERSHIP IS ASYMMETRIC ON THE MIXED ARM AND THAT IS A CAPTURE FACT, NOT A CHOICE:
+# `drive-1430_grunt-*` and `drive-1700_grunt-flat` do not exist on disk, so Flat reaches DRIVE 0.5
+# and Boost 1.0 while Cut reaches all five.  Any comparison ACROSS rows on that arm must be matched
+# on DRIVE first (s178's 13th occurrence of `aggregate-moved-check-membership-first`, where the
+# unmatched pooling actively rewarded the arm that read less).
+ROW_SETS = {
+    "bleedfree": (("Cut", 0, "bleedfree"), ("Flat", 1, "grunt_flat"), ("Boost", 2, "grunt_boost")),
+    "mixed":     (("Cut", 0, "listen"), ("Flat", 1, "listen_flat"), ("Boost", 2, "listen_boost")),
+}
+
+ROWS = ROW_SETS["bleedfree"]
+
+#: Which membership `main()` selected, for every header that would otherwise name one.
+CURRENT_ROWS_LABEL = ["bleedfree"]
 
 # The fit's own converged residual, s151 §5: depth within ±0.83 dB at every (GRUNT, DRIVE) entry.
 # Used as the BAR below — a target that moves by less than the fit's own residual cannot change a
@@ -157,12 +191,31 @@ def ap1b():
                 # notch's own depth so every rung still has a feature to measure.
                 top = min(12.0, 0.6 * base["depth_point"])
                 clips = np.linspace(0.0, top, 7)         # dB of bottom removed
-                pt, ar = [], []
+                # ⛔⛔ s191: THE PER-RUNG CALL WAS UNGUARDED AND IT CRASHED THE WHOLE GATE ON THE
+                # FIRST MIXED CELL. `notch_geometry` legitimately REFUSES when the clipped minimum
+                # lands on a CORE bound, and the 60 % cap above was calibrated on BLEED-FREE curves,
+                # where the nulls are deep; at a mixed cell the null is shallower and its bottom is
+                # floored by the clean tap (s183/s184), so the same fraction erases it. A refusal is
+                # a reading the gate must survive, not an error — s117: a gate that hands the next
+                # session a stack trace has handed them a symptom instead of a reason.
+                kept, pt, ar = [], [], []
                 for c in clips:
                     cl = np.maximum(ped, bottom + c)
-                    r = F.notch_geometry(g, cl)
+                    try:
+                        r = F.notch_geometry(g, cl)
+                    except RuntimeError:
+                        continue                 # the clip erased the feature at this rung
+                    kept.append(c)
                     pt.append(r["depth_point"])
                     ar.append(r["depth_area"])
+                # A slope over 3 points of a 7-rung ladder is not a dose-response
+                # (`check-n-before-reading-a-trend`), and a cell that loses rungs loses them from
+                # the CLIPPED end -- exactly the end the slope is measured on. Named, not silent.
+                if len(kept) < 4:
+                    print(f"  {gname + ' drive ' + format(drv, '.2f'):<34} REFUSED — only "
+                          f"{len(kept)} of {len(clips)} clip rungs kept a readable feature")
+                    continue
+                clips = np.array(kept)
                 if abs(pt[0] - base["depth_point"]) > 1e-12 or abs(ar[0] - base["depth_area"]) > 1e-12:
                     fail("AP1b", f"zero-clip control moved at {gname} drive {drv} — the clipping "
                                  f"harness is not inert")
@@ -245,7 +298,11 @@ def ap1c():
 # AP2 — the census: which readings are censored, and does the point/area gap follow it?
 # ================================================================================================
 def ap2():
-    print("\nAP2  FLOOR-MARGIN CENSUS — bleed-free, stage subtracted, all three realistic sweeps")
+    # ⚠ s191: the label used to say "bleed-free" unconditionally. With `--rows` an axis, a header
+    # that names one membership while grading another is `verify-the-BASELINE-not-its-LABEL` in the
+    # cheapest possible form -- so it reports the membership it was actually given.
+    print(f"\nAP2  FLOOR-MARGIN CENSUS — {CURRENT_ROWS_LABEL[0]}, stage subtracted, all three "
+          f"realistic sweeps")
     print("  margin = (null bottom) − (deconvolution residue).  NEGATIVE = the depth is a LOWER")
     print("  BOUND, not a measurement.  ⛔ Nothing is excluded on this; it is a diagnosis.")
     T = F.shipped_tables()
@@ -340,11 +397,18 @@ def ap3():
           f"{'solve ar':>9} {'n':>2} | {'ar−pt':>7} | {'ar−shipped':>10}")
     for gname, gpos, sname in ROWS:
         for fname, drv in F.SETS[sname]:
-            ship = F.lerp5(T["kNotchGainDb"][gpos], drv, T["kX"])
+            # ⛔⛔ s191: this read `F.lerp5(T["kNotchGainDb"][gpos], ...)` — the BASE table alone —
+            # while line ~378 below subtracts `current_response`'s FULL mix-keyed curve. Since s156
+            # those are two different stages, so the gate compared a solve against a reference that
+            # omitted `kNotchMixK * S(cleanFrac)`, and AP3a (its own load-bearing known answer) has
+            # been RED on the current epoch as a result. `F.cut_db` is now the single resolver both
+            # sides read, and it takes the SAME `clean_frac_of(fname)` the subtraction does.
+            cf = F.clean_frac_of(fname)
+            ship = F.cut_db(T, gpos, drv, cf)
             gp, ga = [], []
             for sw in REAL:
                 g, ped, mod = F.curves(fname, sw)
-                mod_off = mod - F.current_response(g, drv, fs, T, gpos, F.clean_frac_of(fname))
+                mod_off = mod - F.current_response(g, drv, fs, T, gpos, cf)
                 try:
                     pg = F.notch_geometry(g, ped)
                 except RuntimeError:
@@ -537,10 +601,35 @@ def ap6(sol):
 
 
 def main():
+    global ROWS
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--rows", choices=sorted(ROW_SETS), default="bleedfree",
+                    help="which GRUNT-row membership to grade. `bleedfree` (default) is the "
+                         "membership every stored GATE AP/AQ/AR/AX number was computed on; "
+                         "`mixed` is its LISTENING-condition twin (s186's SETS additions).")
+    ap.add_argument("--json", help="write the solved table here")
+    a = ap.parse_args()
+    ROWS = ROW_SETS[a.rows]
+    CURRENT_ROWS_LABEL[0] = a.rows
+
     print("=" * 96)
     print("GATE AP — the OdToneRestore depth targets, re-read with an estimator the deconvolution")
     print("          residue cannot censor.  s151 open item 0.")
     print("=" * 96)
+    print(f"  rows: {a.rows}   {' / '.join(f'{g}={s}' for g, _p, s in ROWS)}")
+    for _g, _p, sname in ROWS:
+        m = F.SET_META[sname]
+        print(f"    {sname:<14} holds {m['hold']}  varies {m['vary']}")
+    if a.rows != "bleedfree":
+        print("  ⚠ NOT the membership the shipped table was fitted on, and not the membership any")
+        print("    stored AP/AQ/AR/AX number was computed on. Read as a SECOND reading of the same")
+        print("    question at a played setting, never as a correction to those numbers.")
+        drv = [sorted({d for f, d in F.SETS[s]}) for _g, _p, s in ROWS]
+        if len({tuple(x) for x in drv}) > 1:
+            print(f"  ⚠⚠ THE DRIVE LADDERS DIFFER ACROSS ROWS — {'; '.join(f'{g}: {v}' for (g, _p, _s), v in zip(ROWS, drv))}")
+            print("     (a capture fact: `drive-1430_grunt-*` and `drive-1700_grunt-flat` are not on")
+            print("     disk). Every ACROSS-ROW comparison below must be matched on DRIVE first.")
     ap1a()
     ap1b()
     ap1c()
@@ -589,10 +678,16 @@ def main():
     print(f"  ⚠ ATTRIBUTION: the disagreement does NOT track the censoring "
           f"(corr with floor margin {r_m:+.3f}); AP6.")
 
-    rep = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reports",
-                       "s152_null_depth_censor.json")
-    import json
-    json.dump({"censored": n_cens, "readings": n_tot, "corr_margin_gap": corr,
+    # ⚠ ROW-AWARE PATH (s191). The mixed arm is a DIFFERENT membership answering the same question,
+    # so writing it over `s152_null_depth_censor.json` would replace the artefact five sessions of
+    # published numbers were computed from with one that merely looks like it — the silent-clobber
+    # s153 documented when a mutation runner wrote a falsified result under the real gate's filename.
+    rep = a.json or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "reports",
+        "s152_null_depth_censor.json" if a.rows == "bleedfree"
+        else f"s191_null_depth_censor_{a.rows}.json")
+    json.dump({"rows": a.rows, "row_sets": [s for _g, _p, s in ROWS],
+               "censored": n_cens, "readings": n_tot, "corr_margin_gap": corr,
                "point_solve_rms_vs_shipped": rms, "point_solve_worst": worst,
                "trade": trade, "corr_margin_metricgap": r_m, "corr_qratio_metricgap": r_q,
                "membership": {f"{k[0]}_{k[1]:.2f}": v for k, v in counts.items()},

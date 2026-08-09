@@ -26128,3 +26128,133 @@ inside the graded pool. The *"slope with a crossing, not a level error"* reading
   twin. ⚠ Note the lineage this session just added to it — GATE AP's `ROWS` is a *third* tool whose
   membership is written against the pre-s181 anchor, alongside GATE Z's `cf_class` (fixed here) and
   the four already on record.
+
+## SESSION 191 (continued) — step 3: GATE AP's bleed-free-only ROWS, pointed at the mixed twin
+
+**Task.** Step 3 of the prioritised list: *"point GATE AP's bleed-free-only `ROWS` at the mixed
+`od_tone_restore_fit.SETS` twin"* (item 19's second orphaned finding, s186). ⚠ Reinforced by the
+user mid-session: *"As with all things, make sure you aren't ONLY checking bleed-free, as usually I
+use ref-od as a baseline for example."* — and `ref-od.wav` **is** the Cut × DRIVE 0.5 cell of the
+mixed membership, so that is exactly the reading this step produces.
+
+⛔ **No `src/` change, nothing shipped.** Artefacts: `/tmp` runs plus the row-aware report path.
+
+### 1. The membership is now an AXIS, and the default is unchanged
+
+`ROW_SETS` gives `bleedfree` (the pre-s191 tuple, verbatim) and `mixed`
+(`listen` / `listen_flat` / `listen_boost` — LEVEL noon, BLEND max, per GRUNT position).
+⛔ **`ROWS` itself is NOT re-pointed**: `notch_shape_gate` (AQ), `notch_residual_gate` (AR) and
+`notch_shoulder_gate` (AX) all do `ROWS = AP.ROWS` at import, so swapping it would silently move
+five gates' stored numbers — the trap `od_tone_restore_fit.FROZEN_SETS` was added to make
+impossible one layer down. `--rows mixed` selects the twin, prints each group's held/varied axes
+from `SET_META`, and writes to a **row-aware report path** so the mixed arm cannot overwrite
+`s152_null_depth_censor.json` (s153's silent-clobber lesson).
+
+⚠ It also prints the asymmetry as a **warning, not a footnote**: the mixed DRIVE ladders are
+Cut [0, 0.25, 0.5, 0.75, 1.0], Flat [0, 0.25, 0.5], Boost [0, 0.25, 0.5, 1.0] — a capture fact
+(`drive-1430_grunt-*` and `drive-1700_grunt-flat` are not on disk), and any across-row comparison
+must be matched on DRIVE first.
+
+### 2. ⭐⭐⭐ THE RESULT: THE AREA ESTIMATOR'S ROBUSTNESS IS A BLEED-FREE PROPERTY, AND IT VANISHES AT THE MIX
+
+AP1b is the gate's load-bearing premise, and it is a **dose-response with no threshold in it**:
+clip each pedal curve from below at a ladder of levels and regress each estimator's depth against
+the amount of clipping. A point depth must fall ~1:1 once the clip bites; an area depth must not.
+
+| membership | slope, POINT | slope, AREA | ratio |
+|---|---|---|---|
+| bleedfree | −1.000 dB/dB | **−0.242** | **4.1×** |
+| **mixed** | −1.000 dB/dB | **−1.029** | **1.0×** |
+
+and the mixed arm is **1.0× at all 12 cells** (0.78–1.05, i.e. the area depth is if anything
+*marginally more* sensitive). The gate's own guard fires and refuses: *"the AREA depth is not more
+robust than the point depth — the whole premise of this gate fails, do NOT read AP3."*
+
+⇒ **GATE AP's premise, its remedy, and the whole frame of s153's standing USER DECISION ("match the
+BOTTOM, or the AREA?") are statements about the BLEED-FREE CORNER. At a played setting the choice
+does not exist**, because the two metrics measure the same thing to within 3 %.
+
+⭐ **Mechanism, and it was already on the books:** at a mixed setting the composite null is SHALLOW
+(AP2 reads 1.2–4.8 dB at `drv_-12`/`-6`, against the deep bleed-free ones) and its bottom is
+**floored by the clean tap**, which cannot cancel because it does not pass through the network doing
+the cancelling (s183 §3, s184's BM4). A 1/6-octave average and a bottom sample only differ when
+there is a narrow bottom to average away; when the whole feature is a few dB deep there is not one.
+
+⭐⭐ **THIS IS THE THIRD INDEPENDENT CONSTRUCTION REACHING THE SAME PLACE, AND THE FIRST AS A
+DOSE-RESPONSE.** s184's BM4 measured the point-vs-area disagreement collapsing off the corner
+(17.1× → 1.6×); s186's BO measured the two estimators AGREEING to ≤0.33 dB at every mixed cell and
+separating completely on the floor margin (a 6.02 dB gap); this measures the **sensitivity itself**,
+by injecting known censoring rather than by observing agreement. Agreement can be a coincidence; a
+slope cannot.
+
+**AP2 corroborates from the census side:** **9 of 36** mixed pedal readings are censored against
+**16 of 26** bleed-free, and the mixed censoring concentrates almost entirely at `sweep_drv_-18` —
+the quietest rung, where the null is deepest. At `drv_-12`/`-6` the point−area gaps run 0.04–0.6 dB.
+`corr(floor margin, point−area gap) = −0.871`, i.e. the two estimators diverge exactly where the
+bottom is censored — the mechanism, measured, on the mixed arm too.
+
+### 3. ⛔⛔ AND GETTING THERE FOUND GATE AP INTERNALLY INCONSISTENT SINCE s156 — ITS KNOWN ANSWER IS RED ON BOTH ARMS
+
+Before any of the above could be read, the gate had to run, and on the DEFAULT membership it was
+already failing — **verified pre-existing by running `git show HEAD:` of the file, which fails
+identically**, so it is not something this session introduced.
+
+**The defect:** AP3 subtracted the stage using `F.current_response(..., clean_frac_of(fname))` —
+the FULL mix-keyed curve, correct — and compared its solve against
+`F.lerp5(T["kNotchGainDb"][gpos], drv, T["kX"])`, **the BASE table alone**. Since s156 the cut is
+`kNotchGainDb + kNotchMixK * S(cleanFrac)`, so the gate **subtracted one stage and compared against
+a different one**, the difference being exactly the omitted term — and that term is not small at the
+anchor, where s185 pinned **S(e) = 0.951**, i.e. near its full value.
+
+⇒ ✅ **`od_tone_restore_fit.cut_db(T, grunt, drive, clean_frac)` extracted as the SINGLE resolver**,
+called by both `current_response` and AP3, so they cannot drift again (the `region_sel` /
+`level_law_gate._endstop` pattern). The default `clean_frac=None` keeps `current_response`'s
+documented behaviour, so every pre-s191 call is bit-identical.
+
+⭐ **The repair is corroborated by which rows it fixed.** AP3a's diffs (solved − shipped):
+
+| row | before the fix | after |
+|---|---|---|
+| Cut 0.00 / 0.50 / 1.00 | −8.51 / −8.46 / −9.86 | **−1.03 / +0.43 / −0.68** |
+| Flat 0.00 / 0.50 / 1.00 | −1.49 / −0.88 / +2.95 | −0.00 / −3.71 / +2.03 |
+| Boost 0.00 / 0.50 / 1.00 | −6.86 / −7.34 / −4.85 | **−10.10 / −12.87 / −10.38** |
+
+The **Cut row now reproduces the shipped table to within the fit's own ±0.83 dB residual**, which
+is what AP3a exists to establish and is strong evidence the omitted term was the defect. ⚠⚠ **But
+BOOST is now WORSE and pooled rms is 6.62 dB against the gate's own 2.49 bar, so AP3a is still RED
+and AP3/AP5's table numbers are NOT quotable on either membership.** On the mixed arm it reads
+**3.19 dB** — better, still over. ⛔ **Do not quote any AP3/AP5 number, including the stored
+`s152_null_depth_censor.json`, until that is resolved**; `CLAUDE.md`'s standing warning
+(*"AP/AQ/AR's stored reports were fitted against the PRE-s156 law — re-verify before quoting"*)
+turns out to understate it: the TOOL was inconsistent, not merely its stored artefacts.
+
+⚠ **What is NOT yet known** and must not be guessed: whether Boost's ~10 dB is a second stale term,
+the s156 DEPTH CEILING (beyond a certain cut, extra depth is averaged away, so a point solve returns
+the smallest gain reaching the target rather than the shipped one — AP3 already flags 1 non-monotone
+cell bleed-free and 18 mixed), or the censoring the gate is measuring. Three candidates, none
+screened. ⛔ It does **not** touch §2's conclusion, which rests on AP1b — a dose-response that does
+not use the solve at all.
+
+**And a second breakage, on the mixed arm only:** AP1b **crashed outright** on the first mixed cell.
+Its per-rung `notch_geometry` call was unguarded, and that function legitimately REFUSES when the
+clipped minimum lands on a CORE bound. The 60 % clip cap was calibrated on bleed-free curves where
+the nulls are deep; at a mixed cell the null is shallow and the same fraction erases it. ⇒ guarded,
+with cells keeping <4 of 7 rungs **REFUSED BY NAME** rather than fitted over 3 points
+(`check-n-before-reading-a-trend`, and the lost rungs come from the CLIPPED end — exactly the end
+the slope is measured on). s117: a gate that hands the next session a stack trace has handed them a
+symptom instead of a reason. ⚠ Also fixed: AP2's header printed *"bleed-free"* unconditionally,
+which with `--rows` an axis is `verify-the-BASELINE-not-its-LABEL` in its cheapest form.
+
+### 4. Where this leaves the list
+
+- **Step 3 is ANSWERED, and more sharply than expected**: the mixed membership does not merely give
+  a different answer to *"does the censoring move the table?"* — it says **the question is
+  bleed-free-only**, because the estimator distinction it rests on is 1.0× at every played cell.
+- ⚠ **It does NOT reopen s153's USER DECISION** (which target to FIT), and it does not close it
+  either. What it says is that the decision is scoped to the corner: at the listening condition
+  there is no measurable difference between the two candidates, so nothing about a played setting
+  argues either way.
+- ⛔ **A NEW BLOCKER for step 5** (item 10's `OdToneRestore` re-fit): AP3a is red, so the tool that
+  would price a re-fit cannot currently certify its own solve. Resolving Boost's ~10 dB is
+  prerequisite work that was not on the list, and it is a **USER DECISION** whether to spend a
+  session on it or to re-fit against `od_tone_restore_fit` directly and leave GATE AP red.

@@ -466,6 +466,28 @@ def clean_frac_of(fname, taper=None):
     return (cl / (od + cl)) if (od + cl) > 0 else 1.0
 
 
+def cut_db(T, grunt, drive, clean_frac=None):
+    """THE EFFECTIVE CUT THE SHIPPED BUILD APPLIES at (grunt, drive, cleanFrac), in dB.
+
+    ⛔⛔ SESSION 191 — EXTRACTED BECAUSE A CONSUMER HAD DRIFTED FROM IT AND NOTHING CAUGHT IT.
+    Since s156 the stage is MIX-KEYED: `cut = kNotchGainDb + kNotchMixK * S(cleanFrac)`.
+    `current_response` (below) computed that inline and correctly; GATE AP's AP3 compared its own
+    solve against **`kNotchGainDb` ALONE** while subtracting `current_response`'s FULL mix-keyed
+    curve — so it subtracted one stage and compared against a different one, and its load-bearing
+    known answer AP3a duly read rms 6.48 dB against its own 2.49 bar (worst 9.86), i.e. RED, with
+    the gate correctly refusing to let anything below it be quoted. The gap is exactly the term it
+    omitted, and it is NOT small at the anchor: s185 pinned `S(e) = 0.951` there, so the mix term is
+    near its full value precisely where the bleed-free membership reads.
+
+    ⇒ ONE resolver, called by both, so the two cannot drift again — the `region_sel` /
+    `level_law_gate._endstop` pattern, applied to this stage. `clean_frac=None` keeps
+    `current_response`'s documented default (kMixCfRef, where S = 0) so every pre-s191 call is
+    bit-identical; a caller reading a capture must pass `clean_frac_of(fname)`."""
+    cf = T["kMixCfRef"] if clean_frac is None else clean_frac
+    return (lerp5(T["kNotchGainDb"][grunt], drive, T["kX"])
+            + lerp5(T["kNotchMixK"][grunt], drive, T["kX"]) * mix_shape(cf, T))
+
+
 def current_response(f, drive, fs, T, grunt=0, clean_frac=None):
     """The stage's own response as the SHIPPED build computes it.
 
@@ -473,9 +495,7 @@ def current_response(f, drive, fs, T, grunt=0, clean_frac=None):
     defaults to kMixCfRef (where S = 0), which reproduces the base table verbatim — the right
     default for a caller that genuinely has no mix, and WRONG for one that simply forgot to pass
     it.  Callers reading a capture must pass `clean_frac_of(fname)`."""
-    cf = T["kMixCfRef"] if clean_frac is None else clean_frac
-    cut = (lerp5(T["kNotchGainDb"][grunt], drive, T["kX"])
-           + lerp5(T["kNotchMixK"][grunt], drive, T["kX"]) * mix_shape(cf, T))
+    cut = cut_db(T, grunt, drive, clean_frac)
     return (rbj_peak_db(f, fs, T["kNotchFreq"], lerp5(T["kNotchQ"][grunt], drive, T["kX"]), -cut)
             + rbj_peak_db(f, fs, T["kPeakFreq"], T["kPeakQ"],
                           lerp5(T["kPeakGainDb"], drive, T["kX"])))
