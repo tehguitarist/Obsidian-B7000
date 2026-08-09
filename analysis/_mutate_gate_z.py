@@ -61,18 +61,36 @@ MUTATIONS = [
      "empty control is exactly what makes a proposed split look free"),
 
     # ---- Z3 / Z5: population guards ------------------------------------------------------------
-    ("Z3 bleed-free population empty",
-     None, "GATE Z3 FAIL",
-     '    sub = [r for r in rows.values() if r["cf"] < 1e-12 and not r["n12"]]\n    if not sub:',
-     '    sub = [r for r in rows.values() if r["cf"] < -1.0 and not r["n12"]]\n    if not sub:',
-     "make the bleed-free class unsatisfiable -- the convention-free table is the load-bearing "
-     "measurement of the session and must refuse rather than print an empty surface"),
+    # ⚠⚠ RE-POINTED AT s191, AND THE EXPECTATION IS DELIBERATELY INVERTED. Until s191 this arm
+    # required `rc != 0`: an empty anchor class was a `sys.exit` in Z3. That exit is what suppressed
+    # Z4-Z6 for eight sessions once s181's end stop emptied the class for real, which is s108's rule
+    # broken ("exit only on things that make the numbers below meaningless"). The gate now REPORTS
+    # the emptiness as a computed NOT-AVAILABLE and continues — so the arm tests that it says so,
+    # loudly, rather than that it dies. `fix the EXPECTATION, not the guard` (s119) applied to a
+    # guard that was deliberately changed.
+    ("Z3 anchor population empty",
+     0, "Z3 CANNOT RUN ON THIS REPORT",
+     'def is_anchor(cf):',
+     'def is_anchor(cf):\n    return False  # MUTANT',
+     "make the anchor class unsatisfiable -- the convention-free table is the load-bearing "
+     "measurement of the session, so the gate must SAY it cannot run rather than print an empty "
+     "surface or silently skip to Z4"),
 
     ("Z5 too few bleed classes to fit",
      None, "GATE Z5 FAIL",
      '    CF_EDGES = ',
      '    CF_EDGES = ',
      "PLACEHOLDER -- replaced below"),
+
+    # ---- the anchor derivation's own known answer (s191) ---------------------------------------
+    ("anchor cf diverges from the shipped end stop",
+     None, "GATE Z FAIL [anchor]",
+     '    a, c = LLG.coef_closed(1.0, LLG.level_taper(1.0))',
+     '    a, c = (0.5, 0.5)  # MUTANT: a fourth stale mirror of LevelBlend',
+     "model the corner with a DIFFERENT LevelBlend than the one FitParams.h ships. The anchor "
+     "class is derived from that corner, so a stale mirror would silently re-classify every "
+     "anchor row -- s182 found two stale mirrors and s189 a third, and none of them was caught "
+     "by the tool that used the value"),
 
     # ---- the computed verdicts, which no exit code can test ------------------------------------
     ("Z3 sign-change verdict is COMPUTED",
@@ -115,11 +133,13 @@ MUTATIONS = [
 # The Z5 arm needs a two-line replacement that the tuple form above cannot express cleanly.
 MUTATIONS[4] = (
     "Z5 too few bleed classes to fit",
-    None, "GATE Z5 FAIL",
+    0, "Z5 CANNOT RUN",
     'CF_EDGES = ((0.35, "cf<0.35"), (0.60, "0.35-0.60"), (0.80, "0.60-0.80"), (1.01, "cf>=0.80"))',
     'CF_EDGES = ((1.01, "cf-all"),)',
-    "collapse the bleed classes to one so a one-parameter law is fitted to a single point -- the "
-    "gate must refuse rather than return a perfectly-fitting meaningless DF",
+    "collapse the bleed classes to one so a one-parameter law would be fitted to a single point -- "
+    "the gate must REPORT that it cannot run rather than return a perfectly-fitting meaningless DF. "
+    "⚠ s191: expectation changed from rc!=0 to a computed refusal, for the same reason as the Z3 "
+    "arm above -- a thin membership is an epoch fact, and exiting on it takes Z6 down with it",
 )
 
 #: ⚠ The Z1-sign arm mutates `shape_gate.py`, not the gate under test, because that is where the
