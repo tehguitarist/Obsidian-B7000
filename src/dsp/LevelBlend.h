@@ -380,10 +380,51 @@ public:
     // agree to 0.03-0.05 dB), which is what makes one number sufficient here.
     double cleanFraction() const noexcept
     {
-        // ⚠ Evaluated at the SETTLED mix (`distTarget`), not at the live `distMix`.
-        // This keys `OdToneRestore`'s notch law, which is re-read once per block; a
-        // mid-stomp reading would chatter that stage's coefficients for a few ms against
-        // a mix that is already on its way somewhere else.
+        // ⛔⛔ EVALUATED AT THE **ENGAGED** PATH (dm = 1.0), i.e. dist_engage IS DELIBERATELY
+        // IGNORED HERE. It was evaluated at `distTarget` from s171 to s198, and that was the
+        // whole of `SwitchTransitionTest`'s standing `distEngage @mids-boost (on)` failure —
+        // measured, not argued (session 198, GATE BV):
+        //
+        //   `setDistEngage()` moves `distTarget` INSTANTLY, so `PedalChain::syncOdToneMix()`
+        //   pushed a cf that jumped 0.02418 -> 1.0 in one sample into the two mix-keyed OD
+        //   stages — an UNSMOOTHED coefficient jump landing at the flip sample while `distMix`
+        //   is still 1.0 and the OD branch is therefore at FULL contribution. The fade below
+        //   was never the problem: the transient lands ON the flip sample and is gone in ~8
+        //   samples, where a too-fast fade would spread over all 576.
+        //
+        // ⭐⭐ AND THE OBVIOUS SUSPECT IS EXONERATED BY THE SAME MEASUREMENT. s175's GRUNT
+        // precedent makes `OdToneRestore` the stage to reach for (there, fading only the
+        // clipper would have left the notch stage's discontinuity wearing the switch's name).
+        // Freezing each stage's cf across the flip separates them and it is NOT that stage:
+        // freeze `OdToneRestore` alone 2.85x -> **2.85x**, freeze `OdMakeup` alone 2.85x ->
+        // **0.58x**, freeze both -> 0.59x. ⇒ **s173's mix-keyed HF peak (5.6 kHz, Q 2.0) is
+        // ~100 % of it.** ⛔ Do not re-open this as an `OdToneRestore` problem.
+        //
+        // ⭐⭐⭐ AND THE EXONERATION IS THE OPPOSITE OF "that stage barely does anything" — THE
+        // STAGE THAT MOVES THE OUTPUT **33x MORE** IS THE ONE THAT IS NOT THE CARRIER. Driving
+        // the same cf 0.02418 -> 1.0 on each stage alone moves the settled output rms by
+        // **-5.121e-03 (OdToneRestore)** against **+1.570e-04 (OdMakeup)** — both live, so
+        // neither freeze arm is a dead intervention, and the ranking INVERTS between the two
+        // statistics. That is not a paradox, it is what the bar measures: a per-sample STEP is
+        // a HIGH-FREQUENCY statistic (d/dn of a component scales with its frequency), so a few
+        // dB on a Q-2 section at 5.6 kHz rings hard while several dB on a Q-16 section at
+        // 323 Hz barely moves a sample-to-sample difference at all. ⇒ ⛔ never rank candidate
+        // carriers for a click by how much they move the response.
+        //
+        // ⭐ WHY IGNORING THE FOOTSWITCH IS THE *CORRECT* READING, not a workaround: this
+        // accessor exists to tell the OD-path stages how much clean signal the BLEND NETWORK
+        // is about to sum on top of them. `dist_engage` is a MUTE of the whole OD branch, not
+        // a change in that ratio — and `processAt(dm <= 0)` returns `cleanIn` EXACTLY, so
+        // while the switch is disengaged the OD branch's tuning is discarded sample for
+        // sample and cannot be heard at all. Re-keying it to 1.0 therefore bought nothing at
+        // the settled end and cost a click at the only point where the branch IS audible: the
+        // fade. ⇒ cf is now a pure function of (LEVEL, BLEND, end stops), which is also what
+        // every analysis mirror (GATE AT/BM/BN) has always modelled it as.
+        //
+        // ⚠ SCOPE, verified by RENDER not by this argument: `base="clean"` captures render at
+        // `--dist-engage 0`, so they DO see a different cf — and their output is bit-identical
+        // regardless, because the OD branch they re-tune is discarded by the `dm <= 0` early
+        // return. `LevelBlendTest` Test 10 asserts both halves.
         const double od = processAt(0.0, 1.0, distTarget);
         const double cl = processAt(1.0, 0.0, distTarget);
         const double sum = od + cl;

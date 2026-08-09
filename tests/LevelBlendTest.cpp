@@ -578,6 +578,65 @@ int main()
             ++failures;
     }
 
+    // ---- Test 10: cleanFraction() ignores dist_engage (s198, item 7) -------
+    // `cleanFraction()` keys the two MIX-KEYED OD-path stages (`OdToneRestore`'s s156 cut,
+    // `OdMakeup`'s s173 HF peak). From s171 to s198 it was evaluated at `distTarget`, which
+    // the footswitch moves INSTANTLY — so a stomp jumped both stages' coefficients in one
+    // sample while `distMix` was still 1.0 and the OD branch was at full contribution. That
+    // was the whole of `SwitchTransitionTest`'s standing `distEngage @mids-boost (on)`
+    // failure (2.85x -> 0.59x once cf stopped moving). See the block at cleanFraction().
+    //
+    // ⚠⚠ THE SECOND HALF IS THE ONE THAT MAKES THE CHANGE FREE, and it is asserted rather
+    // than argued: `base="clean"` captures render at `--dist-engage 0`, so they genuinely
+    // DO see a different cf now — and their OUTPUT cannot move, because `processAt(dm <= 0)`
+    // returns `cleanIn` EXACTLY and discards the OD branch those stages tune. A test that
+    // only checked the cf half would pass while the matrix silently re-baselined.
+    std::printf("\n=== Test 10: cleanFraction() is a BLEND property, not a footswitch one (s198) ===\n");
+    {
+        const FitParams fp10;   // read the end stop from the fit bag, don't transcribe it
+        LevelBlend a, b;
+        a.prepare(48000.0);
+        b.prepare(48000.0);
+        for (LevelBlend* s : {&a, &b})
+        {
+            s->setBlendEndStop(fp10.blendEndStop);
+            s->setLevel(0.75);
+            s->setBlend(0.5);
+        }
+        a.setDistEngage(true);
+        b.setDistEngage(false);
+        a.reset();
+        b.reset();
+        const double cfOn = a.cleanFraction(), cfOff = b.cleanFraction();
+        std::printf("  (a) cf engaged %.8f, disengaged %.8f  %s\n", cfOn, cfOff,
+                    (cfOn == cfOff) ? "PASS (identical)" : "FAIL");
+        if (cfOn != cfOff)
+        {
+            std::printf("      ^ a footswitch stomp still steps the mix-keyed OD stages.\n");
+            ++failures;
+        }
+
+        // (b) NON-VACUITY: cf must be a value the footswitch COULD have overwritten, i.e.
+        // genuinely not 1.0 — otherwise (a) passes for the trivial reason that this
+        // configuration is all-clean anyway and nothing was ever at stake.
+        const bool nonVacuous = std::abs(cfOn - 1.0) > 1e-3;
+        std::printf("  (b) NON-VACUITY: cf = %.8f, must differ from the retired 1.0  %s\n",
+                    cfOn, nonVacuous ? "PASS" : "FAIL");
+        if (!nonVacuous)
+            ++failures;
+
+        // (c) and the price is still zero at the settled end: disengaged, the stage must
+        // return the clean input EXACTLY, whatever the OD branch is doing.
+        const double outOff = b.process(0.375, 9.0);   // a deliberately huge OD input
+        std::printf("  (c) disengaged output %.17g (want exactly 0.375, OD discarded)  %s\n",
+                    outOff, (outOff == 0.375) ? "PASS" : "FAIL");
+        if (outOff != 0.375)
+        {
+            std::printf("      ^ the OD branch is NOT discarded, so re-keying it is not free.\n");
+            ++failures;
+        }
+    }
+
     // ---- Summary ----------------------------------------------------------
     std::printf("\n%s\n", failures == 0 ? "All tests passed." : "Some tests FAILED.");
     return (failures > 0) ? 1 : 0;
