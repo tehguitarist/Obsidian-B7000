@@ -133,11 +133,17 @@ the third and s144 argues it should NOT be built in its template form.
   re-fitting `OdToneRestore` against a membership GATE BO already showed doesn't survive the mix
   (s186) is exactly the rework this ordering exists to avoid. **(4) FIX ITEM 17's TREBLE HALF
   "as best as possible"** — ⛔⛔ this is the SAME feature as item 19's N4 and item 6's "missing HF
-  null" under a third name, with a documented tension (centre accuracy vs drive-ordering, s178
-  BH4/BH5) and a knife-edge depth statistic — not fresh territory. ⚠ It shares its own frequency
-  window with `OdDriveTilt` (`odTiltF0 = 5388 Hz`), which item 19's P4 already found overshooting
-  at 11 of 12 mixed cells in that exact band — baggage this item carries regardless of (2)'s
-  answer. **(5) Item 10's `OdToneRestore` re-fit** — deferred until (3) and (4) both land, then
+  null" under a third name, and carries FOUR axes, not fresh territory — read item 17's own
+  numbered entry for the full facts: **(i) absolute depth at a single condition is a KNIFE-EDGE
+  and is NOT a fit target** (s178: ND/shipped/pre-s172 read 13.56/2.58/34.11 dB at `drv_-18` vs
+  4.93/24.78/7.11 at `drv_-12` — the same build, opposite verdict, two rungs apart); **(ii) depth's
+  ORDERING with drive IS separately gradeable and IS failing** (ND monotonic 8/8, shipped 1/8);
+  **(iii) centre-frequency accuracy** (GATE BF's axis); **(iv) LEVEL-axis centre pinning** (this
+  session's new finding). ⚠⚠ **(ii) and (iii) are in MEASURED tension (s178 BH4/BH5)** — closing
+  one gives the other back; (i) and (iv) have never been tested against either. ⚠ It also shares
+  its frequency window with `OdDriveTilt` (`odTiltF0 = 5388 Hz`), which item 19's P4 already found
+  overshooting at 11 of 12 mixed cells there — baggage regardless of (2)'s answer.
+  **(5) Item 10's `OdToneRestore` re-fit** — deferred until (3) and (4) both land, then
   re-check acceptance (it may move a second time). **(6) The 53 Hz mix cancellation (s184)** —
   low priority; likely resolves to "characterise and accept" (s184's own words: *"not a defect of
   any stage"*) rather than an engineering fix. **(7) Bridged-T notch-depth collapse + bass-peak
@@ -878,13 +884,31 @@ other files cite still resolve; detail is in the two tables and `docs/session-lo
     GRUNT=Cut only, `clipC15Cut`/`odMakeupLowCutDbCut`, applying it globally is REFUTED — see the
     CLOSED/REFUTED rows and `docs/session-log.md` SESSION 187)**) and ⛔ **only the TREBLE half
     remains, BLOCKED ON A FRONTIER, not on effort.** ▶⭐⭐ **THE LIVE ITEM, USER DECISION
-    2026-08-09: "fix it as best as possible."** Four things converge on this ONE feature under
-    three different names (item 19's N4, item 6's "missing HF null", this row) plus a FOURTH,
-    never-before-connected angle this session found: GATE BQ shows the model's centre stops moving
-    with LEVEL at all at `drv_-6` (span collapses to 2.1 %, item 6's pinning problem, unowned).
-    ⛔ Do not assume a fix on one axis (drive-ordering, LEVEL-pinning, centre accuracy) helps the
-    others — s178's own BH4/BH5 measured the opposite for two of them. Detail:
-    `docs/session-log.md` SESSION 190 §9-continued. ⭐⭐ **BOTH nulls are ONE mechanism** — OD-vs-clean cancellations whose
+    2026-08-09: "fix it as best as possible."** This ONE feature carries FOUR axes under three
+    different names (item 19's N4, item 6's "missing HF null", this row) — **and DEPTH is TWO of
+    the four, not one, so it must not be flattened into "drive-ordering":**
+    (i) **ABSOLUTE DEPTH AT ANY SINGLE CONDITION IS A KNIFE-EDGE, NOT A FIT TARGET (s178, GATE BH).**
+    On `ref-od`, ND / shipped / pre-s172 read **13.56/2.58/34.11 dB at `drv_-18`, 4.93/24.78/7.11 at
+    `drv_-12`, 2.35/6.83/2.96 at `drv_-6`** — *"20 dB too deep"* and *"11 dB too shallow"* are **the
+    SAME BUILD two rungs apart**, because a near-perfect OD-vs-clean cancellation is deep AND
+    narrow while a slightly detuned one is neither, and the |OD|=|clean| crossing that sets the
+    null slides along the stimulus ladder as branch gains move. ⛔ Do not quote a depth number from
+    one rung as "the error"; do not fit to one.
+    (ii) **DEPTH's ORDERING (its trend WITH DRIVE) IS SEPARATELY GRADEABLE AND IS A REAL, CURRENTLY
+    FAILING TARGET.** ND's depth falls monotonically with stimulus in **8/8** matched conditions
+    (exact binomial tail vs P=1/6: **5.95e-07**); the **shipped build is monotonic in only 1/8**.
+    This is the one part of "depth" that is a legitimate fit target — but ⚠⚠ **BH4/BH5 measured
+    that closing it TRADES AGAINST axis (iv)**: every arm that reaches ND's depth-ordering gives
+    back GATE BF's centre-frequency accuracy.
+    (iii) **CENTRE-FREQUENCY ACCURACY** — GATE BF's own axis, the one a shelf correction has always
+    been sized against.
+    (iv) **LEVEL-AXIS CENTRE PINNING**, never-before-connected, found THIS session: GATE BQ shows
+    the model's centre stops moving with LEVEL at all at `drv_-6` (span collapses to 2.1 %, item
+    6's pinning problem, unowned).
+    ⛔ Do not assume a fix on one of these four helps the others — BH4/BH5 is a MEASURED
+    counterexample between (ii) and (iii), and (i)/(iv) have never been tested against either.
+    Detail: `docs/session-log.md` SESSION 190, both continuation sections.
+    ⭐⭐ **BOTH nulls are ONE mechanism** — OD-vs-clean cancellations whose
     depth peaks where |OD| = |clean|, so any OD-branch gain slides that crossing along the stimulus
     ladder, which is why a shelf cannot fix either. ⚠⚠ **AND THEY ARE IN TENSION:** hardware wants
     ~320 Hz DEEPER and ~50 Hz SHALLOWER, so closing the bass half necessarily weakened the 320 Hz

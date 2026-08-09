@@ -25790,3 +25790,56 @@ investigation with no way to leverage anything above.
    successor named). Starting either without a fresh hypothesis risks spending a session
    re-confirming what is already known rather than adding to it — unlike #4–5, there is no
    "resume interrupted work" available here.
+
+## SESSION 190 (continued) — the treble notch's DEPTH, made explicit as its own axis
+
+USER: make sure the treble notch's depth is covered in the action list and documented.
+
+Fair catch. The prior write-up (§9-continued and the follow-up prioritisation) named three axes
+for item 17's treble half — "drive-ordering, LEVEL-pinning, centre accuracy" — and folded DEPTH
+into "drive-ordering" without saying so. That flattens two genuinely separate s178 findings into
+one label, and a future session reading "drive-ordering" alone could easily miss that depth's
+*absolute value* is separately, and more fundamentally, unusable as a target.
+
+**The two depth findings, kept apart on purpose (both from s178, GATE BH):**
+
+1. **Absolute depth at any single stimulus condition is a KNIFE-EDGE, not a fit target.** On
+   `ref-od`, ND / shipped / pre-s172 read:
+   | rung | ND | shipped | pre-s172 |
+   |---|---|---|---|
+   | `drv_-18` | 13.56 | 2.58 | 34.11 |
+   | `drv_-12` | 4.93 | 24.78 | 7.11 |
+   | `drv_-6` | 2.35 | 6.83 | 2.96 |
+
+   *"20 dB too deep"* and *"11 dB too shallow"* are the **same build, two rungs apart** — a
+   near-perfect OD-vs-clean cancellation is deep AND narrow, a slightly detuned one is neither, and
+   the mechanism is exact: the null's depth peaks where `|OD| = |clean|`, and any OD-branch gain
+   change slides that crossing point along the stimulus ladder (BH1a validates this to 0.000 dB
+   rms against a render). ⇒ quoting or fitting a depth number from one rung, ever, reproduces
+   `an-endpoint-pair-is-not-a-ladder` (s129) on this exact feature a second time.
+
+2. **Depth's ORDERING — its trend across the stimulus ladder — is a completely different
+   statistic, and it IS gradeable, threshold-free, and currently FAILING.** ND's depth falls
+   monotonically with stimulus in **8 of 8** matched conditions (exact binomial tail against
+   P = 1/6: **5.95e-07**, i.e. not a coincidence). The **shipped build is monotonic in only 1 of
+   8**. This is the one part of "depth" a fix could legitimately target.
+
+3. **And closing (2) costs (3), centre-frequency accuracy — measured, not assumed** (s178's BH4/
+   BH5): *"every arm that reaches ND's ordering gives back GATE BF's centre gain"* — i.e. every
+   candidate tried that improved the depth-ordering statistic made the notch's centre-frequency
+   accuracy worse, and vice versa. Neither direction has a free lunch on record.
+
+**Where this leaves the axis list for item 17's treble half — four, not three, with depth split
+into its own two:**
+
+| axis | status | interacts with |
+|---|---|---|
+| (i) absolute depth at one condition | KNIFE-EDGE — not fittable, ever | mechanism shared with (ii) |
+| (ii) depth's ordering with drive | gradeable, FAILING (1/8 vs 8/8) | trades against (iii), measured |
+| (iii) centre-frequency accuracy | GATE BF's own axis | trades against (ii), measured |
+| (iv) LEVEL-axis centre pinning | this session's new finding | untested against (i)/(ii)/(iii) |
+
+`CLAUDE.md`'s item 17 row and the prioritised-list STATUS entry are both edited to carry this
+four-way, depth-split framing rather than the three-axis one from the prior write-up. No priority
+order changed — item 17's treble half is still step 4 of 7 — this is a documentation correction,
+not a re-sequencing.
