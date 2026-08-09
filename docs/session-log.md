@@ -24907,3 +24907,407 @@ have made them worse than leaving them alone.
   correction, not a flat gain) but has not measured it the way those two sessions did.
 * ⚠ **Sessions 181–187 are all uncommitted** (last `git commit` is session 180) — a standing
   question for the user, not something to act on unilaterally.
+
+---
+
+## SESSION 188 (2026-08-09) — item 19's P4: `OdDriveTilt` was accepted on a CEILING at the one setting where the model has headroom
+
+⛔ **No `src/` change, no `tests/` change, nothing shipped, no rebuild, no re-baseline owed.** New
+GATE **BP** (`analysis/od_tilt_mix_gate.py`, runner `_mutate_gate_bp.py` **12/12 first run**),
+report `analysis/reports/s188_od_tilt_mix.json`.
+
+### 1. The first thing P4 found is that GATE BC cannot be re-run at all
+
+P4's wording is *"re-read `OdDriveTilt`/GATE BC's acceptance number at the mix (BC ran on the e0
+arm)"*, i.e. re-run BC. It does not run. GATE BC imports its requirement through
+`drive_tilt_shape_gate.load_af6()` → `analysis/reports/s134_sk_mechanism.json` →
+`analysis/reports/s122_feature_locus.json`. Both are **gitignored and absent**, and the tool that
+regenerates the second renders into `build/s122_feature_locus/` — GATE W's **READ-ONLY** cache.
+Measured: **0 of its 25 `.args.json` stamps match the shipped binary, 25 are stale**, so
+`W.render` would re-render every one of them and destroy the s122 epoch that GATEs AV / AW / AF /
+AG / BC all read.
+
+⇒ GATE BP imports **no report at all**. Its requirement is MEASURED per cell as
+`pedal − model(tilt OFF)`, which is also the *correct* form at a mixed cell — at the corner the
+requirement is a bleed-free quantity, and off it both sides carry a clean tap, so importing a
+bleed-free requirement and comparing it against a mixed delivery is two different quantities
+(`difference-statistics-hide-common-mode`). BP0 prints the stale-stamp count every run so the trap
+is on the record rather than rediscovered.
+
+### 2. Membership
+
+12 cells, **every one a real capture on disk**, GRUNT cut / ATTACK flat (s151's trap), settings
+resolved from the parse and asserted against the label (s114): the LEVEL ladder at BLEND max
+(cf 0.024 → 0.557, including `ref-od` as the PLAY cell), the BLEND ladder at LEVEL max
+(cf → 0.756), and DRIVE min/max at the play LEVEL. Clean fraction spans **0.024 … 0.756**. Renders
+go to a private dir; GATE W's cache is fingerprinted before and after (50 files unchanged).
+
+Two scope controls, both **BIT-IDENTICAL (0.000e+00 over 4 017 600 samples)**: BLEND min (OD out of
+circuit) and the CLEAN path. That is what licenses reading `ON − OFF` as the stage's own OD-branch
+change seen through dilution, and it is backed by a source assertion (BP1e) that no
+LEVEL/BLEND/mix-derived term reaches any of the 9 `odDriveTilt.` call sites in `PedalChain.h` —
+the follower taps the OD region's input, pre-blend, so its coefficient trajectory is mix-invariant.
+
+### 3. ⭐ The stage's own contribution IS mix-invariant — measured, not just argued
+
+The peak-walk contribution `ON − OFF` reads **−2.87 / −3.11 / −3.18 / −3.25 / −3.24 / −3.21 /
+−3.23 / −3.13 / −3.21 / −3.22 / −3.34 / −3.27 %** across all 12 cells — a spread of **0.47
+percentage points** over a 30× range of clean fraction and the entire DRIVE knob. This is the
+property GATE BB's refutation said was structurally required (a FIXED pre-clipper section's
+coefficient collapsed **50×** across the same knob), and it is now measured at the mix rather than
+inferred from the bleed-free corner. **The stage does what it was built to do.**
+
+### 4. The DELIVERY is not diluted — it is RESHAPED, and it peaks at an INTERIOR mix
+
+Drive-tilt delivered at the read frequency (**2714.1 Hz — MEASURED in-gate as the corner's tilt-OFF
+`treble_peak`, not transcribed**):
+
+| cf | 0.024 | 0.244 | 0.329 | 0.400 | 0.464 | 0.502 | 0.557 |
+|---|---|---|---|---|---|---|---|
+| delivered dB/oct | −0.559 | **−1.217** | −1.118 | −0.957 | −0.806 | −0.717 | −0.586 |
+
+Not monotone; the peak is **interior** (cf 0.244, 2.18× the corner) and at the PLAY cell it is
+**1.44× the corner**, i.e. the stage delivers MORE at played settings, not less. ⚠ This inverts the
+naive dilution prediction and s183's expectation. Mechanism: the dilution factor is itself
+**rung-dependent** (the OD branch compresses with stimulus, the clean tap does not), so the mix adds
+a SECOND rung-dependence on top of the stage's own — and a drive-tilt is a difference between rungs,
+so the two ADD rather than one attenuating the other.
+
+### 5. ⭐⭐ THE HEADLINE — the requirement CHANGES SIGN off the corner, and gate 2's ceiling is breached at every played setting
+
+`required = pedal − model(OFF)`, at 2714 Hz:
+
+| cell | cf | PEDAL | model OFF | required | delivered |
+|---|---|---|---|---|---|
+| corner | 0.024 | −2.832 | −0.790 | **−2.042** | −0.559 |
+| L0.875/B1.00 | 0.244 | −3.424 | −3.899 | **+0.475** | −1.217 |
+| **PLAY (`ref-od`)** | 0.464 | −2.178 | −2.896 | **+0.718** | −0.806 |
+| L1.000/B0.50 | 0.512 | −1.346 | −2.446 | **+1.100** | −0.692 |
+| DRIVE max | 0.464 | −1.586 | −2.866 | **+1.280** | −0.801 |
+
+At the corner the model needs MORE negative tilt — BC's premise. At **11 of 11** mixed cells the
+requirement is **POSITIVE**: the model's composite is *already* more drive-tilted than the pedal's
+before the stage runs, and the stage pushes it further the wrong way.
+
+⛔ **QUOTE THE CENTRE WITH IT — the sign is FREQUENCY-DEPENDENT** (BP2b, per centre, never pooled;
+pooling it would be `a-pooled-statistic-cannot-answer-about-its-own-axis` on the axis that IS the
+answer). Mixed cells with `required > 0`, out of 11: **1200 Hz 9 · 1600 Hz 2 · 2100 Hz 3 ·
+2714 Hz 11 · 3400 Hz 11**. So *"the model is already over-tilted"* is a statement about the band
+**at and above the vertex**, not about the band.
+
+**The peak walk corroborates it on an independent statistic** (bar 0.0, GATE BC4's own convention):
+
+| cell | OFF | ON | stage | PEDAL |
+|---|---|---|---|---|
+| corner | −4.81 % | −7.69 % | −2.87 % | −10.52 % |
+| **PLAY** | **−18.86 %** | **−22.11 %** | −3.24 % | **−14.22 %** |
+| DRIVE max | −18.97 % | −22.24 % | −3.27 % | −9.18 % |
+
+⇒ **11 of 12 cells OVERSHOOT the pedal's own walk, and the corner is the only one that does not.**
+Item 6's gate 2 is a **CEILING** (*"what must not happen is OVERSHOOT"*), and GATE BC tested it at
+the one setting where the model has headroom.
+
+⚠⚠ **AND THE DOMINANT TERM IS NOT THE STAGE.** At the play cell the model already overshoots by
+**−4.6 pp** with the stage OFF and the stage adds **−3.2 pp** on top. ⛔ So this is **NOT a licence
+to revert or re-tune `OdDriveTilt`** — the larger half is the model's own composite mix behaviour
+(item 19's PHASE/mix territory and A3), and pointing an optimiser at `odTiltDbPerDb` would be
+`one-knob-two-jobs-is-compensating` against a defect that lives somewhere else.
+
+### 6. The A3 confound UNDERSTATES the effect (direction only)
+
+Model and pedal are compared at equal KNOB, not equal MIX. A3 puts the model's OD branch ~4.4 dB
+quiet re its own clean tap, so at equal coefficient-cf the MODEL holds MORE clean ENERGY ⇒ the pedal
+at cf `c` is comparable to the model at some `c' < c`, and the confound's direction is just the sign
+of the model's own locus slope there. Measured by central difference on the measured locus:
+**+7.916 dB/oct per unit cf** at the play cell ⇒ at the pedal's lower effective cf the model reads
+MORE negative still ⇒ **correcting for A3 makes `required` LARGER, not smaller.**
+
+⚠⚠ **A DRAFT OF THIS SUB-GATE PRINTED THE OPPOSITE DIRECTION WORD BESIDE A CORRECT NUMBER.** Its
+first form searched for a crossing of the pedal's value on the model's locus, found it at cf 0.535 >
+the cell's 0.464, and concluded *"same direction, the confound could carry this gap"* — which
+answers a different question (*where would the model have to sit to match?*) than the one that
+decides the confound (*which way does the comparison move when the mix positions are equalised?*).
+`computed-verdicts-not-narrated`, **seventh occurrence**, caught by writing the mutation arm for it.
+⚠ Premise printed every run: this reads the PEDAL against the MODEL's locus, so it bounds the
+DIRECTION and never the size; and the locus is NON-MONOTONE (turns over near cf 0.24), so the sign
+is local to the cell and must not be extrapolated to the corner.
+
+### 7. ⛔ A METHODOLOGICAL FINDING ABOUT GATE BC ITSELF: BC4's walk has no validity check
+
+`GATE BC`'s BC4 reads `W.locate(...)["f0"]` directly, with no `edge` / `prom` guard. Measured here,
+`treble_peak` **washes out with drive on BOTH sides**: minimum prominence over the four rungs is
+**1.03 (model OFF) / 0.89 (ON) / 0.88 (pedal)** at the corner and **0.23 / 0.15 / 0.41** at the play
+cell. Cells readable on all three arms, by bar: **0.0 dB → 12/12 · 0.5 dB → 1/12 · 1.0 dB (GATE W's
+own) → 0/12**.
+
+⇒ BC's published **−6.07 %** walk is read from rungs GATE W's own membership rule would refuse. The
+positions are interior and well inside their window, so they are not nonsense — but a walk built on
+them is a claim about a feature that is disappearing. BP4 therefore makes the bar an **AXIS** and
+reports at all three (s137's pattern), rather than picking one.
+
+### 8. Free by-product — a hole in GATE BP's own scope guard, found by its runner
+
+BP1b's first form asserted `n_s != len(SCOPE)` to catch an untested scope control. With
+`SCOPE = ()` that reads `0 != 0` ⇒ False ⇒ the check written to catch an untested control **passes
+it**. `empty-gate-must-fail` in the one place it is invisible. Fixed (`n_s == 0 or ...`) and pinned
+by arm `bp1b-untested`.
+
+### 9. NEXT
+
+* **P5** — re-run GATE AY, owed since s182. Untouched by P1–P4.
+* The overshoot's DOMINANT half (the model's composite mix walk, −4.6 pp before the stage) is
+  **unowned**. It belongs with item 19's phase/mix findings (s179's BI4) and A3, not with task E.
+* ⚠ GATE BC is now **un-runnable** on the current build. Either regenerate its import chain into a
+  COPY of GATE W's cache (≈25 renders, ~3 min) and accept that the result is a current-epoch W6,
+  or retire BC's imports the way GATE BP does. Not done here; named so it is not rediscovered.
+* ⚠⚠ **Sessions 181–188 are all uncommitted** (last `git commit` is session 180).
+
+---
+
+## SESSION 189 — item 19's P5: GATE AY would not run, and repairing it refuted one of its own bounds
+
+**No `src/` change. Nothing shipped. No rebuild, no re-render, no re-baseline owed.**
+New artefacts: `analysis/reports/s189_level_taper.json` (GATE AY),
+`analysis/reports/s189_level_taper_fit.json` (GATE AZ). Runner **16/16**.
+
+### 1. P5 as worded was one command; it exited on its first sub-gate
+
+Item 19's P5 is *"re-run GATE AY, owed since s182"*. Run against the current baseline
+(`s187_grunt_lf.json`, epoch-valid — AY1b passes both directions) it stops immediately:
+
+```
+GATE AY1 FAIL: level_taper_gate's reduction and level_law_gate's coef_closed
+disagree by 2.418e-02 -- one of the two imported modules has drifted
+```
+
+**2.418e-02 is `blendEndStop` exactly.** GATE L refuses on the identical line.
+
+### 2. ⭐⭐ A THIRD MIRROR OF THE `LevelBlend` NETWORK WAS STALE, AND s182 FIXED ONLY TWO
+
+s182 found both of GATE K's coefficient derivations (`coef_closed`, `coef_nodal`) modelling the
+pre-s181 stage, and fixed them behind a **single resolver** (`K._endstop`), inheriting it into
+GATE S, `a3_balance_gate` and three runners. `level_taper_gate.a_of/b_of` — GATE L's *reduced*
+closed form, in a different module — is a **third** mirror of the same network and nothing
+re-pointed it. It went on returning `a = L/(1+L−L²)`, `b = a(1−L)` for eight sessions.
+
+⭐ **What caught it is a guard this project had already written**: AY1 requires GATE L's reduction
+and GATE K's transcription to agree to 1e-15. It is the fourth occurrence of
+`a-known-answer-is-blind-to-what-both-sides-take-as-INPUT` (s145 AM1a, s149 AO2, s182 K2) and the
+first where the divergence guard fired on its own.
+
+✅ Repaired, with the resolver **imported** rather than re-transcribed:
+
+```
+B_eff = endLo + k,  k = 1 − endLo − endHi,  D = 1 + k·L(1−L)
+a(L) = B_eff·L / D
+b(L) = (1 − B_eff) + B_eff·k·L(1−L) / D
+```
+
+Verified to `3.33e-16` against `K.coef_closed` over 100 001 points, and — the check that makes the
+repair safe rather than plausible — **at `endstop = (0,0)` it collapses to the retired pair
+EXACTLY (2.22e-16)**, so every pre-s181 quote off GATE L stays reproducible. L1 asserts that
+collapse itself; `level_taper_gate.ENDSTOP = (0.0, 0.0)` is the reachable escape hatch (s124).
+
+⚠ **The escape hatch has to move BOTH mirrors or it re-creates the defect.** A first draft set the
+module's `ENDSTOP` and left `K.coef_closed` on the shipped value; L1 then failed by exactly
+`blendEndStop` — two correct implementations of two *different* stages, which is the configuration
+s182's own resolver docstring says a closed-vs-nodal known answer cannot see. L1 now evaluates both
+sides at the module's endstop (the ALGEBRA check) and keeps the FitParams divergence guard
+separate (the TOPOLOGY check).
+
+### 3. ⛔⛔ GATE L NOW REFUSES, AND THAT IS ITS RESULT
+
+With the mirror correct, GATE L's own L1 mutation fires: `b = 0.024180 at LEVEL max, not 0`. Every
+inverse in GATE L is anchored on the pure-OD endpoint being **pure** — that exact zero is what
+makes `|rho|` a measurement of the OD path alone — and s181 removed it. GATE L's inverse needs
+**re-deriving against a contaminated endpoint; it is not a re-run**, and that is deliberately not
+done here (GATE L is on no work list).
+
+⚠ Free by-product, measured not assumed: run the ideal-endstop escape hatch and L3's known answer
+still fails — worst **2.35e-02** on the last pre-s181 baseline (`s180_bassshelf.json`) and
+**1.77e-01** on `s187` with the *same* ideal mirror, against a 1e-4 tolerance. ⇒ GATE L is blocked
+by s181 **and** by earlier epoch drift; reviving it is a re-derivation either way. ⛔ Do not read
+the 7.5× as the end stop's share alone — s180→s187 also spans s185 and s187.
+
+### 4. ⛔⛔ THE ANCHOR INVARIANT AY IS BUILT ON HAS BEEN FALSE SINCE s181
+
+AY's docstring justifies reading everything relative to LEVEL max like this: *"L(1) = 1 exactly is
+what makes b(1) = 0 exactly, and that exact zero is the bleed-free endpoint every absolute
+instrument anchors on."* AY1 then **asserted** `b(1) == 0` and exited otherwise.
+
+⭐ **Only the first half was ever load-bearing.** The arithmetic needs a common, exactly
+reproducible reference detent; LEVEL max is still that (it is the ladder's top and where every
+absolute instrument reads). What it is no longer is bleed-free — two claims the prose ran together.
+
+✅ The invariant is now the **stronger** cross-check: `b(1)` must equal the SHIPPED end stop
+exactly, which ties GATE L's reduction to `FitParams.h` through GATE K's single resolver and would
+fail on a drifted header *or* a fourth stale mirror. Measured **0.02418, −32.12 dB re the OD
+coefficient** — and the gate prints s183's warning beside it (that term reaches **+11.2 dB re the
+OD BRANCH** at the 320 Hz null; small as a coefficient is not small as a signal).
+
+⚠⚠ **AY6 had been printing `(od, clean) = (1.0, 0.0)` — the retired bleed-free corner — for eight
+sessions, because its format string was `.1f` and rounded `0.02418` to `0.0`.** A display format
+that rounds a finding to zero is how a corrected gate keeps telling the old story. Now `.5f`:
+`(0.97582, 0.02418)`.
+
+### 5. ⛔⛔ THE `invert_dB` L = 0 NODE — s181 TURNED A MUTE INTO A SINGULARITY
+
+Before the end stop the model **muted** at LEVEL min, so `MUTE_DB` removed that detent and nothing
+downstream ever met it. It is now a real finite reading — and it cannot be an interpolation node on
+a **log-L** axis. The retired code mapped it to `log(1e-12)`, compressing the whole bottom segment
+across twelve decades, so every target between `dB(0)` and `dB(L_min)` inverted to a numerical
+zero. Measured, the first run of the repaired gate printed **`required L(0.125) = 0.0000` in all
+three usable columns** — a fabricated exact zero standing in for a real value in (0, 0.032).
+
+✅ The node is excluded from the basis and **returned as the model's own FLOOR**, which is the more
+useful thing: with the end stop `dB_model(L)` no longer runs to −inf, so the floor is a hard
+physical limit. The low-side status splits in two, and the two have different consequences:
+
+| status | meaning |
+|---|---|
+| `below-floor` | under the model's own rendered level at L = 0 ⇒ **unreachable by ANY taper**, a fact about the device |
+| `below-sample` | between the floor and the smallest sampled L ⇒ reachable, unsampled — a fact about the LADDER |
+
+Measured: LEVEL 0 → `below-floor`, LEVEL 0.125 → `below-sample`. Collapsing them into one `below`
+is what let the fabricated zero look like a reading.
+
+### 6. ⭐⭐ THE REQUIREMENT HAS RE-OPENED — 7 of 9 DETENTS, WORST 3.94 dB
+
+GATE AY2 on `s187_grunt_lf.json` (dB re LEVEL max; `need` = pedal − model):
+
+| LEVEL | pedal | model | need | spread | verdict |
+|---|---|---|---|---|---|
+| 0.000 | −29.77 | −26.50 | **−3.27** | 3.61 | WELL-DEFINED |
+| 0.125 | −22.07 | −18.13 | **−3.94** | 1.57 | WELL-DEFINED |
+| 0.250 | −15.31 | −13.27 | −2.04 | 0.90 | WELL-DEFINED |
+| 0.375 | −9.99 | −8.85 | −1.15 | 1.05 | WELL-DEFINED |
+| 0.500 | −7.27 | −6.36 | −0.92 | 1.04 | WELL-DEFINED |
+| 0.625 | −4.55 | −3.83 | −0.72 | 1.12 | WELL-DEFINED |
+| 0.750 | −2.84 | −2.62 | −0.22 | 1.11 | NOTHING TO DO |
+| 0.875 | −1.79 | −2.11 | +0.31 | 0.30 | WELL-DEFINED |
+
+⇒ **AY2 no longer refuses.** At s174 it exited with *"no detent has a requirement larger than its
+own across-stimulus spread"* (worst |need| 0.58 dB inside a 1.27 dB spread); the model is now
+0.2–3.9 dB **loud** across the ladder relative to its own top.
+
+⚠⚠ **BUT THE BOTTOM TWO DETENTS ARE NOT A TAPER REQUIREMENT, AND THE GATE NOW SAYS SO.** Every
+level here is referred to a LEVEL-max anchor that is **97.6 % OD**, while at LEVEL 0 the model's
+output is **100 % clean bleed** and at 0.125 it is 63.6 %. A clean-dominated detent's `need` is
+therefore mostly **A3 seen through the anchor** — the model's OD path being ~4.59 dB quiet re its
+own clean tap (GATE O, re-quoted s183) — not a statement about which L the knob selects. Predicted
+with no fit: `need(cf → 1) ≈ −4.6 dB` if the pedal's own paths are balanced; measured **−3.27**.
+Same sign, same order. ⛔ **Do NOT re-fit `blendEndStop` from that column.**
+⭐ Two independent mechanisms land on the same pair: the cf ≥ 0.60 flag and the inversion's own
+floor/sample logic both exclude exactly {0.0, 0.125}.
+
+### 7. ⛔⛔ AY5(c)'s HEADROOM BOUND IS REFUTED — BY s181's OWN END STOP
+
+The bound that closed item 9's *other* half read, verbatim:
+
+> "(1−L) is a ratio of pot fractions, so it lives in [0, 1]; the endpoints are PINNED (L(0)=0 is
+> the end stop, L(1)=1 is AY6's bleed-free anchor), so the supremum of the interior span is 1.0 and
+> the most any taper can buy is 1/span_shipped" ⇒ **1.368×**, against 1.744× / 2.670× needed ⇒
+> *"0 of 2 REACH at the family's own SUPREMUM."*
+
+Every clause is about the **pre-s181** network. With the end stop the mixed clean-re-OD ratio is
+
+```
+b/a = (1 − L) + e/((1 − e)·L)        e = 0.02418
+```
+
+asserted against `K.coef_closed` to **1.3e-15**, not assumed — and its second term **DIVERGES as
+L → 0**. ⇒ the interior span has **no finite supremum** and the bound does not exist.
+
+⭐ And the shipped stage already sweeps further than the retired arithmetic said: over the interior
+detents the `(1−L)` span is **0.6377** and the true `b/a` span is **0.9346 — 1.47× larger**, before
+any taper change at all.
+
+⚠⚠ **THIS IS THE WITHDRAWAL OF A REFUTATION, NOT A POSITIVE RESULT.** With `sup = inf` every target
+clears trivially, so the `REACHES` column grades nothing — the gate prints
+`(vacuous: sup is infinite)` and a computed **NO VERDICT** block instead of the retired
+*"the lever is not bounded out, so the fit is worth running"*, which would have been
+`empty-gate-must-fail` wearing a pass. What is established:
+
+* the **arithmetic refutation** of a taper/mix-law reshape for item 9's sensitivity gap is
+  **WITHDRAWN**;
+* nothing says the lever **works** — AY5(b)'s necessary-not-sufficient caveat is untouched;
+* ⚠⚠ **the targets are themselves a retired epoch**: both model-side sensitivities (17.2 %, 9.1 %)
+  were measured PRE-s181, on the network whose mix span has just been measured 1.47× larger.
+  Re-measuring them is owed before either is graded again.
+
+### 8. THE FAMILY VERDICT, and a THIRD membership mismatch inside one gate
+
+⚠⚠ The ambiguity bar and the families it grades must share a population. Pooled over every
+well-defined detent it reads **1.682 dB** — inflated by the two the solve cannot place, whose
+spreads are the largest in the table precisely because that is where the bleed floor sits — and on
+that bar the shipped taper reads INSIDE. Restricted to the scored members it is **0.931 dB** and
+the shipped family crosses to **OUTSIDE**. That moves a verdict, so it is the one that matters.
+
+| family | rms dB | worst dB | vs ambiguity (0.931) |
+|---|---|---|---|
+| shipped 4-seg PWL (s163/s173) | **1.152** | 2.614 | **OUTSIDE by 1.24×** |
+| best single exponent, p = 2.1720 | 0.470 | 1.047 | INSIDE |
+| free monotone curve (the solve) | **0.282** | 0.502 | INSIDE |
+
+⇒ computed verdict: **AN EXPONENT IS ENOUGH** on this epoch — the segmented family buys nothing
+the exponent family does not, which is the opposite of s163's finding and is a consequence of the
+requirement having changed shape, not of the families.
+
+⚠ The hottest column (`drv_-6`) is refused as non-invertible (GATE K3/L8), so the 0.0467 rms
+across-stimulus floor is a **LOWER bound**.
+
+### 9. GATE AZ runs again, and a candidate exists — ⛔ NOT SHIPPED
+
+⚠⚠ **A FOURTH TRANSCRIBED-FILENAME ROT, and the family now has three:** `_mutate_gate_ay.py`'s
+`CURRENT` (fixed s173 by deriving it), its `STALE` (this session — the arm ran against
+`s146_mastertaper.json`, which no longer exists, **died in `json.load` and was scored rc=1, i.e. a
+CRASH counted as a firing epoch guard**), and `level_taper_fit.py`'s `--ay` default
+(`s162_level_taper.json`, four epochs gone). ⭐ `analysis/reports/*.json` is gitignored and
+regenerable, so **any filename written into a default expires on its own** — all three are now
+derived structurally, and the epoch arm REFUSES rather than passing vacuously when no stale report
+exists.
+
+GATE AZ then needed its scorer re-pointed at AY's new membership and basis, and **AZ1's known
+answer is what certifies the two objectives are still the same**: it reproduces AY3's three stored
+families to **0.00e+00 dB**.
+
+The candidate, for the record and **not proposed**: a 4-segment PWL, rms **1.152 → 0.277 dB**,
+worst 2.614 → 0.540, containment 0.109 of the requirement's own spread at every detent, convex,
+endpoints exact, half-rotation **23.75 % → 19.79 %** (toward `circuit.md`'s A-taper band, which no
+term of the objective knows about). Constants are in `s189_level_taper_fit.json`.
+
+⛔ **It is not shipped, and the reason is on record rather than cautious**: s163's taper change cost
+the matrix **7 rows over SHIP → 8** and was taken as an explicit USER DECISION; AZ5 prices this one
+at worst **|Δ cleanFraction| = 0.0824**, which re-stales `OdToneRestore`'s s156 mix law by
+construction (item 10). ⇒ a **USER DECISION**, with a matrix render owed before it can be graded.
+
+⚠ **GATE AZ's runner needed one more epoch-literal fix and it is the same class again.** `az2-choice`
+loosens the containment bar so the 3-segment family becomes admissible and requires the gate to ship
+THREE — with the bar written as the literal **2.0**, calibrated when 3-seg's containment was 1.833.
+On this epoch it is **11.413** (2-seg 18.928), so a fixed 2.0 admits nothing and the arm failed
+against a gate that was working (`suspect the mutation before the guard`, s110). Derived from the
+measured containment instead (`max(1.0, fits[3]["containment"] * 1.001)`), so it admits exactly
+3-seg-and-better on any epoch. **Runners: AY 16/16, AZ 9/9.**
+
+### 10. NEXT
+
+* ✅✅ **USER DECISION TAKEN 2026-08-09: MEASURE FIRST, DO NOT SHIP THE CANDIDATE TAPER.** The
+  grounds are the two caveats above — the requirement's bottom two detents are A3 seen through the
+  anchor rather than a taper, and the targets that would justify a mix-span change are a retired
+  epoch. ⛔ The 4-segment candidate stays on disk, unshipped and reproducible; shipping it would
+  still owe a ~50 min matrix render (s163's price is the precedent) plus an `OdToneRestore`
+  mix-law re-check across all 14 `--set` groups.
+* ▶ **THE NEXT TASK, and it is what the decision selects: re-measure item 9's two sensitivity
+  targets** (bass notch 30.0 % / 17.2 %, s125; `treble_notch` 24.3 % / 9.1 %, s133 AE4) on the
+  current epoch with GATE W's locator on matched LEVEL detents. Both model-side figures predate
+  s181, whose end stop this session measured widening the mix span **1.47×** — so neither may be
+  graded against anything until re-taken. ⛔ Quote CLASSIFICATIONS, not percentages (s158/s159).
+* ⚠ **GATE L is un-runnable on the shipped stage** and its revival is a re-derivation, not a re-run.
+* ✅ **COMMITTED at s189, on the user's decision** — sessions **188–189** as one commit.
+  ⚠⚠ **AND THE STANDING NOTE ITSELF WAS STALE, WHICH IS THE POINT OF `rebuild-targets-dont-
+  transcribe`:** s187's and s188's blocks both carried *"sessions 181–18N are all uncommitted, last
+  `git commit` is session 180"*, and it was false by then — **181–187 had already landed** at
+  `6cdc985` (a merge-style commit) and `fe8e891`. The transcription was copied forward each session
+  while the fact moved underneath it. ⛔ **Run `git log --oneline -5` and `git status --porcelain`;
+  never carry a git claim in prose** — CLAUDE.md's own "Uncommitted work" section says exactly this
+  and these blocks are what it was written about.

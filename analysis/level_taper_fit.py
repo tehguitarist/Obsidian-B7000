@@ -55,7 +55,7 @@ AZ4  the curve's own SHAPE properties, none of which any term of the objective a
 AZ5  the COST, priced before it ships: the clean-fraction shift at every detent, which is what
      `OdToneRestore`'s s156 mix law reads -- so this taper re-stales that fit by construction and
      the size of the re-fit owed is a number, not a worry.
-AZ6  what must NOT move: L(1) = 1 exactly, so the bleed-free anchor every absolute instrument in
+AZ6  what must NOT move: L(1) = 1 exactly, so the ANCHOR every absolute instrument in
      the project reads at is bit-identical.  Asserted, not assumed.
 
 Run:
@@ -63,6 +63,8 @@ Run:
     python3.11 analysis/level_taper_fit.py REPORT.json --ay analysis/reports/s162_level_taper.json \
         --json analysis/reports/s163_level_taper_fit.json
 """
+import glob
+import os
 import argparse
 import json
 import math
@@ -93,7 +95,8 @@ def pwl(x, bs, fs):
     """L(x) for breakpoints bs (ascending in (0,1)) reaching fracs fs; L(0)=0 and L(1)=1 EXACTLY.
 
     Both endpoints are exact by construction and no parameter can move them -- which is what the
-    topology requires (LEVEL min puts the wiper on VD; LEVEL max is the bleed-free anchor)."""
+    topology requires (LEVEL min puts the wiper on VD; LEVEL max is the anchor -- ⛔ s189: NOT
+    "bleed-free", s181's `blendEndStop` put e = 0.02418 of clean signal there)."""
     pts = [(0.0, 0.0)] + list(zip(bs, fs)) + [(1.0, 1.0)]
     for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
         if x <= x1:
@@ -155,12 +158,20 @@ def build_objective(report, ay, out):
                  "not exist on this report and nothing below can be scored")
     cache = {sw: AY.build_dB_of_L(res, sw, ladder, p) for sw in usable}
 
-    def score(curve, _cache=cache, _res=res, _ladder=ladder, _p=p):
+    # ⚠⚠ s189: MEMBERSHIP AND BASIS BOTH COME FROM AY, AND BOTH MOVED.  s181's end stop made the
+    # L = 0 detent a real finite reading, so AY had to drop it from the log-L interpolation basis
+    # (log 0 is not a number -- it was fabricating `required L = 0.0000` for the whole bottom
+    # segment) and to score its three families over the detents the SOLVE could place.  This
+    # scorer must use the same two, or AZ1's known answer -- "reproduce AY3's stored numbers" --
+    # fails against two correct implementations of two different objectives.
+    members = sorted(float(k) for k in ay["ay3"]["required_taper"])
+
+    def score(curve, _cache=cache, _res=res, _members=members, _p=p):
         errs = []
         for sw in _cache:
-            Ls, dB = _cache[sw]
-            lo = np.log(np.maximum(Ls, 1e-12))
-            for x, _f in _ladder:
+            Ls, dB, _floor = _cache[sw]
+            lo = np.log(Ls)
+            for x in _members:
                 if x <= 0.0 or x not in _res[sw]:
                     continue
                 Lx = (_p(x) if curve is None else
@@ -171,7 +182,7 @@ def build_objective(report, ay, out):
             sys.exit("GATE AZ1 FAIL: the objective scored ZERO errors (`empty-gate-must-fail`)")
         return (float(np.sqrt(np.mean(np.square(errs)))), float(np.max(np.abs(errs))), len(errs))
 
-    xs = [x for x, _f in ladder if x > 0.0]
+    xs = [x for x in members if x > 0.0]
     print(f"    ladder {len(ladder)} detents, {len(usable)} of {len(AY.SWEEPS)} stimulus columns "
           f"usable: {', '.join(s.replace('sweep_', '') for s in usable)}")
     return score, xs, p, out
@@ -410,7 +421,7 @@ def gate_az4(fit, p, out):
         sys.exit("GATE AZ4 FAIL: the fitted curve is NOT monotone in the knob -- it is not a pot "
                  "taper at all, whatever its residual")
     if max(ends) > 1e-12:
-        sys.exit(f"GATE AZ4 FAIL: an endpoint is not exact ({ends}) -- L(1) = 1 is the bleed-free "
+        sys.exit(f"GATE AZ4 FAIL: an endpoint is not exact ({ends}) -- L(1) = 1 is the anchor "
                  f"anchor every absolute instrument in the project reads at")
     if not convex:
         print("    ⚠ NOT convex: the segment slopes do not rise monotonically, so this is not a")
@@ -456,17 +467,20 @@ def gate_az5(fit, p, out):
 # AZ6 -- what must NOT move
 # --------------------------------------------------------------------------------------------
 def gate_az6(fit, p, out):
-    print("\n-- AZ6: what must NOT move -- the bleed-free anchor --")
+    # ⛔ s189: "bleed-free" withdrawn throughout -- s181 put e = 0.02418 of clean at this corner.
+    # The check itself is unchanged and still load-bearing: the anchor must be BIT-IDENTICAL,
+    # because it is the detent every absolute instrument in the project reads at.
+    print("\n-- AZ6: what must NOT move -- the ANCHOR corner (⛔ NOT bleed-free since s181) --")
     a_old, b_old = K.coef_closed(1.0, p(1.0))
     a_new, b_new = K.coef_closed(1.0, pwl(1.0, fit["breaks"], fit["fracs"]))
     print(f"    LEVEL = BLEND = max:  OD coef {a_old:.17g} -> {a_new:.17g}")
     print(f"                          clean   {b_old:.17g} -> {b_new:.17g}")
     if a_old != a_new or b_old != b_new:
-        sys.exit("GATE AZ6 FAIL: the bleed-free corner MOVED. Every absolute instrument in the "
+        sys.exit("GATE AZ6 FAIL: the anchor corner MOVED. Every absolute instrument in the "
                  "project anchors there (GATE K7, GATE O's A3 ledger, GATE L's |rho|, "
                  "`OdToneRestore`'s base row, GATE W/AE's membership) -- a taper that moves it "
                  "invalidates all of them, and L(1) = 1 exists precisely to prevent this")
-    print("    AZ6 OK  bit-identical, so every bleed-free reading in the project is untouched.")
+    print("    AZ6 OK  bit-identical, so every reading anchored at LEVEL max is untouched.")
     out["az6"] = {"od": a_new, "clean": b_new, "bit_identical": True}
 
 
@@ -483,12 +497,36 @@ def emit(fit, chosen, out):
     out["constants"] = {n: v for n, v in names}
 
 
+def newest_ay_report():
+    """Newest artefact on disk that is STRUCTURALLY a GATE AY report.  A structural test cannot go
+    stale the way a filename does (s173's fix for the mutation runner, applied to this default)."""
+    best, best_mt = None, -1.0
+    for path in glob.glob("analysis/reports/*.json"):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                doc = json.load(fh)
+        except Exception:
+            continue
+        if isinstance(doc, dict) and {"ay1", "ay2", "ay3"} <= set(doc):
+            mt = os.path.getmtime(path)
+            if mt > best_mt:
+                best, best_mt = path, mt
+    # No fallback literal: a missing artefact must be a loud refusal in the gate's own reader, not
+    # a default that silently names a file nobody rendered (`empty-gate-must-fail`).
+    return best if best is not None else "analysis/reports/<no GATE AY report on disk>"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("report")
-    ap.add_argument("--ay", default="analysis/reports/s162_level_taper.json",
+    # ⚠⚠ s189: this default was the transcribed literal `s162_level_taper.json`, four epochs
+    # stale and no longer on disk -- the THIRD transcribed-filename rot in this tool family after
+    # `_mutate_gate_ay.py`'s CURRENT (s173) and STALE (s189).  `analysis/reports/*.json` is
+    # gitignored and regenerable, so ANY filename written into a default expires on its own.
+    # Derived structurally instead: the newest artefact that IS a GATE AY report.
+    ap.add_argument("--ay", default=newest_ay_report(),
                     help="GATE AY's stored report -- the source of the requirement AND of the "
-                         "known answer this gate is licensed by")
+                         "known answer this gate is licensed by (default: newest on disk)")
     ap.add_argument("--json", default=None)
     args = ap.parse_args()
 

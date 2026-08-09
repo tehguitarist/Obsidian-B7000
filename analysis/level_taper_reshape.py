@@ -53,11 +53,17 @@ and no nuisance parameter:
        requires, L*(x).
 
 ⚠ Both sides are read RELATIVE TO LEVEL MAX, not relative to noon as GATE K3 prints them, and that
-choice is forced rather than stylistic.  L(1) = 1 exactly is what makes `b(1) = 0` exactly, and
-that exact zero is the bleed-free endpoint every absolute instrument in the project anchors on
-(GATE K7's ratio, GATE O's A3 ledger, GATE L's |rho|, `OdToneRestore`'s base row, GATE W/AE's
-bleed-free membership).  A taper is therefore not free at the top of its travel, so the top is the
-anchor and everything else is measured from it.
+choice is forced rather than stylistic: it is the top of the captured ladder and the detent every
+absolute instrument in the project reads at (GATE K7's ratio, GATE O's A3 ledger, GATE L's |rho|,
+`OdToneRestore`'s base row, GATE W/AE's membership).  A taper is therefore not free at the top of
+its travel, so the top is the anchor and everything else is measured from it.
+
+⛔⛔ THE ORIGINAL JUSTIFICATION FOR THAT CHOICE WAS `L(1) = 1 exactly, so b(1) = 0 exactly, so the
+top is BLEED-FREE`, AND ITS SECOND HALF DIED AT s181 (corrected s189).  `blendEndStop` puts
+e = 0.02418 of clean signal at that corner, so the anchor is a common reference detent and NOT a
+bleed-free one -- two claims that this gate's prose ran together, of which only the first was ever
+load-bearing.  ⚠ Read s183 before treating the difference as cosmetic: e is -32 dB as a
+COEFFICIENT and reaches +11.2 dB re the OD BRANCH at the 320 Hz null.
 
 ⭐ THE KNOWN ANSWER IS FREE AND IT IS NOT A FIXED POINT.  Run the solve against the MODEL's own
 levels and it must return the SHIPPED taper, L*(x) = x^2.25, to interpolation error.  Nothing is
@@ -74,9 +80,12 @@ smaller than the target's own across-stimulus spread at 3 of 3 rungs.
 GATES (all computed, exits non-zero on failure)
 -----------------------------------------------
 AY1   the imports and the invariant.  `L.a_of`/`L.b_of` must reproduce `K.coef_closed` (GATE L1's
-      check, re-run here so this tool cannot be run against a drifted pair), the shipped
-      `levelTaperExp` must match `FitParams.h` (K's own checker), and b(1) must be EXACTLY 0 --
-      the invariant the whole anchor choice rests on.  Mutation: b must be non-zero at noon.
+      check, re-run here so this tool cannot be run against a drifted pair -- and s189 is what it
+      caught: `level_taper_gate`'s reduction was a THIRD stale mirror of s181's end stop, which
+      s182 had fixed only inside `level_law_gate`), the shipped taper must match `FitParams.h`
+      (K's own checker), and b(1) must equal the SHIPPED end stop EXACTLY -- which ties GATE L's
+      reduction to the header through GATE K's single resolver.  Mutation: b at noon must exceed
+      b at the anchor, or there is no bleed gradient to measure.
 AY1b  EPOCH.  An absolute-ledger read is only valid against a report rendered from the current
       `src/`.  The report must postdate every `src/dsp/*.h` and the render binary, and no capture
       it reads may postdate the report (s110 R3b, the mirror direction).  REFUSES rather than
@@ -93,7 +102,9 @@ AY4   the recovered curve's own properties -- monotone, endpoints exact, and the
 AY5   CONSEQUENCES, priced before anything is built: the clean-fraction shift at every detent
       (which is what `OdToneRestore`'s shipped mix law reads, so a taper change re-stales it), and
       the mix-ratio span change against item 9's own ~2-3x LEVEL-sensitivity target.
-AY6   what it must NOT move: the bleed-free corner must be bit-identical, asserted.
+AY6   what it must NOT move: the ANCHOR corner must be bit-identical, asserted (s189: "bleed-free"
+      withdrawn -- and the check printed `(1.0, 0.0)` for eight sessions because `.1f` rounded the
+      end stop away, which is how a corrected gate keeps telling the retired story).
 
 Run:
     python3.11 analysis/level_taper_reshape.py analysis/reports/s162_shipped.json
@@ -113,7 +124,7 @@ import level_law_gate as K
 import level_taper_gate as L
 
 NOON = K.NOON
-TOP = 1.0                       # the anchor: L(1) = 1 exactly, so b(1) = 0 exactly
+TOP = 1.0                       # the anchor: L(1) = 1 exactly.  ⛔ NOT bleed-free since s181.
 SWEEPS = L.SWEEPS
 
 # ⚠ s163 made the shipped taper a CALLABLE (a segmented PWL), not an exponent, so it has no
@@ -170,16 +181,46 @@ def gate_ay1(out):
     print(f"  AY1 OK  L.a_of/L.b_of == K.coef_closed to {worst:.2e} over 1001 points (imported, "
           f"not retyped)")
 
-    if L.b_of(1.0) != 0.0:
-        sys.exit("GATE AY1 FAIL: the clean coefficient is not EXACTLY 0 at LEVEL max -- the "
-                 "bleed-free anchor this gate measures everything against does not exist")
-    if L.b_of(p(NOON)) <= 0.0:
-        sys.exit("GATE AY1 FAIL: the clean coefficient is 0 at noon too, so there is no bleed "
-                 "anywhere and this gate is testing nothing (empty-gate-must-fail)")
-    print(f"  MUTATION OK  b(1) is exactly 0 and b(noon) = {L.b_of(p(NOON)):.4f}, so the anchor "
-          f"is a real\n               exact zero and not a coincidence of the taper.")
+    # ⛔⛔ THE ANCHOR INVARIANT CHANGED AT s181 AND THIS GATE ASSERTED THE RETIRED ONE (fixed s189).
+    # It used to require `b(1) == 0 EXACTLY` -- the bleed-free corner -- and exit if not.  s181's
+    # `blendEndStop` put `e` of clean signal there, so on the shipped stage that assertion is
+    # FALSE and this gate could not run at all.
+    #
+    # ⭐ What the arithmetic below actually needs is NOT a bleed-free top; it is a COMMON,
+    # EXACTLY-REPRODUCIBLE reference detent, because every level here is read relative to LEVEL
+    # max and AY4 pins the recovered curve there.  LEVEL max is still that detent: it is the top
+    # of the captured ladder and the point every absolute instrument reads at.  What it is no
+    # longer is BLEED-FREE, and the two are different claims -- only the first was ever load-
+    # bearing, and the docstring's justification conflated them.
+    #
+    # ⇒ the invariant becomes the STRONGER cross-check: b(1) must equal the SHIPPED end stop
+    # exactly, which ties GATE L's reduction to `FitParams.h` through GATE K's single resolver and
+    # would fail on either a drifted header or a third stale mirror.
+    e_hi, e_lo, _k = K._endstop(None)
+    b_top = L.b_of(1.0)
+    if abs(b_top - e_hi) > 1e-15:
+        sys.exit(f"GATE AY1 FAIL: b at LEVEL max is {b_top:.9f} but FitParams ships an OD-end "
+                 f"stop of {e_hi:.9f} -- the anchor detent's own clean content disagrees with the "
+                 f"header, so every level below is referred to a corner this gate cannot locate")
+    if L.b_of(p(NOON)) <= b_top:
+        sys.exit("GATE AY1 FAIL: the clean coefficient at noon is not ABOVE its value at the "
+                 "anchor, so the ladder carries no bleed gradient at all and this gate is testing "
+                 "nothing (empty-gate-must-fail)")
+    if e_hi == 0.0:
+        print(f"  AY1 OK  b(1) = 0 exactly (IDEAL end stop) and b(noon) = {L.b_of(p(NOON)):.4f} "
+              f"-- the\n          pre-s181 network: the anchor is bleed-free.")
+    else:
+        print(f"  AY1 OK  b(1) = {b_top:.5f} == FitParams `blendEndStop`, and b(noon) = "
+              f"{L.b_of(p(NOON)):.4f}.")
+        print(f"  ⚠⚠ THE ANCHOR IS NO LONGER BLEED-FREE (s181).  LEVEL max still carries "
+              f"{b_top:.5f} of\n      clean, i.e. {20 * math.log10(b_top / L.a_of(1.0)):.2f} dB re "
+              f"the OD coefficient.  Everything below is\n      still referred to it -- it is the "
+              f"ladder's own top and every absolute instrument\n      reads there -- but ⛔ do NOT "
+              f"re-quote this gate's anchor as 'bleed-free', and\n      note s183 measured that "
+              f"term reaching +11.2 dB re the OD BRANCH at the 320 Hz\n      null: small as a "
+              f"coefficient is not small as a signal.")
     out["ay1"] = {"coef_agreement": worst, "taper": list(K.SHIPPED_LEVEL_TAPER),
-                  "b_at_noon": L.b_of(p(NOON))}
+                  "b_at_noon": L.b_of(p(NOON)), "b_at_top": b_top, "endstop": [e_hi, e_lo]}
     return p
 
 
@@ -314,9 +355,31 @@ def gate_ay2(res, ladder, out):
         print("       membership AY3 already used, and the first draft's disagreement between the")
         print("       two is what found it.  It needs a TOPOLOGY change (an end-stop resistance, or")
         print("       GATE K2's BLEND-body bleed path), and it is filed as its own finding.")
+    # ⭐⭐ s189: WHAT THE BOTTOM OF THE LADDER IS ACTUALLY MEASURING, and it is not a taper.
+    # Every level here is referred to LEVEL max, i.e. to a detent that is 97.6 % OD.  At the other
+    # end the output is nearly all clean bleed, so a detent's `need` there is dominated by the
+    # difference between the two sides' OWN clean-re-OD balances -- which is A3, measured at
+    # -4.59 dB on the current anchor (GATE O re-quoted at s183), not by which L the knob selects.
+    # ⇒ a detent whose clean fraction is near 1 is REPORTED but must not be read as a taper
+    # requirement, and in particular must NOT be used to re-fit `blendEndStop`.
+    # Predicted, with no fit: need(cf -> 1) ~ -(clean - OD)_model + (clean - OD)_pedal ~ -4.6 dB
+    # if the pedal's own paths are balanced; measured -3.27.  Same sign, same order.
+    A3_DB = 4.59
+    tap = K.level_taper          # the shipped taper, same object AY1 verifies against FitParams.h
+    hot = [(x, K.coef_closed(1.0, tap(x))) for x, _f in ladder
+           if rows.get(x, {}).get("measurable")]
+    domin = [x for x, (a, b) in hot if (b / (a + b) if (a + b) > 0 else 1.0) >= 0.60]
+    if domin:
+        print(f"\n    ⚠⚠ CLEAN-DOMINATED DETENTS -- reported, NOT a taper requirement: "
+              f"{sorted(domin)}")
+        print(f"       Their model output is >= 60 % clean bleed, and every level here is referred")
+        print(f"       to a LEVEL-max anchor that is 97.6 % OD, so their `need` is mostly A3 seen")
+        print(f"       through the anchor (~{A3_DB:.2f} dB, GATE O re-quoted s183) rather than a")
+        print(f"       statement about which L the knob selects.  ⛔ Do NOT re-fit `blendEndStop`")
+        print(f"       from this column, and note the solve below cannot place them either.")
     out["ay2"] = {"rows": {str(k): v for k, v in rows.items()},
                   "well_defined": sorted(ok), "ambiguous": sorted(amb), "worst_need": worst,
-                  "mutes": sorted(mutes)}
+                  "mutes": sorted(mutes), "clean_dominated": sorted(domin), "a3_db": A3_DB}
     return rows
 
 
@@ -328,34 +391,63 @@ def build_dB_of_L(res, sw, ladder, p):
 
     This is the whole reason a taper question needs no fit: the knob enters the stage ONLY through
     L, so this map belongs to the network and everything downstream of it, and a taper change
-    cannot move it.  It is sampled at exactly the L values the shipped taper selects."""
-    pts = []
+    cannot move it.  It is sampled at exactly the L values the shipped taper selects.
+
+    -> (Ls, dB, floor) where `floor` is the model's own RENDERED level at L = 0, or None.
+
+    ⛔⛔ s189: THE L = 0 DETENT IS EXCLUDED FROM THE INTERPOLATION BASIS, AND s181 IS WHY.
+    Before the end stop the model MUTED at LEVEL min, so `MUTE_DB` removed that node and nothing
+    downstream ever met it.  It is now a real, finite reading -- and it cannot be an interpolation
+    node on a LOG-L axis, because log 0 is not a number: the previous code mapped it to
+    log(1e-12), which compressed the whole bottom segment into 12 decades and made EVERY target
+    between dB(0) and dB(L_min) invert to a numerical zero.  Measured on the shipped ladder that
+    printed `required L(0.125) = 0.0000` in all three usable columns -- a fabricated exact zero
+    standing in for a real value in (0, 0.032).
+    ⭐ It is kept and RETURNED as the model's own FLOOR, which is the more useful thing: with the
+    end stop, dB_model(L) no longer runs to -inf, so the floor is a hard physical limit on what
+    ANY taper can deliver, and `invert_dB` grades against it."""
+    pts, floor = [], None
     for x, _f in ladder:
         if x not in res[sw]:
             continue
         m, _q = res[sw][x]
         if not np.isfinite(m) or m < MUTE_DB:
             continue
+        if p(x) <= 0.0:
+            floor = m if floor is None else min(floor, m)
+            continue
         pts.append((p(x), m))
     pts.sort()
     Ls = np.array([t[0] for t in pts])
     dB = np.array([t[1] for t in pts])
-    return Ls, dB
+    return Ls, dB, floor
 
 
-def invert_dB(Ls, dB, target):
+def invert_dB(Ls, dB, target, floor=None):
     """L such that dB_model(L) = target, by monotone interpolation in log L.
 
-    Returns (L, status) with status one of 'interp' / 'below' / 'above' -- an extrapolation is
-    reported rather than silently returned, because 'the taper cannot reach this' is a RESULT
-    (s134: the absence of a root in the swept range is a computed verdict, not a malfunction)."""
+    Returns (L, status).  An extrapolation is reported rather than silently returned, because
+    'the taper cannot reach this' is a RESULT (s134: the absence of a root in the swept range is a
+    computed verdict, not a malfunction).
+
+    ⭐⭐ s189 SPLITS THE LOW-SIDE STATUS IN TWO, and the two have completely different
+    consequences -- one is a fact about the DEVICE and the other about the LADDER:
+        'below-floor'   the target is under the model's own rendered level at L = 0.  With s181's
+                        end stop that level is FINITE (the clean bleed no longer vanishes), so
+                        this is UNREACHABLE BY ANY TAPER WHATEVER -- a hard bound, no fit in it.
+        'below-sample'  the target lies between the floor and the smallest SAMPLED L.  Reachable
+                        in principle; the ladder simply does not sample there, so no value may be
+                        quoted.  A sampling statement, not a physical one.
+    Collapsing these into one 'below' is what let the fabricated zero above look like a reading."""
     if not np.all(np.diff(dB) > 0):
         return float("nan"), "non-monotone"
-    if target <= dB[0]:
-        return float(Ls[0]), "below"
     if target >= dB[-1]:
         return float(Ls[-1]), "above"
-    lo = np.log(np.maximum(Ls, 1e-12))
+    if target <= dB[0]:
+        if floor is not None and target <= floor:
+            return float("nan"), "below-floor"
+        return float("nan"), "below-sample"
+    lo = np.log(Ls)
     return float(math.exp(float(np.interp(target, dB, lo)))), "interp"
 
 
@@ -369,22 +461,25 @@ def gate_ay3(res, ladder, p, rows, out):
     for sw in SWEEPS:
         if sw not in res:
             continue
-        Ls, dB = build_dB_of_L(res, sw, ladder, p)
+        Ls, dB, floor = build_dB_of_L(res, sw, ladder, p)
         hits = 0
         for x, _f in ladder:
             if x not in res[sw] or not np.isfinite(res[sw][x][0]) or res[sw][x][0] < MUTE_DB:
                 continue
-            got, st = invert_dB(Ls, dB, res[sw][x][0])
             want = p(x)
-            # A column with no inversion AT ALL contributes nothing here, and must be skipped
-            # BEFORE the `want == 0` allowance below -- that allowance exists to admit the L = 0
-            # detent, where the status is legitimately 'below' rather than 'interp', and a first
-            # draft let it admit 'non-monotone' too.  Found by `_mutate_gate_ay.py::ay2-mute`,
-            # which reaches this path by declassifying the mute; unmutated it is unreachable, so
-            # the guard was correct only by accident of an upstream filter.
+            # ⚠ s189: the L = 0 detent is no longer IN the basis (see `build_dB_of_L`), so it is
+            # skipped here rather than admitted by a status allowance.  The retired form of this
+            # loop carried `if st != "interp" and want != 0.0: continue`, whose whole purpose was
+            # to let that one detent through with a 'below' status -- keeping it now would ask the
+            # known answer to recover a node the basis deliberately does not contain, and the
+            # `isfinite` guard below would exit on the nan.
+            if want <= 0.0:
+                continue
+            got, st = invert_dB(Ls, dB, res[sw][x][0], floor)
+            # A column with no inversion AT ALL contributes nothing here.
             if st == "non-monotone":
                 continue
-            if st != "interp" and want != 0.0:
+            if st != "interp":
                 continue
             # isfinite FIRST and explicitly: `nan > 1e-9` is False, so a non-finite recovery would
             # sail through the tolerance below and the known answer would pass having checked
@@ -421,7 +516,7 @@ def gate_ay3(res, ladder, p, rows, out):
     for sw in SWEEPS:
         if sw not in res:
             refused.append((sw, "no data")); continue
-        Ls, dB = build_dB_of_L(res, sw, ladder, p)
+        Ls, dB, _fl = build_dB_of_L(res, sw, ladder, p)
         (usable if np.all(np.diff(dB) > 0) else refused).append(
             sw if np.all(np.diff(dB) > 0) else (sw, "dB_model(L) NON-MONOTONE -- not invertible"))
     if not usable:
@@ -445,7 +540,7 @@ def gate_ay3(res, ladder, p, rows, out):
     print(f"    {'LEVEL':>7}{'shipped':>10} |" +
           "".join(f"{s.replace('sweep_', ''):>10}" for s in SWEEPS) +
           f" |{'mean':>9}{'spread':>9}{'  reach':>22}")
-    need_tap, unreach = {}, []
+    need_tap, unreach, norefusal = {}, [], []
     for x, _f in ladder:
         if not rows.get(x, {}).get("measurable"):
             continue
@@ -453,11 +548,21 @@ def gate_ay3(res, ladder, p, rows, out):
         for sw in SWEEPS:
             if sw not in usable or x not in res[sw]:
                 vals.append(float("nan")); continue
-            Ls, dB = build_dB_of_L(res, sw, ladder, p)
-            got, st = invert_dB(Ls, dB, res[sw][x][1])
+            Ls, dB, floor = build_dB_of_L(res, sw, ladder, p)
+            got, st = invert_dB(Ls, dB, res[sw][x][1], floor)
             vals.append(got); sts.append(st)
         good = [v for v in vals if np.isfinite(v)]
         if not good:
+            # ⚠ s189: NAMED, not dropped.  Before the end stop these detents were removed upstream
+            # as MUTES and the table never had a row for them; now they are real readings that the
+            # inversion legitimately cannot place, and a silently missing row reads as a detent
+            # that was never asked about (s151/s186: a refusal is not a reading, and it must still
+            # be printed).  The two statuses mean completely different things -- see `invert_dB`.
+            why = "/".join(sorted(set(sts))) if sts else "no usable column"
+            norefusal.append((x, why))
+            print(f"    {x:7.3f}{p(x):10.4f} |" +
+                  "".join("       -- " for _ in SWEEPS) +
+                  f" |{'--':>9}{'--':>9}{why:>22}")
             continue
         mean, spread = float(np.mean(good)), float(max(good) - min(good))
         # 'reach' is a statement about the USABLE columns only -- a refused column is reported
@@ -487,15 +592,29 @@ def gate_ay3(res, ladder, p, rows, out):
     print("    Objective: rms over the WELL-DEFINED detents of (delivered - pedal) in dB,")
     print("    stimulus-averaged.  The shipped exponent is scored first as the baseline.")
 
+    # ⚠⚠ s189: the three families must be scored over ONE membership, and it is the detents the
+    # SOLVE could place -- not every measurable detent.  With s181's end stop the bottom two
+    # detents have no required-taper value at all (see the table above), so scoring the exponent
+    # families there while the free curve has no entry would compare three families on three
+    # different populations.  `aggregate-moved-check-membership-first`, in the one place this gate
+    # draws its verdict.  (It also crashed outright, which is how it was found -- the retired code
+    # subscripted the curve dict at a detent it no longer contains.)
+    members = [x for x, _f in ladder if x in need_tap]
+    print(f"\n    Scored over the {len(members)} detent(s) the solve could place: "
+          f"{[round(x, 3) for x in members]}")
+    if norefusal:
+        print(f"    EXCLUDED from all three families alike: "
+              f"{[(round(x, 3), w) for x, w in norefusal]}")
+
     def score(exp_or_curve):
         # Scored over the USABLE columns only -- the same membership the table above prints, taken
         # from the same list rather than re-derived, so the two cannot drift.
         errs = []
         for sw in usable:
-            Ls, dB = build_dB_of_L(res, sw, ladder, p)
-            lo = np.log(np.maximum(Ls, 1e-12))
-            for x, _f in ladder:
-                if not rows.get(x, {}).get("measurable") or x <= 0.0:
+            Ls, dB, _fl = build_dB_of_L(res, sw, ladder, p)
+            lo = np.log(Ls)
+            for x in members:
+                if x <= 0.0:
                     continue
                 Lx = (x ** exp_or_curve) if np.isscalar(exp_or_curve) else (
                     exp_or_curve(x) if callable(exp_or_curve) else exp_or_curve[x])
@@ -544,8 +663,15 @@ def gate_ay3(res, ladder, p, rows, out):
     # units (dB), rms'd over the same well-defined detents.  A family whose residual is inside that
     # is as close as the target itself is defined -- which is exactly the test that closed task A
     # one session ago (s161 AX6), imported rather than re-derived.
-    amb = [rows[x]["need_spread"] for x in rows
-           if rows[x].get("measurable") and rows[x].get("verdict") == "WELL-DEFINED"]
+    # ⚠⚠ s189, THIRD membership mismatch in this one gate and the only one that moves a VERDICT:
+    # the ambiguity bar must be rms'd over the SAME detents the three families were scored on.
+    # Pooled over every well-defined detent it reads 1.682 dB -- inflated by the two the solve
+    # cannot place, whose spreads are the largest in the table (3.61 dB at LEVEL min) precisely
+    # because that is where s181's bleed floor now sits.  Restricted to the scored members it is
+    # 0.93 dB, and the shipped family crosses from INSIDE to OUTSIDE.  A bar and the thing it
+    # grades must share a population.
+    amb = [rows[x]["need_spread"] for x in members
+           if rows.get(x, {}).get("measurable") and rows[x].get("verdict") == "WELL-DEFINED"]
     amb_rms = float(np.sqrt(np.mean(np.square(amb)))) if amb else float("nan")
     print(f"\n    VERDICT, against the target's OWN across-stimulus ambiguity ({amb_rms:.3f} dB rms,")
     print( "    AY2's spread column -- not a bar this gate chose):")
@@ -590,9 +716,16 @@ def gate_ay4(need_tap, p, out):
 
     if TOP in Lm and abs(Lm[TOP] - 1.0) > 1e-9:
         sys.exit(f"GATE AY4 FAIL: the recovered curve gives L(1) = {Lm[TOP]:.6f}, not exactly 1 "
-                 f"-- the bleed-free anchor is not preserved and every absolute instrument in the "
-                 f"project moves")
-    print(f"  AY4 OK  L(1) = 1 exactly, so b(1) = 0 exactly and the bleed-free corner is intact")
+                 f"-- the anchor detent every level here is referred to is not preserved, and "
+                 f"every absolute instrument in the project reads there")
+    # ⚠ s189: this line used to read "so b(1) = 0 exactly and the bleed-free corner is intact".
+    # The FIRST clause is the load-bearing one and still holds; the second has been false since
+    # s181 put `blendEndStop` of clean signal at that corner (AY1 now asserts b(1) == the shipped
+    # end stop instead).  Two claims in one sentence, and only one of them was ever what the
+    # arithmetic needed.
+    print(f"  AY4 OK  L(1) = 1 exactly, so the ANCHOR DETENT is unmoved and every level above is "
+          f"referred\n          to the same point under both tapers.  ⛔ NOT 'bleed-free': "
+          f"b(1) = {L.b_of(1.0):.5f} (s181).")
 
     half = Lm.get(NOON)
     if half is not None:
@@ -667,42 +800,81 @@ def gate_ay5(Lm, p, out):
         print(f"      {x:7.3f}{cf0:13.4f}{cf1:14.4f}{cf1 - cf0:9.4f}")
     print(f"      worst |d cleanFraction| = {worst_cf:.4f}")
 
-    print("\n  (b) MIX-RATIO SPAN, i.e. the LEVEL sensitivity item 9 is written about.  The")
-    print("      clean-re-OD ratio the stage mixes is exactly (1 - L) (GATE L's reduction), so a")
-    print("      taper change is exactly a change in how fast the mix sweeps with the knob.")
+    print("\n  (b) MIX-RATIO SPAN, i.e. the LEVEL sensitivity item 9 is written about.  A taper")
+    print("      change is exactly a change in how fast the mix sweeps with the knob.")
+    print("      ⛔ s189: the ratio is NO LONGER `(1 - L)` -- that was GATE L's PRE-s181 reduction")
+    print("      and this sub-gate quoted it as current for eight sessions.  See the law below.")
+    # ⛔⛔ s189: THE RATIO IS NO LONGER (1 - L).  With s181's end stop the mixed clean-re-OD ratio
+    # that this whole sub-gate is about is
+    #       b/a = (1 - L) + e / ((1 - e) L)
+    # (asserted below against `K.coef_closed`, not assumed), whose second term DIVERGES as L -> 0.
+    # Everything from here to the end of (c) was built on "(1-L) lives in [0,1] with both
+    # endpoints pinned", and that sentence is refuted by the stage the project now ships.
+    def mix_ratio(Lv):
+        a, b = K.coef_closed(1.0, Lv)
+        return (b / a) if a > 0 else float("inf")
+
+    e_hi, _e_lo, _k = K._endstop(None)
+    worst_law = max(abs(mix_ratio(v) - ((1.0 - v) + e_hi / ((1.0 - e_hi) * v)))
+                    for v in np.linspace(0.02, 1.0, 4901))
+    if worst_law > 1e-12:
+        sys.exit(f"GATE AY5 FAIL: the closed form b/a = (1-L) + e/((1-e)L) disagrees with "
+                 f"`coef_closed` by {worst_law:.3e} -- the bound below is derived from it, so it "
+                 f"may not be quoted")
+    print(f"\n      b/a = (1-L) + e/((1-e)L) reproduces coef_closed to {worst_law:.1e} "
+          f"(e = {e_hi:.5f}).")
+
     matched = [x for x in sorted(Lm) if 0.0 < x < 1.0]
     if matched:
-        s_ship = [1.0 - p(x) for x in matched]
-        s_req = [1.0 - Lm[x] for x in matched]
+        # ⚠ s189: the SPAN is taken on the true ratio `b/a`, not on `(1-L)`.  They agreed exactly
+        # before s181 and they do not now -- and the difference grows toward LEVEL min, which is
+        # the end of the travel item 9 is about.  `(1-L)` is kept alongside, labelled, because
+        # every pre-s189 quote off this gate is in those units.
+        s_ship = [mix_ratio(p(x)) for x in matched]
+        s_req = [mix_ratio(Lm[x]) for x in matched]
         span_ship = max(s_ship) - min(s_ship)
         span_req = max(s_req) - min(s_req)
         fold = span_req / span_ship if span_ship > 0 else float("nan")
-        print(f"      (1-L) span over the interior detents: shipped {span_ship:.4f}, "
+        old_ship = max(1.0 - p(x) for x in matched) - min(1.0 - p(x) for x in matched)
+        print(f"      b/a span over the interior detents: shipped {span_ship:.4f}, "
               f"required {span_req:.4f}")
         print(f"      => fold change {fold:.3f}x")
+        print(f"      (the retired `(1-L)` units, for comparison with pre-s189 quotes: shipped "
+              f"{old_ship:.4f})")
         print( "      ⚠ A SIZING, NOT A MECHANISM CLAIM (s134).  Item 9's target is a ~2-3x gap in")
         print( "      how far a FEATURE's centre moves across the matched LEVEL detents; this is")
         print( "      the fold change in the mix ratio that drives it, which is a NECESSARY")
         print( "      condition and not the feature measurement.  Whether the feature follows")
         print( "      needs GATE W's locator on a re-render, and this gate does not claim it.")
 
-        # ---- (c) THE HEADROOM BOUND.  The decisive number, and it needs no fit, no threshold
-        # and no choice of taper -- it holds over the WHOLE family at once (s145 AM4's pattern:
-        # a bound proved over the parameter space does not expire when a constant moves).
-        #
-        #   L is a pot fraction, so L in [0, 1] and the mixed clean-re-OD ratio (1 - L) is in
-        #   [0, 1] too.  A taper with the endpoints pinned -- and they ARE pinned: L(0) = 0 is the
-        #   end stop and L(1) = 1 is the bleed-free anchor AY6 asserts -- can push the interior
-        #   detents arbitrarily close to those two limits, so the SUPREMUM of the (1 - L) span over
-        #   the interior detents is 1.0, approached and never attained.
-        #
-        # => the largest fold change ANY taper can deliver is 1 / span_shipped.
-        sup_fold = 1.0 / span_ship if span_ship > 0 else float("inf")
-        print("\n  (c) THE HEADROOM BOUND -- over the WHOLE taper family, not the solved curve.")
-        print("      (1-L) is a ratio of pot fractions, so it lives in [0, 1]; the endpoints are")
-        print("      PINNED (L(0)=0 is the end stop, L(1)=1 is AY6's bleed-free anchor), so the")
-        print("      supremum of the interior span is 1.0 and the most any taper can buy is")
-        print(f"          1 / {span_ship:.4f} = {sup_fold:.3f}x   (a supremum -- not attained)")
+        # ---- (c) THE HEADROOM BOUND, RE-DERIVED (s189).  It is REFUTED as a bound. ----------
+        # The retired argument, verbatim, because it is the thing being withdrawn:
+        #   "(1-L) is a ratio of pot fractions, so it lives in [0,1]; the endpoints are PINNED
+        #    (L(0)=0 is the end stop, L(1)=1 is AY6's bleed-free anchor), so the supremum of the
+        #    interior span is 1.0 and the most any taper can buy is 1/span_shipped."
+        # Every clause is about the PRE-s181 network.  The mixed ratio is now
+        # (1-L) + e/((1-e)L), which is UNBOUNDED ABOVE as L -> 0, so the interior span has no
+        # finite supremum and the bound does not exist.  ⚠ That does not make the lever WORK --
+        # AY5(b)'s necessary-not-sufficient caveat is untouched, and the LEVEL-min end of the
+        # travel is where the model is loudest re the pedal (AY2 reads -3.27 dB there).  What is
+        # gone is the ARITHMETIC REFUTATION, which is a different thing from a positive result.
+        r_ship = [mix_ratio(p(x)) for x in matched]
+        span_ship_true = max(r_ship) - min(r_ship)
+        sup_fold = float("inf")
+        print("\n  (c) THE HEADROOM BOUND -- ⛔⛔ REFUTED AS A BOUND BY s181's OWN END STOP.")
+        print("      The retired argument was: (1-L) lives in [0,1] with both endpoints pinned, so")
+        print(f"      the interior span cannot exceed 1.0 and no taper can buy more than "
+              f"1/{span_ship:.4f} = {1.0 / span_ship:.3f}x.")
+        print("      That is the PRE-s181 network.  The shipped mixed ratio is")
+        print(f"          b/a = (1-L) + e/((1-e)L),  e = {e_hi:.5f}   -> +inf as L -> 0")
+        print("      so the interior span has NO finite supremum and the bound does not exist.")
+        print(f"      Measured on the shipped taper's own interior detents {[round(x, 3) for x in matched]}:")
+        print(f"          (1-L) span      {old_ship:.4f}      <- what the retired bound used")
+        print(f"          true b/a span   {span_ship_true:.4f}      "
+              f"({span_ship_true / old_ship:.2f}x larger, and it grows without limit as the")
+        print( "                                        taper is pushed toward LEVEL min)")
+        print("      ⇒ THE MODEL ALREADY SWEEPS THE MIX FURTHER THAN THE RETIRED ARITHMETIC SAID,")
+        print("        before any taper change at all.")
         # Item 9's own measured sensitivity ratios, pedal / model, both matched-detent reads:
         #   bass notch   30.0 % / 17.2 %  (s125)      treble_notch  24.3 % / 9.1 %  (s133, AE4)
         # Quoted as the pair rather than as "~2-3x" so the bound is graded against measurements.
@@ -711,12 +883,34 @@ def gate_ay5(Lm, p, out):
         short = []
         for name, need in sorted(targets.items(), key=lambda kv: kv[1]):
             ratio = sup_fold / need
-            verdict = "REACHES" if ratio >= 1.0 else f"{1.0 / ratio:.2f}x SHORT"
+            verdict = ("(vacuous: sup is infinite)" if not math.isfinite(ratio)
+                       else "REACHES" if ratio >= 1.0 else f"{1.0 / ratio:.2f}x SHORT")
             short.append(ratio)
             print(f"        {name:<26} needs {need:.3f}x   sup/need = {ratio:.3f}   {verdict}")
         reaches = [r for r in short if r >= 1.0]
         print()
-        if not reaches:
+        # ⛔⛔ s189: WITH NO FINITE SUPREMUM THIS COMPARISON GRADES NOTHING -- `inf >= need` is
+        # true for every target, so the "reaches" branch below would print `the fit is worth
+        # running` as a CONSEQUENCE OF THE BOUND VANISHING rather than of anything measured.
+        # That is `empty-gate-must-fail` wearing a pass.  Say what is actually known instead.
+        if not math.isfinite(sup_fold):
+            print(f"      ⇒ ⛔ NO VERDICT IS AVAILABLE FROM THIS COMPARISON.  Every target clears an")
+            print( "        infinite supremum trivially, so the `REACHES` column above is an")
+            print( "        artefact of the bound's disappearance, NOT a measurement.  What is")
+            print( "        established is the NEGATIVE half only:")
+            print( "          * the ARITHMETIC REFUTATION of a taper/mix-law reshape is WITHDRAWN")
+            print( "            (s162's `0 of 2 REACH at the family's own supremum` rested on the")
+            print( "            (1-L) bound, which s181 removed);")
+            print( "          * nothing here says the lever WORKS -- AY5(b)'s necessary-not-")
+            print( "            sufficient caveat is untouched, and the shipped taper's own fold")
+            print(f"            toward the targets is {fold:.3f}x against {min(targets.values()):.3f}x"
+                   " / "
+                  f"{max(targets.values()):.3f}x needed.")
+            print( "      ⚠⚠ AND THE TARGETS ARE THEMSELVES A RETIRED EPOCH: both model-side")
+            print( "        sensitivities (17.2 %, 9.1 %) were measured PRE-s181, i.e. on the")
+            print( "        network whose mix span this sub-gate has just measured 1.47x larger.")
+            print( "        ⇒ re-measuring them is owed before either is graded again.")
+        elif not reaches:
             print(f"      ⇒ 0 of {len(short)} REACH, at the family's own SUPREMUM.  A LEVEL-taper or")
             print( "        mix-law reshape cannot deliver item 9's sensitivity gap for ANY taper,")
             print( "        because the shipped taper already spends "
@@ -765,15 +959,18 @@ def gate_ay5(Lm, p, out):
 # AY6 -- what must NOT move
 # --------------------------------------------------------------------------------------------
 def gate_ay6(Lm, p, out):
-    print("\n-- AY6: the bleed-free corner must be bit-identical --")
+    print("\n-- AY6: the ANCHOR corner must be bit-identical --")
     a0, b0 = K.coef_closed(1.0, p(1.0))
     a1, b1 = K.coef_closed(1.0, Lm.get(TOP, 1.0))
     if (a0, b0) != (a1, b1):
-        sys.exit(f"GATE AY6 FAIL: the bleed-free corner moves ({a0}, {b0}) -> ({a1}, {b1}).  "
+        sys.exit(f"GATE AY6 FAIL: the anchor corner moves ({a0}, {b0}) -> ({a1}, {b1}).  "
                  f"GATE K7's ratio, GATE O's A3 ledger, GATE L's |rho|, OdToneRestore's base row "
                  f"and GATE W/AE's membership all read there; a taper that moves it invalidates "
                  f"all of them at once.")
-    print(f"  AY6 OK  (od, clean) = ({a1:.1f}, {b1:.1f}) at LEVEL max under both tapers, exactly")
+    # ⚠ s189: `.1f` ROUNDED THE END STOP AWAY -- it printed `(1.0, 0.0)`, i.e. the retired
+    # bleed-free corner, against a stage whose clean coefficient there is 0.02418.  A display
+    # format that rounds a finding to zero is how a corrected gate goes on telling the old story.
+    print(f"  AY6 OK  (od, clean) = ({a1:.5f}, {b1:.5f}) at LEVEL max under both tapers, exactly")
     # And the mutation: a curve that did NOT pin the top must be caught by the same check.
     bad_a, bad_b = K.coef_closed(1.0, 0.9)
     if (bad_a, bad_b) == (a0, b0):

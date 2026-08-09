@@ -59,7 +59,36 @@ ROOT = os.path.dirname(HERE)
 SRC = os.path.join(HERE, "level_taper_reshape.py")
 MUT = os.path.join(HERE, f"_mutated_gate_ay_{os.getpid()}.py")
 
-STALE = "analysis/reports/s146_mastertaper.json"   # pre-s156 DSP change — AY1b must refuse it
+# ⚠⚠ s189: `STALE` WAS A TRANSCRIBED FILENAME AND IT ROTTED, EXACTLY AS `CURRENT` DID AT s173 --
+# in the same file, one constant apart, and s173 fixed only the one it was looking at.
+# `analysis/reports/*.json` is gitignored and regenerable, so `s146_mastertaper.json` had simply
+# been cleaned up; the arm then died in `json.load` with a FileNotFoundError and was scored
+# rc=1 -- a CRASH counted as a firing epoch guard, which is s117's "check guard IDENTITY, not a
+# non-zero exit" arriving through the back door.  Derived instead, and it REFUSES rather than
+# passing vacuously when no stale report exists (`empty-gate-must-fail`).
+def oldest_stale_matrix_report(srcs_newest):
+    """The oldest full matrix report that PREDATES the newest src/ file -- i.e. one AY1b must
+    refuse.  A structural test cannot go stale the way a filename does."""
+    best, best_mt = None, float("inf")
+    for path in glob.glob(os.path.join(ROOT, "analysis", "reports", "*.json")):
+        try:
+            with open(path) as fh:
+                doc = json.load(fh)
+        except Exception:
+            continue
+        if not (isinstance(doc, dict) and {"captures", "meta", "summary"} <= set(doc)):
+            continue
+        if len(doc.get("captures") or []) < 100:
+            continue
+        mt = os.path.getmtime(path)
+        if mt < srcs_newest and mt < best_mt:
+            best, best_mt = path, mt
+    if best is None:
+        sys.exit("MUTATION TEST FAIL: no matrix report on disk PREDATES the newest src/ file, so "
+                 "the epoch arm has nothing the guard could refuse and would pass vacuously.  "
+                 "Render one against an older build, or drop the arm deliberately -- do not let "
+                 "it report a green light for an untested guard (`empty-gate-must-fail`).")
+    return os.path.relpath(best, ROOT)
 
 
 # ⚠⚠ s173: `CURRENT` used to be the transcribed literal `s162_shipped.json`, and by this session
@@ -93,6 +122,11 @@ def newest_matrix_report():
 
 
 CURRENT = newest_matrix_report()
+_SRC_GLOBS = ("src/dsp/*.h", "src/*.cpp", "analysis/offline_render.cpp")
+_NEWEST_SRC = max(os.path.getmtime(f)
+                  for g in _SRC_GLOBS
+                  for f in glob.glob(os.path.join(ROOT, g)))
+STALE = oldest_stale_matrix_report(_NEWEST_SRC)
 
 # (name, why, [(pattern, replacement), ...], expect_rc, must_contain, must_absent, report)
 ARMS = [
@@ -111,12 +145,34 @@ ARMS = [
      [(r'abs\(a - L\.a_of\(Lv\)\)', 'abs(a - L.a_of(Lv) - 1e-9)')],
      1, "AY1 FAIL", None, CURRENT),
 
+    # ⚠ s189: RE-POINTED.  The retired arm patched `if L.b_of(1.0) != 0.0:` -- the invariant s181
+    # made false.  The invariant is now "b at the anchor EQUALS the shipped end stop", which ties
+    # GATE L's reduction to FitParams.h through GATE K's single resolver; reading it just below
+    # the anchor must still refuse, and for the same reason (the anchor's own clean content is
+    # not what the header says).
     ("ay1-anchor",
-     "the anchor test is pointed just below LEVEL max, where the clean coefficient is NOT exactly "
-     "zero — the exact zero every absolute instrument in the project reads at must be checked AT "
-     "the anchor",
-     [(r'if L\.b_of\(1\.0\) != 0\.0:', 'if L.b_of(0.999) != 0.0:')],
-     1, "bleed-free anchor", None, CURRENT),
+     "the anchor test is pointed just below LEVEL max, so the clean coefficient read there no "
+     "longer matches the shipped end stop — the anchor's own contents must be checked AT the "
+     "anchor, or every level below is referred to a corner the gate cannot locate",
+     [(r'b_top = L\.b_of\(1\.0\)', 'b_top = L.b_of(0.999)')],
+     1, "disagrees with the header", None, CURRENT),
+
+    # ⭐⭐ s189, NEW AND IT REPRODUCES THIS SESSION'S OWN HEADLINE DEFECT.  `level_taper_gate`'s
+    # reduction was a THIRD mirror of the LevelBlend network and it sat on the pre-s181 topology
+    # for eight sessions while s182 fixed only the two inside `level_law_gate`.  The arm makes the
+    # mirror ideal again while GATE K stays shipped; AY1's divergence check must catch it.
+    # ⚠ The patch lands in an IMPORTED module (s128), so it is applied to `level_taper_gate.py`
+    # rather than to the gate under test.
+    # ⚠ The mutation targets an IMPORTED module (s128), and it is injected as a module-level
+    # override INTO THE MUTANT rather than written over `level_taper_gate.py` on disk (s139): the
+    # override then lives and dies with the subprocess, so a crashed arm cannot leave a patched
+    # dependency behind for every later run to inherit.
+    ("ay1-third-mirror",
+     "level_taper_gate's reduction is pinned to the IDEAL network while level_law_gate keeps the "
+     "shipped end stop — s181's defect, reproduced.  Two correct implementations of two DIFFERENT "
+     "stages, which is the one configuration a closed-vs-nodal known answer cannot see",
+     [(r'^NOON = K\.NOON$', 'L.ENDSTOP = (0.0, 0.0)\nNOON = K.NOON')],
+     1, "modules has drifted", None, CURRENT),
 
     # ---- AY1b: THE licence.  Mutates nothing; runs against a pre-s156 report. -------------------
     ("ay1b-epoch",
@@ -206,14 +262,43 @@ ARMS = [
      0, None, None, CURRENT),
 
     # ---- AY5(c): THE arm.  This verdict is why task D closes as specified. ----------------------
-    ("ay5-reaches",
-     "item 9's own sensitivity ratios are shrunk until the taper family's supremum clears them, so "
-     "the bound must report that the lever REACHES — if it still says 0 of 2, the refutation of "
-     "task D is hard-coded",
-     [(r'targets = \{"bass notch \(s125\)": 30\.0 / 17\.2, '
-       r'"treble_notch \(s133 AE4\)": 24\.3 / 9\.1\}',
-       'targets = {"bass notch (s125)": 1.05, "treble_notch (s133 AE4)": 1.10}')],
-     0, "reach at the supremum", None, CURRENT),
+    # ⚠⚠ s189: RE-POINTED, and the reason is the session's second finding.  The retired arm shrank
+    # item 9's targets until a FINITE supremum cleared them.  There is no finite supremum any more
+    # -- s181's end stop made the mixed ratio unbounded as L -> 0 -- so that arm could no longer
+    # test anything, and the verdict it guarded ("0 of 2 REACH") has been WITHDRAWN.  What must be
+    # armed now is the withdrawal itself: is "NO VERDICT IS AVAILABLE" a computed consequence of
+    # the supremum being infinite, or narration?  Restore a finite supremum and the gate must go
+    # back to grading the targets against it.
+    ("ay5-sup-finite",
+     "the supremum is forced FINITE again (the pre-s181 value), so the gate must abandon its "
+     "no-verdict branch and grade item 9's targets against the bound — if it still refuses, the "
+     "withdrawal is hard-coded rather than computed",
+     [(r'sup_fold = float\("inf"\)', 'sup_fold = 1.0 / old_ship')],
+     0, "REACH, at the family's own SUPREMUM", None, CURRENT),
+
+    # ---- s189: the two NEW distinctions this session introduced, both load-bearing -------------
+    # `invert_dB`'s low-side status was ONE value ('below') until s181's end stop put a finite
+    # floor under dB_model(L).  'below-floor' is a statement about the DEVICE (unreachable by any
+    # taper) and 'below-sample' one about the LADDER (reachable, unsampled); collapsing them is
+    # what let a fabricated `required L = 0.0000` look like a reading.
+    ("ay3-floor-split",
+     "the floor comparison is disabled, so every low-side refusal collapses back to the single "
+     "'below-sample' status — the DEVICE-vs-LADDER distinction must disappear with it, or the "
+     "gate is printing a status it did not compute",
+     [(r'if floor is not None and target <= floor:', 'if False:')],
+     0, None, "below-floor", CURRENT),
+
+    # The ambiguity bar and the families it grades must share a population.  Pooled over every
+    # well-defined detent the bar is inflated by the two the solve cannot place -- whose spreads
+    # are the largest in the table, precisely because that is where s181's bleed floor sits -- and
+    # the SHIPPED family crosses from OUTSIDE to INSIDE on that alone.
+    ("ay3-amb-membership",
+     "the ambiguity bar is re-pooled over every well-defined detent instead of the detents the "
+     "families were actually scored on — the shipped family's verdict must flip, or the bar is "
+     "not being computed on the population it grades",
+     [(r'amb = \[rows\[x\]\["need_spread"\] for x in members',
+       'amb = [rows[x]["need_spread"] for x in rows')],
+     0, None, None, CURRENT),
 
     # ---- AY6: the corner nothing may move ------------------------------------------------------
     ("ay6-corner",
@@ -258,6 +343,8 @@ def build(muts):
 # on every epoch and needs no maintenance when a verdict legitimately flips.
 FLIP = {
     "ay4-band": r"the requirement moves the pot (INTO|TOWARD|AWAY FROM) the band",
+    # s189: the shipped family's INSIDE/OUTSIDE verdict must move when the bar's population does.
+    "ay3-amb-membership": r"shipped exponent\s+[\d.]+ dB\s+(INSIDE|OUTSIDE)",
 }
 
 

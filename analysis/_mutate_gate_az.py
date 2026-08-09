@@ -162,13 +162,19 @@ ARMS = [
     # to ship at all, which the runner scored as a dead guard against a gate doing exactly the
     # right thing (`suspect the mutation before the guard`, s110/s114, and note the refusal is
     # itself the improvement -- the retired rule would have shipped the biggest family instead).
-    # ⇒ mutate the BAR that decides admissibility rather than the range: loosen containment to
-    # 2.0 and the 3-segment family (1.833) becomes admissible while the 2-segment one (2.797)
-    # does not, so the gate must ship THREE.  That tests that the choice READS the containment
-    # measurement, which is the property the shipped constants actually rest on.
+    # ⇒ mutate the BAR that decides admissibility rather than the range: loosen containment just
+    # far enough to admit the 3-segment family while leaving the 2-segment one out, so the gate
+    # must ship THREE.  That tests that the choice READS the containment measurement, which is the
+    # property the shipped constants actually rest on.
+    # ⚠⚠ s189: THE LOOSENED BAR WAS THE LITERAL `2.0`, CALIBRATED WHEN 3-seg's CONTAINMENT WAS
+    # 1.833.  On the current epoch it is 11.413 (2-seg 18.928), so a fixed 2.0 admits NOTHING and
+    # the arm failed against a gate that was working -- the same epoch-dependent-literal rot this
+    # runner's own header describes for its report paths, one field over.  DERIVED from the
+    # measured containment instead, so it admits exactly 3-seg-and-better on any epoch.
     ("az2-choice", 0, "SHIP the SMALLEST family meeting BOTH: the 3-SEGMENT",
      '    contained = {n: bool(fits[n]["containment"] <= 1.0) for n in ns}',
-     '    contained = {n: bool(fits[n]["containment"] <= 2.0) for n in ns}',
+     '    contained = {n: bool(fits[n]["containment"] <= max(1.0, fits[3]["containment"] * 1.001))'
+     ' for n in ns}',
      "loosen the containment bar so the 3-SEGMENT family becomes admissible. The gate must then "
      "ship THREE, i.e. the choice tracks the measurement rather than being hard-coded"),
 

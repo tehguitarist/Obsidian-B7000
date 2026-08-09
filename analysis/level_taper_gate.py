@@ -30,6 +30,21 @@ i.e. the clean-re-OD ratio the stage mixes is EXACTLY (1 - L).  L1 gates that re
 GATE K2's `coef_closed`, so it is a third independent derivation of the same two numbers, not a
 retyping of them.
 
+⛔⛔ THAT PAIR IS THE PRE-s181 NETWORK, AND BOTH LINES ABOVE ARE NOW FALSE ON THE SHIPPED STAGE
+(corrected s189).  `blendEndStop` (s181) puts a wiper end stop between the knob and the pot, so
+with `e` the OD-end stop the reduction is
+
+    a(L) = (1-e) L / D,   b(L) = e + (1-e) (1-e) L(1-L) / D,   D = 1 + (1-e) L (1-L)
+
+and the mixed clean-re-OD ratio is
+
+    b/a = (1 - L) + e / ((1 - e) L)          <-- UNBOUNDED as L -> 0, not bounded by 1
+
+⚠ The second term is the whole of s181: a clean path that survives at LEVEL min.  Any argument of
+the form "(1-L) lives in [0,1] so the mix span is bounded" is refuted by it -- see GATE AY's AY5(c),
+which was built on exactly that sentence and had to be re-derived.  ⭐ At e = 0 everything above
+collapses to the pair printed first, exactly, and L1 asserts that collapse.
+
 `plugin_db`/`pedal_db` are band-averaged POWER, so the band average of the mixed output is
 
     mean|a H_od + b H_cl|^2 = a^2 P_od [ 1 + t^2 + 2 t c ],   t = (1-L) rho,  rho = sqrt(P_cl/P_od)
@@ -92,6 +107,13 @@ NOON = 0.5
 SHIPPED_TAPER = K.level_taper
 SWEEPS = ["sweep_clean", "sweep_drv_-18", "sweep_drv_-12", "sweep_drv_-6"]
 
+# ⚠ s189: the BLEND wiper end stop this module's reduction reads.  `None` = whatever
+# `level_law_gate` resolves from `FitParams.h` (the SINGLE resolver, s182 -- never a second
+# transcription).  Set it to `(0.0, 0.0)` to reproduce every pre-s181 GATE L number exactly; L1
+# asserts that collapse itself, so the escape hatch is measured rather than asserted (s124: keep
+# the retired form reachable, and say so at the option).
+ENDSTOP = None
+
 # Settings that must be identical between the ladder and the two endpoint captures.  `level` and
 # `blend` are the two being varied, so they are excluded by construction.
 ENDPOINT_KEYS = ("drive", "gruntIdx", "attackIdx", "master", "lo", "loMid", "hiMid", "hi",
@@ -108,43 +130,105 @@ IDENT_TOL = 1e-3
 # --------------------------------------------------------------------------------------------
 # L1 -- the reduced closed form
 # --------------------------------------------------------------------------------------------
-def a_of(L):
-    """OD coefficient of the shipped LevelBlend at BLEND = 1, reduced to closed form.
+def a_of(L, endstop=None):
+    """OD coefficient of the shipped LevelBlend at BLEND KNOB = 1, reduced to closed form.
 
-    Derivation from LevelBlend::process with B = 1:
-        Vw = (Vo/(1-L) + Vc) / (1/(1-L) + 1/L + 1)
-    Multiply through by L(1-L):
-        Vw = (L*Vo + L(1-L)*Vc) / (L + (1-L) + L(1-L)) = (L*Vo + L(1-L)*Vc) / (1 + L - L^2)
-    so a = L/(1+L-L^2) and b = a*(1-L).  L1 gates this against GATE K2's own transcription."""
-    return L / (1.0 + L - L * L)
+    Derivation from LevelBlend::process with the BLEND KNOB at max.  ⚠ s189: the knob is not the
+    wiper -- s181 gave the stage an end stop, so `B_eff = endLo + knob*k` with
+    `k = 1 - endLo - endHi`, and at knob = 1 that is `endLo + k`, NOT 1.  With `Vc` reaching the
+    wiper through the pot BODY (conductance `k`, not 1):
+
+        Vw = (Vo/(1-L) + k*Vc) / (1/(1-L) + 1/L + k)
+
+    Multiply through by L(1-L) and write `D = 1 + k*L*(1-L)`:
+
+        Vw = (L*Vo + k*L(1-L)*Vc) / D
+        a  = B_eff * L / D
+        b  = (1 - B_eff) + B_eff * k*L(1-L) / D
+
+    ⭐ At `endstop = (0, 0)` this collapses to `a = L/(1+L-L^2)`, `b = a*(1-L)` EXACTLY -- the
+    retired pre-s181 reduction -- so every pre-s181 quote off this module stays reproducible, and
+    L1 asserts that collapse as its own known answer.
+
+    ⚠⚠ WHY THIS EDIT WAS OWED (s189).  s182 found BOTH of GATE K's mirrors stale on s181's end
+    stop and fixed them behind a single resolver -- and THIS reduction is a THIRD mirror, in a
+    different module, which nothing re-pointed.  It went on returning the ideal network for eight
+    sessions while agreeing with nothing.  The resolver is IMPORTED (`K._endstop`), never
+    re-transcribed, so the three cannot drift again: `s145 AM1a` / `s149 AO2` / `s182 K2`, fourth
+    occurrence, and the first where the guard that caught it was one this project had already
+    written."""
+    end_hi, end_lo, k = K._endstop(ENDSTOP if endstop is None else endstop)
+    b_eff = end_lo + k
+    return b_eff * L / (1.0 + k * L * (1.0 - L))
 
 
-def b_of(L):
-    return a_of(L) * (1.0 - L)
+def b_of(L, endstop=None):
+    end_hi, end_lo, k = K._endstop(ENDSTOP if endstop is None else endstop)
+    b_eff = end_lo + k
+    D = 1.0 + k * L * (1.0 - L)
+    return (1.0 - b_eff) + b_eff * k * L * (1.0 - L) / D
 
 
 def gate_l1(out):
     print("-- L1: the reduced closed form vs GATE K2's `coef_closed` --")
+    # ⚠⚠ s189: BOTH sides are evaluated at the SAME end stop, and that is not a loosening -- it is
+    # what makes this an algebra check rather than a topology check.  Handing the two mirrors
+    # different networks is the one configuration s182's own resolver docstring says the
+    # closed-vs-nodal known answer cannot see, and it is what a naive `ENDSTOP = (0,0)` escape
+    # hatch would silently do (measured: the check failed by exactly `blendEndStop`, against two
+    # correct implementations of two different stages).
+    # ⇒ the TOPOLOGY question gets its own guard immediately below, which is where it belongs.
+    es = ENDSTOP
+    if es is None:
+        K.check_shipped_endstop()
+    else:
+        print(f"  L1 NOTE  ENDSTOP overridden to {es} -- reproducing a RETIRED epoch on purpose; "
+              f"the\n           FitParams divergence guard is skipped BY REQUEST, not by accident.")
     worst = 0.0
     for L in np.linspace(0.0, 1.0, 1001):
-        a, b = K.coef_closed(1.0, float(L))
+        a, b = K.coef_closed(1.0, float(L), endstop=es)
         worst = max(worst, abs(a - a_of(L)), abs(b - b_of(L)))
     if worst > 1e-15:
         sys.exit(f"GATE L1 FAIL: the reduction disagrees with level_law_gate.coef_closed by "
                  f"{worst:.3e} -- the algebra below is wrong, so nothing here may be quoted")
-    print(f"  L1 OK   a(L)=L/(1+L-L^2), b=a(1-L) reproduces coef_closed to {worst:.2e} "
+    print(f"  L1 OK   the end-stopped reduction reproduces coef_closed to {worst:.2e} "
           f"over 1001 points")
-    # Mutation: the whole inverse leans on b vanishing at LEVEL max (that is what makes the
-    # pure-OD capture an exact endpoint).  If b were never 0 the endpoint would not exist.
-    if b_of(1.0) != 0.0:
-        sys.exit("GATE L1 FAIL: b is not exactly 0 at LEVEL max -- the pure-OD endpoint that "
-                 "|rho| is measured against does not exist")
+
+    # KNOWN ANSWER, and it is the one that makes the repair safe rather than merely plausible:
+    # at endstop = (0, 0) the reduction must be the RETIRED pre-s181 closed form, exactly.
+    worst0 = 0.0
+    for L in np.linspace(0.0, 1.0, 1001):
+        a0 = L / (1.0 + L - L * L)
+        worst0 = max(worst0, abs(a_of(L, (0.0, 0.0)) - a0),
+                     abs(b_of(L, (0.0, 0.0)) - a0 * (1.0 - L)))
+    if worst0 > 1e-15:
+        sys.exit(f"GATE L1 FAIL: at endstop=(0,0) the reduction does not collapse to the retired "
+                 f"a=L/(1+L-L^2) (worst {worst0:.3e}) -- pre-s181 quotes off this module are no "
+                 f"longer reproducible, so the repair changed the network rather than extending it")
+    print(f"  L1 OK   endstop=(0,0) collapses to the retired a=L/(1+L-L^2) to {worst0:.2e} "
+          f"(pre-s181 reproducible)")
+
+    # ⛔⛔ THE REFUSAL, AND IT IS THIS GATE'S RESULT RATHER THAN A MALFUNCTION.  Every inverse
+    # below is anchored on the pure-OD capture being pure -- b EXACTLY 0 at LEVEL max is what
+    # makes `|rho|` a measurement of the OD path alone.  s181's `blendEndStop` removed that exact
+    # zero (b(1) = e), so the anchor this gate rests on no longer exists on the shipped stage and
+    # GATE L's inverse would need re-deriving with a contaminated endpoint before it can be
+    # quoted again.  That is a re-derivation, not a re-run, and it is deliberately NOT done here.
+    # ⭐ `--endstop-ideal` keeps every pre-s181 GATE L number reproducible.
+    b_top = b_of(1.0)
+    if b_top != 0.0:
+        sys.exit(f"GATE L1 REFUSES (this is a RESULT, not a bug): b = {b_top:.6f} at LEVEL max, "
+                 f"not 0.  s181's `blendEndStop` put clean signal at the bleed-free corner, so the "
+                 f"pure-OD endpoint every inverse below is anchored on does not exist on the "
+                 f"shipped stage.  GATE L's inverse needs RE-DERIVING against a contaminated "
+                 f"endpoint -- it is not a re-run.  Set `level_taper_gate.ENDSTOP = (0.0, 0.0)` "
+                 f"to reproduce every pre-s181 number exactly (L1 asserts that collapse).")
     if b_of(SHIPPED_TAPER(NOON)) <= 0.0:
         sys.exit("GATE L1 FAIL: b is 0 at noon too -- there is no bleed to identify and this "
                  "gate is testing nothing (empty-gate-must-fail)")
     print(f"  MUTATION OK  b = 0 exactly at LEVEL max and {b_of(SHIPPED_TAPER(NOON)):.4f} at noon, "
           f"so the endpoint\n               is real and the bleed term is not identically zero.")
-    out["l1"] = {"worst": worst}
+    out["l1"] = {"worst": worst, "worst_ideal_collapse": worst0}
 
 
 # --------------------------------------------------------------------------------------------
