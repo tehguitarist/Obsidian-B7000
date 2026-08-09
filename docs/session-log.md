@@ -27389,3 +27389,139 @@ is shape-normalised). Small, real, unowned.
 - ⚠ **Unowned, new, small:** `level-0815`'s +2.00 dB / 0.245× depth (§7). Not folded into any item.
 - ⚠ **A carry-forward for every future session that uses `--fit blendEndStop=0` as "the pre-s181
   model": it is not one any more** (§6). Scope it, or emulate `kMixCf[0]` alongside.
+
+## SESSION 198 (2026-08-10) — action-list item 7: the standing `SwitchTransitionTest` failure is an unsmoothed COEFFICIENT jump, and the obvious suspect is exonerated
+
+**`ctest` 22/22 for the first time since s194.** One `src/` line changed
+(`LevelBlend::cleanFraction()`), one new test (`LevelBlendTest` Test 10), **no constant re-fitted,
+no re-baseline owed** — the whole 162-capture matrix is bit-identical, measured on 50 renders across
+two binaries rather than argued.
+
+### 1. Reproduced, and it is ONE cell in ONE direction
+
+`distEngage @mids-boost (on)` reads **2.85x** against the bar of 1.0; every other `distEngage` cell
+sits at 0.58-0.80x and all four selectors at 0.08-0.52x. The asymmetry is the whole clue and had not
+been read: the SAME pot config in the OTHER direction is **0.59x**. `applyFlip` maps `on` to
+`distEngage = false`, so **DISENGAGING clicks and ENGAGING does not.**
+
+### 2. ⭐⭐ IT IS NOT THE FADE — the transient lands ON the flip sample and is gone in ~8
+
+A per-sample trace of `(flipped − twin)` through the transition (scratch probe, phase 0):
+
+    n +0  d|diff| 7.81e-02      n +3  d|diff| 7.08e-02      n +6  d|diff| 4.09e-02
+    n +1  d|diff| 4.27e-02      n +4  d|diff| 1.26e-02      n +7  d|diff| 2.87e-02
+    n +2  d|diff| 9.71e-02      n +5  d|diff| 2.43e-02      n +8  d|diff| 9.00e-03
+
+The fade is **576 samples** (12 ms at 48 k). A too-fast fade spreads its excess over all 576; this
+is a decaying high-frequency ring confined to the first handful, with the ramp barely started
+(3/576) when the maximum lands. ⇒ **`kDistFadeSeconds` was never the lever**, and slowing it would
+have been the wrong repair — it would have masked a discontinuity rather than removed one.
+
+### 3. ⭐⭐⭐ THE CAUSE: `cleanFraction()` was evaluated at `distTarget`, which the footswitch moves INSTANTLY
+
+`setDistEngage()` sets `distTarget` with no ramp, and `PedalChain::syncOdToneMix()` reads
+`cleanFraction()` straight into the two MIX-KEYED OD-path stages. So a stomp jumped
+**cf 0.02418 → 1.00000 in one sample** — an unsmoothed coefficient change in `OdMakeup`'s s173 HF
+peak and `OdToneRestore`'s s156 cut — **while `distMix` was still 1.0 and the OD branch was
+therefore at full contribution.** That is exactly s175's GRUNT finding in a new place (*fading only
+the clipper would have left the notch stage's discontinuity wearing the switch's name*), and it
+explains the direction asymmetry with no free parameter: disengaging jumps the coefficients while
+the branch is still fully audible; engaging jumps them while `distMix` is 0 and the branch is muted,
+so the same jump is inaudible.
+
+⚠ The header comment that put it at `distTarget` gives a real reason (*"a mid-stomp reading would
+chatter that stage's coefficients for a few ms against a mix that is already on its way somewhere
+else"*) — correct about chatter, and it traded a few ms of chatter for a single full-size step.
+
+### 4. ⭐⭐⭐ AND THE OBVIOUS SUSPECT IS EXONERATED — BY THE MEASUREMENT THAT RANKS IT FIRST
+
+Freezing each stage's cf across the flip separates them (`private->public` probe, four arms):
+
+| arm | diffStep | ratio | per-phase |
+|---|---|---|---|
+| baseline | 2.554e-01 | **2.85x** CLICK | 1.08 / 2.56 / 0.89 / 2.85 |
+| freeze BOTH | 5.251e-02 | 0.59x | 0.59 / 0.40 / 0.56 / 0.39 |
+| freeze `OdToneRestore` | 2.550e-01 | **2.85x** CLICK | 1.08 / 2.56 / 0.89 / 2.85 |
+| freeze `OdMakeup` | 5.226e-02 | **0.58x** | 0.58 / 0.41 / 0.56 / 0.42 |
+
+⇒ **s173's mix-keyed HF peak is ~100 % of it and the notch stage is ~none of it**, which is the
+opposite of what s175's precedent predicts.
+
+⭐⭐⭐ **AND THE EXONERATION IS NOT "that stage barely does anything" — THE STAGE THAT MOVES THE
+OUTPUT 33x MORE IS THE ONE THAT IS NOT THE CARRIER.** Non-vacuity arm, driving the same
+cf 0.02418 → 1.0 on each stage alone and reading the SETTLED output rms:
+
+    untouched                  1.839710555
+    cf = 1.0 on OdToneRestore  1.834589417   delta −5.121e-03   MOVES
+    cf = 1.0 on OdMakeup       1.839867581   delta +1.570e-04   MOVES
+
+Both interventions are live (so neither freeze arm is dead), and the **ranking INVERTS between the
+two statistics**. Not a paradox — it is what the bar measures: a per-sample STEP is a
+**HIGH-FREQUENCY** statistic (d/dn of a component scales with its frequency), so a few dB on a Q-2
+section at **5.6 kHz** rings hard while several dB on a Q-16 section at **323 Hz** barely moves a
+sample-to-sample difference at all. ⛔ **Never rank candidate carriers for a click by how much they
+move the response.**
+
+### 5. THE FIX — evaluate `cleanFraction()` at the ENGAGED path, i.e. ignore `dist_engage`
+
+    -  const double od = processAt(0.0, 1.0, distTarget);
+    -  const double cl = processAt(1.0, 0.0, distTarget);
+    +  const double od = processAt(0.0, 1.0, 1.0);
+    +  const double cl = processAt(1.0, 0.0, 1.0);
+
+⭐ **Why that is the CORRECT reading and not a workaround.** The accessor exists to tell the OD-path
+stages how much clean signal **the BLEND network** is about to sum on top of them. `dist_engage` is
+a **MUTE of the whole OD branch**, not a change in that ratio — and `processAt(dm <= 0)` returns
+`cleanIn` **exactly**, so while the switch is disengaged the OD branch those stages tune is
+discarded sample for sample and cannot be heard. Re-keying it to 1.0 bought **nothing** at the
+settled end and cost a click at the one point where the branch IS audible: the fade. ⇒ cf is now a
+pure function of (LEVEL, BLEND, end stops), which is also what every analysis mirror (GATE AT / BM /
+BN) has always modelled it as — one fewer stale-mirror surface, not one more.
+
+⛔ The alternative — a dual-instance crossfade on `OdMakeup` across the dist ramp (s175's pattern) —
+was **not** taken: it smooths the symptom while still pointlessly re-tuning a muted branch, and
+`odMakeupShadow` is already owned by `gruntFade`, so a second independent ramp would collide.
+
+### 6. RESULT, and the price is measured on BOTH sides
+
+**`distEngage @mids-boost (on)` 2.85x → 0.59x.** `SwitchTransitionTest` **245 checks, 0 failures**;
+full suite **22/22** (was 21/22 since before s195).
+
+⭐ Free known answer nobody asked for: after the fix the two DIRECTIONS agree to 4 s.f. at **all
+four** pot configs (diffStep 5.251e-02 / 5.251e-02, 3.512e-01 / 3.512e-01, 1.581e-02 / 1.581e-02,
+7.646e-01 / 7.646e-01), where before they disagreed 2.85x vs 0.59x at `mids-boost`. That is expected
+by construction once nothing steps — the diff traces `(1−dm)·(clean−engaged)` one way and
+`dm·(engaged−clean)` the other — so it is corroboration that the discontinuity is **gone** rather
+than merely smaller.
+
+⭐⭐ **SCOPE, TWO-SIDED AND RENDERED — no re-baseline owed.**
+- **The change IS live on the affected population**: at every `--dist-engage 0` cell
+  `cleanFraction()` goes **1.00000000 → 0.48113776** (`ref-clean`), i.e. it moves 0.52 of a
+  coordinate whose whole graded range is [0,1]. So the bit-identity below is not vacuous.
+- **And 30 of 30 CLEAN captures render BIT-IDENTICAL anyway**, because the OD branch those laws
+  tune is discarded by the `dm <= 0` early return.
+- **20 of 20 OD control cells bit-identical** — expected by construction (`distTarget` is 1.0
+  there, so old and new evaluate the identical expression) and a free check that the edit reached
+  nothing else. **50/50 total, two binaries with distinct md5s** (`0d97328d…` vs `911c6bcb…`).
+- ⭐ **The shipped binary is bit-identical to the A/B's `new` arm** (`911c6bcb…` both sides), so
+  that comparison IS the acceptance — no re-render owed (s196's pattern).
+
+### 7. Regression cover, mutation-controlled
+
+`LevelBlendTest` **Test 10**, three arms: (a) cf must be identical engaged vs disengaged; (b)
+NON-VACUITY — cf must differ from the retired 1.0, or (a) passes because the configuration was
+all-clean anyway and nothing was at stake; (c) the disengaged output must be the clean input
+**exactly**, which is what makes re-keying free (a test asserting only (a) would pass while the
+matrix silently re-baselined). Mutation control run for real: reverting the one line takes Test 10
+(a) red with its own message, `LevelBlendTest` to rc=1, and `SwitchTransitionTest` back to
+**2.85x — reproducing the pre-fix numbers to every printed digit**, which is what proves the mutation
+restores the old build exactly. ⭐ Built with `--target LevelBlendTest` / `--target
+SwitchTransitionTest` only, so `OfflineRender` was never relinked (md5 asserted unchanged across all
+four rebuilds) — s195's pattern, applied so the A/B renders stayed valid.
+
+### 8. What this does NOT close
+
+⚠ The `kDistFadeSeconds = 0.012` sweep (s171) stands untouched and is still the right constant —
+this session did not re-open it, and the comment block above it still describes a real 5 ms failure
+at `blend-noon`. ⚠ Nothing here touches item 17, item 10 or the release gate; the matrix is
+bit-identical, so `s196_mixk.json` remains the current baseline.

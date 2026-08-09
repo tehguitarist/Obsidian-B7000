@@ -140,6 +140,14 @@
 // s162/s163/s166. Both endpoints below are therefore explicit early returns onto
 // exactly the pre-change expressions.
 //
+// ⚠⚠ AND THE CROSSFADE ALONE WAS NOT ENOUGH — s198. Building the ramp left a SECOND,
+// separate discontinuity that this stage's own coefficients never see: everything
+// KEYED on `cleanFraction()` still stepped in one sample, because that accessor read
+// `distTarget`. `SwitchTransitionTest` duly stayed red on `distEngage @mids-boost`
+// for ~25 sessions while the fade below was doing exactly what it was built to do.
+// ⇒ ⛔ when you smooth a control, grep for what READS the state it changes, not just
+// for what the control multiplies. Full derivation at `cleanFraction()`.
+//
 // ---- Polarity ---------------------------------------------------------------
 // Both paths are non-inverting (resistive dividers). The polarity concern at
 // the BLEND summing node (J201 unconfirmed sign + clipper's known −48.5 gain)
@@ -425,8 +433,8 @@ public:
         // `--dist-engage 0`, so they DO see a different cf — and their output is bit-identical
         // regardless, because the OD branch they re-tune is discarded by the `dm <= 0` early
         // return. `LevelBlendTest` Test 10 asserts both halves.
-        const double od = processAt(0.0, 1.0, distTarget);
-        const double cl = processAt(1.0, 0.0, distTarget);
+        const double od = processAt(0.0, 1.0, 1.0);
+        const double cl = processAt(1.0, 0.0, 1.0);
         const double sum = od + cl;
         return sum > 0.0 ? cl / sum : 1.0;
     }

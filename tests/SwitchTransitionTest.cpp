@@ -86,6 +86,21 @@
 // constants on the grounds that they look like the same quantity — they were swept
 // against different worst cells.
 //
+// ⛔⛔ AND THE FIRST REGRESSION THIS TEST CAUGHT LIVE, s198 — `distEngage @mids-boost
+// (on)` went red at 2.85x and stayed red for several sessions, and IT WAS NOT THE
+// FADE. `LevelBlend::cleanFraction()` was evaluated at `distTarget`, which
+// `setDistEngage()` moves with NO ramp, so `PedalChain::syncOdToneMix()` jumped the
+// two MIX-KEYED OD stages' coefficients in ONE sample while `distMix` was still 1.0
+// and the OD branch was at full contribution. ⭐ The statistic said so and nobody
+// read it: the failure is ASYMMETRIC (2.85x disengaging, 0.59x engaging at the SAME
+// cell), which a fade-rate problem cannot be — a crossfade traverses the same path
+// both ways. Disengaging steps the coefficients while the branch is audible;
+// engaging steps them while `distMix` = 0 and the branch is muted. ⇒ ⛔ before
+// reaching for `kDistFadeSeconds`, TRACE the transition: a too-fast fade spreads its
+// excess over all 576 samples, and this one landed ON the flip sample and was gone
+// in ~8, with the ramp 3/576 advanced. Fixed at `cleanFraction()`, which carries the
+// full derivation; `LevelBlendTest` Test 10 is the regression cover.
+//
 // ⛔⛔ THE s171 OUTCOME, KEPT BECAUSE IT REVISES s170's OWN NUMBERS — the item 14
 // pre-registered stop
 // ("if every switch at every pot position sits below the signal's own quiet step,
