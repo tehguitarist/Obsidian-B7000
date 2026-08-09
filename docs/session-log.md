@@ -25311,3 +25311,134 @@ measured containment instead (`max(1.0, fits[3]["containment"] * 1.001)`), so it
   while the fact moved underneath it. ⛔ **Run `git log --oneline -5` and `git status --porcelain`;
   never carry a git claim in prose** — CLAUDE.md's own "Uncommitted work" section says exactly this
   and these blocks are what it was written about.
+
+## SESSION 190 — item 9's two sensitivity targets, re-measured: both SHRANK, and the pedal was never the thing that moved
+
+**Task.** The standing USER DECISION from s189 (2026-08-09) on open item 9 was **"MEASURE FIRST, DO
+NOT SHIP"**: the 4-segment LEVEL-taper candidate stays on disk until item 9's two pre-s181
+sensitivity targets are re-taken. GATE AY5(c) says so in its own output — *"the targets are
+themselves a retired epoch ... re-measuring them is owed before either is graded again."* This
+session is that measurement. ⛔ **No `src/` change, nothing shipped, no rebuild, no re-render of the
+matrix, no re-baseline owed.**
+
+**New instrument: GATE BQ** (`analysis/level_sensitivity_gate.py`), runner `_mutate_gate_bq.py`
+**10/10**. Artefact `analysis/reports/s190_level_sensitivity.json`. It re-measures W4's statistic —
+per feature, per side, the centre frequency across the LEVEL detents, `span = max/min − 1` — with
+the ladder, the locator, the windows and the validity constants all **IMPORTED** from
+`feature_locus_gate`, never re-derived.
+
+### 1. Three things GATE BQ does that W4 does not, each for a reason already paid for
+
+- **MATCHED detents.** An estimator that refuses is correlated with the thing being graded (a
+  feature too shallow to locate *is* the outcome under test), so unmatched spans reward the arm
+  that reads less — s178's 13th occurrence, in its most self-serving form. Item 9's own note
+  carries the scar (`9.1 % vs 133.5 %` raw against `9.1 % vs 24.3 %` matched). Every span here is
+  over detents readable on **both** sides at that sweep, and the drops are NAMED.
+- **Every sweep printed.** W4 reads `sweep_clean` only, which is right for W4's own MIX-vs-NETWORK
+  question and wrong for a sizing that will decide a ship: s126 measured this family of gaps
+  *collapsing* with stimulus, and the user's stated playing level is `drv_-12`. All four rungs are
+  printed and `sweep_clean` is labelled as W4's condition.
+- **A denominator guard.** `need` divides by the MODEL's span; a model span at the locator's own
+  resolution makes the fold arbitrarily large for free. A cell under `3 × (GRID_STEP_FRAC/3)` =
+  **1.45 %** is REFUSED and printed as refused. ⚠ It fires for real — `treble_notch × drv_-6` has a
+  model span of **1.30 %**.
+
+### 2. ⭐⭐ THE KNOWN ANSWER, AND IT IS THE REASON ANYTHING HERE IS ATTRIBUTABLE
+
+The **pedal side is binary-independent** — no render, no binary, no shipped constant enters it, only
+the capture files and this locator (s159 AW1b's trick). So the pedal spans must still be what the
+source sessions published. Measured against the **PRIMARY** artefacts:
+
+| feature | primary source | published | measured | rel err | n |
+|---|---|---|---|---|---|
+| `bass_notch` | s125's recorded loci, pedal **38.1–54.4 Hz** | 42.8 % | **42.8 %** | **0.09 %** | 7 |
+| `treble_notch` | GATE AE's own docstring, *"pedal span 44.1 % over 6 detents"* | 44.1 % | **44.1 %** | **0.11 %** | 6 |
+
+Two artefacts, written by two different sessions with two different instruments, both reproduced —
+so the locator, the windows and the ladder membership are validated together, and **every move
+below is the MODEL epoch alone.**
+
+### 3. ⛔⛔ AND THE PAIR GATE AY ACTUALLY GRADES AGAINST IS NOT A PEDAL MEASUREMENT
+
+The numbers AY5(c) uses (`30.0/17.2` and `24.3/9.1`) are **neither source session's**. They are a
+**matched-detent restatement**, and matched membership is decided by the **MODEL's** readability —
+so a "pedal span" in that form has a retired model baked into it, which is exactly why it cannot
+serve as the binary-independent known answer it looks like. Measured / restated: **1.43×** and
+**1.81×**. ⚠ And the two primary figures come from **two different instruments** (GATE W's locator
+for the bass notch, GATE AE's for the treble one) ⇒ *item 9's "two targets" were never one
+measurement.* GATE BQ puts both on one instrument, which is the point of re-measuring at all.
+
+### 4. ⭐⭐ THE RESULT: BOTH TARGETS SHRANK, AT EVERY GRADEABLE CELL
+
+`need = pedal span / model span`, matched detents:
+
+| feature | sweep | n | model | pedal | **need now** | AY grades |
+|---|---|---|---|---|---|---|
+| `bass_notch` | clean | 7 | 29.8 % | 42.8 % | **1.437×** | 1.744× |
+| `bass_notch` | drv_-18 | 7 | 29.8 % | 43.1 % | **1.449×** | 1.744× |
+| `bass_notch` | drv_-12 | 7 | 29.7 % | 44.1 % | **1.483×** | 1.744× |
+| `bass_notch` | drv_-6 | 7 | 29.6 % | 47.4 % | **1.603×** | 1.744× |
+| `treble_notch` | clean | 1 | — | — | **REFUSED** (<3 matched) | 2.670× |
+| `treble_notch` | drv_-18 | 6 | 27.5 % | 28.0 % | **1.019×** | 2.670× |
+| `treble_notch` | drv_-12 | 6 | 12.2 % | 17.8 % | **1.460×** | 2.670× |
+| `treble_notch` | drv_-6 | 6 | 1.3 % | 10.4 % | **REFUSED** (denominator floor) | 2.670× |
+
+**6 of 8 cells gradeable; every one is SMALLER than what AY grades against.**
+
+### 5. WHERE THE MOVE IS — the model's own LEVEL sensitivity has GROWN
+
+Pedal pinned by §2, so it is all model side. Unmatched (the PRIMARY figures' own membership rule):
+
+| feature | then | now: clean / drv_-18 / drv_-12 / drv_-6 |
+|---|---|---|
+| `bass_notch` | **20.7 %** (s125 loci 53.2–64.2 Hz) | **29.8 / 29.8 / 29.7 / 29.6 %** |
+| `treble_notch` | **3.7 %** (GATE AE, 3 detents) | n<3 / **27.5 / 13.7 / 1.3 %** |
+
+⛔⛔ **NOT ATTRIBUTED TO ANY ONE CHANGE, and the gate says so every run.** s181's end stop, s185's
+re-anchor and s187's GRUNT-keyed bass-null fix all landed in between, and **s187 moved this exact
+feature's centre by construction** (the model's bass null now runs 42.8–55.5 Hz against s125's
+53.2–64.2 — both ends down ~10 Hz, which is s187's fix, visible on an axis it was never fitted
+against). ⚠ The bass notch's **1.44×** span growth sits beside s181's independently measured
+**1.47×** larger mix span; that is a suggestive coincidence and is explicitly **not** claimed as an
+attribution, because at least three changes are confounded here.
+
+⚠ Two membership facts worth carrying: the model's `treble_notch` reads only **1** detent at
+`sweep_clean` where GATE AE recorded **3**, and its span **collapses to 1.30 % at `drv_-6`** while
+the pedal still reads 10.4 % — i.e. at hot stimulus the model's treble notch stops moving with LEVEL
+at all. That is item 6's "the model's features are pinned" on the LEVEL axis rather than the drive
+one, and nothing owns it.
+
+### 6. What it means for the s189 candidate — and what still binds
+
+The LEVEL-law taper delivers a mix-ratio fold of **1.206×** (GATE AY5(b)). Against the re-measured
+needs: **1 of 6 graded cells REACHES**, `need/delivered` runs **0.85× … 1.33×**. Against the
+restated pair it would read **1.45× … 2.21× short at every cell** ⇒ re-measuring moves the candidate
+from *"clearly short on both"* to *"1 of 6 cells reached"*.
+
+⛔ **That is not a licence to ship it, and BQ4 prints all three reasons:** (i) AY5(b)'s
+necessary-not-sufficient caveat — a fold in `b/a` is not a measured centre move, and no gate here
+measures whether the centre follows; (ii) the majority of cells are still short; (iii) the taper's
+own price is unpaid (a ~50 min matrix render at s163's precedent, plus an `OdToneRestore` mix-law
+re-check, `worst |Δ cleanFraction| = 0.0304`).
+
+### 7. Instrument defects found by this session's own runner
+
+- **A vacuous transcription check shipped in the first draft** — it guarded on `hasattr(AY, ...)`
+  for a name that was never defined, so it passed forever. Replaced with a read of GATE AY's
+  **stored** `ay5.headroom.targets`, which refuses on drift; arm `bq1-ay-missing` pins it.
+- **BQ2 crashed under the loosened-matching arm** (`TypeError: 'NoneType' object is not
+  subscriptable`) because it re-read each cell four times. A gate must REFUSE where it would crash
+  (s117); the loop now reads once into a dict and counts an unreadable side as a DROP.
+- **The runner's own redirect fought one of its arms** — `bq0-render-into-cache` rewrites the
+  `REN_DIR` line the redirect also targets, and the redirect correctly reported `REDIRECT-FAILED`.
+  Fixed by recognising the case from the RESULT (does the source now name a PID-unique dir?) rather
+  than by naming the arm, so a future arm gets the same treatment automatically.
+- **Two arms needed the OPPOSITE check.** `bq2-matching` and `bq-verdict` are "this line must STOP
+  being printed" arms; scoring them as `needle in out` marked a working gate WRONG GUARD. Split
+  into a `DISAPPEARS` set, both checked against the control so an arm cannot pass by the line being
+  absent for an unrelated reason.
+
+⛔⛔ **No arm points any render at `build/s122_feature_locus/`.** Both cache arms operate on a
+PID-unique DECOY, so a dead guard damages the decoy and never the s122 epoch that GATEs AV / AW /
+AF / AG / BC read (0 fresh / 25 stale stamps — s188). The real cache's fingerprint was **identical
+before and after every run this session** (`4aa2199c08436a76`), asserted by BQ0.
