@@ -274,7 +274,17 @@ ARMS = [
      "no-verdict branch and grade item 9's targets against the bound — if it still refuses, the "
      "withdrawal is hard-coded rather than computed",
      [(r'sup_fold = float\("inf"\)', 'sup_fold = 1.0 / old_ship')],
-     0, "REACH, at the family's own SUPREMUM", None, CURRENT),
+     0, None, "NO VERDICT IS AVAILABLE", CURRENT),
+    # ⚠⚠ s190: THE NEEDLE WAS "REACH, at the family's own SUPREMUM" (i.e. the arm assumed the
+    # finite supremum would land in the 0-of-N REACH sub-branch) UNTIL item 9's targets were
+    # RE-POINTED at s190's smaller, current-epoch pair -- at which point the SAME finite supremum
+    # legitimately clears both of them, the code correctly takes the OTHER sub-branch ("N of M
+    # reach"), and the old needle went missing on a gate that was working perfectly. This is the
+    # arm depending on `targets` without saying so (`suspect-the-mutation-before-the-guard`, s110):
+    # the load-bearing thing this arm exists to prove is "the vacuous no-verdict branch was
+    # actually LEFT", not "which of its two live sub-branches fired" -- so the check now asserts
+    # the ABSENCE of the no-verdict text, which is true under a finite supremum regardless of
+    # which target pair is loaded, on this epoch or the next one that re-measures item 9.
 
     # ---- s189: the two NEW distinctions this session introduced, both load-bearing -------------
     # `invert_dB`'s low-side status was ONE value ('below') until s181's end stop put a finite

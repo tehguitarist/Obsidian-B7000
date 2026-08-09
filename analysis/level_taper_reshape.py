@@ -875,10 +875,22 @@ def gate_ay5(Lm, p, out):
         print( "                                        taper is pushed toward LEVEL min)")
         print("      ⇒ THE MODEL ALREADY SWEEPS THE MIX FURTHER THAN THE RETIRED ARITHMETIC SAID,")
         print("        before any taper change at all.")
-        # Item 9's own measured sensitivity ratios, pedal / model, both matched-detent reads:
-        #   bass notch   30.0 % / 17.2 %  (s125)      treble_notch  24.3 % / 9.1 %  (s133, AE4)
-        # Quoted as the pair rather than as "~2-3x" so the bound is graded against measurements.
-        targets = {"bass notch (s125)": 30.0 / 17.2, "treble_notch (s133 AE4)": 24.3 / 9.1}
+        # ⭐⭐ RE-POINTED s190 (was 30.0/17.2 -- s125, and 24.3/9.1 -- s133 AE4).  Both of those
+        # were PRE-s181 model-side measurements, and s189 established the model whose sensitivity
+        # they describe no longer exists (s181's end stop, s185's re-anchor and s187's GRUNT-keyed
+        # LF pair all moved it).  GATE BQ (`analysis/level_sensitivity_gate.py`) re-measured both
+        # on ONE instrument, matched detents, all four stimulus rungs, against a pedal side proven
+        # binary-independent (reproduces two PRIMARY artefacts to 0.09/0.11 %) -- so this pair is
+        # the model's CURRENT sensitivity, not a retired one.
+        # Read at `drv_-12`, the project's own playing-level convention (`playing-level-is-drv-12`),
+        # from the SHIPPED taper's own report: `analysis/reports/s190_level_sensitivity_shipped.json`
+        # bq3.{bass_notch,treble_notch}.sweep_drv_-12.need.  ⚠⚠ `treble_notch`'s `drv_-6` rung
+        # (need 5.060x) is DELIBERATELY EXCLUDED here, not merely unused: GATE BQ traced it to the
+        # model's own `treble_notch` centre PINNING against LEVEL at that rung (span collapses to
+        # 2.1 %, item 6's territory, not this taper's) -- folding it in would let an unrelated
+        # defect set this gate's target.  See `docs/session-log.md` SESSION 190 for the full trace.
+        targets = {"bass notch (s190, drv_-12)": 0.9616659435644065,
+                  "treble_notch (s190, drv_-12)": 1.2268793181422084}
         print("\n      graded against item 9's own matched-detent sensitivity ratios:")
         short = []
         for name, need in sorted(targets.items(), key=lambda kv: kv[1]):
@@ -906,10 +918,23 @@ def gate_ay5(Lm, p, out):
             print(f"            toward the targets is {fold:.3f}x against {min(targets.values()):.3f}x"
                    " / "
                   f"{max(targets.values()):.3f}x needed.")
-            print( "      ⚠⚠ AND THE TARGETS ARE THEMSELVES A RETIRED EPOCH: both model-side")
-            print( "        sensitivities (17.2 %, 9.1 %) were measured PRE-s181, i.e. on the")
-            print( "        network whose mix span this sub-gate has just measured 1.47x larger.")
-            print( "        ⇒ re-measuring them is owed before either is graded again.")
+            # ⛔⛔ s190: THIS BLOCK USED TO SAY "the targets are themselves a retired epoch" and
+            # hardcode "17.2 %, 9.1 %" -- the exact problem it was flagging, and it stayed printed
+            # UNCONDITIONALLY after `targets` was re-pointed at the current epoch, which would have
+            # kept telling every future reader the fix was still owed. `targets` NAMES its own
+            # epoch (see the dict's keys) precisely so this warning can be computed FROM it rather
+            # than re-asserted -- print the provenance that is actually live, and flag forward
+            # rather than backward: this pair is only as current as the LAST render it was measured
+            # against.
+            print( "      ⚠ ITEM 9's TARGETS ARE THE CURRENT EPOCH, RE-POINTED s190:")
+            for k, v in sorted(targets.items()):
+                print(f"          {k:<32} needs {v:.3f}x")
+            print( "        ⇒ measured against the SHIPPED taper on GATE BQ "
+                  "(`analysis/level_sensitivity_gate.py`), matched detents, `drv_-12`.")
+            print( "        ⚠⚠ Re-measure again if the model changes downstream of LevelBlend or")
+            print( "        the LEVEL law re-fits a second time -- that is exactly the mechanism")
+            print( "        that retired the PREVIOUS pair (30.0/17.2, 24.3/9.1), and nothing here")
+            print( "        detects it happening; it must be checked by hand.")
         elif not reaches:
             print(f"      ⇒ 0 of {len(short)} REACH, at the family's own SUPREMUM.  A LEVEL-taper or")
             print( "        mix-law reshape cannot deliver item 9's sensitivity gap for ANY taper,")
@@ -926,7 +951,12 @@ def gate_ay5(Lm, p, out):
         # written on (fold 0.625x) and is FALSE the moment the shipped taper or the OD:CLEAN ratio
         # moves.  Both have since moved (s163's PWL, s172's `OdMakeup`).  Direction is now read off
         # `fold`, and the two branches say opposite things (`computed-verdicts-not-narrated`, the
-        # 5th occurrence).  Item 9's targets are all > 1x, i.e. they always want a LARGER sweep.
+        # 5th occurrence).
+        # ⛔ CORRECTED s190: "item 9's targets are all > 1x" is NO LONGER TRUE and must not be
+        # re-assumed -- the RE-POINTED bass target reads 0.962x (< 1), i.e. the shipped taper's own
+        # mix-span already exceeds what the bass notch needs.  Only treble_notch (1.227x) still
+        # wants a larger sweep.  The per-target REACH/SHORT breakdown three lines below is what
+        # replaced the old unconditional phrase; do not re-narrate a direction from `fold` alone.
         want = "LARGER" if fold > 1.0 else "SMALLER"
         same_way = fold > 1.0
         head = ("AND THE TWO JOBS NOW PULL THE SAME WAY" if same_way
@@ -939,8 +969,24 @@ def gate_ay5(Lm, p, out):
             print( "           target as a SIDE EFFECT, so it is not `one-knob-two-jobs-is-")
             print( "           compensating` on this epoch.  ⛔ NOT a claim that it CLOSES item 9 --")
             print( "           AY5(b)'s own caveat still binds (this is the mix ratio that drives")
-            print( "           the feature, not the feature measurement), and the fold is short of")
-            print(f"           both targets ({', '.join(f'{v:.3f}x' for v in targets.values())}).")
+            print( "           the feature, not the feature measurement).")
+            # ⛔⛔ s190: THIS WAS "the fold is short of both targets", UNCONDITIONALLY -- true of
+            # the retired pair (both > 1.744x) and FALSE of the re-pointed one the moment bass's
+            # need dropped to 0.962x.  Computed per target, not narrated, or the same defect this
+            # comment is fixing recurs the next time either `fold` or `targets` moves.
+            clears = {k: fold >= v for k, v in targets.items()}
+            if all(clears.values()):
+                print(f"           and the fold CLEARS every target "
+                      f"({', '.join(f'{v:.3f}x' for v in targets.values())}).")
+            elif not any(clears.values()):
+                print(f"           and the fold is short of every target "
+                      f"({', '.join(f'{v:.3f}x' for v in targets.values())}).")
+            else:
+                cleared = [k for k, ok in clears.items() if ok]
+                short_of = [k for k, ok in clears.items() if not ok]
+                print(f"           and it CLEARS {', '.join(cleared)} ({fold:.3f}x >= "
+                      f"{targets[cleared[0]]:.3f}x) while remaining SHORT of "
+                      f"{', '.join(short_of)} ({fold:.3f}x < {targets[short_of[0]]:.3f}x).")
         else:
             print( "         So even inside the bound they are not one correction:")
             print( "         `one-knob-two-jobs-is-compensating`.")
