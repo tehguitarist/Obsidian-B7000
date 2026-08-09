@@ -25843,3 +25843,288 @@ into its own two:**
 four-way, depth-split framing rather than the three-axis one from the prior write-up. No priority
 order changed — item 17's treble half is still step 4 of 7 — this is a documentation correction,
 not a re-sequencing.
+
+## SESSION 191 — the two matrix costs from s190, localised: one overlaps item 17, the other is not distortion at all
+
+**Task.** Step 2 of the s190 prioritised action list, verbatim: *"Run the two matrix-cost
+diagnostics (decision #4), specifically the OD 8–16.3 kHz per-band breakdown FIRST. Cheap (both
+tools already exist), and its answer changes how #3 below is scoped: if the cost sits inside the
+treble notch's own band, that is evidence to fold into the treble-notch investigation rather than
+treating them as two separate small problems."*
+
+⛔ **No `src/` change, nothing shipped, no rebuild, no re-render, no re-baseline owed.** `ctest`
+22/22 (unchanged, and it could not have changed — this session touched `analysis/` only).
+Artefacts: `analysis/reports/s191_hf_region.json`, `s191_thd_locus_s187_grunt_lf.json`,
+`s191_thd_locus_s190_leveltaper.json`.
+
+⚠ **One premise in the task did not survive contact: `thd_locus_gate.py --compare` does not
+exist** — GATE Z has no such flag (`--json` and `--ex-gain-n12` only). The instruction was written
+from memory of `release_gate.py`'s interface, which does have `--compare`. Run on both reports
+separately and differenced instead. `check-what-a-tool-already-prints`, in its mirror form: check
+what a tool already *accepts* before writing an invocation into a plan.
+
+---
+
+### 1. GATE BR — a new tool, because a per-band breakdown of a gated region did not exist
+
+`analysis/hf_region_breakdown.py`, runner `analysis/_mutate_gate_br.py` (**10/10**, after three of
+its own arms were repaired — §4). It is a **DIAGNOSTIC, not a bar**: no threshold is invented, and
+`release_gate.py` remains the criterion.
+
+Design, in the order the checks run:
+
+- **BR0 MEMBERSHIP.** Both reports go through `release_gate.deltas`/`subsets`, so the graded OD
+  set, the by-name exclusions and the detected reference dropouts are the gate's own, not this
+  tool's. The two are then MATCHED (intersected). Measured: **450 OD rows before, 450 after, 450
+  matched — membership IDENTICAL, nothing dropped.**
+- **BR1 KNOWN ANSWER.** The pooled region statistics recomputed here reproduce `release_gate`'s
+  own stored cells at **0.000e+00** on both epochs (before median 0.6346 / p90 5.2101; after
+  0.5819 / 5.3327). Without it the tool could decompose a different statistic than the number it
+  claims to explain, and every per-band column below would still look plausible.
+- **BR2** per-band |delta| distribution, **BR3** attribution, **BR4** top-decile membership *and
+  identity*, **BR5** row attribution, **BR6** the treble-notch window across the region boundary.
+
+### 2. What the OD 8–16.3 kHz cost actually is
+
+⭐⭐ **THE FIRST THING TO SAY IS THAT THE REGION IMPROVED.** The +0.123 dB is the p90 alone:
+
+| statistic | s187 | s190 | Δ |
+|---|---|---|---|
+| median | 0.635 | 0.582 | **−0.053** |
+| mean | — | — | **−0.015** |
+| p90 | 5.210 | 5.333 | **+0.123** |
+
+and **319 of 450 matched rows (70.9 %) moved DOWN**. A session reading "the taper cost this region
+0.123 dB" without that context would be reading a tail statistic as the region's verdict.
+
+**Per band** (matched rows, n = 450 each):
+
+| band | median s187 → s190 | Δ | mean Δ |
+|---|---|---|---|
+| 8127.5 Hz | 0.698 → 0.831 | **+0.133** | +0.090 |
+| 10240.0 Hz | 0.432 → 0.519 | **+0.087** | +0.074 |
+| 12901.6 Hz | 0.482 → 0.402 | −0.080 | −0.045 |
+| 16255.0 Hz | 0.953 → 0.710 | **−0.243** | −0.180 |
+
+⇒ the two lowest bands worsened and the two highest improved, the top band by the largest margin
+in the table.
+
+⭐⭐ **ATTRIBUTION, BY SUBSTITUTION — and the obvious method disagrees completely.** The
+counterfactual that works is: recompute the pooled p90 on the AFTER data with ONE band's values
+REVERTED to their BEFORE values. Same rows, same band count, same quantile position; only the band
+under test moves.
+
+| reverted | p90 | Δ remaining | Δ carried | share |
+|---|---|---|---|---|
+| (none) | 5.333 | +0.123 | — | — |
+| 8127.5 | 5.267 | +0.057 | **+0.066** | **53.9 %** |
+| 10240.0 | 5.271 | +0.061 | **+0.061** | **50.1 %** |
+| 12901.6 | 5.295 | +0.085 | +0.038 | 30.7 % |
+| 16255.0 | 5.333 | +0.123 | +0.000 | **0.0 %** |
+
+⇒ computed verdict **DISTRIBUTED**: no single band carries it (top 53.9 %, next 50.1 %). ⚠ The
+shares do not sum to 100 % and are not meant to — an order statistic is not additive over disjoint
+sub-populations, so each share reads as *"how much does this band carry on its own"*. The gate says
+so rather than normalising them into a fake decomposition.
+
+⛔ **LEAVE-ONE-BAND-OUT — the method a first draft used — GIVES A DIFFERENT AND WORTHLESS ANSWER,
+and it is printed as a labelled control for exactly that reason.** It reads 8127.5 **130.2 %**,
+10240 **−8.0 %**, 12901.6 **+8.3 %**, 16255 **123.8 %**, i.e. it names 10240 Hz the carrier by a
+**0.3 pp margin over 12901.6** — a knife-edge verdict (s154: *"a verdict that flips on 1 % of its
+own bar is not a verdict"*), and it names a band the substitution test says carries half. The
+reason is structural: dropping a band changes the population SIZE, so it moves where the 90th
+percentile falls as well as which values are there. ⇒ **for an order statistic, revert; do not
+remove.**
+
+⭐ **16255 Hz carries EXACTLY 0.0 % of the p90 move while having the largest median improvement in
+the table (−0.243 dB).** Both are true and they are not in tension: its own p90 is unchanged to
+three decimals (6.511 → 6.511), so its values near the threshold did not move at all while its
+bulk did.
+
+⭐⭐ **THE TOP DECILE IS THE SAME CELLS, NOT A NEW POPULATION: 177 of 180 shared, Jaccard 0.967.**
+The three that swapped are named in the gate's own working; two of the three that *left* have
+**bit-identical values before and after** (5.269 → 5.269 at 8127.5, 5.228 → 5.228 at 12901.6) and
+fell out only because the THRESHOLD rose past them. ⚠ The per-band counts are identical in both
+reports (67/34/30/49) — flagged as an implausible coincidence and checked rather than enjoyed
+(`an-implausible-coincidence-is-a-bug-report`): it is genuine, and explained, because exactly one
+cell left and one arrived in each of three bands.
+
+⚠ **DENSITY.** The 19 values straddling the 90th percentile span **0.494 dB**, so the +0.123 dB
+move is **0.25×** the local spread. A p90 sitting in a dense neighbourhood moves easily; that
+bounds how much any single dB of movement there is worth reading into, and it is printed every run.
+
+### 3. ⭐⭐⭐ BR6 — and this is the part that answers the sequencing question
+
+GATE W's `treble_notch` window is **4200–12000 Hz**; the release gate's region boundary cuts it at
+**8 kHz**. So one feature moving inside that window reads as two gated regions moving oppositely.
+Printed on one axis:
+
+| band | gated region | median s187 → s190 | mean Δ |
+|---|---|---|---|
+| 4063.7 | 100 Hz–8 kHz | 0.806 → 0.745 | −0.051 |
+| 5120.0 | 100 Hz–8 kHz | 2.059 → 1.779 | **−0.306** |
+| 6450.8 | 100 Hz–8 kHz | 1.108 → 0.858 | −0.180 |
+| 8127.5 | 8–16.3 kHz | 0.698 → 0.831 | **+0.090** ← region boundary |
+| 10240.0 | 8–16.3 kHz | 0.432 → 0.519 | +0.074 |
+| 12901.6 | 8–16.3 kHz | 0.482 → 0.402 | −0.045 |
+
+⇒ **THE SIGN CHANGES INSIDE THE WINDOW**: better at 4063.7 / 5120 / 6450.8 / 12901.6, worse at
+8127.5 / 10240 — and the largest single improvement anywhere in the graded band (**−0.306 dB mean
+at 5120 Hz**) sits three bands from the largest degradation. **That is the signature of a FEATURE
+MOVING within the band, not of a broadband level change**, and it is the same mechanism GATE BH's
+BH1a describes for this null: an OD-branch gain change slides the `|OD| = |clean|` crossing. A
+LEVEL taper is precisely an OD:clean mix-ratio change (s163 measured that exact mechanism, in the
+direction of a cost).
+
+⚠⚠ **SIGNATURE, NOT MEASUREMENT — the gate says so on every run.** This is a per-band ERROR table,
+not a located centre. Measuring where the null actually sat before and after needs GATE W's
+locator (or GATE BF / GATE BH), and nobody has run that across this epoch pair.
+
+**Weighted by frequency membership: carried INSIDE the treble notch's territory +0.127 dB, OUTSIDE
++0.038 dB** ⇒ computed verdict: *the matrix cost is carried MOSTLY by bands inside item 17's
+treble-notch territory — evidence to fold into that investigation, not a separate problem.*
+⚠ **OVERLAP IN FREQUENCY IS NOT IDENTITY OF MECHANISM.** This is a band-membership statement;
+nothing here measures a shared carrier.
+
+⇒ **The s190 action list's own conditional resolves to its first branch.** Its words: *"if the cost
+sits inside the treble notch's own band, that is evidence to fold into the treble-notch
+investigation rather than treating them as two separate small problems."* It does.
+
+### 4. GATE BR's own runner found three defects in itself — all three were the ARM, not the guard
+
+s110's rule (*suspect the mutation before the guard*) fired three times on the first run, and one
+of them produced a real new guard:
+
+1. **`br3-distributed` was VACUOUS.** It relaxed only the FIRST clause of a two-clause `dominant`
+   test, so the 20 pp separation requirement still bound and the branch never changed. Re-pointed
+   at the whole expression.
+2. **`br3-overlap`'s needle never matched.** The `or` continuation is indented under an open
+   paren, so a 4-space prefix is not what is in the source. `PATCH DID NOT APPLY` is the runner
+   telling the truth; the arm was wrong.
+3. ⭐⭐ **`br3-substitution` expected a line that prints unconditionally, so it could never fail** —
+   and diagnosing that produced **a guard the gate did not have**: a non-zero pooled Δ with every
+   band's substitution share at ~0 is not a finding, it is a broken counterfactual (the delta
+   exists, so *something* must move when the values producing it are reverted). `GATE BR3 FAIL
+   [vacuous]` now refuses on it, and the arm tests that refusal. This is s185's own lesson — a
+   sub-gate whose arms all carry zero intervention printed a confident `BAR: MET` while comparing
+   0 to 0 — caught here by writing the arm rather than by shipping the number.
+
+### 5. ⛔⛔ GATE Z HAD NOT RUN SINCE SESSION 181, AND ITS DEFAULT REPORT WAS BOTH STALE AND ABSENT
+
+The THD half of the task could not start, for two independent reasons found in the first minute.
+
+**(a) The `bleed-free` class was an EXACT ZERO and has been EMPTY since s181.** `cf_class` read
+`cf < 1e-12`, on the strength of GATE K2's s103 finding that *"the LevelBlend clean coefficient is
+identically 0 only where BOTH BLEND and LEVEL are max"* — true of the network s103 measured, and
+false since s181 shipped `blendEndStop`, which puts **e = 0.02418** of clean signal at that very
+corner. So the population **Z3, Z4, Z5 and Z6's split all depend on** became empty by construction,
+Z3 `sys.exit`ed on it, and **Z4–Z6 never ran, for eight sessions.**
+
+⭐ **THE FIFTH OCCURRENCE OF A TOOL STILL MODELLING THE PRE-s181 ANCHOR**, after s182's two stale
+`level_law_gate` mirrors, s189's third (`level_taper_gate.a_of/b_of`), and GATE L's refusal. And
+this one was invisible in a new way: the previous four *disagreed* with something and were caught
+by a divergence guard. This one made a population empty, which reads as *"this report has no such
+rows"* — a data statement, not a code statement.
+
+⛔ **And the `sys.exit` is s108's rule broken**: *exit only on things that make the numbers below
+meaningless*. An empty anchor class does not make Z4–Z6 meaningless — Z6's split is exactly what
+was needed here — so it is a computed verdict, not a validity failure.
+
+**(b) `DEFAULT_REPORT = "analysis/reports/s124_ship.json"` — stale by name AND absent from disk.**
+`_mutate_gate_z.py`'s CONTROL died in `open()` with a `FileNotFoundError`, so every arm below it
+was unattributable. Two things wrong at once: `analysis/reports/*.json` is **gitignored and
+regenerable**, so any filename written into a default expires on its own (s189 found exactly this
+rot in two more tools, one line apart); and `s124_ship.json` is the artefact `CLAUDE.md` marks
+⛔ **STALE-EPOCH FOR EVERY ABSOLUTE LEDGER**, which GATE O6b refuses BY NAME — so even while it
+existed it was the wrong default for a gate whose Z1 reproduces `release_gate`.
+
+**Repairs, all additive:**
+- `ANCHOR_CF` is **DERIVED** from the shipped end stop through the same `coef_closed` every row
+  already uses (which reads s182's single resolver), with a **known answer that asserts cf at the
+  corner equals `blendEndStop` EXACTLY** — the algebra collapses to `e` there, so a fourth stale
+  mirror of `LevelBlend` makes this refuse instead of silently re-classifying every anchor row.
+- One predicate, `is_anchor()`. Z3/Z4/Z6 had **inlined `cf < 1e-12` in four places**, which is how
+  one stale definition took four sub-gates down together; there is now nothing to keep in step.
+- The retired definition stays reachable: **`--anchor-cf 0`** reproduces every pre-s191 GATE Z
+  number, and the gate PRINTS which definition ran plus a ⛔ banner saying the shipped stage cannot
+  reach it (s124's rule).
+- Z3 and Z5's hard exits become **computed refusals that continue**; Z4's *"no harmonics block in
+  this report"* message, which blamed the report for a membership outcome, now distinguishes the
+  two causes.
+- The default report is resolved **structurally** (newest artefact carrying `captures`/`meta`/
+  `summary` with ≥100 captures — the same resolver shape s173 gave `_mutate_gate_ay`).
+- Runner **11/11**: two arms re-pointed (their expectations changed from `rc != 0` to a computed
+  refusal, deliberately — `fix the EXPECTATION, not the guard`, s119, applied to a guard that was
+  changed on purpose), one arm **added** for the anchor divergence.
+
+### 6. ⭐⭐ The THD answer, and it needs no fit at all
+
+With the gate running, two free known answers settle it:
+
+**Z3's whole (rung × DRIVE) surface is BIT-IDENTICAL between s187 and s190** — all 9 cells +0.00,
+pooled −0.70 dB either way, `changes_sign` True either way, monotone falling 3/3 on both axes
+either way, 43.6 % of bands model-higher either way. The anchor rows sit at LEVEL = BLEND = max,
+where the shipped taper is pinned (`L(1) = 1` under both curves), so those renders are
+bit-identical — which is s190's own two-sided scope check reproduced from a completely different
+instrument.
+
+**Z6 localises the cost exactly:**
+
+| population | n | rms s187 → s190 | signed mean s187 → s190 |
+|---|---|---|---|
+| full-send OD (**the gated row**) | 289 | 2.434 → **2.544** | **+0.249 → −0.524** |
+| anchor cf only | 46 | 2.573 → **2.573** | **−0.593 → −0.593** |
+| with bleed only | 243 | 2.407 → **2.538** | **+0.408 → −0.511** |
+| gain-n12 [control] | 33 | 1.754 → **1.637** | +0.557 → +0.317 |
+
+⇒ ⭐⭐⭐ **100 % OF THE +0.110 dB LIVES IN THE BLEED ROWS AND 0 % IN THE ANCHOR ROWS.** The rows
+*without* a mix are unmoved to four decimals; only the rows that HAVE a mix moved, and their signed
+mean **crossed zero** (+0.408 → −0.511) while the distortion-generating surface did not move at
+all. ⇒ **the THD cost is mix dilution and involves NO change in distortion generation whatsoever.**
+More clean signal in the denominator, the same harmonics in the numerator — GATE Z's own Z5
+mechanism, and exactly what s163's SHIPPED CONSTANTS row predicted a taper re-fit would cost. It is
+now **proven by a bit-identity, not argued from a dilution law.**
+
+⚠ Note the shape of it: the unsigned rms grew because |signed| grew (0.408 → 0.511) as the
+population crossed zero — `unsigned-aggregates-have-no-sign` (s109) working in the other
+direction, where the magnitude moving up is a *sign crossing* rather than a worsening.
+
+**⭐ Free by-product: s128's convention-free surface REPRODUCES on the current epoch**, 62 sessions
+and a long list of shipped constants later — **+4.88 … −4.70 dB** against s128's published
+**+4.47 … −4.21**, still monotone falling 3/3 with stimulus and 3/3 with DRIVE, still crossing zero
+inside the graded pool. The *"slope with a crossing, not a level error"* reading is intact.
+
+**⚠ Two things did NOT reproduce. Both recorded, NEITHER attributed:**
+
+1. **Z4's zero CROSSING is gone, and it was always a knife-edge.** Rung means run
+   **+3.66 / +2.06 / +0.32** where s128 published +2.88 → **−0.32**. The ORDERING (monotone
+   falling) reproduces; the crossing does not, and the endpoint nearest zero is **0.32 dB against a
+   mean step of 1.67 dB**, so the boolean flips on a fifth of one rung. ⛔ `CLAUDE.md`'s
+   *"reproduce the same ordering and the same crossing (+2.88 → −0.32 dB)"* must be re-quoted as
+   **ordering only**. ⚠ And Z4's rung means POOL OVER DRIVE, where most of Z3's span lives, so a
+   surface that crosses in (rung × DRIVE) need not cross in rung alone — a limit of the axis, not a
+   contradiction of Z3. Same pass fixed a `computed-verdicts-not-narrated` defect in the line that
+   reports it: the gate printed **"THE TWO INSTRUMENTS DISAGREE ABOUT THE ORDERING"** whenever
+   *either* property failed, so an ordering that agreed perfectly with a crossing that differed was
+   reported as an ordering disagreement — a different and much more alarming claim, in the one line
+   a reader takes the corroboration from.
+2. **Z5's one-parameter dilution law no longer lands on A3's number.** DF fits **−0.23 dB**
+   (s190, interior, rms 0.55 over 4 classes) and **−0.00 dB** (s187, **ON ITS BOUND ⇒
+   unidentified**), against A3's independently measured **−4.38** and s128's own fitted **−3.70**.
+   ⛔ **NOT attributed, and it must not be**: the anchor class's BASE moved from cf = 0 to
+   cf = 0.02418 in the same edit that made the gate runnable, and three shipped constants landed
+   between s128 and now. Two changes, one number. It is an open observation, and it does not touch
+   §6's conclusion, which rests on a bit-identity rather than on this fit.
+
+### 7. What this means for the action list
+
+- **Step 2 is DONE, and it resolves step 4's scoping question to the "fold it in" branch.** The
+  HF matrix cost overlaps item 17's treble-notch territory in frequency (+0.127 dB inside vs
+  +0.038 outside), and BR6 shows the taper moved the error DOWN at 5120/6450.8 Hz and UP at
+  8127.5/10240 Hz — a feature moving up the band. ⚠ Frequency overlap, not a shared mechanism.
+- **The THD half is CLOSED as "not a defect to chase".** Mix dilution, zero distortion-generation
+  change, proven by bit-identity. ⛔ No DSP change should be aimed at it.
+- **Step 3 is next**: point GATE AP's bleed-free-only `ROWS` at the mixed `od_tone_restore_fit.SETS`
+  twin. ⚠ Note the lineage this session just added to it — GATE AP's `ROWS` is a *third* tool whose
+  membership is written against the pre-s181 anchor, alongside GATE Z's `cf_class` (fixed here) and
+  the four already on record.
