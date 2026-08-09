@@ -25694,3 +25694,99 @@ narrower than the pooled statistic suggests) before considering any DSP change a
   model at 0.02/0.19/0.04 dB where the pedal's falls monotonically, 3/3 GRUNT) and the
   **bass-peak walk** (disjoint ranges, correcting A3 makes it worse, gap collapses 25.7 % → 6.4 %
   across stimulus — GATE Y). Neither has a candidate; neither was raised by the user this session.
+
+## SESSION 190 (continued) — the two extra items added to the action list, and a full prioritised order
+
+USER: add item 19's two orphaned findings and item 6's other two unaddressed features to the
+action list; prioritise the whole list to minimise back-and-forth; is the treble notch in the mix
+with any of these?
+
+### The two new items, named precisely (both were surfaced §9-continued, neither decided on yet)
+
+- **ITEM D — the 53 Hz mix cancellation** (s184, GATE BM): at BLEND max / LEVEL 0.125–0.25 the end
+  stop's own worst-case response reaches **33.47 dB at 53.1 Hz**, invisible to `release_gate`
+  (per-row null gain) and, in s184's own words, **"not a defect of any stage."** ⚠ This is not
+  obviously a FIX item — it may resolve to "characterise and accept" rather than "correct",
+  because it is an emergent property of two architecturally-correct branches (the OD path and the
+  clean bleed the end stop deliberately introduced, item 12) nulling against each other at one mix
+  setting. The open question is whether it is *audible* / *reachable by a player*, not whether the
+  model is wrong.
+- **ITEM E — GATE AP's bleed-free-only `ROWS`** (s186): `null_depth_censor_gate.ROWS`, which GATE
+  AQ and GATE AX both inherit, names only bleed-free (GRUNT) sets as the mapping for
+  `OdToneRestore`'s (gain, Q) table. A mixed twin now exists in `od_tone_restore_fit.SETS`
+  (`grunt_mix`, `grunt_cold_mix`, `listen_flat`, `listen_boost`) and nobody has pointed GATE AP at
+  it. This is the SAME defect class GATE BO already found once (s186: *"the GRUNT axis was 12 of 12
+  rows bleed-free... its ordering does not survive the mix"*) — GATE AP's censoring analysis and
+  GATE AQ/AX's shape work are ALL still reading the bleed-free-only membership BO flagged.
+- **ITEM F — the bridged-T notch-depth collapse** (item 6, ~700–800 Hz): model pinned at
+  0.02/0.19/0.04 dB across GRUNT where the pedal's falls monotonically, 3/3 GRUNT positions.
+  **No candidate mechanism exists** — this was never part of task E (s164–166) and no carrier
+  search has ever been run against it.
+- **ITEM G — the bass-peak walk** (item 6, ~160–210 Hz, GATE Y): disjoint ranges (model
+  154.6–165.5 Hz vs pedal 195.7–208.9 Hz), correcting A3 makes it WORSE (moves the model the wrong
+  way), no single LF constant reaches. **Closed at s126 as "no single-constant route exists"** —
+  starting on this means finding a genuinely new mechanism class, not resuming interrupted work.
+
+### Is the treble notch "in the mix" with these four?
+
+**Mostly no — three of the four are a different frequency region AND a different stage from the
+treble notch, so they don't block or get blocked by it:**
+
+| item | region | stage | shares machinery with treble notch (4200–12000 Hz)? |
+|---|---|---|---|
+| D (53 Hz) | LF | `LevelBlend` end stop | No — the end stop is upstream of the whole chain and is common-mode to every notch, but nothing about FIXING D touches the treble region |
+| E (GATE AP membership) | ~320 Hz | `OdToneRestore` | No — different stage, item 10's territory, not item 17's |
+| F (bridged-T, ~700–800 Hz) | mid | passive bridged-T network | No — different network entirely, upstream of the clipper's own recovery path |
+| G (bass peak, ~160–210 Hz) | LF | pre-clipper treble/ATTACK ladder | No — GATE Y already isolated this to a different element set |
+
+**But there is one real, partial overlap the four new items don't have and the treble notch
+does — `OdDriveTilt`.** Its shelf corner is `odTiltF0 = 5388 Hz`, INSIDE the treble notch's own
+window, and item 19's P4 (s188, GATE BP) already measured it OVERSHOOTING at 11 of 12 mixed cells
+in that exact band. Whatever "fix the treble notch as best as possible" turns into, it will be
+working inside a band where a SEPARATE, already-shipped, already-flagged-as-imperfect stage lives —
+that's baggage the treble notch carries into any investigation, not one of the four items above.
+
+**And there is a SECOND, unconfirmed overlap worth checking before starting: the "OD 8–16.3 kHz
+p90" matrix cost from decision #4.** Measured this session, on the LEVEL ladder at GRUNT=cut, the
+treble notch's centre sits at **5200–6900 Hz on BOTH sides — entirely inside the "100 Hz–8 kHz"
+gated band, NOT the "8–16.3 kHz" one.** But item 19's own N4 row records the feature's full
+documented range as **6150–10708 Hz** (the bleed-free driven ladder across GRUNT/DRIVE, a
+DIFFERENT condition set than this session's LEVEL ladder) — which DOES straddle into 8–16.3 kHz at
+some conditions. ⇒ **whether the matrix cost and the treble notch are the same mechanism is not
+yet known and should be checked with the diagnostic (decision #4) BEFORE deep treble-notch work**,
+not assumed either way — that is exactly the back-and-forth the prioritisation below is built to
+avoid.
+
+### THE FULL PRIORITISED LIST
+
+Ordered by information value and dependency, NOT by item number — cheap, diagnostic-only steps
+that could change how later steps are approached go first; items with no dependency on anything
+else and no known candidate mechanism go last, since starting them commits to a fresh
+investigation with no way to leverage anything above.
+
+1. ✅ **DONE** — GATE AY5(c) re-pointed (§9 above).
+2. **Run the two matrix-cost diagnostics (decision #4), specifically the OD 8–16.3 kHz per-band
+   breakdown FIRST.** Cheap (both tools already exist), and its answer changes how #3 below is
+   scoped: if the cost sits inside the treble notch's own band, that is evidence to fold into the
+   treble-notch investigation rather than treating them as two separate small problems; if it does
+   not, the two stay independent and #3 proceeds without that shadow.
+3. **Run item E (point GATE AP's bleed-free-only `ROWS` at the mixed `SETS` twin).** Cheap
+   (the mixed sets already exist in `od_tone_restore_fit.SETS`, s186), and its answer directly
+   informs #4 below: if GATE AQ/AX's shape work has been reading a membership that doesn't survive
+   the mix (the same finding GATE BO already made once, s186), item 10's re-fit needs to know that
+   BEFORE it re-fits, not after — re-fitting against a membership about to be shown wrong is exactly
+   the back-and-forth being avoided.
+4. **Item 17's treble half** (informed by #2's answer about the matrix-cost overlap). The main
+   investigation; see the session-log note above (§9-continued) on why this is not fresh territory
+   and what "as best as possible" should mean given the documented tension and knife-edge history.
+5. **Item 10's `OdToneRestore` re-fit** — deferred until #4 lands (already decided), now also
+   informed by #3's membership finding.
+6. **Item D (the 53 Hz cancellation)** — low priority, likely resolves to a characterisation
+   decision ("accept, it is not a defect") rather than an engineering fix; does not block or get
+   blocked by anything above; can be picked up whenever convenient.
+7. **Items F and G (bridged-T depth collapse, bass-peak walk)** — lowest priority, and stated
+   plainly: BOTH require a genuinely NEW mechanism idea before any measurement is useful (F has
+   never had a carrier search run at all; G's single-constant route was closed at s126 with no
+   successor named). Starting either without a fresh hypothesis risks spending a session
+   re-confirming what is already known rather than adding to it — unlike #4–5, there is no
+   "resume interrupted work" available here.

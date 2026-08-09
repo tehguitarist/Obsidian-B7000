@@ -118,18 +118,33 @@ the third and s144 argues it should NOT be built in its template form.
   LEVEL max and is **proven pre-existing by bit-identity**. ✅✅ **GATE AY5(c) RE-POINTED at the
   s190 current-epoch targets (0.962×/1.227×, was `30.0/17.2`/`24.3/9.1`) — USER DECISION,
   three narrated print statements fixed to computed ones, 13/16 mutation arms pass (3 pre-existing
-  AY3 failures flagged, unrelated, unfixed).** ▶⭐⭐ **FOUR NEXT STEPS AGREED WITH THE USER
-  2026-08-09** (detail: `docs/session-log.md` SESSION 190 §9 continued): **(1) DONE above.
-  (2) FIX ITEM 17's TREBLE HALF "as best as possible"** — ⛔⛔ read the session-log section first:
-  this is the SAME feature as item 19's N4 and item 6's "missing HF null" under a third name, with
-  a *documented* tension (centre accuracy vs drive-ordering, s178 BH4/BH5) and a knife-edge depth
-  statistic — not fresh territory. **(3) Item 10's `OdToneRestore` re-fit — DEFERRED until after
-  (2) lands, then re-check acceptance** (it may move again). **(4) The two matrix costs — run
-  `thd_locus_gate.py --compare` and a per-band breakdown of OD 8–16.3 kHz FIRST**, before any DSP
-  change. ⚠ Also surfaced, not yet decided: item 19's five-task plan is now fully COMPLETE (its
-  "P5 untouched" header is stale); item 19's two orphaned findings (s184's mix cancellation, s186's
-  unused mixed `SETS` twin); item 6's OTHER two unaddressed features (bridged-T depth collapse,
-  bass-peak walk) — distinct from (2), not raised this session.
+  AY3 failures flagged, unrelated, unfixed).** ▶⭐⭐ **SEVEN-ITEM ACTION LIST, PRIORITISED WITH
+  THE USER 2026-08-09** (detail: `docs/session-log.md` SESSION 190, both continuation sections).
+  Item 19's five-task plan is fully COMPLETE; its two orphaned findings and item 6's other two
+  unaddressed features are folded into this list rather than left to be re-surfaced later.
+  **(1) DONE above** (GATE AY5(c) re-pointed). **(2) Matrix-cost diagnostics FIRST** —
+  `thd_locus_gate.py --compare` and a per-band breakdown of OD 8–16.3 kHz — cheap, and its answer
+  decides whether item (4)'s scope should include this cost: this session's own LEVEL-ladder
+  measurement puts the treble notch's centre at **5200–6900 Hz, entirely inside "100 Hz–8 kHz"**,
+  but item 19's N4 records its FULL documented range (a different, bleed-free driven-ladder
+  condition) as **6150–10708 Hz**, which DOES straddle "8–16.3 kHz" — unconfirmed either way,
+  check before assuming. **(3) Point GATE AP's bleed-free-only `ROWS` at the mixed `od_tone_
+  restore_fit.SETS` twin** (`grunt_mix` etc., s186) — cheap, and must land BEFORE (5), because
+  re-fitting `OdToneRestore` against a membership GATE BO already showed doesn't survive the mix
+  (s186) is exactly the rework this ordering exists to avoid. **(4) FIX ITEM 17's TREBLE HALF
+  "as best as possible"** — ⛔⛔ this is the SAME feature as item 19's N4 and item 6's "missing HF
+  null" under a third name, with a documented tension (centre accuracy vs drive-ordering, s178
+  BH4/BH5) and a knife-edge depth statistic — not fresh territory. ⚠ It shares its own frequency
+  window with `OdDriveTilt` (`odTiltF0 = 5388 Hz`), which item 19's P4 already found overshooting
+  at 11 of 12 mixed cells in that exact band — baggage this item carries regardless of (2)'s
+  answer. **(5) Item 10's `OdToneRestore` re-fit** — deferred until (3) and (4) both land, then
+  re-check acceptance (it may move a second time). **(6) The 53 Hz mix cancellation (s184)** —
+  low priority; likely resolves to "characterise and accept" (s184's own words: *"not a defect of
+  any stage"*) rather than an engineering fix. **(7) Bridged-T notch-depth collapse + bass-peak
+  walk (item 6's other two)** — lowest priority: BOTH need a genuinely NEW mechanism idea before
+  any measurement is useful (bridged-T has never had a carrier search; the bass peak's
+  single-constant route was closed at s126 with no successor named) — starting either without a
+  fresh hypothesis risks re-confirming what is already known rather than adding to it.
 
 - ⭐⭐ **SESSION 190's MEASUREMENT HALF — ITEM 9's TWO SENSITIVITY TARGETS RE-MEASURED (s189's USER
   DECISION, "MEASURE FIRST"): BOTH SHRANK, AND THE PEDAL WAS NEVER THE THING THAT MOVED.** New
