@@ -25559,3 +25559,138 @@ in-class, and mostly level, which is a reason to accept them, not a reason to ca
 against the **RETIRED restated pair** (`30.0/17.2`, `24.3/9.1`) hard-coded in `gate_ay5` — re-pointing
 it at s190's numbers is a **USER DECISION**, not a tidy-up, because it changes how the next candidate
 is judged.
+
+### 9. GATE AY5(c) re-pointed at item 9's current-epoch targets — USER DECISION 2026-08-09
+
+`gate_ay5` graded any future taper candidate against the retired pre-s181 pair (`30.0/17.2` —
+s125, `24.3/9.1` — s133 AE4) even after §8's re-fit and §5's independent re-measurement
+established their current-epoch replacement. **User decision: re-point now.**
+
+**Re-pointed to the s190-shipped, `drv_-12` (playing-level) needs**: bass notch **0.962×**, treble
+notch **1.227×**, read from `analysis/reports/s190_level_sensitivity_shipped.json`
+(`bq3.{bass_notch,treble_notch}.sweep_drv_-12.need`). `treble_notch`'s `drv_-6` rung (5.060×) is
+**deliberately excluded** — GATE BQ traced it to the model's own `treble_notch` centre *pinning*
+against LEVEL at that rung (span collapses to 2.1 %), which is item 6's territory, not this
+taper's; folding it in would let an unrelated defect set this gate's target.
+
+⛔⛔ **Three downstream print statements were narrated, not computed, and went stale the moment
+`targets` changed — fixed, not just re-pointed:**
+- *"Item 9's targets are all > 1x, i.e. they always want a LARGER sweep"* — a code comment,
+  falsified by bass's new need (0.962× < 1). Corrected in place.
+- *"the fold is short of both targets"* — printed unconditionally inside the `same_way` branch. On
+  the new pair the shipped taper's own `fold` (1.008×) **clears bass and remains short of
+  treble**. Replaced with a per-target computed check (`fold >= v` for each), printing which
+  target(s) are cleared and which remain short.
+- *"AND THE TARGETS ARE THEMSELVES A RETIRED EPOCH"* — hardcoded the literal **"17.2 %, 9.1 %"**
+  and would have kept telling every future reader the fix was still owed, even after the fix
+  landed. Replaced with a block that prints the *live* `targets` dict (whose keys now name their
+  own epoch) and a forward-looking caveat instead of a backward complaint: re-measure again if the
+  model changes downstream of `LevelBlend` or the LEVEL law re-fits a second time, because nothing
+  in the gate detects that happening automatically.
+
+**Mutation runner fix.** `_mutate_gate_ay.py`'s `ay5-sup-finite` arm forces `sup_fold` finite and
+asserted the output contains `"REACH, at the family's own SUPREMUM"` — i.e. it assumed the finite
+supremum would land in the `0 of N REACH` sub-branch. It depended on `targets` **without saying
+so**: with the smaller re-pointed pair, the same finite supremum now legitimately clears both
+targets, the gate correctly takes the *other* sub-branch (`"N of M reach"`, different case and
+punctuation), and the old needle went missing on a gate that was working perfectly
+(`suspect-the-mutation-before-the-guard`). Fixed to assert the actual invariant — the no-verdict
+text (`"NO VERDICT IS AVAILABLE"`) is **absent** under a finite supremum — which holds regardless
+of which target pair is loaded, on this epoch or the next one that re-measures item 9.
+
+**Result: 13/16 arms pass.** The remaining 3 (`ay3-family`, `ay3-exponent`,
+`ay3-amb-membership`) are **pre-existing** — confirmed by running the unmodified runner against
+`git stash` before any edit landed — in the AY3 sub-gate (reachability/family fitting), which
+this session did not touch. ⚠ **Flagged, not fixed**: out of scope for a re-point, and worth a
+session of its own before the next time AY3's family-fitting verdict is quoted.
+
+Verified: `analysis/level_taper_reshape.py analysis/reports/s190_leveltaper.json` runs clean;
+output written to `analysis/reports/s190_level_taper.json`. No `src/` change; no matrix re-render
+owed (this is a targets/narration fix inside an analysis gate, not a DSP change).
+
+## SESSION 190 (continued) — decisions handed to the user, and what's next
+
+Four decisions were put to the user after §8 shipped; three answers below, one executed above (§9).
+
+### Decision 1 — re-point GATE AY5(c): DONE, §9 above.
+
+### Decision 2 — fix item 17's treble half ("the treble notch") — USER: "we SHOULD fix it, as best as possible"
+
+⛔⛔ **READ THIS BEFORE STARTING — "the treble notch" is not fresh territory, and three item
+numbers already point at the SAME feature under three different names:**
+
+- **Item 17's treble half** — `CLAUDE.md` open-work item 17: *"only the TREBLE half remains,
+  BLOCKED ON A FRONTIER, not on effort"* (s178, GATE BH).
+- **Item 19's N4** — the notch/peak review's own table: *"treble null, measured 6150–10708 Hz —
+  BLOCKED ON A FRONTIER: §1 gives NEITHER reference authority, its depth is a knife-edge that
+  inverts between adjacent rungs, and every arm reaching ND's ordering gives back GATE BF's centre
+  gain"* — i.e. a documented TENSION between two things a candidate needs simultaneously.
+- **Item 6's "missing HF null"** — its own table row: *"HF null DEPTH (6150–10708 Hz) — NO
+  interior extremum in 9 of 9 bleed-free driven cells [model] / RISES monotonically, 3/3 [pedal]"*
+  — the same window, same feature, from the drive-dependence angle.
+- **`GATE W`'s `treble_notch`** — the window this whole session's GATE BQ read (4200–12000 Hz) is
+  the SAME feature, from the LEVEL-dependence angle: **this session found it separately, and it is
+  the fourth angle on one physically fragile OD-vs-clean cancellation.**
+
+⇒ **"fix the treble notch" means: pick up a feature with three-item-numbers' worth of prior
+investigation (s172, s173, s178, GATE BH, GATE BF, GATE AE), a *documented* structural tension
+(centre accuracy vs drive-ordering, s178's BH4/BH5: *"every arm that reaches ND's ordering gives
+back GATE BF's centre gain, and every arm that keeps the centre fails the ordering"*), a documented
+knife-edge (its depth statistic inverts between adjacent stimulus rungs, s178), AND a fourth,
+never-before-connected symptom this session found (the model's centre stops moving with LEVEL
+entirely at `drv_-6`, item 6's pinning problem seen on a new axis).**
+
+⚠ What "as best as possible" should mean in practice, given that history: this is a proper
+investigation session (or several), not a tuning pass. The route s178 names as the only one not
+yet tried is a **co-moved flat gain** (`odMakeupDb` 6.0 → 6.7 with the shelf cut raised to match) —
+unowned, and it needs GATE BF, s172's midrange optimum and the HF term all re-priced before it can
+be attempted; s178 explicitly says **"do not start it as a tuning change."** The LEVEL-axis pinning
+this session found (item 6's territory) has had NO carrier search run against it at all — every
+carrier search to date (s129–s155, the long CLOSED/REFUTED chain under item 6) was run against the
+*drive* axis, never the LEVEL axis; whether the same exhaustive screen applies is unknown.
+⛔ Do not assume a fix that helps one angle (drive-ordering, LEVEL-pinning, centre accuracy) helps
+the others — s178's own BH4/BH5 is a direct, measured counterexample.
+
+### Decision 3 — item 10's `OdToneRestore` re-fit — USER: "address after the other fixes are in, in case it moves; double-check it"
+
+Deferred on purpose. Current state: the re-fit is **stale by construction** (the s190 taper moved
+`cleanFraction()`, worst |Δcf| 0.0824) but its **acceptance still holds** (extra cut needed
++0.25/+0.13/−0.24/−0.59 dB at the listening set, −0.52/−0.20/−0.27 dB at mixed BLEND cells, all
+inside s151's ±0.83 dB residual — §8(d) above). ⚠ **Whatever Decision 2's work does to the OD path
+will move `cleanFraction()` and/or the OD:CLEAN ratio again** — `OdMakeup`, `OdToneRestore`'s own
+mix law, and the HF term all read or feed that ratio (s172/s173's own chain). **Re-check
+`od_tone_restore_fit.py --geom --set listen --depth area` (and `--set blend`) AFTER Decision 2's
+work lands, before deciding whether item 10's re-fit is still owed** — it may already be moved
+again by then, and re-fitting before that would be fitting a target that is about to change a
+second time.
+
+### Decision 4 — the two matrix costs from §8(b) — USER: "see if there's anything easy"
+
+- **OD 8–16.3 kHz p90: 5.210 → 5.333** (+0.123, mostly level per §8(c)'s re-levelling: +0.035
+  retained). Over its bar either way (5.210 was already over 2.50 STRETCH). Unowned; no gate has
+  ever localised WHERE in that band the +0.123 lives (per-band breakdown not yet run).
+- **THD full send: 2.434 → 2.544** (+0.110). SHIP either way (bar 3.00, STRETCH 2.00). GATE Z
+  (`thd_locus_gate.py`) already localises the pooled THD row to a **slope with a crossing** across
+  the (DRIVE × stimulus) plane — worth checking whether the taper moved that crossing's location
+  or just its two endpoints, which `thd_locus_gate.py --compare` should show directly without a
+  new instrument.
+⚠ Neither has been traced to a mechanism. "Anything easy" should mean: run the two diagnostics
+named above FIRST (they exist, they're cheap, and they may show the cost is a level artefact
+narrower than the pooled statistic suggests) before considering any DSP change aimed at either.
+
+### What else is on the list — not yet decided, surfaced for completeness
+
+- **Item 19's five-task plan is now fully COMPLETE** (P1–P5 all done, P5 at s189/190) — its header
+  line (*"P5 untouched"*) is stale and should be corrected in the same edit that opens whatever
+  comes next; the whole item can be marked closed.
+- **Item 19's two "owned by no task" findings, still unowned:**
+  (i) the end stop's worst-case mix cancellation at BLEND max / LEVEL 0.125–0.25, **33.47 dB at
+  53.1 Hz** — invisible to `release_gate` (per-row null gain), not a defect of any stage (s184).
+  (ii) GATE AP's `ROWS` is bleed-free-only and GATE AQ/AX both inherit it; a mixed twin now exists
+  in `SETS` (`grunt_mix`, `grunt_cold_mix`, `listen_flat`, `listen_boost`) and pointing them at it
+  is a measurement nobody has taken (s186).
+- **Item 6's OTHER two unaddressed features** (distinct from the treble notch/HF null above,
+  and NOT part of any decision above): the **bridged-T notch-depth collapse** (pinned in the
+  model at 0.02/0.19/0.04 dB where the pedal's falls monotonically, 3/3 GRUNT) and the
+  **bass-peak walk** (disjoint ranges, correcting A3 makes it worse, gap collapses 25.7 % → 6.4 %
+  across stimulus — GATE Y). Neither has a candidate; neither was raised by the user this session.

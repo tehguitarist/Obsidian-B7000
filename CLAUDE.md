@@ -115,10 +115,21 @@ the third and s144 argues it should NOT be built in its template form.
   half closes as a side effect: need 1.744× → 0.964×.** ⚠ Costs, both in-class: OD 8–16.3 kHz p90
   5.210 → 5.333, THD full send 2.434 → 2.544. ⚠ `OdToneRestore`'s mix law is stale by construction
   and its **acceptance still holds** (worst −0.59 dB against ±0.83); the one over-bar cell is at
-  LEVEL max and is **proven pre-existing by bit-identity**. ⚠⚠ **STILL OWED: GATE AY5(c) grades
-  candidates against the RETIRED restated pair** (`30.0/17.2`, `24.3/9.1`, hard-coded in `gate_ay5`)
-  — re-pointing it at s190's numbers is a **USER DECISION**, not a tidy-up. Detail:
-  `docs/session-log.md` SESSION 190 §8.
+  LEVEL max and is **proven pre-existing by bit-identity**. ✅✅ **GATE AY5(c) RE-POINTED at the
+  s190 current-epoch targets (0.962×/1.227×, was `30.0/17.2`/`24.3/9.1`) — USER DECISION,
+  three narrated print statements fixed to computed ones, 13/16 mutation arms pass (3 pre-existing
+  AY3 failures flagged, unrelated, unfixed).** ▶⭐⭐ **FOUR NEXT STEPS AGREED WITH THE USER
+  2026-08-09** (detail: `docs/session-log.md` SESSION 190 §9 continued): **(1) DONE above.
+  (2) FIX ITEM 17's TREBLE HALF "as best as possible"** — ⛔⛔ read the session-log section first:
+  this is the SAME feature as item 19's N4 and item 6's "missing HF null" under a third name, with
+  a *documented* tension (centre accuracy vs drive-ordering, s178 BH4/BH5) and a knife-edge depth
+  statistic — not fresh territory. **(3) Item 10's `OdToneRestore` re-fit — DEFERRED until after
+  (2) lands, then re-check acceptance** (it may move again). **(4) The two matrix costs — run
+  `thd_locus_gate.py --compare` and a per-band breakdown of OD 8–16.3 kHz FIRST**, before any DSP
+  change. ⚠ Also surfaced, not yet decided: item 19's five-task plan is now fully COMPLETE (its
+  "P5 untouched" header is stale); item 19's two orphaned findings (s184's mix cancellation, s186's
+  unused mixed `SETS` twin); item 6's OTHER two unaddressed features (bridged-T depth collapse,
+  bass-peak walk) — distinct from (2), not raised this session.
 
 - ⭐⭐ **SESSION 190's MEASUREMENT HALF — ITEM 9's TWO SENSITIVITY TARGETS RE-MEASURED (s189's USER
   DECISION, "MEASURE FIRST"): BOTH SHRANK, AND THE PEDAL WAS NEVER THE THING THAT MOVED.** New
@@ -621,10 +632,16 @@ not say that** (the correction is the "HF region" entry under §"Standing rules"
 ⚠ **The numbering is historical and is NOT the priority order** — every rules file, gate docstring
 and CLOSED/REFUTED row cites these numbers, so they are kept.
 
-▶⭐⭐ **ITEM 19 IS THE LIVE ITEM — the full notch/peak review, opened at the user's request
-2026-08-08. Its five-task plan is at P5 of 5: P1 done s184, P2 SHIPPED s185, P3 done s186,
-P4 done s188; P5 untouched.** The agreed order that got here was ~~16~~ → ~~17~~ → ~~18~~ → ~~12~~ → **19**.
-⛔ **Only item 17's TREBLE half and item 6's three unaddressed features remain outside item 19**;
+✅✅ **ITEM 19 IS NOW FULLY COMPLETE — the full notch/peak review, opened at the user's request
+2026-08-08. All five tasks done: P1 s184, P2 SHIPPED s185, P3 s186, P4 s188, P5 s189/190 (GATE AY
+repaired, item 9's targets re-measured and re-pointed, and its own finding — the requirement
+re-opening — was shipped as the s190 LEVEL taper).** The agreed order that got here was
+~~16~~ → ~~17~~ → ~~18~~ → ~~12~~ → **19**.
+▶⭐⭐ **THE LIVE ITEM AS OF s190 IS ITEM 17's TREBLE HALF** (user decision 2026-08-09, "fix it as
+best as possible") — ⛔ read `docs/session-log.md` SESSION 190 §9-continued before starting: it is
+the same feature as item 19's N4 and item 6's "missing HF null", with a documented tension and a
+knife-edge statistic, not unexplored ground.
+⛔ **Item 6's other two unaddressed features remain outside both item 17 and item 19**;
 everything else below is CLOSED or PARKED, kept as the record of what was tried.
 ⚠ Both prior plans are complete: **s160's (A → D → E → ship) at s167**, and **s167's own
 (W1 → W2 → W3) at s170 — where W1, the only one that targeted the gate, was REFUTED** on premise and
@@ -845,7 +862,14 @@ other files cite still resolve; detail is in the two tables and `docs/session-lo
     a USER-REPORTED "less bass" on `ref-od` found the null sat at 1.374× the pedal's frequency;
     GRUNT=Cut only, `clipC15Cut`/`odMakeupLowCutDbCut`, applying it globally is REFUTED — see the
     CLOSED/REFUTED rows and `docs/session-log.md` SESSION 187)**) and ⛔ **only the TREBLE half
-    remains, BLOCKED ON A FRONTIER, not on effort.** ⭐⭐ **BOTH nulls are ONE mechanism** — OD-vs-clean cancellations whose
+    remains, BLOCKED ON A FRONTIER, not on effort.** ▶⭐⭐ **THE LIVE ITEM, USER DECISION
+    2026-08-09: "fix it as best as possible."** Four things converge on this ONE feature under
+    three different names (item 19's N4, item 6's "missing HF null", this row) plus a FOURTH,
+    never-before-connected angle this session found: GATE BQ shows the model's centre stops moving
+    with LEVEL at all at `drv_-6` (span collapses to 2.1 %, item 6's pinning problem, unowned).
+    ⛔ Do not assume a fix on one axis (drive-ordering, LEVEL-pinning, centre accuracy) helps the
+    others — s178's own BH4/BH5 measured the opposite for two of them. Detail:
+    `docs/session-log.md` SESSION 190 §9-continued. ⭐⭐ **BOTH nulls are ONE mechanism** — OD-vs-clean cancellations whose
     depth peaks where |OD| = |clean|, so any OD-branch gain slides that crossing along the stimulus
     ladder, which is why a shelf cannot fix either. ⚠⚠ **AND THEY ARE IN TENSION:** hardware wants
     ~320 Hz DEEPER and ~50 Hz SHALLOWER, so closing the bass half necessarily weakened the 320 Hz
