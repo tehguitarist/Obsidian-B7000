@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #include "MnaSolve.h" // mna::differs — exact-inequality float compare without -Wfloat-equal
 
 // =============================================================================
