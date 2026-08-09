@@ -252,7 +252,12 @@ static const FitField kFitFields[] = {
     {"odMakeupHfHz", &FitParams::odMakeupHfHz},
     {"odMakeupHfQ", &FitParams::odMakeupHfQ},
     {"odMakeupHfAtOdDb", &FitParams::odMakeupHfAtOdDb},
+    // ⚠⚠ GRUNT-KEYED SINCE s195: `odMakeupHfPeakDb` reaches the DSP at GRUNT = Cut ONLY, and
+    // `odMakeupHfPeakDbNonCut` at flat/boost.  An arm that overrides one name alone is therefore
+    // a NO-OP at the other positions — the s194 defect (`--fit odMakeupLowCutDb` silently inert
+    // at Cut for seven sessions).  Override BOTH unless the keying itself is the subject.
     {"odMakeupHfPeakDb", &FitParams::odMakeupHfPeakDb},
+    {"odMakeupHfPeakDbNonCut", &FitParams::odMakeupHfPeakDbNonCut},
     {"odMakeupHfPeakCf", &FitParams::odMakeupHfPeakCf},
     {"odMakeupHfAtCleanDb", &FitParams::odMakeupHfAtCleanDb},
     {"odNotchQScale", &FitParams::odNotchQScale},

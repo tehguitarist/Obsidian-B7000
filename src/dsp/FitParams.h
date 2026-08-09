@@ -1573,9 +1573,46 @@ struct FitParams
     double odMakeupHfHz = 5600.0;      // centre of the 4-8 kHz band this corrects
     double odMakeupHfQ = 2.0;
     double odMakeupHfAtOdDb = -4.5;    // gain at cleanFrac = 0 (pure OD)
-    double odMakeupHfPeakDb = 3.3;     // gain at odMakeupHfPeakCf
+    double odMakeupHfPeakDb = 3.3;     // gain at odMakeupHfPeakCf -- GRUNT = Cut ONLY (s195)
     double odMakeupHfPeakCf = 0.43;    // where the requirement turns over
     double odMakeupHfAtCleanDb = 0.9;  // gain as cleanFrac -> 1
+
+    // ⛔⛔ SESSION 195 — THE PEAK NODE IS GRUNT-KEYED, AND s173's TABLE ABOVE IS A GRUNT=CUT
+    // TABLE.  Its own caption says the fit set was "5 captures spanning the LEVEL and BLEND
+    // ladders": every one of those is UNTOKENED, and an untokened capture is GRUNT = Cut
+    // (`captures.py` defaults gruntIdx -- the s151 trap).  So the +3.3 dB peak node was fitted at
+    // ONE switch position and applied at all three.
+    // ⭐⭐ Measured across a GRUNT-BALANCED set (GATE BS, 29 captures = 10 (DRIVE x BLEND x LEVEL)
+    // shapes at all three positions, 3 stimulus rungs each), the term's effect on the 4-8 kHz
+    // median error SEPARATES COMPLETELY, with no threshold anywhere:
+    //
+    //     LEVEL max        (cf ~ 0.02, the law makes it a CUT)     HELPS  9/9   median -1.97 dB
+    //     LEVEL noon/BLEND max, GRUNT = cut     (a BOOST)          HELPS  4/4   median -0.40 dB
+    //     LEVEL noon/BLEND max, GRUNT = flat/boost (a BOOST)       HELPS  0/7   median +1.07 dB
+    //
+    // ⇒ `odMakeupHfAtOdDb` (the CUT half, which is what acts at LEVEL max) is right at ALL THREE
+    // positions and MUST NOT be touched -- scaling the whole term down is what costs the nine
+    // LEVEL-max conditions up to 2.9 dB.  What is wrong is the POSITIVE peak node, and only at
+    // flat and boost.  Mechanism, and it is the same one as s187's bass half: GRUNT switches the
+    // clipper's own input coupling bank, and s170's BE1b measured flat/boost driving the clipper
+    // +7.6 dB HARDER -- so a shared post-clipper term cannot serve all three positions (s38's
+    // argument, fifth occurrence).
+    // ⚠⚠ AT CUT THE THREE AXES GENUINELY TRADE and the shipped value is therefore UNCHANGED
+    // there: sweeping the Cut node 3.3 -> 0.0 buys the depth ORDERING (3/7 -> 7/7 monotone) and
+    // costs the centre (|1-r| 0.083 -> 0.122), the 4-8 kHz median (1.255 -> 1.465) and 2.8-4 kHz
+    // (0.550 -> 0.766) together.  §1 gives NEITHER reference authority over this null's DEPTH
+    // (which is what the ordering grades) while the captures ARE the authority for centres and
+    // band magnitudes, so paying an authoritative axis to buy an unauthoritative one is a
+    // judgement call rather than a measurement.
+    // ✅✅ USER DECISION TAKEN 2026-08-09: KEEP 3.3.  The `keyed +1.0/+0.0` arm was put to the
+    // user with its full price (it reaches ND's FULL 20/20 ordering at a balanced centre of
+    // 0.051, still better than s173's 0.073) and DECLINED, on the authority argument above.
+    // ⛔ This is a decided trade, not an unexplored one -- do not re-open it as "the ordering is
+    // still 3/7 at Cut" without new evidence about which reference governs this null's DEPTH.
+    // ⚠ What is NOT decided by it is GATE BS's BS4: the model's HF null is PINNED (centre span
+    // 3.7 % across GRUNT against ND's 20.7 %), which is open item 6 and bounds this whole family
+    // whichever node value ships.
+    double odMakeupHfPeakDbNonCut = 0.0;   // dB; GRUNT = Flat and Boost (was effectively 3.3)
 
     // ---- OdToneRestore notch WIDTH (s172) ------------------------------------------
     // MULTIPLIER on the fitted kNotchQ table (OdToneRestore.h), 1.0 = shipped.

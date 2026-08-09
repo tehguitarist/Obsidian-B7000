@@ -395,9 +395,11 @@ public:
         // The low-shelf half is now GRUNT-keyed (session 187, item 17's bass half PART 2);
         // syncGruntKeyedOd() sets BOTH odCoupling's C15 and this shelf from the SAME GRUNT
         // read, so they cannot drift apart the way two independent call sites could.
+        // ⚠ setHfMix() is NOT called here: since s195 its peak node is GRUNT-keyed and it is set
+        // inside syncGruntKeyedOd() above, from the same single GRUNT read as the LF shelf and
+        // C15.  A second call site here would overwrite the keyed value with the Cut one at every
+        // applyFitParams(), which is exactly the two-setters-two-orders trap (s124).
         syncGruntKeyedOd();
-        odMakeup.setHfMix(f.odMakeupHfHz, f.odMakeupHfQ, f.odMakeupHfAtOdDb,
-                          f.odMakeupHfPeakDb, f.odMakeupHfPeakCf, f.odMakeupHfAtCleanDb);
         odToneRestore.setQScale(f.odNotchQScale);   // notch WIDTH multiplier (s172)
         odToneRestore.setDepthOffset(f.odNotchDepthDb);  // uniform extra cut (s172)
 
@@ -823,6 +825,15 @@ private:
                         isCut ? fit.odMakeupLowCutDbCut : fit.odMakeupLowCutDb,
                         fit.odMakeupHighHz, fit.odMakeupHighCutDb,
                         fit.odMakeupLowS, fit.odMakeupHighS);
+        // s195: the mix-keyed HF term's POSITIVE peak node is GRUNT-keyed too (FitParams.h has
+        // the 9/9, 4/4, 0/7 separation this rests on).  It lives HERE rather than beside the
+        // other setHfMix arguments in applyFitParams() for the same reason the LF shelf does:
+        // both setters call this one function, so there is no "whichever ran last wins" ordering
+        // to reason about (s124), and the shadow instance is snapshotted before it runs, so the
+        // GRUNT crossfade covers this node for free.
+        odMakeup.setHfMix(fit.odMakeupHfHz, fit.odMakeupHfQ, fit.odMakeupHfAtOdDb,
+                          isCut ? fit.odMakeupHfPeakDb : fit.odMakeupHfPeakDbNonCut,
+                          fit.odMakeupHfPeakCf, fit.odMakeupHfAtCleanDb);
     }
 
     static Clipper::Grunt gruntEnum(int idx) noexcept

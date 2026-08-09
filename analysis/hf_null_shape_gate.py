@@ -117,11 +117,24 @@ DEPTH_GRADED = "bass_notch"
 ORDER_GRADED = "treble_notch"
 
 # ---- the arms ----------------------------------------------------------------------------------
-HF_OFF = ("--fit", "odMakeupHfAtOdDb=0", "--fit", "odMakeupHfPeakDb=0", "--fit", "odMakeupHfAtCleanDb=0")
-MK_OFF = ("--fit", "odMakeupDb=0", "--fit", "odMakeupLowCutDb=0", "--fit", "odMakeupHighCutDb=0")
+# ⛔⛔ EVERY LF-SHELF OVERRIDE MUST SET **BOTH** NAMES.  s187 made the LF cut GRUNT-keyed, so
+# `--fit odMakeupLowCutDb=<x>` is a NO-OP at GRUNT = Cut — which is 7 of this gate's 10 conditions,
+# and was silently true of `MK_OFF` and of the whole `lowCut` ladder from s187 to s194.  Rendered
+# at 0 and at 6 the two outputs were bit-identical (0.000000 dB) while the arms still got names in
+# the results table.  ⇒ after keying a constant, grep every `--fit <oldname>` in `analysis/` and
+# re-assert non-vacuity (s194; the addition to s149's stale-input rule).
+def _lowcut(d):
+    return ("--fit", f"odMakeupLowCutDb={d}", "--fit", f"odMakeupLowCutDbCut={d}")
+
+
+# ⛔ `odMakeupHfPeakDb` is GRUNT = Cut ONLY since s195, so BOTH names are set — otherwise this arm
+# leaves the peak live at flat/boost and "HF off" is a no-op there (the s194 defect, re-armed).
+HF_OFF = ("--fit", "odMakeupHfAtOdDb=0", "--fit", "odMakeupHfPeakDb=0",
+          "--fit", "odMakeupHfPeakDbNonCut=0", "--fit", "odMakeupHfAtCleanDb=0")
+MK_OFF = ("--fit", "odMakeupDb=0", "--fit", "odMakeupHighCutDb=0") + _lowcut(0.0)
 S172 = ("--fit", "odMakeupHighHz=2800", "--fit", "odMakeupHighCutDb=6.0") + HF_OFF
 
-LOWCUT = {d: ("--fit", f"odMakeupLowCutDb={d}") for d in (0.0, 6.0)}
+LOWCUT = {d: _lowcut(d) for d in (0.0, 6.0)}
 
 ARMS = {
     "ship (s173)":  (),
@@ -137,6 +150,10 @@ BASELINE_ARM = "ship (s173)"
 LOWCUT_LADDER = [(0.0, LOWCUT[0.0]), (None, ()), (6.0, LOWCUT[6.0]), (float("inf"), HF_OFF + MK_OFF)]
 
 CLEAN_CONTROL = "blend-0700_base-od.wav"   # BLEND = 0 -> the OD branch is out of circuit entirely
+
+# `od_tone_restore_fit.grunt_pos_of` returns the PHYSICAL enum index (Cut < Flat < Boost), which is
+# NOT the APVTS order — imported rather than re-derived (s151's permutation trap).
+F_GRUNT = {0: "cut", 1: "flat", 2: "boost"}
 
 
 def die(tag, msg):
@@ -273,41 +290,92 @@ def makeup_db(f, fs, p):
     return d
 
 
-def shipped_makeup():
-    """Parse OdMakeup's constants out of FitParams.h — never transcribed (s146's masterTaperBreak
-    trap: a name that survives a MEANING change silently rebuilds the wrong curve)."""
+_SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "dsp")
+
+
+def _fitparam(src, name):
     import re
-    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            "..", "src", "dsp", "FitParams.h")).read()
+    m = re.search(rf"\b{name}\s*=\s*(-?[0-9.eE+-]+)\s*;", src)
+    if not m:
+        die("BH0", f"cannot parse {name} out of FitParams.h — if it was renamed, update THIS "
+                   f"parser rather than letting the gate fall back to a stale literal")
+    return float(m.group(1))
+
+
+def _assert_keying():
+    """⛔⛔ THE GUARD s194 EXISTS FOR.  `PedalChain::syncGruntKeyedOd()` picks OdMakeup's LF shelf
+    cut per GRUNT position, and this mirror must key on exactly the same field pair.
+
+    s187 added `odMakeupLowCutDbCut` and this parser went on reading `odMakeupLowCutDb` alone — a
+    regex that is correct about the name it looks for cannot notice that a SECOND, MORE SPECIFIC
+    name now governs.  That is the sixth stale-mirror casualty in this project, and the only
+    defence is to read the SELECTOR itself and refuse when it stops naming what we mirror."""
+    src = open(os.path.join(_SRC_DIR, "PedalChain.h")).read()
+    i = src.find("void syncGruntKeyedOd")
+    if i < 0:
+        die("BH0", "PedalChain::syncGruntKeyedOd() is gone — the GRUNT-keyed OdMakeup fields this "
+                   "gate mirrors are resolved somewhere else now; re-derive the mirror")
+    body = src[i:i + 900]
+    for tok in ("odMakeupLowCutDbCut", "odMakeupLowCutDb", "Clipper::Grunt::Cut"):
+        if tok not in body:
+            die("BH0", f"syncGruntKeyedOd() no longer mentions `{tok}` — the keying changed under "
+                       f"this mirror (s194's own defect, re-armed)")
+    # Anything else OdMakeup-keyed would also have to be mirrored; refuse on a new one.
+    import re
+    keyed = set(re.findall(r"fit\.(odMakeup\w+)", body))
+    if keyed != {"odMakeupDb", "odMakeupLowHz", "odMakeupLowCutDbCut", "odMakeupLowCutDb",
+                 "odMakeupHighHz", "odMakeupHighCutDb", "odMakeupLowS", "odMakeupHighS"}:
+        die("BH0", f"syncGruntKeyedOd() reads an OdMakeup field set this mirror does not know: "
+                   f"{sorted(keyed)}")
+
+
+def shipped_makeup(grunt="cut"):
+    """Parse OdMakeup's constants out of FitParams.h — never transcribed (s146's masterTaperBreak
+    trap: a name that survives a MEANING change silently rebuilds the wrong curve).
+
+    ⚠⚠ `grunt` IS NOT OPTIONAL DECORATION.  Since s187 the LF shelf cut is GRUNT-KEYED: at Cut the
+    stage reads `odMakeupLowCutDbCut` (2.2) and everywhere else `odMakeupLowCutDb` (6.0).  Every
+    capture without a `grunt-` token is Cut (s151), so the DEFAULT here is the one that matters."""
+    _assert_keying()
+    src = open(os.path.join(_SRC_DIR, "FitParams.h")).read()
     want = {"gainDb": "odMakeupDb", "lowHz": "odMakeupLowHz", "lowCutDb": "odMakeupLowCutDb",
+            "lowCutDbCut": "odMakeupLowCutDbCut",
             "highHz": "odMakeupHighHz", "highCutDb": "odMakeupHighCutDb",
             "lowS": "odMakeupLowS", "highS": "odMakeupHighS",
             "hfHz": "odMakeupHfHz", "hfQ": "odMakeupHfQ",
             "hfAtOdDb": "odMakeupHfAtOdDb", "hfPeakDb": "odMakeupHfPeakDb",
             "hfPeakCf": "odMakeupHfPeakCf", "hfAtCleanDb": "odMakeupHfAtCleanDb"}
-    out = {}
-    for k, name in want.items():
-        m = re.search(rf"\b{name}\s*=\s*(-?[0-9.eE+-]+)\s*;", src)
-        if not m:
-            die("BH0", f"cannot parse {name} out of FitParams.h — if it was renamed, update THIS "
-                       f"parser rather than letting the gate fall back to a stale literal")
-        out[k] = float(m.group(1))
+    out = {k: _fitparam(src, n) for k, n in want.items()}
+    out["grunt"] = grunt
+    out["_lowCutShared"] = out["lowCutDb"]          # the field flat/boost read
+    if grunt == "cut":
+        out["lowCutDb"] = out["lowCutDbCut"]        # what Cut actually runs
     return out
 
 
 def apply_arm(p, arm):
     """The arm's `--fit` overrides applied to the parsed shipped set, so the Python model and the
-    render cannot disagree about what an arm IS."""
+    render cannot disagree about what an arm IS.
+
+    ⚠⚠ THE LF CUT IS RESOLVED LAST AND BY GRUNT, mirroring `syncGruntKeyedOd()` exactly — so an
+    arm that overrides `odMakeupLowCutDb` alone comes out INERT at Cut here, precisely as it is
+    inert in the render.  A mirror that quietly "did what the arm meant" would hide the s194
+    defect instead of reproducing it."""
     q = dict(p)
-    name = {"odMakeupDb": "gainDb", "odMakeupLowCutDb": "lowCutDb", "odMakeupHighCutDb": "highCutDb",
+    name = {"odMakeupDb": "gainDb", "odMakeupLowCutDb": "lowCutDb",
+            "odMakeupLowCutDbCut": "lowCutDbCut", "odMakeupHighCutDb": "highCutDb",
             "odMakeupHighHz": "highHz", "odMakeupLowHz": "lowHz",
             "odMakeupHfAtOdDb": "hfAtOdDb", "odMakeupHfPeakDb": "hfPeakDb",
             "odMakeupHfAtCleanDb": "hfAtCleanDb"}
+    shared = p.get("_lowCutShared", p["lowCutDb"])
+    q["_lowCutShared"] = shared
     for a in arm:
         if "=" in a:
             k, v = a.split("=", 1)
             if k in name:
-                q[name[k]] = float(v)
+                key = "_lowCutShared" if k == "odMakeupLowCutDb" else name[k]
+                q[key] = float(v)
+    q["lowCutDb"] = q["lowCutDbCut"] if q.get("grunt", "cut") == "cut" else q["_lowCutShared"]
     return q
 
 
@@ -363,16 +431,32 @@ def bh0c_clean_rung(out):
 def bh1a_transfer_known_answer(out):
     """The Python OdMakeup model must reproduce what the RENDER does.
 
-    Bleed-free (LEVEL max AND BLEND max, GATE K2's only corner) the composite IS the OD branch, so
+    At the LEVEL-max/BLEND-max corner the composite is (almost) the OD branch, so
     render(ship) - render(makeup off) in dB is the stage's transfer EXACTLY, with no fit and no
     free parameter.  ⚠ This validates the Python model against the shipped C++ — it is the check
-    that licenses BH3's arithmetic, and without it BH3 is an argument rather than a measurement."""
+    that licenses BH3's arithmetic, and without it BH3 is an argument rather than a measurement.
+
+    ⛔⛔ "ALMOST" IS THE WHOLE STORY SINCE s181, AND THIS CHECK REFUSED ON IT (s194).  `blendEndStop`
+    puts e = 0.02418 of CLEAN at that corner, and the clean term does NOT receive the makeup — so
+    the difference is contaminated wherever the clean term is comparable to the OD term, which
+    s183 measured is exactly at the ~320 Hz null (bleed reaching +11.2 dB re the OD branch) and at
+    the band edges.  Measured here: 200-400 Hz rms 0.640 and 8-12 kHz 0.285 against 800 Hz-8 kHz
+    agreeing to <= 0.11 dB — a THIRD independent confirmation of s183's shape term, from a gate not
+    built to measure it.  ⇒ BOTH arms are rendered at `--fit blendEndStop=0`, which s181's own row
+    certifies is bit-identical to the pre-s181 stage, so the corner is TRULY bleed-free and the
+    subtraction is exact again.  ⚠ That makes this a known answer about the STAGE's transfer, and
+    deliberately not about the shipped composite — which is what BH2/BH4 measure, on the shipped
+    end stop."""
     print("\n-- BH1a: the OD-branch transfer, Python model vs the RENDER (bleed-free) -------------")
     fname = "level-1700_base-od.wav"
-    g, _, mod_ship = curves(fname, PLAYING_RUNG, ())
-    _, _, mod_off = curves(fname, PLAYING_RUNG, HF_OFF + MK_OFF)
-    p = shipped_makeup()
-    cf = 0.0                                     # bleed-free: LEVEL and BLEND both max
+    ef = ("--fit", "blendEndStop=0")             # see the docstring: the corner is not bleed-free
+    print("    ⚠ both arms rendered at `--fit blendEndStop=0` — the SHIPPED corner carries")
+    print("      e = 0.02418 of clean, which does not receive the makeup, so the subtraction is")
+    print("      only exact at the retired corner (s124's reachable-retired-form rule).")
+    g, _, mod_ship = curves(fname, PLAYING_RUNG, ef)
+    _, _, mod_off = curves(fname, PLAYING_RUNG, ef + HF_OFF + MK_OFF)
+    p = shipped_makeup(F_GRUNT[F.grunt_pos_of(fname)])
+    cf = 0.0                                     # e = 0 here BY CONSTRUCTION, not by assumption
     p = dict(p, hf_gain_db=hf_gain_at(p, cf))
     band = (g >= 200.0) & (g <= 12000.0)
     pred = makeup_db(g[band], A.SAMPLE_RATE if hasattr(A, "SAMPLE_RATE") else 48000.0, p)
@@ -383,12 +467,21 @@ def bh1a_transfer_known_answer(out):
     rms = float(np.sqrt(np.mean(resid ** 2)))
     print(f"    200 Hz-12 kHz, shape-only (both de-meaned): rms |render - python| = {rms:.3f} dB, "
           f"worst {np.max(np.abs(resid)):.3f} dB   n={band.sum()}")
+    # Printed every run so a future contamination is LOCALISED rather than merely refused: s183's
+    # shape term lives at the ~320 Hz null and the band edges, not in the midband.
+    subs = {}
+    for lo, hi in ((200.0, 400.0), (400.0, 800.0), (800.0, 8000.0), (8000.0, 12000.0)):
+        s = (g[band] >= lo) & (g[band] < hi)
+        if s.sum():
+            subs[f"{lo:.0f}-{hi:.0f}"] = float(np.sqrt(np.mean(resid[s] ** 2)))
+    print("    per band: " + "  ".join(f"{k} {v:.3f}" for k, v in subs.items()))
     ok = rms < 0.25
     print(f"    ⇒ {'PASS' if ok else 'REFUSE'} — the Python OdMakeup model {'reproduces' if ok else 'does NOT reproduce'} "
           f"the shipped stage, so BH3's arithmetic is {'licensed' if ok else 'NOT licensed'}")
     if not ok:
         die("BH1a", "the Python transfer model disagrees with the render; BH3 would be narration")
-    out["bh1a"] = {"rms_db": rms, "n": int(band.sum())}
+    out["bh1a"] = {"rms_db": rms, "n": int(band.sum()), "per_band_rms": subs,
+                   "endstop_zeroed": True}
 
 
 def bh1b_synthetic(out):
@@ -519,7 +612,10 @@ def bh3_mechanism(out, depths):
     OD-branch gain AT THE NULL rises.  Graded as a RANK correlation over the arms, which needs no
     threshold and no fitted model."""
     print("\n-- BH3: the mechanism — OD-branch gain AT the null vs which rung is deepest ---------")
-    p0 = shipped_makeup()
+    # GRUNT = cut is the default of every untokened capture and is where 7 of the 10 conditions
+    # sit; at 5.5 kHz the 200 Hz LF shelf contributes ~0 either way, so the keying is carried for
+    # correctness rather than because it moves this number.
+    p0 = shipped_makeup("cut")
     f_null = 5500.0
     print(f"    {'arm':14s}{'gain @5.5kHz':>14s}{'deepest rung (mode over conditions)':>40s}")
     rows = []
@@ -693,7 +789,12 @@ def bh6_bass_depth(out):
 
     # The LF dose-response.  MONOTONE in the lever is the claim; it is counted, not asserted.
     print(f"\n    LF dose-response — `odMakeupLowCutDb` against the model's own bass depth:")
-    ship_low = shipped_makeup()["lowCutDb"]
+    # ⚠ TWO shipped values since s187, not one: Cut runs `odMakeupLowCutDbCut`, flat/boost the
+    # shared field.  Printed as a pair so the ladder's "shipped" rung cannot read as a single point.
+    _sm = shipped_makeup("cut")
+    ship_low = _sm["lowCutDb"]
+    print(f"      (shipped LF cut is GRUNT-KEYED since s187: Cut {_sm['lowCutDbCut']:.1f} dB, "
+          f"flat/boost {_sm['_lowCutShared']:.1f} dB)")
     # ⚠ MATCHED across the ladder too, for the same reason: a rung of the ladder that reads fewer
     # cells is not a smaller number, it is a different question.
     def readable_at_every_rung_of_ladder(fname):

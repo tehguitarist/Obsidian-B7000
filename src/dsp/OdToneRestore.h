@@ -310,6 +310,28 @@ private:
     // LOWER BOUND on what hardware wants, and increasingly so as GRUNT opens up.
     // ⛔ §3 is a PNG read: sign and rough size only, never a fit target (§5 rule 3).
     //
+    // ⛔⛔⛔ SESSION 153's DECISION BELOW IS **REVERSED AT s196 — BUT ONLY AT THE CORNER, AND
+    // ONLY FOR `kNotchMixK`.  THIS TABLE (`kNotchGainDb`) IS UNCHANGED AND STAYS UNCHANGED.**
+    // Read the s153 block that follows as the history of a decision, not as a live instruction.
+    //   * WHAT REVERSED IT: s153's FIRST and load-bearing ground was that the trade is a WASH.
+    //     Re-measured on the current epoch (GATE BT, s196) the area solve costs **-0.02 dB** of
+    //     point accuracy to buy **+2.31 dB** of area, against s153's +0.51 to buy +0.52.  s153's
+    //     own numbers are NOT re-derivable (eight shipped constants since), so the CHANGE is not
+    //     attributable to any one of them — what is quotable is that the stated ground is gone.
+    //   * AND TWO FINDINGS POSTDATE s153, both about which estimator is READABLE rather than
+    //     which target to prefer: 16 of 26 pedal depth readings on this membership are censored,
+    //     so their POINT depth is a LOWER BOUND (AP2; s186's BO5 sharpened it to a SIGN
+    //     disagreement at 4 of 6 flat/boost cells, the populations separated by a 6.02 dB gap);
+    //     and at a MIXED setting the two metrics agree to 1.0x (s191's AP1b).  ⇒ THE METRIC
+    //     CHOICE ONLY BITES AT THE CORNER, AND THE CORNER IS WHERE POINT IS THE CENSORED READING.
+    //   * ⚠ s153's ground (2) — HARDWARE is the authority and is DEEPER than ND — is UNTOUCHED and
+    //     still argues the other way.  It was weighed and the decision was taken anyway.
+    //   * ⚠ Ground (3) is untouched too: which metric the EAR follows is STILL established by
+    //     nothing measured.  ⛔ This reversal is a statement about which reading is a BOUND, NOT
+    //     a demonstration that the area depth is what a listener tracks.
+    // ✅✅ USER DECISION 2026-08-10.  Scope: `kNotchMixK`'s corner behaviour only — see that table.
+    //
+    // ---- s153's decision, as taken (history) ----------------------------------------------
     // ⛔⛔ USER DECISION, SESSION 153 — **THESE VALUES STAY AS THEY ARE.  DO NOT RE-SOLVE
     // THEM AGAINST THE AREA METRIC.**  GATE AP (s152) measured what a censor-robust
     // 1/6-octave POWER-INTEGRATED depth asks for instead, in this table's own unit, and
@@ -386,10 +408,60 @@ private:
     // capture at that drive are interpolated across drive; GRUNT boost DRIVE 0.75/1.0 have no
     // readable bleed-free null at all (the pedal's is past the reader's core bound there), so they
     // carry the DRIVE-0.5 value forward and are the weakest entries in this table.
+    // ⭐⭐⭐ SESSION 196 — THE FLAT AND BOOST ROWS WERE WRONG-SIGNED, AND ARE RE-DERIVED HERE.
+    // GATE BT (`analysis/mix_corner_gate.py`, runner 5/5) re-solved the corner cut on GATE AP's
+    // CENSOR-ROBUST AREA depth and got K NEGATIVE at all nine cells (-14.43 .. -4.41) where this
+    // table spanned -9.65 .. +5.81.  Only Flat and Boost are re-pointed; the Cut row is UNCHANGED
+    // and its renders are BIT-IDENTICAL across the change (verified, two-sided).
+    //
+    // ⭐⭐ THE SIGN IS ARGUED INDEPENDENTLY BY THIS FILE'S OWN PHYSICS, with no data in it.  The
+    // kMixS block below states that S rises to +0.951 at the corner after dipping to -0.525, and
+    // that *with K NEGATIVE* this makes the required cut PEAK at intermediate mix and fall toward
+    // bleed-free -- "the shape is physically expected".  s156's own CLOSED/REFUTED row gives the
+    // mechanism: at intermediate mix the model's null is diluted hardest while the pedal's target
+    // is still deep; at cleanFrac -> 0 the model's null is already close.  THAT MECHANISM IS A
+    // PROPERTY OF THE MIX, SO IT CANNOT DEPEND ON THE GRUNT SWITCH -- yet the retired table applied
+    // the same S with POSITIVE K at flat/boost, INVERTING the hump at 2 of 3 positions.  5 of 9
+    // sign contradictions -> 0.
+    //
+    // ⚠⚠ WHY THE OLD FLAT/BOOST NUMBERS WERE THIN, which is on the record above and unchanged:
+    // each of those rows rested on TWO measured cells, the rest interpolated or carried forward.
+    // ⛔ NOT claimed: that s156 got them wrong *because* of the censoring.  s186's BO5 measured
+    // that bleed-free at flat/boost the POINT and AREA estimators disagree about the SIGN at 4 of
+    // 6 cells, which is suggestive and is NOT a demonstration -- and GATE AP's own AP6 separately
+    // measures that the SIZE of that gap does not track the censoring (r = +0.43).  Two different
+    // claims; do not merge them.
+    //
+    // ✅✅ USER DECISION 2026-08-10, TWO PARTS, both taken against a priced alternative:
+    //   (1) FLAT/BOOST ONLY.  The all-three-rows arm scores marginally better on the area metric
+    //       (corner 2.08 vs 2.31) and ALSO fixes Cut x DRIVE 0.5's -4.84 dB corner error, but it
+    //       moves 19 captured mixed cells and puts +2.67 dB into the Cut row's own ungraded band.
+    //       Declined for the conservative arm, which leaves Cut bit-identical.
+    //   (2) THE AREA METRIC AT THE CORNER, reversing s153.  s153 chose POINT on the stated ground
+    //       that the trade was a WASH (cost +0.51 dB of point to buy +0.52 of area); measured
+    //       today it costs -0.02 to buy +2.31.  Two findings postdate s153 and both bear on which
+    //       estimator is READABLE: 16 of 26 pedal depth readings on this membership are censored
+    //       by the deconvolution residue, so their POINT depth is a LOWER BOUND (AP2, sharpened by
+    //       s186's BO5); and at a MIXED setting the two metrics agree to 1.0x (s191's AP1b), so
+    //       the choice does not exist there.  ⇒ the metric choice ONLY bites at the corner, and
+    //       the corner is exactly where POINT is the censored reading.
+    //
+    // ⚠⚠ THE PRICE, AND IT IS NOT VISIBLE TO ANY CAPTURE.  K multiplies S at EVERY clean fraction,
+    // and there is NO capture between cleanFrac 0.0242 and 0.4811 at flat or boost.  Inside that
+    // band this table now ADDS cut where it REMOVES it at the corner -- up to +4.26 dB (flat) and
+    // +7.42 dB (boost) at cleanFrac ~ 0.21, opposite-signed to the corner fix at 3 of 3 rows.
+    // Those are settings a player can dial and nothing on disk can grade (s185's CAPTURED-vs-
+    // DIALLABLE split).  ⛔ "no capture moved" is a statement about the GRID, not about the law.
+    //
+    // ⚠ PROVENANCE PER ENTRY: DRIVE 0.00 / 0.50 / 1.00 are SOLVED (n = 3 sweeps each, except
+    // Boost x 1.00 which is n = 2 -- its middle rung is REFUSED because the pedal's minimum rests
+    // on `notch_geometry`'s CORE bound at 287.6 Hz, s151's documented 238.3 Hz migration, and the
+    // refused rung is the DEEP one so that entry is biased toward its shallow neighbours).
+    // DRIVE 0.25 / 0.75 are LINEARLY INTERPOLATED between them and are the thinnest entries here.
     static constexpr double kNotchMixK[3][5] = {
-        { -7.87, -8.61, -9.34, -9.50,  -9.65 },  // Cut
-        { -1.56,  0.71,  2.97,  1.97,   0.97 },  // Flat
-        {  3.40,  4.61,  5.81,  5.81,   5.81 },  // Boost
+        {  -7.87,  -8.61,  -9.34,  -9.50,  -9.65 },  // Cut   — UNCHANGED (s156); bit-identical
+        {  -6.23,  -5.32,  -4.41,  -5.79,  -7.16 },  // Flat  — s196 (was -1.56/0.71/2.97/1.97/0.97)
+        { -10.28,  -9.32,  -8.36,  -8.17,  -7.98 },  // Boost — s196 (was 3.40/4.61/5.81/5.81/5.81)
     };
 
     // S(cleanFrac): the shared, dimensionless shape of the mix dependence, pinned to 0 at
