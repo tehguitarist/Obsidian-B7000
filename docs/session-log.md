@@ -26258,3 +26258,78 @@ which with `--rows` an axis is `verify-the-BASELINE-not-its-LABEL` in its cheape
   would price a re-fit cannot currently certify its own solve. Resolving Boost's ~10 dB is
   prerequisite work that was not on the list, and it is a **USER DECISION** whether to spend a
   session on it or to re-fit against `od_tone_restore_fit` directly and leave GATE AP red.
+
+## SESSION 191 (continued) — Boost's residual: handed over, but not handed over cold
+
+USER: *"Lets do boost's residual, but we'll handover to a separate session."*
+
+Brief written: **`docs/gate-ap-boost-residual-handover.md`**. ⛔ **No `src/` change, nothing
+shipped, no rebuild.** Before writing it, two bounded probes were run — on cached renders only —
+because `a-backlog-item's-proposed-REPAIR-is-a-claim` (s142) applies to a handover as much as to a
+work item: a brief that lists three candidates without touching any of them hands the next session a
+wishlist, and the two cheapest candidates were killable in minutes.
+
+### What the probes settled, so the next session does not re-derive it
+
+**⛔ CANDIDATE 1 — s156's DEPTH CEILING — REFUTED.** The hypothesis was that past some cut the
+composite's measured depth saturates, so a point solve returns the smallest gain reaching the target
+rather than the shipped one. Evaluated directly, composite depth against gain at every Boost cell
+(bleed-free, stage subtracted), 0 → 60 dB:
+
+```
+Boost d0.00 sweep_drv_-18   ship=20.38  pedal_pt=20.62  Q=16.71
+   gain  0: 9.75   5:13.66  10:17.41  15:20.88  20:24.92  25:29.66  30:34.26  40:42.81  60:55.59
+```
+
+**Monotone and near-linear at every cell, on every sweep. No plateau anywhere.** ⚠ And it does NOT
+contradict s156: that ceiling was measured at the **listening mix**, where the clean tap floors the
+null's bottom. Bleed-free there is no floor, so there is nothing to saturate against. ⇒ **the depth
+ceiling is a MIX property** — which is the *same scoping* this session found for the point-vs-area
+distinction itself (§2 of the previous entry), from a completely different direction. Two
+corner-only properties of this stage, found on one day, by two unrelated probes.
+
+⚠ It leaves AP3's `NONMONO` flag unexplained (1 cell bleed-free, **18** mixed, "3 sign changes").
+Almost certainly the root-finder seeing sub-threshold wobble in `err(gain)` rather than the depth
+being non-monotone — named in the brief as check #1 precisely so it is not assumed either way.
+
+**⛔ SUB-HYPOTHESIS — "AP averages per-sweep solves over a target that spans 17 dB" — ALSO FAILS.**
+It is true that the pedal's own point depth spans a lot at fixed (GRUNT, DRIVE) — Boost 0.00 reads
+20.62 / 24.91 / 7.52 (span **17.40 dB**) — and s154's AR6 and s153's AQ2b both say a mean over
+sweeps is a lossy target here. But it does not explain the pattern: **Cut 0.50 spans 13.31 dB and
+agrees to 0.43 dB, while Boost 1.00 has the second-SMALLEST span in the table (3.27) and is
+10.38 dB out.** Carried as a caveat on the statistic; refuted as the carrier.
+
+### ⭐⭐ What replaced them, and why it reframes the question
+
+Working out *why* the s191 fix helped Cut and hurt Boost produced the leading hypothesis. The fix
+made `ship` the cut the build actually applies, i.e. `base + K·S(e)` with **S(e) = 0.951**; the
+three rows' `kNotchMixK` have **different signs** — Cut **−7.87…−9.65**, Flat −1.56…+2.97, Boost
+**+3.40…+5.81** — so the same correction pushed Cut's reference DOWN ~9 dB (toward its solve) and
+Boost's UP ~5.5 dB (away from it). That is the expected behaviour of a correct fix sitting on top of
+a second, independent problem, and it says the second problem is about **Boost's row**, not about
+the mix term.
+
+⇒ **THE LEADING HYPOTHESIS: AP3a is not broken; it is correctly reporting that the SHIPPED TABLE IS
+STALE.** AP3a's premise — *"the shipped table was fitted in the point metric, so an independent
+solve in the same metric has a right answer that already exists"* — carries an unstated clause:
+**against the model that was shipping at the time.** It last passed at s152 (0.57 dB rms). Since
+then s156 re-fitted the table as a MIX-KEYED law (and `kNotchGainDb` **changed meaning**), and
+**eight** OD-path changes have landed (s172 `OdMakeup`, s173's HF term + taper, s177 C31, s180 the
+bass shelf, s181 `blendEndStop`, s185's re-anchor, s187's GRUNT-keyed LF pair — ⚠ **Cut-only**,
+and Cut is the row that now agrees — s190's taper). Every one moves the model's own null depth and
+therefore the cut it needs. On that reading the per-row pattern (**Cut ~1, Flat ~2–4, Boost ~10 dB**)
+is a **map of how stale each row is**, and a direct input to item 10 rather than a gate defect.
+
+⚠⚠ **Hypothesis, not a finding**, and it does not yet explain why Boost is worst. The brief carries
+**one pre-registered test that decides it** — compare AP3's solved POINT column against a FRESH
+`od_tone_restore_fit` fit on the current build, on BOTH memberships: agreement means the solve is
+sound and AP3a's premise needs re-scoping to *a currently-fitted table*; disagreement means the
+solve is wrong and Boost is where it shows. ⛔ And it says explicitly what NOT to do: loosen AP3a's
+bar to make it green, which would delete the staleness signal the check has started producing
+(`if the rebuilt test is harder than the one it replaces and still passes, it is a correction; if it
+is easier, it is a concession`).
+
+⚠ Also flagged in the brief: **GATE AP has no mutation runner** — one of the few gates without one,
+and it is about to be edited. s191 wrote one for GATE BR and it immediately found three defective
+arms plus a missing guard in the gate itself; s182's `_mutate_gate_k.py` found two defects inside
+the very fix it was testing. Writing `_mutate_gate_ap.py` is probably that session's first act.

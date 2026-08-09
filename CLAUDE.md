@@ -173,9 +173,24 @@ the third and s144 argues it should NOT be built in its template form.
   corner; it neither reopens nor closes it. ⛔⛔ **AND IT EXPOSED A NEW BLOCKER FOR (5): GATE AP has
   been internally inconsistent since s156 and its load-bearing known answer AP3a is RED on BOTH
   memberships** (rms 6.62 / 3.19 against its own 2.49 bar) — the omitted `kNotchMixK·S(cf)` term is
-  fixed and the **Cut row now reproduces to ±1 dB**, but Boost is ~10 dB out with three unscreened
-  candidates. ⛔ **No AP3/AP5 number is quotable, including the stored `s152_null_depth_censor.json`.**
-  ⚠ Original wording kept for the record: **(3) Point GATE AP's bleed-free-only `ROWS` at the mixed `od_tone_
+  fixed and the **Cut row now reproduces to ±1 dB**, but Boost is ~10 dB out.
+  ⛔ **No AP3/AP5 number is quotable, including the stored `s152_null_depth_censor.json`** (which is
+  not even on disk — `reports/*.json` is gitignored, so those figures survive only as prose).
+  ▶⭐⭐ **USER DECISION 2026-08-09: DO Boost's residual, AS ITS OWN SESSION — brief written,
+  `docs/gate-ap-boost-residual-handover.md`, and it does NOT start cold.** ⛔ Read it first: of the
+  three candidates s191 named, **s156's DEPTH CEILING is already REFUTED** (the composite depth is
+  monotone and near-linear 0→60 dB at every Boost cell — that ceiling is a **MIX** property, and
+  bleed-free there is no clean tap to floor the bottom), and the obvious sub-hypothesis (AP averages
+  per-sweep solves over a target spanning 17 dB) **also fails**: Cut 0.50 spans 13.3 dB and agrees
+  to 0.43 dB while Boost 1.00 has the second-smallest span in the table and is 10.38 dB out.
+  ⭐⭐ **THE LEADING HYPOTHESIS IS THAT AP3a IS NOT BROKEN BUT IS CORRECTLY REPORTING A STALE
+  SHIPPED TABLE** — s156 re-fitted it mix-keyed and eight OD-path changes have landed since
+  (s172/173/177/180/181/185/187/190) — which would make the per-row pattern (Cut ~1, Flat ~2–4,
+  Boost ~10 dB) a **map of staleness and a direct input to item 10** rather than a gate defect.
+  **One pre-registered test decides it**: compare AP3's solved POINT column against a FRESH
+  `od_tone_restore_fit` fit on the current build, on BOTH memberships. ⛔ Do NOT loosen AP3a's bar
+  to make it green — that deletes the staleness signal. ⚠ GATE AP has **no mutation runner**, and is
+  about to be edited. ⚠ Original wording kept for the record: **(3) Point GATE AP's bleed-free-only `ROWS` at the mixed `od_tone_
   restore_fit.SETS` twin** (`grunt_mix` etc., s186) — cheap, and must land BEFORE (5), because
   re-fitting `OdToneRestore` against a membership GATE BO already showed doesn't survive the mix
   (s186) is exactly the rework this ordering exists to avoid. **(4) FIX ITEM 17's TREBLE HALF
