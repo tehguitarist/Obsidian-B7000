@@ -242,6 +242,28 @@ the third and s144 argues it should NOT be built in its template form.
   any measurement is useful (bridged-T has never had a carrier search; the bass peak's
   single-constant route was closed at s126 with no successor named) — starting either without a
   fresh hypothesis risks re-confirming what is already known rather than adding to it.
+  ⭐⭐ **(8) FINAL CONFIRMATION SWEEP — A FULL NOTCH/PEAK RE-MEASUREMENT ACROSS SETTINGS, RUN AFTER
+  ALL THE ABOVE LAND** (USER-ADDED 2026-08-09). Item 19 measured the comb on one instrument at one
+  epoch; this re-runs it at the END, on the shipped build, to confirm nothing regressed and that
+  every fix survives OFF the setting it was fitted at. ⛔⛔ **ITS WHOLE POINT IS MEMBERSHIP, so it
+  must NOT be bleed-free-only** — the user's standing steer (*"ONLY looking at bleed free for
+  literally anything breaks ANY setting that isn't level1700 … `ref-od` should be the starting
+  reference, NEVER the bleed free one"*, s173) plus s186's BO2 (the GRUNT ordering does not survive
+  the mix) plus s191's AP1b (the estimator's own censoring robustness is 4.1× at the corner and
+  **1.0×** at every played cell). **Required coverage, all four axes at once:** (a) **MIX** —
+  bleed-free corner AND `ref-od` AND the LEVEL/BLEND ladders (`od_tone_restore_fit.SETS`' 14 groups,
+  s186, are the ready-made membership); (b) **STIMULUS** — the clean sweep AND the driven rungs,
+  **including `drv_-12`, the user's stated playing level**, and `drv_-6`; (c) **GRUNT** — all three
+  positions, never Cut alone (s151's trap: every untokened capture is GRUNT = Cut); (d) **DRIVE** —
+  the whole ladder, not its endpoints (s129: *an endpoint pair is not a ladder*). ⚠ Grade the seven
+  features of item 19's own table (N1/P1/N2/P2/N3/P3/N4) so the result is directly comparable to
+  that table. ⛔ **Quote CLASSIFICATIONS, not percentages** (s158/s159: every FIXED / DRIVE-DEPENDENT
+  verdict is window-stable on both sides and the percentages are not), ⛔ grade DEPTH at a mixed
+  setting and **never GAIN** (s192), ⛔ print BOTH the point and the area depth (s152), and ⛔ match
+  membership before differencing any two epochs (s159 — the twelfth occurrence). ⚠ Expect REFUSALS
+  and name them: several of these features have no reading at the corner at all (s184: `bass_notch`
+  and `treble_notch` resolve in **0 of 36** bleed-free readings against 255/347 of 684 played), which
+  is a finding about the membership, not missing data.
 
 - ⭐⭐ **SESSION 190's MEASUREMENT HALF — ITEM 9's TWO SENSITIVITY TARGETS RE-MEASURED (s189's USER
   DECISION, "MEASURE FIRST"): BOTH SHRANK, AND THE PEDAL WAS NEVER THE THING THAT MOVED.** New
