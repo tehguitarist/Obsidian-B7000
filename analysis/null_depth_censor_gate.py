@@ -103,6 +103,12 @@ FIT_RESIDUAL_DB = 0.83
 FAIL = []
 NONMONO = []
 
+#: What `solve_gain` does when its own uniqueness check finds more than one root.
+#: "refuse" (default, s192) drops the cell — a refusal is not a reading; "average" reproduces the
+#: pre-s192 behaviour of returning whichever root brentq's bracket lands on, so every published
+#: AP3/AP5 number stays reachable.
+MULTIROOT = ["refuse"]
+
 
 def fail(tag, msg):
     FAIL.append(tag)
@@ -368,6 +374,22 @@ def solve_gain(g, mod_off, ped_geo, drv, gpos, T, fs, metric):
     # ⚠ brentq returns *a* root; it says nothing about uniqueness.  Nothing guarantees depth is
     # monotone in gain, so it is CHECKED rather than assumed — a second root would make the solved
     # gain a choice the gate never made.
+    #
+    # ⭐⭐ SESSION 192 — THE CHECK WAS RIGHT AND ITS CONSEQUENCE WAS NOT ENFORCED.  It recorded the
+    # multiplicity in `NONMONO` and then returned the root anyway, so an arbitrary root was averaged
+    # into AP3's mean and only a global footnote said so.  Measured on the one flagged bleed-free
+    # cell (Boost x DRIVE 0.00, `sweep_drv_-6`): `err` runs −1.68 / −0.62 / **+0.65** / **+1.03** /
+    # **−0.45** / −0.03 / +2.25 over gain −12…+6, i.e. it genuinely crosses zero THREE times and the
+    # outer roots sit ~11 dB apart.  The excursion driving it is only ~1.5 dB of depth — the reader's
+    # argmin HOPS grid cells as the added biquad reshapes the curve (f0 309.1 → 313.6 → 318.2 across
+    # those same rungs), which re-assigns the shoulders and therefore the shoulder-referred depth.
+    # ⇒ on a SHALLOW target (this one is 7.52 dB) that wobble is a large fraction of the target and
+    # the inversion is genuinely ill-posed.  A refusal is not a reading (s151/s152), so the cell is
+    # now DROPPED rather than averaged, and `--multiroot average` keeps the retired behaviour
+    # reachable so every pre-s192 AP3/AP5 number reproduces (s124's reachable-retired-form rule).
+    # ⚠ This is NOT the depth ceiling: bleed-free the depth-vs-gain map is monotone and near-linear
+    # over the solution region (slope 0.89 median), which s191 measured and this session reproduced.
+    # The wobble is the READER's quantisation, not the physics.
     # ⚠⚠ The check is ROOT UNIQUENESS, not monotonicity, and a first draft got that wrong: it
     # required `err` to be non-decreasing across a ladder spanning −12…+60 dB, and duly flagged 5
     # cells.  Traced on one of them, depth is perfectly monotone through the whole solution region
@@ -381,9 +403,27 @@ def solve_gain(g, mod_off, ped_geo, drv, gpos, T, fs, metric):
     sign_changes = sum(1 for a, b in zip(vals, vals[1:]) if (a < 0) != (b < 0))
     if sign_changes > 1:
         NONMONO.append(f"{metric} d{drv:.2f} g{gpos}: {sign_changes} sign changes")
+        if MULTIROOT[0] == "refuse":
+            return None
     if err(lo) > 0 or err(hi) < 0:
         return None
     return float(brentq(err, lo, hi, xtol=1e-3))
+
+
+def depth_at_gain(g, mod_off, gain, drv, gpos, T, fs):
+    """The composite's POINT depth at a given cut — the forward map `solve_gain` inverts.
+
+    Exposed because two things need it and neither should re-derive it: AP3b converts a GAIN gap
+    into the DEPTH unit its bar is actually defined in, and AP3a's synthetic round trip builds its
+    own known-answer curve from it."""
+    q = F.lerp5(T["kNotchQ"][gpos], drv, T["kX"])
+    peak = F.rbj_peak_db(g, fs, T["kPeakFreq"], T["kPeakQ"],
+                         F.lerp5(T["kPeakGainDb"], drv, T["kX"]))
+    comp = mod_off + F.rbj_peak_db(g, fs, T["kNotchFreq"], q, -gain) + peak
+    try:
+        return F.notch_geometry(g, comp)
+    except RuntimeError:
+        return None
 
 
 def ap3():
@@ -427,13 +467,189 @@ def ap3():
     return out
 
 
-def ap3a(sol):
-    """KNOWN ANSWER: the POINT solve must reproduce the SHIPPED table.
+def ap3a(T, fs):
+    """KNOWN ANSWER: the solve must invert its own forward map — a SYNTHETIC round trip.
 
-    The shipped table was fitted in the point metric by iterating a rebuild-and-re-measure loop, so
-    an independent analytic solve in the same metric has a right answer that already exists.  This
-    is what makes AP3's area column readable at all — without it, a disagreement between the two
-    columns is equally consistent with the solve being broken.
+    ⭐⭐⭐ SESSION 192 — THIS REPLACES A CHECK THAT COULD NOT ANSWER THE QUESTION IT ASKED.  The
+    retired AP3a compared the POINT solve against the SHIPPED table and gated AP3/AP5 on the match.
+    That certifies the solve ONLY IF the table is already right, so on any cell where the table is
+    wrong it is unfalsifiable in the wrong direction: it goes red and cannot distinguish "the solve
+    is broken" from "the table is stale" — which is precisely the state it was left in at s191, and
+    precisely the question the session was opened to answer.  ⇒ ONE CHECK WAS CARRYING TWO
+    QUESTIONS (s154's AR2/AR3 pattern, and the "three outcomes, not two" rule) and it is now split:
+
+      * AP3a (here)  — DOES THE SOLVE WORK?  Answered against a curve whose right answer is
+        CONSTRUCTED, so no reference data and no shipped constant can make it pass or fail.
+      * AP3b (below) — IS THE TABLE WHERE THE SOLVE SAYS IT SHOULD BE?  A measurement, reported
+        in the unit its bar is defined in, gating NOTHING.
+
+    The construction: `mod_off + notch(ship + G)` IS a curve whose composite depth the solve must
+    map back to exactly `ship + G`, for a known injected `G`.  Nothing about the pedal, the
+    censoring or the table's correctness enters it — it is `rbj_peak_db` inverted through
+    `notch_geometry`, which is the only thing AP3 needs to be trusted about.
+    ⚠ It is deliberately run at the SHIPPED operating point and swept either side of it, so it
+    exercises the same region of the map AP3 actually solves in; a round trip run somewhere the
+    solve never goes would be a `gate-domain-must-cover-candidate-reach` failure."""
+    print("\nAP3a  KNOWN ANSWER — SYNTHETIC ROUND TRIP: inject a known cut, recover it")
+    print("  target curve = the model's own stage-subtracted curve + a notch at (ship + G).")
+    print("  The solve must return ship + G.  No pedal data, no table correctness, no censoring.")
+    print(f"  {'cell':<26} {'ship':>7} {'G':>6} {'want':>7} {'got':>7} {'err':>7} {'slope':>7}")
+    errs, refused, slopes = [], [], []
+    for gname, gpos, sname in ROWS:
+        for fname, drv in F.SETS[sname]:
+            cf = F.clean_frac_of(fname)
+            ship = F.cut_db(T, gpos, drv, cf)
+            g, ped, mod = F.curves(fname, "sweep_drv_-12")
+            mod_off = mod - F.current_response(g, drv, fs, T, gpos, cf)
+            for G in (-6.0, -3.0, 0.0, +3.0, +6.0):
+                want = ship + G
+                syn = depth_at_gain(g, mod_off, want, drv, gpos, T, fs)
+                if syn is None:
+                    refused.append(f"{gname} d{drv:.2f} G{G:+.0f} (synthetic curve has no null)")
+                    continue
+                got = solve_gain(g, mod_off, {"depth_point": syn["depth_point"],
+                                              "depth_area": syn["depth_area"]},
+                                 drv, gpos, T, fs, "point")
+                if got is None:
+                    refused.append(f"{gname} d{drv:.2f} G{G:+.0f} (solve refused)")
+                    continue
+                # The local slope of the forward map AT the injected point.  An inverse is only as
+                # well-posed as this: where the composite's depth barely responds to the cut, a
+                # depth read good to a fraction of a dB still pins the gain only to several dB.
+                lo_ = depth_at_gain(g, mod_off, want - 1.0, drv, gpos, T, fs)
+                hi_ = depth_at_gain(g, mod_off, want + 1.0, drv, gpos, T, fs)
+                sl = (float("nan") if lo_ is None or hi_ is None
+                      else (hi_["depth_point"] - lo_["depth_point"]) / 2.0)
+                errs.append(got - want)
+                slopes.append(sl)
+                if abs(got - want) > 0.05:
+                    print(f"  {gname + ' d' + format(drv, '.2f'):<26} {ship:7.2f} {G:+6.1f} "
+                          f"{want:7.2f} {got:7.2f} {got - want:+7.3f} {sl:7.3f}")
+    if not errs:
+        fail("AP3a", "the synthetic round trip produced NO measurements — it cannot certify "
+                     "anything (empty-gate-must-fail)")
+        return float("nan"), refused
+    rms = float(np.sqrt(np.mean(np.square(errs))))
+    worst = float(np.max(np.abs(errs)))
+    print(f"  {len(errs)} round trips, rms {rms:.4f} dB, worst {worst:.4f} dB "
+          f"(brentq's own xtol is 1e-3)")
+    if refused:
+        print(f"  ⚠ {len(refused)} of {len(errs) + len(refused)} REFUSED and are named, not dropped "
+              f"silently: {refused[:3]}")
+    # The bar is the root-finder's own tolerance, scaled for the depth reader's grid quantisation.
+    # It is NOT the fit's residual — this arm has nothing to do with the fit.
+    if worst > 0.25:
+        # ⭐⭐ WHY the round trip missed is a SEPARATE question from whether it missed, and a wrong
+        # reason here sends the next session after the wrong defect (s95/s146).  So the diagnosis is
+        # COMPUTED: split the trips by whether they recovered, and compare the forward map's local
+        # slope in the two groups.  A broken solve misses at any slope; an ILL-CONDITIONED inverse
+        # misses precisely where the map is flat, and the two groups then separate on slope with no
+        # bar to argue about.
+        ok_sl = [s for e, s in zip(errs, slopes) if abs(e) <= 0.25 and np.isfinite(s)]
+        bad_sl = [s for e, s in zip(errs, slopes) if abs(e) > 0.25 and np.isfinite(s)]
+        m_ok = float(np.median(ok_sl)) if ok_sl else float("nan")
+        m_bad = float(np.median(bad_sl)) if bad_sl else float("nan")
+        print(f"  d(depth)/d(gain) at the RECOVERED trips: median {m_ok:.3f} (n={len(ok_sl)})")
+        print(f"  d(depth)/d(gain) at the MISSED    trips: median {m_bad:.3f} (n={len(bad_sl)})")
+        if np.isfinite(m_bad) and np.isfinite(m_ok) and m_bad < m_ok:
+            fail("AP3a", f"the depth->gain inverse is ILL-CONDITIONED on this membership: the "
+                         f"round trip misses by up to {worst:.2f} dB, and it misses where the "
+                         f"forward map is FLATTEST (median slope {m_bad:.3f} at the missed trips "
+                         f"vs {m_ok:.3f} at the recovered ones). ⇒ the SOLVE is not broken and the "
+                         f"table is not implicated — the composite's depth barely responds to the "
+                         f"OD branch's cut here, because the clean tap floors the null (s156's "
+                         f"DEPTH CEILING, which s191 scoped to the mix). GRADE THIS STAGE IN "
+                         f"DEPTH, NOT IN GAIN: read AP3b's DEPTH column and ignore AP3's gains.")
+        else:
+            fail("AP3a", f"the solve does not invert its own forward map (worst {worst:.3f} dB) and "
+                         f"it misses independently of the map's slope ({m_bad:.3f} at the missed "
+                         f"trips vs {m_ok:.3f} at the recovered ones) — that is NOT conditioning; "
+                         f"AP3's columns are not measurements, fix the solve")
+    else:
+        print(f"  ✅ the solve inverts its own forward map to {worst:.4f} dB, so AP3's columns are")
+        print(f"     measurements of the CURVES and any disagreement with the table is the TABLE's.")
+    return rms, refused
+
+
+def ap3b(sol, T, fs):
+    """MEASUREMENT (gates nothing): how far the shipped table sits from what the model now needs.
+
+    ⚠⚠ SESSION 192 — THE RETIRED AP3a's BAR WAS A UNIT ERROR, AND THAT IS WHY THE MIXED ARM WENT
+    RED.  Its bar is `3 x FIT_RESIDUAL_DB`, imported (correctly) from the fit's own converged
+    residual — but that residual is +/-0.83 dB of **DEPTH**, and the quantity it was compared against
+    is a **GAIN**.  Those are the same unit only where d(depth)/d(gain) = 1.  Measured this session:
+    bleed-free median slope **0.890** (so 1 dB of depth = 1.12 dB of gain — nearly harmless, which is
+    exactly why the check passed at s152 at 0.57 dB) and mixed median slope **0.304** (1 dB of depth
+    = **3.29 dB of gain**), because at a played setting the clean tap floors the null's bottom and
+    the composite's depth barely responds to the OD branch's cut — s156's DEPTH CEILING, which s191
+    established is a MIX property.  ⇒ the same bar was ~3.3x too tight on the mixed arm.
+    ⛔ The repair is NOT to widen the bar: it is to report the gap in the unit the bar is defined
+    in.  Both columns are printed with the slope that converts them, so the conflation cannot
+    return."""
+    print("\nAP3b  THE TABLE vs THE SOLVE — reported in BOTH units, with the slope between them")
+    print("  ⚠ the bar (the fit's own ±0.83 dB residual) is a DEPTH residual, so the DEPTH column")
+    print("    is the one it may be applied to.  The GAIN column is what AP3 solves in.")
+    print(f"  {'grunt':<6} {'drv':>4} {'shipped':>8} {'solved':>8} {'Δgain':>7} | "
+          f"{'slope':>6} {'Δdepth':>7}")
+    gains, depths, slopes = [], [], []
+    for gname, gpos, sname in ROWS:
+        for fname, drv in F.SETS[sname]:
+            key = (gname, drv)
+            if key not in sol:
+                continue
+            ship, mp, ma, _n1, _n2 = sol[key]
+            cf = F.clean_frac_of(fname)
+            # The DEPTH gap, measured rather than converted: the depth the shipped cut achieves
+            # against the depth the solved cut achieves, on the same curves AP3 solved on.
+            dd, sl = [], []
+            for sw in REAL:
+                g, ped, mod = F.curves(fname, sw)
+                mod_off = mod - F.current_response(g, drv, fs, T, gpos, cf)
+                a = depth_at_gain(g, mod_off, ship, drv, gpos, T, fs)
+                b = depth_at_gain(g, mod_off, mp, drv, gpos, T, fs)
+                lo_ = depth_at_gain(g, mod_off, ship - 1.0, drv, gpos, T, fs)
+                hi_ = depth_at_gain(g, mod_off, ship + 1.0, drv, gpos, T, fs)
+                if a is not None and b is not None:
+                    dd.append(a["depth_point"] - b["depth_point"])
+                if lo_ is not None and hi_ is not None:
+                    sl.append((hi_["depth_point"] - lo_["depth_point"]) / 2.0)
+            if not dd:
+                continue
+            mdd, msl = float(np.mean(dd)), (float(np.mean(sl)) if sl else float("nan"))
+            gains.append(mp - ship)
+            depths.append(mdd)
+            slopes.append(msl)
+            print(f"  {gname:<6} {drv:4.2f} {ship:8.2f} {mp:8.2f} {mp - ship:+7.2f} | "
+                  f"{msl:6.3f} {mdd:+7.2f}")
+    g_rms = float(np.sqrt(np.mean(np.square(gains))))
+    d_rms = float(np.sqrt(np.mean(np.square(depths))))
+    msl = float(np.nanmedian(slopes))
+    bar = 3.0 * FIT_RESIDUAL_DB
+    print(f"\n  GAIN-domain  rms {g_rms:5.2f} dB (worst {max(abs(v) for v in gains):5.2f})")
+    print(f"  DEPTH-domain rms {d_rms:5.2f} dB (worst {max(abs(v) for v in depths):5.2f})"
+          f"  <- the unit the ±{FIT_RESIDUAL_DB} dB bar is defined in")
+    print(f"  median d(depth)/d(gain) = {msl:.3f}  ⇒ 1 dB of depth = {1.0 / msl:.2f} dB of gain "
+          f"on this membership")
+    verdict = ("INSIDE" if d_rms <= bar else "OUTSIDE")
+    print(f"  ⇒ the shipped table is {verdict} 3x the fit's own residual in DEPTH "
+          f"({d_rms:.2f} vs {bar:.2f})")
+    print("  ⚠ REPORTED, NOT GATED. AP3a certifies the solve; this is a measurement of the TABLE,")
+    print("    and it is a direct input to open item 10's re-fit rather than a defect in this gate.")
+    return {"gain_rms": g_rms, "gain_worst": float(max(abs(v) for v in gains)),
+            "depth_rms": d_rms, "depth_worst": float(max(abs(v) for v in depths)),
+            "median_slope": msl, "verdict": verdict}
+
+
+def _ap3a_retired(sol):
+    """The pre-s192 AP3a, kept REACHABLE so every published number reproduces (s124's rule).
+
+    ⛔ Not called by `main()`. It compares a GAIN gap against a DEPTH bar (see AP3b) and gates the
+    solve on the table being right (see AP3a); it is kept so the retired FORM stays readable.
+    ⭐ THE PUBLISHED NUMBERS ARE REPRODUCED WITHOUT IT, and that path is the one to use because it
+    is the one that was verified: `--multiroot average` restores the pre-s192 solve and AP3b's
+    GAIN-domain column is then the retired AP3a's diff column, cell for cell.  Measured s192 on the
+    bleed-free arm: rms **6.62**, worst **12.87**, per-cell −1.03/+0.43/−0.68 (Cut),
+    −0.00/−3.71/+2.03 (Flat), −10.10/−12.87/−10.38 (Boost) — s191's table exactly.
 
     ⚠⚠ WHAT THIS KNOWN ANSWER IS BLIND TO, found by its own mutation arm and worth stating because
     it is not obvious: it is INVARIANT to a uniform shift of the shipped table.  Add 5 dB to every
@@ -608,10 +824,15 @@ def main():
                     help="which GRUNT-row membership to grade. `bleedfree` (default) is the "
                          "membership every stored GATE AP/AQ/AR/AX number was computed on; "
                          "`mixed` is its LISTENING-condition twin (s186's SETS additions).")
+    ap.add_argument("--multiroot", choices=("refuse", "average"), default="refuse",
+                    help="what to do with a cell whose depth-vs-gain map has several roots. "
+                         "`refuse` (default, s192) drops it — a refusal is not a reading; "
+                         "`average` reproduces the pre-s192 behaviour and every published number.")
     ap.add_argument("--json", help="write the solved table here")
     a = ap.parse_args()
     ROWS = ROW_SETS[a.rows]
     CURRENT_ROWS_LABEL[0] = a.rows
+    MULTIROOT[0] = a.multiroot
 
     print("=" * 96)
     print("GATE AP — the OdToneRestore depth targets, re-read with an estimator the deconvolution")
@@ -635,17 +856,29 @@ def main():
     ap1c()
     n_cens, n_tot, corr = ap2()
     counts = ap4(None)
+    T = F.shipped_tables()
+    fs = 48000.0 * W.OS_FACTOR
+    rms, synth_refused = ap3a(T, fs)
     sol = ap3()
-    rms, worst = ap3a(sol)
+    stale = ap3b(sol, T, fs)
     trade = ap5(sol)
     r_m, r_q = ap6(sol)
 
     print("\n" + "=" * 96)
     print("VERDICT")
     print("=" * 96)
-    if NONMONO:
-        fail("AP3", f"depth is NOT monotone in gain for {len(NONMONO)} cell(s) — the solved gain "
-                    f"is one root of several: {NONMONO[:4]}")
+    # ⚠⚠ s192: multi-rootedness is no longer a GATE FAILURE — it is a per-cell REFUSAL that AP3
+    # enforces (see `solve_gain`).  The cells are NAMED here rather than silently dropped (s40), and
+    # under `--multiroot average` the retired hard failure is restored, because in that mode an
+    # arbitrary root really IS being averaged into the mean and the gate must say so.
+    if NONMONO and MULTIROOT[0] == "average":
+        fail("AP3", f"depth is NOT monotone in gain for {len(NONMONO)} cell(s) and --multiroot "
+                    f"average is RETURNING one of them: {NONMONO[:4]}")
+    elif NONMONO:
+        print(f"  ⚠ {len(NONMONO)} (cell x metric) solve(s) REFUSED for multiple roots and are "
+              f"excluded from AP3's means, not averaged: {NONMONO[:4]}")
+        print("    ⇒ read AP3's `n` columns: a refused cell lowers them, and a row whose deepest")
+        print("      rung is the refused one has a mean biased toward its shallow rungs.")
     if FAIL:
         print(f"  ❌ {len(set(FAIL))} sub-gate(s) failed: {', '.join(sorted(set(FAIL)))}")
         print("     The numbers above are NOT quotable until these are fixed.")
@@ -653,8 +886,14 @@ def main():
     moved = {k: v for k, v in sol.items() if abs(v[2] - v[0]) > FIT_RESIDUAL_DB}
     print(f"  {n_cens}/{n_tot} pedal depth readings are censored by the residue "
           f"(corr with the point−area gap {corr:+.3f}).")
-    print(f"  The POINT solve reproduces the shipped table to {rms:.2f} dB rms, so the AREA solve")
-    print(f"  is measured in the same unit and is comparable to it.")
+    print(f"  The solve inverts its own forward map to {rms:.4f} dB rms (AP3a, synthetic), so both")
+    print(f"  of AP3's columns are measurements of the curves and are comparable to each other.")
+    print(f"  ⚠ SEPARATELY (AP3b, gates nothing): the shipped table sits {stale['depth_rms']:.2f} dB "
+          f"rms away in DEPTH from")
+    print(f"    what the solve says the model now needs — {stale['verdict']} 3x the fit's own "
+          f"±{FIT_RESIDUAL_DB} dB residual.")
+    print(f"    That is a property of the TABLE, and it is open item 10's input, not this gate's "
+          f"defect.")
     if not moved:
         print(f"\n  ⇒ NO shipped entry owes a change larger than the fit's own ±{FIT_RESIDUAL_DB} dB "
               f"residual.\n     Open item 0 CLOSES: the censoring is real and it does not move the "
@@ -662,7 +901,12 @@ def main():
     else:
         print(f"\n  ⇒ {len(moved)} of {len(sol)} entries owe a change larger than the fit's own "
               f"±{FIT_RESIDUAL_DB} dB residual:")
-        for (gname, drv), (ship, mp, ma, a, b) in sorted(moved.items()):
+        # ⚠⚠ s192: these unpacked to `a, b` and `a` IS THE ARGPARSE NAMESPACE — so this loop rebound
+        # it to an int and the report path below died in `a.json`.  Pre-existing, and MASKED because
+        # the gate always returned at the FAIL check above before reaching here; it surfaced the
+        # moment AP3a stopped failing.  `a-defect-masked-by-a-second-defect-surfaces-when-the-second
+        # -is-fixed` (s181), inside this very gate.
+        for (gname, drv), (ship, mp, ma, _np, _na) in sorted(moved.items()):
             print(f"     {gname:<6} drive {drv:.2f}: shipped {ship:+7.2f} -> area-solved "
                   f"{ma:+7.2f}  ({ma - ship:+.2f} dB)")
         print("\n  ⚠ That is what the AREA metric asks for.  It is NOT automatically the right")
@@ -687,8 +931,18 @@ def main():
         "s152_null_depth_censor.json" if a.rows == "bleedfree"
         else f"s191_null_depth_censor_{a.rows}.json")
     json.dump({"rows": a.rows, "row_sets": [s for _g, _p, s in ROWS],
+               "multiroot": a.multiroot,
                "censored": n_cens, "readings": n_tot, "corr_margin_gap": corr,
-               "point_solve_rms_vs_shipped": rms, "point_solve_worst": worst,
+               # s192: `synthetic_roundtrip_rms` is AP3a's new (solve-only) certification.
+               # `table_staleness` is the retired AP3a's question, in BOTH units, gating nothing.
+               "synthetic_roundtrip_rms": rms, "synthetic_refused": synth_refused,
+               "table_staleness": stale,
+               # ⚠ THESE TWO KEEP THEIR PRE-s192 MEANING EXACTLY — the GAIN-domain gap between the
+               # point solve and the shipped table — so a consumer reading them still gets the
+               # quantity the name promises. They are now AP3b's output rather than AP3a's, and the
+               # thing that CHANGED is which check gates on them (nothing does).
+               "point_solve_rms_vs_shipped": stale["gain_rms"],
+               "point_solve_worst": stale["gain_worst"],
                "trade": trade, "corr_margin_metricgap": r_m, "corr_qratio_metricgap": r_q,
                "membership": {f"{k[0]}_{k[1]:.2f}": v for k, v in counts.items()},
                "table": {f"{k[0]}_{k[1]:.2f}": {"shipped": v[0], "solve_point": v[1],

@@ -1,5 +1,20 @@
 # HANDOVER — GATE AP's Boost residual, and whether AP3a is broken or is telling the truth
 
+> ✅✅ **CONSUMED AT SESSION 192. KEPT AS THE RECORD OF WHAT WAS PREDICTED — read the OUTCOME in
+> `docs/session-log.md` SESSION 192 and this brief's two CLOSED/REFUTED rows in `CLAUDE.md`, not the
+> hypotheses below.** The answer was **neither** of the two branches §4 pre-registered: AP3a was ONE
+> CHECK CARRYING TWO QUESTIONS and could answer neither, because it gated the SOLVE on the TABLE
+> being right. Split, the solve round-trips to **1e-4 dB** (it was never broken), the mixed arm's
+> failure was a **UNIT ERROR** (a DEPTH bar applied to a GAIN residual, ~3.3× too tight at the mix),
+> and the bleed-free Boost residual is the **mix law's corner EXTRAPOLATION** on the one row whose
+> `kNotchMixK` is positive.
+> ⛔ **Three specific claims below are WRONG and are left in place deliberately, so the reasoning is
+> auditable:** §5's *"GATE AP has no mutation runner"* (it has had one since s150–156 — it simply was
+> not re-run at s191, which is how one of its arms died), §3's leading *"the shipped table is stale"*
+> hypothesis (REFUTED — the mixed arm would be off too and it agrees to 0.54 dB in depth), and §3's
+> dismissal of the per-sweep spread (it IS a carrier, just not via the pedal-depth span it was tested
+> on — the SOLVED-GAIN span reaches 30–34 dB and changes sign).
+>
 > Written at session 191, at the user's request, to be picked up as its own session.
 > ⛔ **Read `.claude/rules/reference-sources.md` and `.claude/rules/measurement-discipline.md`
 > first, as always.** Then `docs/session-log.md` SESSION 191 (continued) §3, which is where this

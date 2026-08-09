@@ -756,18 +756,28 @@ def do_geom(args):
           "any static element value.")
 
 
-def fit_rung(g, ped, mod, drive, fs, T, notch_only=False, clean_frac=None):
+def fit_rung(g, ped, mod, drive, fs, T, notch_only=False, clean_frac=None, grunt=0):
     """Solve for the notch+peak the stage SHOULD have at this drive rung.
 
     target = (what the stage does now) + (what is still missing) -- so the answer is absolute
-    stage parameters, not a correction to be applied by hand on top of the current table."""
+    stage parameters, not a correction to be applied by hand on top of the current table.
+
+    ⚠⚠ SESSION 192 — `grunt` WAS HARDCODED 0 AND THAT MADE THIS TOOL CUT-ONLY BY CONSTRUCTION.
+    `current_response` was called with a literal row index 0, so a caller fitting a `grunt_flat` /
+    `grunt_boost` / `listen_boost` group added back GRUNT CUT's notch (Q and cut both) before
+    solving, and the returned "cut the stage should apply" was a Cut-row answer wearing the other
+    row's name.  Since s151 the tables are `[3][5]` and s186 added the mixed twins, so every GRUNT
+    row is now a legitimate fit target.  Default 0 keeps every pre-s192 call bit-identical (asserted
+    by re-running `--fit` and diffing), and `do_fit` now resolves the row PER CAPTURE via
+    `grunt_pos_of` rather than from the group name — which is what the vary-grunt groups
+    (`grunt_hot`, `grunt_cold`, `grunt_mix`) need, since they hold DRIVE and sweep GRUNT."""
     from scipy.optimize import least_squares
 
     lo, hi = FIT_BAND
     m = (g >= lo) & (g <= hi)
     f = g[m]
     # What the stage must deliver = what it already delivers + what is still missing.
-    target = current_response(f, drive, fs, T, 0, clean_frac) + (ped - mod)[m]
+    target = current_response(f, drive, fs, T, grunt, clean_frac) + (ped - mod)[m]
     B = trend_basis(f)
 
     def shape(p):
@@ -809,23 +819,37 @@ def do_fit(args):
     print(f"\nFIT  (stage runs at {fs:.0f} Hz = 48k x OS {W.OS_FACTOR})")
     print(f"  fitted over {FIT_BAND[0]:.0f}-{FIT_BAND[1]:.0f} Hz, with a quadratic-in-log-f trend "
           f"fitted JOINTLY and discarded (that trend is A3, not this stage's job)")
-    # row 0 = GRUNT cut, which is the position `--fit`'s bleed-free set sits at.
-    print(f"  shipped now (GRUNT cut row): fn={T['kNotchFreq']:.1f} Q={T['kNotchQ'][0]} "
-          f"gain={T['kNotchGainDb'][0]}")
+    # ⛔⛔ SESSION 192 — `--set` AND `--sweep` WERE BOTH DECLARED AND ONE WAS IGNORED HERE.
+    # This loop read `SETS["bleedfree"]` as a literal while `--set` was already parsed and offered
+    # (and `--geom`/`--matrix` honour it), so `--fit --set grunt_boost` silently fitted the
+    # bleed-free CUT group and printed it under the caller's chosen name.  That is
+    # `printed-is-not-scored` in its other direction: an option that exists, is documented in
+    # `--help`, and does nothing on this path.  Now honoured, with the GRUNT row resolved per
+    # capture so the vary-grunt groups work too.
+    which = getattr(args, "which", "bleedfree")
+    print(f"  set = {which}  (rows resolved per capture; sweep = {args.sweep})")
+    g0 = grunt_pos_of(SETS[which][0][0])
+    print(f"  shipped now (GRUNT row {g0}): fn={T['kNotchFreq']:.1f} Q={T['kNotchQ'][g0]} "
+          f"gain={T['kNotchGainDb'][g0]}")
+    print(f"               K={T['kNotchMixK'][g0]}")
     print(f"               fp={T['kPeakFreq']:.1f} Q={T['kPeakQ']} gain={T['kPeakGainDb']}")
-    print("\n" + "=" * 86)
-    print(f"  {'DRIVE':>6} | {'notch f0':>9} {'notch Q':>8} {'notch dB':>9} | "
-          f"{'peak f0':>8} {'peak Q':>7} {'peak dB':>8} | {'rms':>6} | discarded trend @400Hz")
-    print("=" * 86)
+    print("\n" + "=" * 100)
+    print(f"  {'DRIVE':>6} {'g':>2} | {'notch f0':>9} {'notch Q':>8} {'notch dB':>9} | "
+          f"{'peak f0':>8} {'peak Q':>7} {'peak dB':>8} | {'rms':>6} | {'shipped cut':>11} "
+          f"| discarded trend @400Hz")
+    print("=" * 100)
     res = {}
-    for fname, drv in SETS["bleedfree"]:
+    for fname, drv in SETS[which]:
+        gpos = grunt_pos_of(fname)
+        cf = clean_frac_of(fname)
         g, ped, mod = curves(fname, args.sweep)
-        best, f, target, co = fit_rung(g, ped, mod, drv, fs, T, clean_frac=clean_frac_of(fname))
+        best, f, target, co = fit_rung(g, ped, mod, drv, fs, T, clean_frac=cf, grunt=gpos)
         fn, qn, gn, fp, qp, gp = best.x
         rms = float(np.sqrt(np.mean(best.fun ** 2)))
-        res[drv] = best.x
-        print(f"  {drv:6.2f} | {fn:9.1f} {qn:8.2f} {gn:9.2f} | {fp:8.1f} {qp:7.2f} {gp:8.2f} "
-              f"| {rms:6.3f} | {co[0]:+6.2f} dB, slope {co[1]:+5.2f}, curv {co[2]:+5.2f}")
+        res[(gpos, drv)] = best.x
+        print(f"  {drv:6.2f} {gpos:2d} | {fn:9.1f} {qn:8.2f} {gn:9.2f} | {fp:8.1f} {qp:7.2f} "
+              f"{gp:8.2f} | {rms:6.3f} | {cut_db(T, gpos, drv, cf):11.2f} "
+              f"| {co[0]:+6.2f} dB, slope {co[1]:+5.2f}, curv {co[2]:+5.2f}")
     print("\n  notch dB is the CUT to apply (positive number = cut that many dB).")
     print("  ⚠ these are per-rung free fits — read them for the TREND, then impose one f0/one Q law")
     print("    rather than shipping three unrelated triples.")

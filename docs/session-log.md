@@ -26333,3 +26333,189 @@ is easier, it is a concession`).
 and it is about to be edited. s191 wrote one for GATE BR and it immediately found three defective
 arms plus a missing guard in the gate itself; s182's `_mutate_gate_k.py` found two defects inside
 the very fix it was testing. Writing `_mutate_gate_ap.py` is probably that session's first act.
+
+## SESSION 192 — GATE AP's Boost residual: the solve was sound, the BAR had the wrong unit, and the bleed-free corner is a mix-law extrapolation
+
+> ⛔ **No `src/` change, nothing shipped, no rebuild, no re-render.** Everything below is analysis
+> tooling plus measurement. The session's job was s191's handover
+> (`docs/gate-ap-boost-residual-handover.md`): find out why AP3a's residual concentrated on the
+> Boost row, and decide whether AP3a was a broken check or a correct report.
+> **Answer: neither, as posed. It was ONE CHECK CARRYING TWO QUESTIONS, and it could not answer
+> either.** Runner **9/9**.
+
+### 1. Reproduced first, then decomposed per sweep — which is where it was hiding
+
+Both arms reproduce s191 exactly (bleed-free rms 6.62 / worst 12.87; mixed 3.19 / 7.26). AP3 prints
+the **MEAN of three per-sweep solved gains**, and the pathology is invisible in the mean. Per sweep,
+bleed-free Boost:
+
+| cell | solved gain per sweep (−18 / −12 / −6) | mean | ship | diff |
+|---|---|---|---|---|
+| Boost 0.00 | 14.61 / 23.55 / **−7.30** | 10.29 | 20.38 | −10.10 |
+| Boost 0.50 | 12.47 / 27.95 / **−6.22** | 11.40 | 24.27 | −12.87 |
+| Boost 1.00 | 14.51 / **REFUSED** / 7.26 | 10.89 | 21.27 | −10.38 |
+
+⇒ carried by **`sweep_drv_-6`**, where the pedal's Boost null collapses to **7.52 / 7.28 / 10.04 dB**
+while the model at the shipped cut sits **~19–20 dB** deep, so the required cut runs from +27.95 to
+**−7.30 dB at ONE (GRUNT, DRIVE) cell** — a **30–34 dB span that changes sign**. That is s154's AR6
+and s153's AQ2b on this stage's own gain axis: no single table entry can serve all three rungs.
+⚠ And **Boost 1.00 is a MEMBERSHIP artefact on top**: its middle rung is REFUSED (`notch_geometry`:
+the minimum rests on a CORE bound), which is s151's documented 238.3 Hz migration at
+Boost × DRIVE max — and the refused rung is the DEEP one, so the mean is biased toward its shallow
+neighbours. ⭐ The source already warned about this: `CORE = (285, 372)` is calibrated on GRUNT CUT
+and its own comment says it "DO[ES] NOT TRANSFER TO THE OTHER TWO POSITIONS".
+
+### 2. THE DECISIVE TEST (handover §4), run in a sharper form than it was written
+
+The brief asked for AP3's point column against a fresh `od_tone_restore_fit` fit. Run naively those
+answer different questions (AP3 solves a GAIN at pinned Q; the fit frees f0/Q/gain plus a peak), so
+both were run with **f0 and Q pinned to shipped and the cut as the only unknown** — same single
+scalar, two completely different objectives (depth equality vs a curve residual over 250–850 Hz with
+the trend projected out).
+
+| arm | DEPTH objective vs shipped | CURVE objective vs shipped |
+|---|---|---|
+| bleed-free | rms **6.62**, worst 12.87 | rms **9.02**, worst 16.25 |
+| mixed | rms **3.19**, worst 7.26 | rms **1.57**, worst 2.71 |
+
+⭐⭐ **On the bleed-free arm BOTH objectives miss, and they AGREE WITH EACH OTHER on Boost to 0.55 /
+0.16 dB** (−10.10/−10.65 and −12.87/−12.71). Two independent objectives agreeing that closely is
+strong evidence the SOLVE is sound and the TABLE's corner value is wrong — which is the brief's own
+pre-registered "if BOTH miss, the table is stale" branch. ⭐⭐ **On the mixed arm the CURVE objective
+reproduces the shipped table to 1.57 dB rms with every residual small and positive** ⇒ the table is
+NOT stale in general; it is right at the mix it was fitted at.
+
+### 3. ⭐⭐⭐ THE MECHANISM: the bleed-free corner is an EXTRAPOLATION of the mix law, and Boost is the only row extrapolated UPWARD
+
+`kMixCfRef = 0.441` and **S there is 0.0001**, so `kNotchGainDb` records the cut at essentially the
+LISTENING mix — and the `listen*` groups sit at cf 0.48114, **S = +0.0058**. ⇒ the mixed arm reads
+the table at its own reference (cut@listen ≈ base to 0.05 dB). The bleed-free corner is
+**S = +0.951**, so its cut is `base + 0.951·K`:
+
+| row | K | corner − listen | bleed-free CURVE residual |
+|---|---|---|---|
+| Cut | −7.87 … −9.65 (**NEGATIVE**) | −7.44 … −9.12 | +0.82 / +0.82 / −4.83 |
+| Flat | −1.56 … +2.97 (mixed) | −1.47 / +2.81 / +0.92 | −4.19 / −9.33 / −8.04 |
+| Boost | +3.40 … +5.81 (**POSITIVE**) | +3.21 / +5.49 / +5.49 | −10.65 / −12.71 / −16.25 |
+
+`corr(CURVE residual, K·S) = **−0.904**`, against the shipped-cut confound's −0.760; slope −0.873 dB
+of residual per dB of upward extrapolation. ⚠⚠ **n = 9 over THREE rows, and K·S is collinear with
+row identity, so this identifies a DIRECTION and a rough SIZE, not a coefficient** — and the relation
+is monotone rather than linear (Flat is already −4.19 at K·S = −1.48). Quote it as: *the further the
+mix law extrapolates a row's cut UPWARD at the corner, the more that row over-cuts there, and Boost
+is the row extrapolated furthest up.* ⇒ this is a direct input to **open item 10**, and it is the
+measured version of s185's standing warning against "finishing the job" by re-mapping the other seven
+`kMixCf` nodes.
+
+### 4. ⭐⭐⭐ WHY AP3a COULD NOT ANSWER: it gated the SOLVE on the TABLE being right
+
+AP3a compared the point solve against the shipped table and **gated AP3/AP5 on the match**. That
+certifies the solve *only if the table is already right*, so on any cell where the table is wrong it
+is unfalsifiable in the wrong direction — red, and unable to distinguish "the solve is broken" from
+"the table is stale". **That is exactly the state s191 left it in, and exactly the question this
+session was opened to answer.** One check, two questions (s154's AR2/AR3; the "three outcomes, not
+two" rule). Split:
+
+- **AP3a is now a SYNTHETIC ROUND TRIP.** `mod_off + notch(ship + G)` is a curve whose right answer
+  is CONSTRUCTED, so no reference data, no censoring and no shipped constant can make it pass or
+  fail. Measured bleed-free: **44 round trips, rms 0.0001 dB, worst 0.0002 dB** ⇒ **THE SOLVE WAS
+  NEVER BROKEN.** (1 of 45 refused, named: `Cut d0.00 G−6` lands below the bracket's own −12 floor.)
+- **AP3b is the retired question, gating nothing**, reported in BOTH units with the slope between
+  them.
+
+### 5. ⭐⭐ AND THE MIXED ARM'S FAILURE WAS A UNIT ERROR IN THE GATE
+
+AP3a's bar is `3 × FIT_RESIDUAL_DB`, imported (correctly) from the fit's own converged residual —
+but that residual is **±0.83 dB of DEPTH** and the quantity compared against it is a **GAIN**. Those
+are the same unit only where `d(depth)/d(gain) = 1`. Measured:
+
+* bleed-free median slope **0.890** ⇒ 1 dB of depth = 1.12 dB of gain (nearly harmless, which is
+  precisely why the check passed at s152 at 0.57 dB);
+* mixed median slope **0.299** ⇒ 1 dB of depth = **3.34 dB of gain**.
+
+⇒ the same bar was ~3.3× too tight on the mixed arm. Regraded in DEPTH: **mixed rms 0.54 dB, worst
+1.16 — INSIDE the 2.49 bar**; bleed-free **4.35 dB — OUTSIDE**. ⛔ The repair is NOT widening the
+bar: both columns and the converting slope are printed, so the conflation cannot return, and the
+bleed-free arm still reads OUTSIDE, which is the signature of a correction rather than a concession.
+
+### 6. AP3a now FAILS on the mixed arm, and that is a real finding with a COMPUTED diagnosis
+
+The synthetic round trip misses by up to **7.84 dB** on the mixed arm, with **19 of 60 refused**
+(the synthetic curve has no readable null at all once the cut is reduced). A wrong reason here would
+send the next session after the wrong defect (s95/s146), so the diagnosis is computed by splitting
+the trips on whether they recovered and comparing the forward map's local slope:
+
+```
+d(depth)/d(gain) at the RECOVERED trips: median 0.882 (n=34)
+d(depth)/d(gain) at the MISSED    trips: median 0.061 (n= 6)   <- some NEGATIVE (−0.004 … −0.099)
+```
+
+A 14× separation, no bar needed. ⇒ **the depth→gain inverse is ILL-CONDITIONED at a played setting,
+the solve is not broken and the table is not implicated** — s156's DEPTH CEILING (which s191 scoped
+to the mix) measured for the first time as an *instrument* failure rather than as a mysterious table
+disagreement. ⭐⭐ **THE OPERATIONAL RULE THAT FALLS OUT: at a mixed setting grade this stage in
+DEPTH, never in GAIN.**
+
+### 7. `solve_gain`'s uniqueness check was RIGHT and its consequence was not enforced
+
+It recorded multiplicity in `NONMONO` and returned the root anyway, so an arbitrary root was averaged
+into AP3's mean with only a global footnote. On the flagged bleed-free cell (Boost × DRIVE 0.00,
+`sweep_drv_-6`) `err` runs **−1.68 / −0.62 / +0.65 / +1.03 / −0.45 / −0.03 / +2.25** over gain
+−12…+6: it genuinely crosses zero **three times**, with the outer roots ~11 dB apart. The driver is
+only ~1.5 dB of depth — the reader's argmin HOPS grid cells as the added biquad reshapes the curve
+(f0 309.1 → 313.6 → 318.2), which re-assigns the shoulders and hence the shoulder-referred depth. On
+a **shallow** target (7.52 dB) that wobble is a large fraction of the target. ⚠ **NOT the depth
+ceiling** — bleed-free the map is monotone and near-linear over the solution region (slope 0.89).
+✅ A refusal is not a reading, so the cell is now DROPPED; **`--multiroot average` keeps the retired
+behaviour reachable** and reproduces s191's figures exactly (verified: GAIN rms 6.62, worst 12.87,
+every per-cell diff). ⭐ Refusing that one cell moves Boost 0.00 from **−10.10 → −1.30 dB**, i.e. one
+of the three Boost cells was entirely this artefact.
+
+### 8. Four defects found in the tooling, three of them mirrors of corrections that had already landed
+
+1. ⛔⛔ **`fit_rung` hardcoded `grunt=0`, making `od_tone_restore_fit` CUT-ONLY BY CONSTRUCTION.** Any
+   caller fitting `grunt_flat` / `grunt_boost` / `listen_boost` added back **GRUNT CUT's** notch
+   before solving. Fixed additively (`grunt=0` default). **Non-vacuity measured**: row 0 identical to
+   **0.000** dB, non-Cut rows move **+2.86 … +28.07 dB**. ⭐ GATE AU is unaffected — its sets are
+   `("listen", "bleedfree")`, both grunt 0, so the default is *correct* there, not merely preserved.
+2. ⛔ **`--fit` silently ignored its own `--set`**, reading `SETS["bleedfree"]` as a literal while
+   `--geom`/`--matrix` honoured the option. `printed-is-not-scored` in its other direction: an option
+   that exists, is in `--help`, and does nothing.
+3. ⛔⛔ **The runner's `AP3a` arm had been DEAD SINCE s191** — its pattern matched the very line s191
+   replaced with `F.cut_db(...)`, so it silently stopped applying and the runner was never re-run to
+   notice. Re-pointed at the new AP3a. ⚠ Anchored on `depth_at_gain`'s **docstring**, because its
+   `q = F.lerp5(...)` line is byte-identical to `solve_gain`'s and a `count=1` patch would hit the
+   inverse instead of the forward map.
+4. ⛔⛔ **The runner's verdict arm carried the EXACT defect s191 fixed in the gate — a third mirror.**
+   Its synthetic pedal was `off + rbj(−kNotchGainDb)`: the base table alone, no `kNotchMixK·S(cf)`
+   and no peak term, so "the pedal that is exactly what the shipped table produces" sat at a cut the
+   build does not apply and `moved` could never be empty — it reported NARRATED against a working
+   gate. ⭐ **Fixed by DELETING the mirror rather than repairing it**: `off` is `mod` minus the
+   stage's full response, so the arm's own stated intent IS `ped = mod`, referencing no constant at
+   all and unable to go stale again.
+
+⭐ Plus a **pre-existing crash that only surfaced once AP3a stopped failing**: the `moved` loop
+unpacked to `a, b`, and `a` **is the argparse namespace**, so the report path died in `a.json`. Masked
+for as long as the gate returned early at its own `FAIL` check —
+`a-defect-masked-by-a-second-defect-surfaces-when-the-second-is-fixed` (s181), inside this gate.
+
+### 9. What is NOT done, and two corrections to the brief
+
+- ⛔ **The brief's "GATE AP has no mutation runner" is WRONG** — `analysis/_mutate_gate_ap.py` has
+  existed since commit `e179ab5` (s150–156). It was not re-run at s191, which is how arm 8 died.
+- ⛔ **The brief's leading hypothesis is REFUTED in its stated form.** It read: AP3a is correctly
+  reporting that eight OD-path changes since s156 have staled the table. If that were it, the MIXED
+  arm would be off too — and it agrees to 0.54 dB in depth. The staleness is **localised to the mix
+  law's corner extrapolation**, not general.
+- ⚠ **GATE AR is still RED, and not because of anything here**: it needs `s153_notch_shape.json`
+  (GATE AQ's report, gitignored and absent). Its cross-gate known answer against AP's report **now
+  passes at 1.2e-04**, so regenerating AQ's artefact is the only thing between AR and green.
+  ⛔ Deliberately not run — it would write current-epoch content under an `s153` name, which is a
+  separate decision about AQ's published numbers.
+- ⚠ **`analysis/reports/s152_null_depth_censor.json` now holds s192 content under an s152 name.**
+  That is the pre-existing path convention (the mixed arm writes `s191_null_depth_censor_mixed.json`)
+  and GATE AR imports the s152 path by name, so it was left alone rather than renamed mid-session.
+  It is a live instance of the stale-filename trap and should be re-pointed when AR is next touched.
+- ⚠ Boost 0.50 and 1.00's residuals are **NOT** fully explained by the multi-root artefact (only
+  Boost 0.00 was). What remains on them is §1's 30-dB sign-changing per-sweep requirement plus §3's
+  extrapolation — both measured, neither closable from this stage's gain.

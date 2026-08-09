@@ -162,13 +162,21 @@ for _s in F.SETS.values():
 
 
 def _synth(fname, sweep, ren_dir=F.REN_DIR, meta=False):
+    # ⛔⛔ SESSION 192 — THIS CARRIED THE EXACT DEFECT s191 FIXED IN THE GATE, A THIRD MIRROR OF IT.
+    # It rebuilt the synthetic pedal as `off + rbj(..., -kNotchGainDb)` — the BASE table alone,
+    # without `kNotchMixK * S(cleanFrac)` and without the peak term — while the gate's own `ship`
+    # comes from `F.cut_db`, the mix-keyed resolver.  So the "pedal that is exactly what the shipped
+    # table produces" was a pedal at a cut the build does NOT apply, differing by K*S = -7.5..+5.5 dB,
+    # and `moved` could never be empty.  The arm duly reported NARRATED against a gate that was
+    # working.  ⇒ s149/s182/s189's rule again: a correction has to land at EVERY consumer, and a
+    # mutation runner is a consumer.
+    # ⭐ The fix deletes the mirror instead of repairing it.  `off` is `mod` MINUS the stage's full
+    # response, so `off + (that same response)` is identically `mod` — the arm's own stated intent
+    # ("replace each pedal curve with exactly what the shipped build already produces") IS `ped =
+    # mod`, with no table read at all.  It cannot go stale again because it references no constant.
     r = _orig_curves(fname, sweep, ren_dir=ren_dir, meta=True)
     g, _ped, mod, mt = r
-    drv, gp = _DRV[fname], F.grunt_pos_of(fname)
-    off = mod - F.current_response(g, drv, _FS, _T, gp, F.clean_frac_of(fname))
-    q = F.lerp5(_T["kNotchQ"][gp], drv, _T["kX"])
-    ship = F.lerp5(_T["kNotchGainDb"][gp], drv, _T["kX"])
-    ped = off + F.rbj_peak_db(g, _FS, _T["kNotchFreq"], q, -ship)
+    ped = mod.copy()
     return (g, ped, mod, mt) if meta else (g, ped, mod)
 
 
@@ -223,14 +231,29 @@ ARMS = [
      [(r'^REAL = ', _MONKEY_NONMONOTONE + 'REAL = ')],
      1, "AP3", ),
 
-    ("AP3a  the point solve must reproduce the SHIPPED table",
-     "shift the REFERENCE the check compares against by 5 dB, leaving the physics alone.\n"
-     "    ⭐ It must be the reference ALONE: shifting `shipped_tables` instead leaves AP3a passing\n"
-     "    unchanged, because that table is used BOTH to subtract the stage out and as the\n"
-     "    reference, so the shift cancels — a real blind spot of this known answer, now recorded\n"
-     "    in ap3a's docstring.  This known answer is what licenses reading AP3's area column.",
-     [(r'ship = F\.lerp5\(T\["kNotchGainDb"\]\[gpos\], drv, T\["kX"\]\)\n(\s+)gp, ga = \[\], \[\]',
-       r'ship = F.lerp5(T["kNotchGainDb"][gpos], drv, T["kX"]) + 5.0\n\1gp, ga = [], []')],
+    # ⛔⛔ SESSION 192 — RE-POINTED, AND THE OLD ARM HAD BEEN DEAD SINCE s191.  Its pattern matched
+    # `ship = F.lerp5(T["kNotchGainDb"][gpos], ...)`, the line s191 replaced with `F.cut_db(...)`, so
+    # it silently stopped applying and the runner was never re-run to notice — s173's lesson (an
+    # epoch-naming guard must be extended when the epoch ends) pointed at a mutation ARM.
+    # AP3a is now a SYNTHETIC ROUND TRIP and the old mutation (shift the reference table) cannot
+    # touch it by design — that is the whole point of the new check.  What must break it is a
+    # disagreement between the forward map and the inverse: `depth_at_gain` builds the synthetic
+    # target, `solve_gain`'s own `err` inverts it, and they must use the SAME Q.
+    # ⭐ Isolated on purpose: AP1c has its own construction and does not call `depth_at_gain`, so
+    # this arm fails AP3a alone rather than tripping an earlier guard (s119).
+    ("AP3a  the solve must invert its OWN forward map (synthetic round trip)",
+     "build the synthetic target at a different Q than the solve inverts at.  The round trip must\n"
+     "    then miss, because the curve it is asked to invert is not the curve its own `err` models.\n"
+     "    ⭐ This replaces a table-shift arm that could only ever test AP3a WHILE THE TABLE WAS\n"
+     "    RIGHT — the conflation s192 split AP3a and AP3b apart to remove.",
+     # ⚠ ANCHORED ON `depth_at_gain`'s OWN DOCSTRING, not on the `q = ...` line: that line is
+     # byte-identical in `solve_gain` and `depth_at_gain`, and a `count=1` patch would silently hit
+     # the FIRST (the solve) and mutate the inverse instead of the forward map — testing something
+     # else while looking correct.
+     [(r'own known-answer curve from it\."""\n    q = F\.lerp5\(T\["kNotchQ"\]\[gpos\], drv, '
+       r'T\["kX"\]\)',
+       'own known-answer curve from it."""\n'
+       '    q = F.lerp5(T["kNotchQ"][gpos], drv, T["kX"]) * 1.6')],
      1, "AP3a", ),
 
     # ---------------- COMPUTED-VERDICT ARM --------------------------------
