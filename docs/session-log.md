@@ -27754,3 +27754,197 @@ corner**, crosses no class, and leaves CLEAN untouched.
 (`csd`/`h1`/`h1band`) within ONE report — it does not compare two files**, and handing it a path
 fails with *"method '…json' not stored"*. Diff two epochs via `--json` on each and difference the
 `cells` dict, checking `n_rows` first.
+
+---
+
+## SESSION 201 (2026-08-10) — action-list item 10: the FINAL CONFIRMATION SWEEP, and the comb's verdicts turn out to depend on the rung
+
+▶ The last item on the ten-item action list, USER-ADDED 2026-08-09 and scoped at s193 so it could
+not be run badly. ⛔ **No `src/` change, no constant proposed, no rebuild, no re-baseline.** New
+gate `analysis/comb_confirm_gate.py` (**GATE BV**) + `analysis/_mutate_gate_bv.py` (**9/9**).
+Artefact: `analysis/reports/s201_comb_confirm.json`.
+
+### 1. What was measured, and why it is not item 19 re-run
+
+Item 19's seven-row table (N1/P1/N2/P2/N3/P3/N4) is a **snapshot on one instrument at one epoch**.
+Six constants have shipped since (s185, s187, s190, s195, s196, s199), three of which move the
+OD-branch gain — the quantity that sets where every one of these OD-vs-clean cancellations sits.
+So the table is not a standing guarantee, and nothing in item 19's own plan re-read it at the end.
+
+GATE BV re-reads all seven on the **shipped build**, across **all four required axes at once**:
+
+| axis | coverage | how |
+|---|---|---|
+| MIX | bleed-free corner + `ref-od` + the LEVEL (9 detents) and BLEND (5) ladders + the LEVEL×BLEND interior | `od_tone_restore_fit.SETS`' 14 groups, IMPORTED |
+| STIMULUS | all 4 rungs incl. `drv_-12` (the user's playing level) and `drv_-6` | `W.SWEEPS`, free per capture |
+| GRUNT | all 3 positions | ⭐ +6 captures **already on disk** that `SETS` does not hold |
+| DRIVE | all 5 rungs | `SETS`' own ladders |
+
+**50 captures × 4 rungs × 2 sides × 7 features.** The locator, its windows, its grid and its
+validity rule are all GATE W's, **imported**; the AREA depth is `od_tone_restore_fit.band_db_grid`,
+GATE R's own 1/6-octave convention, imported. Nothing was re-derived.
+
+⭐ **The six extra captures are `check-for-unread-data-first`, tenth occurrence.** `SETS`' GRUNT
+coverage at a MIX is three cells wide, and s195 measured what an unbalanced GRUNT pool does to a
+conclusion on **this exact comb** (its list was 7 cut / 1 flat / 2 boost, and the pooled statistic
+built on it cancelled a sign change). `grunt-{flat,boost}_blend-{0930,1200,1430}_base-od.wav` were
+on disk, unread by any tool. ⚠ Even so the pool is **cut 31 / boost 10 / flat 9** — cut-heavy **by
+construction**, because every untokened capture is GRUNT = Cut (s151). ⇒ **every statistic in this
+gate is computed WITHIN a GRUNT position and never pooled across them**, and BV1 says so.
+
+### 2. BV2 — the known answer, and it is exact
+
+The pedal side is **binary-independent**: no render, no binary and no shipped constant enters it.
+So its LEVEL-ladder spans must still be GATE BQ's (s190), which BQ's own BQ1 established reproduce
+**s125's published loci** and **GATE AE's docstring**:
+
+    bass_notch    pedal span over 7 detents at sweep_clean:  42.820 %  vs BQ's 42.820 %   rel err 0.00e+00
+    treble_notch  pedal span over 6 detents at sweep_clean:  44.050 %  vs BQ's 44.050 %   rel err 0.00e+00
+
+⇒ the locator, the windows, the ladder membership and the matching rule are validated **together**,
+against two earlier sessions' artefacts, on an instrument none of them shares — so every model-side
+move below is attributable to the MODEL epoch alone (s159 AW1b's trick).
+
+⭐ Free second corroboration: the READ-ONLY `build/s122_feature_locus/` fingerprint reads
+**4aa2199c08436a76**, which is byte-for-byte GATE BQ's stored `forbidden_fp_before` from s190 —
+that epoch has not moved in eleven sessions. BV0 asserts it before and after and REFUSES on change.
+
+### 3. ⭐⭐⭐ THE HEADLINE: 33 % OF THIS COMB'S VERDICTS DEPEND ON THE STIMULUS RUNG
+
+**18 of 27 non-thin graded cells give the same verdict at every rung they can be read on.** The
+other **9 do not** — a cell reads `TRACKS` at three rungs and `OFFSET` at the fourth, or `DEEP` at
+one and `SHALLOW` at the next.
+
+⇒ **s178's knife-edge is NOT a property of the treble null.** s178 measured that one feature
+reading "20 dB too deep" and "11 dB too shallow" on the SAME build two rungs apart, and the finding
+has been carried since as a caution about N4 specifically. It is a property of **the comb**: every
+feature here is an OD-vs-clean cancellation whose depth peaks where `|OD| = |clean|`, and the
+stimulus ladder slides that crossing, so a single-rung reading of ANY of them is not a property of
+the model. ⛔ **A pooled median over the ladder would have published nine verdicts that no rung
+holds** — which is what the first draft of this gate did, silently, before the per-rung split was
+added.
+
+⚠⚠ Two cells where the instability is a **sign change**, not a boundary wobble:
+
+    mid_peak     corner flat   clean=HIGH drv_-18=HIGH drv_-12=HIGH  drv_-6=LOW
+    treble_notch played boost  clean=LOW  drv_-18=HIGH drv_-12=HIGH  drv_-6=-
+
+### 4. ⭐⭐⭐ THE NEW FINDING: N2 IS NOT MEASURABLE ON THE MODEL AT ANY PLAYED GRUNT-CUT SETTING
+
+    mid_notch PLAYED grunt cut  : model   0  pedal  38  matched   0   of 112
+    mid_notch PLAYED grunt flat : model   4  pedal  12  matched   4   of  24
+    mid_notch PLAYED grunt boost: model   8  pedal  15  matched   8   of  28
+
+**Zero of 112.** GRUNT cut × LEVEL noon is `ref-od.wav` — the user's own stated baseline — and at
+every played setting there the model's curve carries no feature the locator will accept in the
+285–358 Hz window, while the pedal's does in 38 of 112.
+
+⭐ **The refusal REASON is split, and the split is the diagnosis** (which is why BV3 counts them
+separately rather than reporting one number): **EDGE 28 / PROM 84**. `EDGE` = the extremum sits on
+a window bound, i.e. the feature MOVED (s151); `PROM` = the window is right and there is nothing in
+it (s126/s133's presence/absence). ⇒ **absence dominates migration 3 : 1.** Corroborated directly:
+at `ref-od` × `drv_-12` the model's `mid_notch` prominence reads **0.03 dB** against the pedal's
+1.74.
+
+⚠⚠ **NOT stated as a regression, and the distinction matters.** Item 19's N2 = "a PASS" was
+measured on a different quantity (C1 = `mid_peak − mid_notch` depth re ND at the listening mix),
+which does not require a resolvable local minimum in a fixed window. What is measured here is
+**presence**, and it is consistent with s179's BI3 — which measured the model's composite notch
+centre wandering **20.7 %** across GRUNT (352.0 / 291.8 / 300.3 Hz) against the pedal's 2.9 %, i.e.
+onto this window's own edges. ⛔ **The confirming step was NOT run and is owed**: separating "moved
+out of the window" from "gone" properly needs the widened-window read (GATE AV's method, s158),
+because a `PROM` refusal is measured in a FIXED window. Recorded as an open observation.
+
+### 5. What the sweep CONFIRMS — three shipped fixes survive off the setting they were fitted at
+
+⭐⭐ **N1 (bass null), the s180 depth + s187 centre pair, GRUNT-Cut-only by construction:**
+
+    bass_notch  played cut    n=46  POINT -0.08 dB  AREA -0.10 dB   MATCHES
+    bass_notch  played flat   n=10  POINT +10.54    AREA +8.93      model TOO DEEP
+    bass_notch  played boost  n= 2  POINT  +4.78    AREA +4.49      THIN -- not a verdict
+
+⇒ the fix **holds at played settings at the position it was fitted for**, and the flat/boost
+residual s187's own row calls *"unowned"* is now **quantified at played settings for the first
+time**. ⚠ The boost cell is n = 2 and carries no verdict.
+
+⭐⭐ **N4 (treble null), s195's `odMakeupHfPeakDbNonCut`, keyed to GRUNT flat + boost:**
+
+    treble_notch played cut    n=51  AREA +2.67 dB   model TOO DEEP
+    treble_notch played flat   n= 9  AREA -0.41 dB   MATCHES
+    treble_notch played boost  n=11  AREA -0.17 dB   MATCHES
+
+⇒ **exactly the shape s195 shipped**: the two positions the fix targets now MATCH, and the one
+position the USER DECISION 2026-08-09 deliberately kept at 3.3 is the one still over. The declined
+trade's price, measured at played settings.
+
+⭐ **P1 (bass peak):** centre **−19.99 %** at played cut (n = 52) — s125's disjoint-range finding,
+reproduced. ⚠ And a nuance no prior reading has: its **DEPTH matches** (+0.15 dB, n = 52). The
+feature is the right size in the wrong place.
+
+### 6. What is still open, read at played settings
+
+| # | feature | centre (played) | depth (played, AREA) |
+|---|---|---|---|
+| N1 | bass null | c HIGH · f HIGH · b LOW | **c −0.10 MATCHES** · f +8.93 · b THIN |
+| P1 | bass peak | **c LOW (−20 %)** · f THIN · b REF | c +0.15 MATCHES |
+| N2 | ~320 Hz null | **c REFUSED (0/112)** · f LOW · b LOW | c REF · f +1.53 · b +0.99 |
+| P2 | mid peak | **c/f/b all HIGH** (17.0 / 6.7 / 13.6 %) | c −0.14 · f +0.05 MATCHES · b −0.88 |
+| N3 | ~800 Hz bridged-T | c TRACKS (n=3) · f/b REF | c −1.61 too shallow |
+| P3 | treble peak | c HIGH (+1.4 %) | **c −3.94 too shallow** |
+| N4 | treble null | c LOW · f LOW · b HIGH | **c +2.67** · f −0.41 · b −0.17 MATCHES |
+
+⚠ **N3 is barely measurable ON THE PEDAL SIDE** — 3 of 36 corner readings, 9 of 164 played. Item
+19's N3 row already says it is *"NOT a notch defect"*; this adds that the reference itself mostly
+has no feature there, so it is not gradeable rather than merely un-actioned.
+
+⭐ **P2's centre is HIGH at all three GRUNT positions at played settings**, which no row of item
+19's table states (P2's row is about `kPeakGainDb` and separability, a GAIN question). Unowned.
+
+### 7. The gate's own defects, all four found and fixed before anything was quoted
+
+1. ⚠⚠ **IT POOLED THE STIMULUS AXIS** — one of the four axes the item requires. Fixed by
+   re-computing every verdict per rung and flagging disagreement; that flag is §3's headline.
+2. ⚠ **It quoted verdicts off n = 1 and n = 2 cells** (`+18.33 dB` beside figures backed by 50).
+   `check-n-before-reading-a-trend`. Thin cells are now printed — hiding them would hide
+   membership — and marked `THIN`, carrying no verdict.
+3. ⚠ **It reported refusals as one number**, merging "the feature moved" with "the feature is
+   gone". Split into EDGE/MARGIN vs PROM — which is what makes §4 a diagnosis instead of a gap.
+4. ⭐⭐ **A LOSSY DISPLAY HID A SIGN CHANGE THE GUARD HAD CORRECTLY DETECTED.** The per-rung line
+   truncated each verdict to six characters, so `OFFSET model HIGH` and `OFFSET model LOW` both
+   printed as `OFFSET` — and a cell whose direction INVERTS across the ladder read as four
+   identical rungs beside a NOT-STABLE flag, i.e. as a contradiction rather than as the finding.
+   **That is s195's own defect arriving through a format string.** Fixed with direction-preserving
+   codes; a new `measurement-discipline` entry carries it.
+
+### 8. The mutation runner, and the arm that was vacuous
+
+`analysis/_mutate_gate_bv.py`, **9 of 9**. Five refusal arms (stale binary, cache changed, render
+into the read-only cache — on a PID-unique DECOY so a dead guard cannot damage the real epoch —
+GRUNT-cut-only membership, and the known answer) and four `expect_rc == 0` computed-verdict arms
+(matching, the thin guard, the stability flag, the two depth estimators).
+
+⚠⚠ **`bv4-matching` FAILED on its first run, and s110's rule resolved it: the MUTATION was
+vacuous, not the guard dead.** It targeted `mid_notch` at played GRUNT cut, reasoning that 12
+model-valid readings against 0 matched would flip `REFUSED` into a quoted number. **The model reads
+that feature in 0 of 112 cells there** — so matching is not the binding constraint and dropping it
+cannot change the line. ⭐ **Diagnosing the vacuous arm is what produced §4's finding.** Re-pointed
+at `bt_notch` corner/flat (model-valid 11, matched 0, VERIFIED before use), it passes.
+
+⚠ Fixing it also required each row line to carry its own feature name, so a needle could be unique
+— a formatting change that makes the output greppable and was worth making anyway.
+
+### 9. Status
+
+⛔ Nothing shipped, nothing proposed, no `src/` change, so **`ctest` is unaffected and stands at
+s198/s199's 22/22**; no re-baseline is owed and the current baseline remains
+`analysis/reports/s199_cutmixk.json`. **The ten-item action list is COMPLETE.**
+
+▶ What this hands forward, in priority order:
+1. **N2's presence at played GRUNT cut** (§4) — new, unowned, at the user's own baseline setting,
+   and its confirming widened-window check is owed before it is called a defect.
+2. **N1 at GRUNT flat/boost** (+8.93 dB too deep, n = 10) — s187's own named-unowned residual,
+   now sized at played settings.
+3. **P2's centre, HIGH at all three GRUNT positions** — unowned, stated by no item.
+4. **P3's depth, −3.94 dB too shallow at played cut** — unowned.
+5. ⚠ And the standing caution that now applies to all of them: **33 % of this comb's verdicts move
+   with the rung**, so none of the above may be fitted from a single-rung reading.

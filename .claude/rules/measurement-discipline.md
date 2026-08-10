@@ -2354,6 +2354,37 @@
     from a footnote to the session's headline, because the direction was the opposite of the one the
     handover led a reader to expect. ⚠ Committed while writing a gate whose entire purpose was to
     stop a previous session's direction being inherited unchecked. (s184, GATE BM's BM2)
+- ⭐⭐⭐ **A LOSSY *DISPLAY* CAN HIDE A SIGN CHANGE THAT THE GUARD CORRECTLY DETECTED — AND IT
+  PRESENTS AS THE GATE CONTRADICTING ITSELF, WHICH IS WORSE THAN A SILENT FAILURE.** A new gate
+  re-computed every pooled verdict per stimulus rung and flagged disagreement — the guard worked
+  perfectly. Its per-rung line then truncated each verdict to six characters for width, so
+  `OFFSET model HIGH` and `OFFSET model LOW` **both printed as `OFFSET`**: a cell whose direction
+  INVERTS across the ladder displayed as four identical rungs sitting beside a `NOT STABLE` flag.
+  ⭐ The first reading of that output was *"the stability check is buggy, it fires on four identical
+  values"* — i.e. the display sent the next debugging step at the one guard that was working, and
+  the finding it had caught (a sign change, which is the most consequential kind of instability)
+  was the thing being explained away. ⭐⭐ GENERAL: **any code that shortens, rounds, bins or
+  truncates a verdict for display must be checked for whether two verdicts with OPPOSITE meaning
+  can collapse onto one string** — and the check is mechanical: enumerate the verdict vocabulary
+  and assert the display map is injective. Prefer an explicit code table (`HIGH`/`LOW`/`TRK`) over
+  a slice. ⚠ This is s195's own defect (a signed statistic aggregated until a sign change cancelled)
+  arriving through a **format string** rather than through a statistic, which is why it did not
+  look like the same class of error. Same family as `unsigned-aggregates-have-no-sign` (s109) and
+  s189's `.1f` that rounded a shipped end stop to `0.0` and kept printing the retired finding.
+  (s201, GATE BV's `short()`)
+- ⭐⭐ **A MUTATION ARM POINTED AT A CELL WHERE THE GUARD IS NOT THE BINDING CONSTRAINT IS VACUOUS —
+  AND DIAGNOSING IT CAN BE HOW YOU FIND THE SESSION'S RESULT.** An arm dropped matched membership
+  and required a `REFUSED` verdict to stop being printed, targeting a cell recorded as *12
+  model-valid readings against 0 matched*. It failed. s110's rule (suspect the mutation before the
+  guard) resolved it: those 12 readings were at OTHER switch positions, and at the targeted one the
+  model reads the feature in **0 of 112** cells — so matching was never what refused that cell, and
+  dropping it could not change the line. ⭐ **The vacuity WAS the finding**: "the model has no such
+  feature at any played setting at this switch position" is a stronger and more specific statement
+  than the arm was built to test, and nothing else in the session was looking for it. ⇒ when an arm
+  fails, compute what the guard it targets is actually binding on **at that cell**; the answer is
+  either a better arm or a result. ⚠ And re-point the arm at a cell VERIFIED to have
+  `model_valid > matched > 0` before calling it fixed — which also required giving every output row
+  its own feature name so a needle could be unique, a change worth making anyway. (s201)
 - ⭐⭐ **A MUTATION TEST MUST RUN WHERE THE TOOL RUNS, AND IT NEEDS AN UNMUTATED CONTROL — OR EVERY
   MUTATION "PASSES" FOR A REASON THAT HAS NOTHING TO DO WITH THE GUARDS.** Mutation-testing GATE O's
   five guards by writing patched copies to `/tmp` returned a clean **5 of 5 PASS**. All five were
