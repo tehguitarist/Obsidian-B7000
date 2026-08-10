@@ -10,6 +10,8 @@ values rather than approximated by ear. No neural captures, so turning the knob 
 
 ![Obsidian B7000 plugin UI](image.png)
 
+**[⬇ Download the latest release](https://github.com/tehguitarist/Obsidian-B7000/releases/latest)**
+
 ## What it is
 
 Eight pots (**Master**, Blend, Level, Drive, Bass, Lo‑Mids, Hi‑Mids, Treble), two 3‑way toggles
