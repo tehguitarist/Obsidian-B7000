@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.0.1 — 2026-08-10
+
+Accuracy follow-up to 1.0.0. No control, parameter, or preset changes — a DAW project saved against
+1.0.0 loads and sounds the same except where listed below.
+
+### Fixed
+
+- **A footswitch click.** Engaging or disengaging the Distortion footswitch could produce an
+  audible click at some EQ settings — the internal mix-balance stages were reading the wrong signal
+  during the footswitch's own transition. Worst case measured at 2.85× the signal's own largest
+  sample-to-sample step; now measures at 0.59×, below the signal's own step.
+- **The 3-position switches (Attack, Grunt, and both mid-frequency selectors) now crossfade
+  cleanly** when changed during playback, closing the small click 1.0.0 listed as a known
+  limitation.
+- The overdrive tone-shaping stage's correction at the Grunt Boost and Flat positions was applied
+  with the wrong sign (making the ~320 Hz midrange character less accurate, not more, at those
+  switch positions); corrected. At Grunt Cut, a residual over-correction at moderate Drive settings
+  is narrowed.
+- The bass response's centre frequency at Grunt = Cut is corrected. A user-reported "less bass"
+  perception traced to that null sitting at roughly 1.37× the intended frequency — a centring
+  error, not a level one.
+- A previously-unmodelled coupling capacitor in the LO-MID EQ band (present on the schematic) is
+  now in the model, improving low-mid accuracy.
+
+### Changed
+
+- **6 of 14 gated accuracy rows are now over their agreed target** (down from 9 at 1.0.0).
+- The overdrive-path headroom fix flagged in 1.0.0 as scheduled for this release ("clipper
+  headroom") was investigated and found not to fit inside the pedal's own 9 V supply rail — it does
+  not work, on the physics, not on effort. The underlying defect (the overdrive path reads quiet
+  relative to the reference, worst at Grunt flat/boost) remains, and is now understood to be a
+  structural limit rather than an open task.
+
+### Verification
+
+- **22/22** automated tests (was 21/21).
+- Re-validated against the same 162-capture reference matrix.
+
 ## 1.0.0 — 2026-08-06
 
 First release. Circuit-level emulation of the **Darkglass B7K Ultra** bass overdrive / DI preamp,
