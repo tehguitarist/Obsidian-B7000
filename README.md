@@ -67,18 +67,29 @@ Three [ENG]-tagged features aren't on the schematic we traced (an original-B7K c
 own published frequency table to within 8.5%). See `circuit.md`'s `[ENG]` tags for exactly which
 parts of the circuit are schematic-verified versus engineered-to-spec.
 
-## Accuracy vs. the real pedal
+## Accuracy vs. reference captures
 
-*Placeholder — populated once Phase 9 (reference validation) runs.* Once calibration is accepted,
-this section will report sub-sample-aligned null depth against the real B7K Ultra captures across
-the drive/tone/switch matrix, the same way `analysis/null_test.py` and `VALIDATION_REPORT.md` do
-for the sibling [Monarch of Tone](https://github.com/tehguitarist/MoT) project:
+Sub-sample-aligned null depth, measured with `analysis/null_review_gate.py` against a
+pre-registered 12-capture set — fixed by control-axis coverage (clean path, both Blend/Drive
+extremes, both Attack throws, both off-flat Grunt throws) *before* any number was read, not chosen
+after the fact for how deep it goes. Same shape of measurement as `analysis/null_test.py` /
+`VALIDATION_REPORT.md` in the sibling [Monarch of Tone](https://github.com/tehguitarist/MoT)
+project. Figures are gain-matched — shape/phase agreement only, they say nothing about absolute
+level (checked separately, see `docs/calibration-and-gain-staging.md`).
 
-| Mode / setting | Best null vs. the real pedal |
-|---|---|
-| Clean (Drive min) | TBD |
-| Mid-drive | TBD |
-| Max drive | TBD |
+⚠ **The reference is a capture of the Neural DSP Darkglass B7K Ultra plugin, not a physical
+pedal** — see `.claude/rules/reference-sources.md` for the full breakdown. Its linear path (EQ,
+tone, filtering) tracks real hardware to within 1.4 dB on an independent third-party comparison, so
+a deep null there is meaningful; its even-order harmonic content sits roughly 27 dB below a real
+B7K Ultra's (a known, deliberate gap this project doesn't chase against that particular reference —
+same file, §4), so a shallower null at a heavily-driven setting partly reflects that difference in
+the *reference*, not necessarily one in the pedal.
+
+| Mode / setting | Best null, 100 Hz–8 kHz band (gain-matched) | Reference capture |
+|---|---|---|
+| Clean (OD path fully out of circuit) | −26.5 dB | `ref-clean.wav` — identical at every stimulus level, since Drive has nothing to act on |
+| Mid-drive (Drive at noon) | −15.3 dB | `ref-od.wav` |
+| Max drive | −9.4 dB | `drive-1700_base-od.wav` |
 
 ## Performance
 
@@ -89,19 +100,19 @@ are specific to the box that produced them (Apple Silicon laptop, Release build)
 
 | Oversampling | CPU (≈ % of one core) | × realtime | Added latency | Best for |
 |---|---|---|---|---|
-| **1×** | 1.1 % | 93× | 0 samples | Tracking / low-latency live use |
-| **2×** | 2.3 % | 44× | 49 samples | Everyday playing |
-| **4×** | 3.4 % | 29× | 60 samples | Higher-fidelity highs |
-| **8×** | 6.2 % | 16× | 64 samples | Maximum fidelity |
+| **1×** | 1.1 % | 88× | 0 samples | Tracking / low-latency live use |
+| **2×** | 2.4 % | 41× | 49 samples | Everyday playing |
+| **4×** | 3.7 % | 27× | 60 samples | Higher-fidelity highs |
+| **8×** | 6.6 % | 15× | 64 samples | Maximum fidelity |
+| **Render** *(auto, offline bounce)* | 6.6 % | n/a — not realtime-constrained | 64 samples | Maximum fidelity; engages automatically on DAW export (defaults to the 8× factor) |
 
 Oversampling is the CPU-vs-fidelity dial, and the CD4049 clipper's per-sample Newton solve is the
 dominant cost — but far less dominant than it was. Session 124's re-anchor of the clipper's knee
 exponent to `k = 2` put `sig()`/`sigDeriv()` back on their closed-form path instead of two
-`std::pow` each, which alone is worth **−56 to −59 % of the whole chain** at every factor; 1st-order
-ADAA (on at 1×/2× only) costs **+18 to +22 %** back at those two factors and nothing at 4×/8×. Net,
+`std::pow` each, which alone is worth **−54 to −58 % of the whole chain** at every factor; 1st-order
+ADAA (on at 1×/2× only) costs **+16 to +19 %** back at those two factors and nothing at 4×/8×. Net,
 the plugin is roughly **twice as fast as it was before session 124** — see `CLAUDE.md`'s open-work
 item 3 for the full table and the both-ends arithmetic check.
-| **Render** *(auto, offline bounce)* | — | TBD | Engages automatically on DAW export |
 
 ## Building
 

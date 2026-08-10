@@ -922,6 +922,36 @@
     the dependency on disk (which needs a `finally` restore and can leak into other runs) but to
     **inject a module-level monkey-patch into the mutant itself**, after its imports: the override
     then lives and dies with the subprocess and there is no shared state at all. (s139)
+- ⭐⭐⭐ **MUTATE THE *INPUT* TO A GUARD, NEVER ITS *OUTPUT* — OR THE ARM TESTS THE `if` AND NOT
+  THE COMPUTATION FEEDING IT, AND A VACUOUS GUARD PASSES ITS OWN MUTATION TEST.** A gate's
+  stale-binary check was written `newer = [p for p in W._src_files() if ...] if hasattr(W,
+  "_src_files") else []`. **`W` has no such attribute**, so the expression evaluated to `[]` every
+  run and the guard could never fire — and its mutation arm, which patched the line to
+  `newer = ["FAKE"]`, **passed**, because forcing the result naturally makes the `if` fire. The
+  arm proved the branch worked and said nothing about whether anything reached it. ⇒ point the
+  mutation at whatever the guard READS (here the binary's mtime, set to 0.0 so every source file
+  legitimately postdates it); a guard whose input you cannot reach from a mutation is a guard you
+  have not tested. ⭐⭐ **And the root cause deserves its own rule: a guard behind a `hasattr` /
+  `getattr(..., default)` / `try: ... except: pass` fallback is a guard that DISAPPEARS the day the
+  attribute is renamed, silently and in the flattering direction** — the same failure-open shape as
+  s106's `nan` comparisons, wearing defensive-programming clothes. Either the attribute exists and
+  you call it, or the gate refuses. ⭐ Pair it with a **non-vacuity assertion on the scan itself**
+  (here: refuse if the source glob matches nothing), and give that its own arm. (s203, GATE BX)
+
+- ⭐⭐ **A MUTATION THAT PERTURBS A SHARED HELPER CANCELS EXACTLY WHEN THE STATISTIC IS A
+  DIFFERENCE — THE FOURTH VACUITY SHAPE, AND IT READS AS `NARRATED` AGAINST A WORKING GATE.** An
+  arm built to force a band statistic to say "the model is short of LF" subtracted 50 dB inside the
+  band-reading helper. That helper is called for **both** operands (`band(model) − band(pedal)`),
+  so the perturbation cancelled to the last bit, the verdict never moved, and the runner reported
+  `WRONG GUARD / NARRATED` against a gate that was perfectly correct. ⇒
+  `difference-statistics-hide-common-mode` (s74/s75) committed **inside a mutation arm**, and
+  s110's "suspect the mutation before the guard" resolving to vacuity a fourth time. ⭐ The fix is
+  to perturb **ONE OPERAND at the call site**, never the shared reader. ⚠ And watch the regex when
+  you move there: the two call sites were `acc[b].append(...)` and `bacc[b].append(...)`, and `\b`
+  **cannot** separate them because `b` and `a` are both word characters — it needs a negative
+  lookbehind. ⭐ GENERAL: before writing any mutation, ask *which of the statistic's operands does
+  this touch?* If the answer is "both", it is inert by construction. (s203, `_mutate_gate_bx.py`)
+
 - ⭐⭐ **ASK WHETHER THE PARTIALITY YOUR GUARD IMAGINES IS STRUCTURALLY POSSIBLE — A GUARD THAT
   CANNOT FIRE IS WORSE THAN NO GUARD, AND s129's THREE-OUTCOME RULE CAN BE APPLIED TO THE WRONG
   AXIS.** GATE AE dutifully implemented "a GRUNT class that loses a stimulus rung is a MALFORMED
@@ -2070,6 +2100,37 @@
   the render preceded the final edit. Here the chain was clean (source 09:36:14 → binary 09:37:36 →
   report 10:03:07) and the report was valid; that is a fact to be *established*, not assumed —
   s118's stale-epoch read cost a retracted conclusion for want of exactly this check. (s200)
+
+- ⭐⭐⭐ **AN ADMISSION RULE CAN SELECT ON THE GRADED QUANTITY ITSELF — AND WHEN IT DOES, THE
+  DEFECT'S "SIZE" IS A PROPERTY OF THE ADMITTED SET RATHER THAN OF THE MODEL.** s178's
+  `matched_cells` lesson says an estimator's REFUSALS are correlated with the thing being graded
+  more often than they look. This is its sharpest form, and it is structural rather than
+  accidental: a feature's depth was graded only on cells where a PROMINENCE bar passed on both
+  sides — and a cell clears a prominence bar **precisely when the feature is deep**, which is the
+  outcome being scored. Measured, the admitted cells' model-side floor margin was **−11.9 dB** and
+  the refused cells' **+1.5** ⇒ admission tracked the graded quantity, in the direction that
+  inflates it. ⭐⭐ **The diagnostic is one line and it needs no threshold: print the graded
+  quantity's own proxy separately for the ADMITTED and the REFUSED cells.** If the two populations
+  differ in the direction of the finding, the pooled number is a selection effect and cannot be
+  quoted as a size. ⭐⭐ **The demonstration is stronger still — re-derive the same statistic under
+  two or three different matched memberships of the SAME data.** Here it read **+8.93 dB** (the
+  source gate's rule, n=10), **+15.66** (matched pairwise against one arm, n=4) and **+16.45**
+  (matched across five arms, n=2). A quantity that triples with the admission rule is not a
+  measurement of the device. ⚠ And check the OTHER direction before concluding: the same gate's
+  control position (where the model matches) reproduced tightly and stably, so the instrument was
+  not broken — it was being read outside the regime where it resolves. ⭐ The escape is to find a
+  statistic with **no admission rule at all** — here a fixed frequency BAND, on which every cell is
+  readable and the direction of the finding INVERTED. (s203, GATE BX's BX3/BX4)
+
+- ⚠⚠ **A VALIDITY RULE WITH TWO CLAUSES IS NOT THE SAME RULE AS ITS FIRST CLAUSE — AND DROPPING THE
+  SECOND IS THE NATURAL THING TO DO.** Grading a feature referred to its NEIGHBOUR, the source gate
+  required the graded feature to be a resolved extremum on both sides **AND** the neighbour
+  supplying the reference level not to be resting on a window bound. Reaching for the obvious rule
+  — the first clause alone — admitted 13 cells instead of 10, spanned **33.3 dB instead of 15.8**,
+  and **CHANGED SIGN** (+18.80 against −14.48). ⇒ a session would have published a sign instability
+  the real rule does not have. ⭐ GENERAL: when reproducing another gate's number, import its
+  predicate rather than restating the part of it you remember — and if your `n` disagrees with the
+  stored `n`, that is the tell, not a rounding difference. (s203)
 
 ## 3. Gates, controls and verdicts
 

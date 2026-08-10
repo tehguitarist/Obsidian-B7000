@@ -27948,3 +27948,353 @@ s198/s199's 22/22**; no re-baseline is owed and the current baseline remains
 4. **P3's depth, −3.94 dB too shallow at played cut** — unowned.
 5. ⚠ And the standing caution that now applies to all of them: **33 % of this comb's verdicts move
    with the rung**, so none of the above may be fitted from a single-rung reading.
+
+## SESSION 202 (2026-08-10) — s201's owed step: N2's widened-window confirmation, and the refusal LABELS do not mean what they were read to mean
+
+**GATE BW** (`analysis/n2_window_gate.py`), runner `_mutate_gate_bw.py` **11/11**, no `src/` change,
+nothing shipped, no re-baseline, **nothing rendered** (it reads GATE BV's own 50-render cache, whose
+stamps it re-verifies: 0 of 50 stale against the shipped binary `f28d5139…`).
+
+### 0. What was owed
+
+s201's GATE BV measured the model's `mid_notch` — item 19's **N2**, the ~320 Hz null — unreadable in
+**0 of 112 played GRUNT-cut cells** against the pedal's 38, including at `ref-od.wav`, the user's own
+stated baseline. It split the refusals by REASON — **EDGE 28 / PROM 84** — and read that split as the
+diagnosis: *"'the feature moved onto a window bound' accounts for a quarter and 'the window is right
+and there is nothing in it' for three quarters ⇒ **absence dominates migration 3:1**."* Its own
+write-up then flagged the confirming step as **owed and not run**: a `PROM` refusal is measured in a
+FIXED window, so separating *moved out of the window* from *gone* needs the widened-window read
+(GATE AV's method, s158). This session ran it.
+
+### 1. The instrument, and why it is two instruments
+
+The two refusal reasons are different questions and only one of them is answered by AV's method.
+
+- **BW4 — PINNED WIDENING**, AV's literal method, for the PROM refusals: hold the extremum where the
+  shipped window put it, widen ONLY the walk domain, re-read. ⚠⚠ **And it cannot stand alone here**,
+  which is the whole reason a second instrument exists: AV5 measured that in a window FLANKED by
+  neighbouring features — which every shipped window is — **161 of 300 feature-free curves read
+  PRESENT** under widening, because the walk climbs the neighbours' flanks.
+- **BW5 — THE INTERIOR-EXTREMUM CENSUS**, the discriminator the verdict rests on. GATE AE's
+  construction (s133): *"no interior extremum at all"* is a statement with no bar in it.
+  `bass_peak_locus._best_interior` (E2, s126's repair, classified by AV0) requires a genuine
+  **two-sided** local minimum, so a monotone flank returns **nothing** where a walk-based reader
+  returns a plausible number — and its `min(left, right)` penalises a dimple on a slope by
+  construction, because walking downhill breaks the walk immediately. ⇒ **AV5's inflation is refused
+  structurally rather than thresholded.**
+
+⭐⭐ **THE SEARCH DOMAIN IS `od_tone_restore_fit.SHOULDER` (210–520 Hz), IMPORTED, AND s151's JUMP IS
+STRUCTURALLY IMPOSSIBLE IN IT — ASSERTED, NOT CHECKED FOR.** s151 established that widening GATE W's
+`mid_notch` window is exactly where a reader changes features: at DRIVE max the model's curve falls
+monotonically from ~370 Hz into the bridged-T, so a window wide enough to hold the right shoulder
+puts the GLOBAL minimum at ~550 Hz (measured: f0 550.8, depth 0.000, edge=1). So this gate picks no
+widening factor for the SEARCH — it uses the window the stage that OWNS this feature already derived,
+and **BW0 asserts `SHOULDER`'s top (520 Hz) sits below `bt_notch`'s window (620 Hz)** and that
+`SHOULDER` strictly CONTAINS W's (285, 358), so "moved out of the shipped window" is a reachable
+outcome rather than one excluded by construction.
+
+### 2. The known answers, both of which had to hold first
+
+- **BW1a** — the imported pinned walk at widen 1.0 reproduces `W.locate`'s own `prom` to
+  **0.000e+00 over 400 readings**. AV pays this because it TRANSCRIBED the walk; this gate IMPORTS
+  it, so the assertion is really that the import still binds — which is the thing that rots silently.
+- **BW1b** ⭐⭐ — the refusal census recomputed here reproduces **GATE BV's STORED one exactly**:
+  corner model **36/36**, corner pedal **35/36**, played model **12/164**, played pedal **65/164**,
+  and every refusal REASON count. That is what makes everything below attributable: it proves this
+  gate reads BV's population through BV's predicate and is not a second opinion landing nearby.
+- **BW3 — NON-VACUITY, and it was free.** `a silent estimator and an absent feature are
+  indistinguishable` (s126/s133). BV3 had already measured the control without being asked: the model
+  resolves N2 at **36 of 36 bleed-free corner cells**. Run through the identical widened instrument
+  they classify **36/36 IN-WINDOW**, interior prominence **median 16.56 dB (7.36–30.40)** ⇒ an ABSENT
+  verdict below is a statement about the CELL, not about this gate.
+
+### 3. ⭐⭐⭐ The result — and s201's own gloss is REFUTED
+
+| refusal | IN-WINDOW | MOVED HIGH | MOVED LOW | BELOW-BAR | ABSENT | n |
+|---|---|---|---|---|---|---|
+| EDGE | 8 | 5 | 0 | 7 | 8 | 28 |
+| PROM | 53 | 0 | 0 | 31 | 0 | 84 |
+| **TOTAL** | **61** | **5** | **0** | **38** | **8** | **112** |
+
+**THE THRESHOLD-FREE NUMBER IS `ABSENT`, AND IT IS 8 OF 112.** In **104 of 112 (93 %)** the model's
+curve HAS a two-sided interior minimum between 210 and 520 Hz — there is a feature there. Of those,
+**66 clear W's own 1.0 dB presence bar** once the walk is not truncated; 38 sit below it at a median
+prominence of **0.38 dB**.
+
+⛔⛔ **SO "ABSENCE DOMINATES MIGRATION 3:1" IS REFUTED, AND THE MECHANISM OF THE ERROR IS THE
+GENERALISABLE PART: IT READ THE REFUSAL *LABELS* AS OUTCOMES.** Measured, the split does not map onto
+moved/gone at all and comes close to inverting:
+
+- **PROM** — read as *"the window is right and there is nothing in it"* — is **53 of 84 PRESENT**.
+- **EDGE** — read as *"the feature moved"* — is **13 of 28**, i.e. 15 of the 28 are the ones with no
+  feature.
+
+⇒ the reason a reader gives for refusing tells you **where it stopped looking**, not what is there.
+
+⭐ **WHERE THE FEATURE ACTUALLY IS, AND IT IS ONE NUMBER:** the located centres run
+**287.4–375.8 Hz, median 350.9**, against a window that **STOPS AT 358** — **50 of 66 sit within 3 %
+of that upper bound** and 5 sit above it. The model's N2 at played GRUNT-cut settings is a
+**~2.5 dB dimple crowding the top of a window drawn around a ~17 dB null at the bleed-free corner.**
+
+⚠ **BAR SENSITIVITY, PRINTED (s137).** Over W's own `PROM_SWEEP`: at 0.5/1.0/2.0/4.0 dB the PRESENT
+count runs **77/66/40/18** while **ABSENT is 8 at every bar** — it is not a bar call, by construction.
+⇒ quote ABSENT as the finding and PRESENT with its bar.
+
+### 4. Continuity — and a wrong test in this gate's own first draft
+
+s151's condition for calling a moved reading *"the same null"* is continuity against the same capture
+at lower drive. **BW6's first draft used a SPAN BAR** (the feature's own 1/6-oct width) and flagged 3
+captures — all high-DRIVE — as suspect. ⛔ **That is the wrong test, and the reason is worth keeping:
+a large span is what a MIGRATION and a JUMP have IN COMMON; what separates them is ORDER.** A reader
+alternating between two dimples gives an erratic sequence; one feature moving with stimulus gives a
+monotone one, and **monotonicity needs no threshold at all**.
+
+Re-tested: **26 of 26 captures MONOTONE in stimulus** (a randomly-ordered 4-sequence is monotone with
+probability 2/4! = 8.3 %; observed 100 %), median span 5.84 %, worst 34.47 % —
+`drive-1700_blend-0930` walking **375.8 → 355.2 → 282.3 → 279.5 Hz**. ⇒ ONE feature migrating.
+⭐ And the DIRECTION is the one s151 documented on the **PEDAL** at high drive (its null reaching
+238.3 Hz at DRIVE max); here it is measured on the **MODEL**.
+⚠ Monotonicity is tested **at the locator's own resolution** (`W.GRID_STEP_FRAC`, imported), not
+exactly: one capture reverses by **0.4 Hz = 0.14 %, a TENTH of a 1/48-oct cell**, and demanding exact
+monotonicity of a parabola-interpolated quantity fails correct data.
+
+### 5. Two defects in this gate's own instrument, both found rather than argued
+
+**(a) ABSENT and BELOW-BAR were merged, and the merge flattered the alarming reading.** The first
+draft called both `GONE` and reported **"46 of 112 genuinely absent"**. That merges a statement with
+NO BAR IN IT (the curve is monotone, so there is no feature at any depth) with one that is ENTIRELY a
+bar call (a real local minimum, shallower than a threshold) — and they have different owners: the
+first would be a missing feature, the second is this comb's already-measured DILUTION at a mixed
+setting. Split, the honest numbers are **8 and 38**. `three outcomes, not two` (s129), on the one
+axis where collapsing them overstates the defect by **5.75×**.
+
+**(b) The mutation runner found a CRASH.** `bw5-search-domain` restricts the search to W's own window,
+which empties the PRESENT set — and BW7 formatted a `None` and died with a `TypeError`. s117: a gate
+must refuse or degrade, never hand the next session a stack trace. Fixed, plus BW5 now prints the
+above-the-bound COUNT unconditionally, because **zero is a real reading there** and suppressing the
+line makes the gate silent in exactly the configuration a reader needs to tell from a working one.
+
+### 6. What this does NOT say
+
+- ⛔ **Nothing here says N2's DEPTH or CENTRE is right.** The model's feature is a ~2.5 dB dimple at
+  played settings against ~17 dB at the bleed-free corner — that dilution is item 19's own finding
+  and is **UNCHANGED**. The depth question is BV5's row.
+- ⚠ **The model/pedal asymmetry is real and unexplained.** The pedal reads **38 of 112** through the
+  SAME window and the SAME bar. This gate says why the model reads 0; it does not say the two sides
+  agree, and it does not measure why the pedal's null is better centred or deeper.
+- ⚠ **8 cells genuinely have no N2 at all** — small, real, and unowned. All 8 are EDGE refusals.
+- ⛔ It changes no constant, proposes none, and grades no fix.
+
+### 7. Consequence for the action list
+
+s201's hand-forward finding **(1)** — *"N2 is not measurable on the model at any played GRUNT-cut
+setting"* — is **RESOLVED as a WINDOW-AND-BAR fact, not a presence one**, and is closed as a defect
+candidate. It should not be worked as "the model is missing its 320 Hz null". What survives from it
+is (a) the 8-cell residue above, and (b) the observation that **GATE W's `mid_notch` window
+(285–358 Hz) no longer contains this feature at played settings on the model side** — which is a
+statement about the INSTRUMENT and bears on every gate that reads `mid_notch` through it.
+⛔ **NOT proposed here: moving W's window.** That is a shared constant read by GATE W/AA/AD/AE/BQ/BV
+and by `od_tone_restore_fit`; changing it would move five gates' stored numbers at once
+(`FROZEN_SETS`' trap one layer up, s186), and this gate's finding is that the window is too narrow
+for ONE feature on ONE side at ONE class of setting. It needs its own decision, with the blast radius
+priced.
+
+## SESSION 203 (2026-08-10) — s201's hand-forward finding (2): N1 at GRUNT flat/boost is the ADMISSION RULE, not the feature
+
+**GATE BX** (`analysis/n1_flat_boost_gate.py`), runner `_mutate_gate_bx.py`, no `src/` change,
+nothing shipped, no re-baseline. Artefact: `analysis/reports/s203_n1_flat_boost.json`. 65 renders
+into a private `build/n1_frontier`; both read-only epochs (`build/s122_feature_locus`,
+`build/s201_comb_confirm`) fingerprinted before and after and **unchanged**.
+
+### 0. What was owed
+
+s201 ranked this second of four hand-forward findings:
+
+    bass_notch  played flat   n=10  POINT +10.54  AREA +8.93   model TOO DEEP
+    bass_notch  played boost  n= 2  POINT  +4.78  AREA +4.49   THIN
+    bass_notch  played cut    n=46  POINT  -0.08  AREA -0.10   MATCHES
+
+filed as *"s187's own named-unowned residual, now sized at played settings"*. Unlike 9 of the
+comb's 27 cells this one is **STABLE at all four stimulus rungs**, so it clears s201's own caution
+that 33 % of these verdicts move with the rung — which is why it was worth opening first.
+
+### 1. The starting hypothesis was the s195 pattern, and its PREMISE is true
+
+`odMakeupLowCutDb = 6.0` was chosen by GATE BJ (s180), whose membership is `BH.CONDITIONS` —
+**7 cut / 1 flat / 2 boost**, the same cut-heavy pool s195 caught GATE BH with on the treble half.
+s187 then gave GRUNT = Cut its own field (`odMakeupLowCutDbCut = 2.2`), so **the shared 6.0 is now
+applied ONLY at the two positions that supplied 3 of the 10 conditions that chose it.** A constant
+fitted at cut, inherited ungraded at flat/boost — structurally identical to s195's HF peak.
+
+⭐ And the lever is architecturally clean, which s194 had already recorded from the other side:
+because s187 keyed Cut away, **`--fit odMakeupLowCutDb` and `--fit clipC15` are flat/boost-ONLY on
+the shipped build.** BX0c asserts it two-sidedly — flat and boost MOVE, cut and clean are
+**BIT-IDENTICAL** — so what was a documented trap for GATE BH (its Cut arms silently inert) is the
+feature here.
+
+⛔⛔ **The premise holds and the conclusion does not.** Graded directly at flat/boost on a complete
+population, 6.0 is the BEST value available and every lever move is worse (§5). Recorded because
+the analogy to s195 was strong, it was the obvious thing for the next session to try, and it fails.
+
+### 2. BX1 — the known answer, exact on both graded positions
+
+Recomputed from GATE BV's own cache through BV's own `valid`/`shoulder_ok`/`comb_of`:
+
+    played flat   n 10 (BV 10)   here +8.93 dB   BV +8.93 dB   |Δ| 0.000e+00
+    played boost  n  2 (BV  2)   here +4.49 dB   BV +4.49 dB   |Δ| 0.000e+00
+
+⇒ the reader and the membership rule are validated together, and through BV2 this chains to GATE BQ
+(s190), s125's published loci and GATE AE's docstring. ⚠ `cut` is SAMPLED here (5 files, n=4) where
+BV enumerates 31, so its |Δ| of 0.158 is a membership difference and BX1 requires exactness on the
+**graded** positions only, and says so.
+
+### 3. ⭐⭐ BX2 — the decomposition, and s201's headline SURVIVES it
+
+BV's depth is `area(neighbour) − area(feature)`; for `bass_notch` the neighbour is `bass_peak`. So
+`+8.93` could have been the notch, the peak, or both, and **neither operand had ever been printed**
+(s117). Split:
+
+    flat   n=10   Δnotch  -8.96   Δpeak  +1.15   Δdepth  +8.93  ⇒ notch 100.3 %, peak  12.9 %
+    boost  n= 2   Δnotch  -3.49   Δpeak  +1.00   Δdepth  +4.49  ⇒ notch  77.7 %, peak  22.3 %
+
+⇒ **it genuinely is N1.** A check that could have failed and did not — worth recording as such,
+because P1 (the bass peak) is independently known to be 20 % off in centre (s201 §5) and was a live
+candidate to be contaminating this.
+
+### 4. ⭐⭐⭐ BX3 — but `+8.93 dB` is not a defect SIZE
+
+Four properties of the statistic, all computed:
+
+- **SELECTION.** Admitted cells have a MODEL floor margin of **−11.9 dB**; refused cells **+1.5**.
+  A cell is admitted precisely when the model's null is DEEP enough to clear `MIN_PROM_DB` ⇒ **the
+  admission rule selects on the graded quantity**, in the direction that inflates it. s178's
+  `matched_cells` lesson, and 10 of 24 flat cells survive it.
+- **CENSORING.** **10 of 10** admitted flat MODEL bottoms sit BELOW the deconvolution residue, so
+  every quotable reading is a **LOWER BOUND** — and there is no robust estimator to fall back on,
+  because s191's AP1b measured the AREA depth's censoring robustness as **1.0× at MIXED cells**
+  (its 4.1× is a BLEED-FREE property) and every cell here is mixed.
+- **DISPERSION.** A 15.83 dB spread about its own median = **1.8×**, from 10 readings that are
+  really **3 captures × 3–4 rungs**.
+- **WINDOW.** At boost, **8 of 28** cells EDGE-refuse at f0 = 30.7 Hz against the window's own
+  30.0 Hz bound, **on both sides** — s202's N2 finding on a second feature. (At flat, 0 of 24;
+  flat's refusals are PROM, i.e. presence.)
+
+⭐⭐ **AND THE SIZE IS A PROPERTY OF THE ADMITTED SET, NOT OF THE MODEL — the same data reads
++8.93 dB (BV's rule, n=10), +15.66 (matched pairwise against one arm, n=4) and +16.45 (matched
+across five arms, n=2).**
+
+⚠⚠ One membership subtlety, recorded because it is the read a session gets by reaching for the
+obvious rule: applying `BV.valid()` to the graded feature ALONE — and letting the NEIGHBOUR that
+supplies the reference level rest on a window bound — admits 13 cells instead of 10, spans
+**33.3 dB** and **CHANGES SIGN** (+18.80 against −14.48). ⇒ **`shoulder_ok` on the neighbour is
+load-bearing, not bookkeeping.** This session's own first probe did it the loose way and would have
+published a sign instability that BV's rule does not have.
+
+### 5. ⭐⭐ BX4 — on a complete statistic the direction INVERTS
+
+A fixed band has none of §4's properties: every cell readable, nothing located, nothing selected,
+nothing censored — and it is **s187's own axis**, so the numbers stay commensurable with the session
+that scoped the fix to Cut.
+
+| GRUNT | 40–80 Hz median | 63–100 Hz median | mean\|err\| (40–80) | cells model-LOW (63–100) |
+|---|---|---|---|---|
+| cut (CONTROL) | −0.13 | +0.05 | 0.52 | 9/20 |
+| flat | **−0.33** | **+1.27** | 1.71 | **1/24** |
+| boost | **+1.46** | +0.96 | 2.16 | 4/28 |
+
+⇒ **the model is NOT short of LF at flat or boost — it is slightly HIGH.** A null genuinely 8.9 dB
+deeper would pull these DOWN, and it does not. What differs is that the model's cancellation is
+**narrower and deeper**: a 1/6-octave depth reads it as ~9 dB and an octave-wide band reads it as
+~0. ⚠ flat/boost are still 3–4× worse than cut on `mean|err|` (1.71 / 2.16 vs 0.52) — that scatter
+is real and untouched; what is refuted is its DIRECTION and its size.
+
+⭐ BX4b guards the whole axis: the normalisation band moves at most **0.190 dB** between arms
+against band errors up to 6.95, so none of these readings is a normalisation shift wearing an LF
+name.
+
+### 6. ⛔⛔ BX5 — every lever is worse, at both positions, on every column
+
+| arm | flat 40–80 | flat 63–100 | flat \|err\| | boost 40–80 | boost 63–100 | boost \|err\| |
+|---|---|---|---|---|---|---|
+| **SHIP (5.2n / 6.0)** | **−0.33** | **1.27** | **1.71** | **1.46** | **0.96** | **2.16** |
+| C15 only (2u2 / 6.0) | 2.24 | 2.60 | 2.37 | 4.46 | 1.96 | 4.11 |
+| shelf only (5.2n / 2.2) | 0.85 | 3.54 | 2.68 | 4.20 | 3.00 | 4.44 |
+| BOTH = s187 global | 5.44 | 4.96 | 4.83 | 6.78 | 4.03 | 6.51 |
+| C15 300n / 6.0 | 2.16 | 2.58 | 2.34 | 4.43 | 1.95 | 4.09 |
+
+**Arms beating SHIP on all three columns: NONE, at both positions.**
+
+⚠⚠ **And the DEPTH axis cannot arbitrate this at all**: matched across the five arms it retains
+**2 of 24 cells at flat and 0 of 28 at boost**. Checked for fairness against a straw arm — matched
+**pairwise** against a single mild arm it is still only **4 of 24**, so the fragility is intrinsic.
+On those 4 cells the levers do help (15.66 → 9.06 with C15, → 11.13 with the shelf), which is a
+genuine trade — but it resolves against them, because the axis that improves is the censored,
+selected, 4-of-24 one and the axis that worsens is complete.
+
+### 7. ⭐ BX6 — s187's global refutation reproduces, three epochs later
+
+s187 rendered the Cut pair applied GLOBALLY and recorded flat/boost's 63–100 Hz error going to
+**+3.2…+9.7 dB**. Measured now, across s190's taper, s195's HF key and s196/s199's mix-K rows:
+
+    flat   +4.96 dB   ✅ inside      boost  +4.03 dB   ✅ inside
+
+⇒ a free cross-session known answer, and s187's decision to scope the fix to GRUNT = Cut **stands
+on current evidence** rather than on its own epoch's.
+
+### 8. The runner, and its own vacuous arm
+
+`analysis/_mutate_gate_bx.py`, **11 of 11** — five refusal arms (stale binary, a VACUOUS probe that
+changes nothing, rendering into a read-only epoch, and the known answer) and five `expect_rc == 0`
+computed-verdict arms (the carrier, the selection verdict, BX4's direction, a dominating arm, and
+s187's reproduction), each required to print the OPPOSITE verdict.
+
+⚠⚠ **`bx4-model-is-short` FAILED on its first run, and s110's rule resolved it to a VACUOUS
+MUTATION for the fourth time in this project's runners.** The arm pushed the model's LF down by
+50 dB — by patching the band-reading helper. That helper is called for **both** operands
+(`band(model) − band(pedal)`), so the perturbation **cancelled exactly**, the verdict never moved,
+and the runner reported `WRONG GUARD / NARRATED` against a gate that was correct. ⇒
+**`difference-statistics-hide-common-mode` committed inside a mutation arm.** Fixed by perturbing
+**one operand at the call site**; ⚠ and the regex needs a negative lookbehind, because the two call
+sites are `acc[b].append(...)` and `bacc[b].append(...)` and `\b` cannot separate them (`b` and `a`
+are both word characters). A new `measurement-discipline` entry carries it.
+
+⭐ The runner gained an optional arm-name filter in the same pass — one arm re-runs in ~2.5 min
+against ~28 for the full set, which is what made diagnosing the vacuity cheap rather than a
+second full cycle.
+
+⛔⛔ **AND A SECOND, WORSE ONE: THE STALE-BINARY GUARD WAS ITSELF VACUOUS, AND ITS ARM PASSED
+ANYWAY.** It was written `newer = [...] if hasattr(W, "_src_files") else []` — **`W` has no such
+attribute**, so it evaluated to `[]` every run and could never fire. The arm passed because it
+patched the RESULT line (`newer = ["FAKE_SRC"]`), which forces the `if` and tests nothing feeding
+it. ⇒ **mutate the INPUT to a guard, never its output**, and ⛔ **a guard behind a `hasattr`
+fallback is a guard that disappears the day the attribute is renamed** — s106 N3's failing-open
+`nan` in defensive-programming clothes. Rewritten the way GATE BV0 writes it, with no fallback,
+plus a non-vacuity refusal if the source glob matches nothing, and TWO arms (`bx0-stale-binary`
+now sets the binary's mtime to 0.0; `bx0-scan-empty` empties the scan). Runner **11 arms**.
+
+⚠⚠ **AND THE FIX WAS MADE WHILE THE RUNNER WAS MID-FLIGHT, WHICH IS s184's OWN RULE BROKEN.** The
+runner re-reads the gate's source once per arm, so an edit part-way through puts the early arms on
+one epoch and the later ones on another and the tally is **unattributable** — exactly like s124's
+mixed-binary matrix report, and it looks completely normal because every line still says PASS. The
+part-run was **killed and discarded**, the mutants swept, and the full set re-run against a source
+frozen and hash-recorded first. ⇒ `pgrep` for a running runner before editing the gate it tests,
+not just before a build.
+
+### 9. Verdict
+
+**N1 at GRUNT flat/boost CLOSES as CHARACTERISE AND ACCEPT. Nothing shipped, nothing proposed.**
+The direction survives as an unmeasurable **sharpness** difference — the model's LF cancellation at
+flat is narrower and deeper than the pedal's — and **`+8.93 dB` is refuted as a defect size**.
+
+⛔ What must NOT be done with this: re-open it by quoting the depth number, or re-run the lever
+sweep. Both are answered. ⚠ What is genuinely left and is NOT this finding: flat/boost's `mean|err|`
+of 1.71 / 2.16 dB over 40–80 Hz against cut's 0.52 — real, small, one-signed at boost, and it is a
+BAND statement, not a null statement.
+
+### 10. Status
+
+`ctest` unaffected (no `src/` change) and stands at s198/s199's **22/22**; the current baseline
+remains `analysis/reports/s199_cutmixk.json`. ⇒ **two of s201's four hand-forward findings remain:
+(3) P2's centre HIGH at all three GRUNT positions, and (4) P3's depth −3.94 dB too shallow** — both
+unowned, both subject to s201's rung caution, and both graded through the same locator whose
+admission rule this session has now shown selects on the graded quantity at a neighbouring feature.
