@@ -77,14 +77,6 @@ after the fact for how deep it goes. Same shape of measurement as `analysis/null
 project. Figures are gain-matched — shape/phase agreement only, they say nothing about absolute
 level (checked separately, see `docs/calibration-and-gain-staging.md`).
 
-⚠ **The reference is a capture of the Neural DSP Darkglass B7K Ultra plugin, not a physical
-pedal** — see `.claude/rules/reference-sources.md` for the full breakdown. Its linear path (EQ,
-tone, filtering) tracks real hardware to within 1.4 dB on an independent third-party comparison, so
-a deep null there is meaningful; its even-order harmonic content sits roughly 27 dB below a real
-B7K Ultra's (a known, deliberate gap this project doesn't chase against that particular reference —
-same file, §4), so a shallower null at a heavily-driven setting partly reflects that difference in
-the *reference*, not necessarily one in the pedal.
-
 | Mode / setting | Best null, 100 Hz–8 kHz band (gain-matched) | Reference capture |
 |---|---|---|
 | Clean (OD path fully out of circuit) | −26.5 dB | `ref-clean.wav` — identical at every stimulus level, since Drive has nothing to act on |
