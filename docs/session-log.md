@@ -27525,3 +27525,232 @@ four rebuilds) — s195's pattern, applied so the A/B renders stayed valid.
 this session did not re-open it, and the comment block above it still describes a real 5 ms failure
 at `blend-noon`. ⚠ Nothing here touches item 17, item 10 or the release gate; the matrix is
 bit-identical, so `s196_mixk.json` remains the current baseline.
+
+---
+
+## SESSION 199 (2026-08-10) — action-list item 8: the narrow lever cannot reach the collateral, and one component of the declined arm is refuted by render
+
+**Outcome: `OdToneRestore::kNotchMixK`'s Cut row SHIPS at entries 0 and 2 (with 1 and 3 re-derived,
+entry 4 held). USER DECISION 2026-08-10. `ctest` 22/22.**
+
+### 1. What item (8) asked, and why its own answer is no
+
+s196 knowingly left Cut × DRIVE 0.5 over-cutting the bleed-free corner by **4.84 dB**, having priced
+and declined the all-rows arm on two objections: it *"moves 19 captured mixed cells and puts
++2.67 dB into the Cut row's own ungraded band"*. Item (8) asked whether a **narrower** lever — moving
+just that one table entry rather than the whole row — reaches the residual without that collateral.
+
+⛔⛔ **It does not, and the arithmetic is one line.** The corner fix needs
+`ΔK = −4.837 / S(corner) = −5.086`, and the ungraded band contains `S_min = −0.525`, so that entry
+alone contributes `−5.086 × −0.525 = +2.67 dB` there. **That is the entire published collateral.**
+Measured, the worst ungraded excursion is **IDENTICAL (+2.67 dB) across all three candidate arms** —
+all-rows, entry-2-only, and entries-0+2. It is a property of the **cell**, not of the row's width, so
+no choice of which *other* entries to move can reduce it.
+
+⇒ item (8)'s premise is refuted: narrowing buys nothing on the axis s196 declined on. What shipped
+accepts that objection rather than dodging it.
+
+⭐ Confirmed first that only the Cut row is live on this epoch: re-solving Flat and Boost against
+GATE AP's area targets today returns `dK ≤ 0.007` at 6 of 6 cells, i.e. they are already AT their
+area solution. Consistent with s196, and it means every number below is attributable to the Cut row.
+
+### 2. The second objection is near-empty when measured, not merely small
+
+s196 recorded the all-rows arm's 19 mixed cells costing **−0.00 / +0.01 dB**. Re-measured on THIS
+arm rather than inherited, the three largest movers read:
+
+| capture | applied Δcut | POINT err | AREA err |
+|---|---|---|---|
+| `level_ladder` cf 0.2284 | **+2.39** | 0.81 → 0.82 (+0.02) | 0.63 → 0.70 (**+0.07**) |
+| `blend` cf 0.2681 | **+1.78** | 0.58 → 0.53 (−0.06) | 0.33 → 0.39 (**+0.06**) |
+| `mixgrid` cf 0.9845 | **−1.26** | 0.04 → 0.04 (−0.00) | 0.04 → 0.04 (**−0.00**) |
+
+⇒ the composite dilutes an OD-branch change so hard that 2.39 dB of applied cut costs 0.07 dB of
+measured error. **The cell COUNT was never a measured price**, and quoting "19 cells move" as the
+objection overstates it by roughly two orders of magnitude.
+
+### 3. ⛔⛔ DRIVE 1.00's correction is REFUTED BY RENDER — which is what makes the shipped arm win
+
+Rendering each Cut corner cell fixed alone (GATE BT's own `curves_arm`/reader, 3 sweeps each):
+
+| drv | applied Δcut | realised Δ POINT | realised Δ AREA | realised/applied (area) |
+|---|---|---|---|---|
+| 0.00 | −1.08 | −0.20 | **−0.37** | 0.345 |
+| 0.50 | −4.84 | **+1.24** | **−1.79** | 0.369 |
+| 1.00 | −1.91 | +0.18 | **+0.14** | **0.075** |
+
+DRIVE 1.00 applies 1.91 dB and realises **+0.14 dB of AREA error — wrong-signed**, at a
+realised/applied ratio of **0.075**, where 0.00 and 0.50 sit at 0.345/0.369, **inside s185's
+independently measured 0.304–0.689 composite-dilution range**. ⚠ n = 3 sweeps: a **flag, not a
+mechanism**, and it is NOT attributed (the pedal's null migrates at high drive — s151's documented
+238.3 Hz — and `notch_geometry`'s CORE window is known not to transfer off GRUNT Cut). Dropping it is
+nonetheless what makes the shipped arm beat the one s196 declined, **on both axes at once**:
+
+| arm | corner AREA gain | captured mixed cells moved | worst ungraded ADDS-cut |
+|---|---|---|---|
+| all-rows Cut *(s196 declined)* | −2.02 | 19 | **+2.67** |
+| entry-2 only *(item 8's lever)* | −1.79 | 15 | **+2.67** |
+| **entries 0+2 — SHIPPED** | **−2.16** | **15** | **+2.67** |
+
+### 4. ⚠⚠ The POINT column, quoted with the change
+
+At the target cell the two depth estimators move OPPOSITE ways: **AREA 2.41 → 0.62** and
+**POINT 2.60 → 3.84**. That is s153's metric trade, which s196's USER DECISION already reversed *at
+the corner for this table* — so this ships under the governing metric, not in spite of one.
+⛔ It is **not** a demonstration that the area depth is what a listener tracks; s153's grounds (2)
+hardware-is-deeper and (3) the ear is unestablished are untouched and both still argue the other way.
+
+⭐ The plain-language version, on one sweep (`sweep_drv_-12`), is the clearest statement of what
+POINT and AREA even are here: the pedal reads **point 13.92 / area 9.08**; the shipped model read
+**14.67 / 11.73** — its notch BOTTOM was already near-right and its notch was too **WIDE**; the
+candidate reads **11.34 / 9.78** — it fixes the width and overshoots the bottom. Depth and width are
+two coordinates of one feature, and no single number orders them.
+
+### 5. ⛔ A genuinely narrower lever exists and was deliberately NOT taken
+
+At one cell the applied cut is exactly `base + K·S(cf)`, so a narrow fix has **two** free parameters
+and every arm above moved only one. Pinning the corner leaves a 1-D family, and **7 points on it
+dominate pure-K on BOTH axes**:
+
+| ΔK | Δbase | worst graded \|Δcut\| | listening Δcut | ungraded ADDS-cut |
+|---|---|---|---|---|
+| −5.09 (pure K) | 0.00 | 2.39 | −0.03 | **+2.67** |
+| −4.50 | −0.56 | **1.68** | −0.58 | **+1.80** |
+| −4.00 | −1.03 | 2.03 | −1.06 | **+1.07** |
+
+Every one needs `Δbase ≠ 0`, i.e. re-opening **`kNotchGainDb`** — which s153 decided, s196 explicitly
+scoped out (*"THIS TABLE IS UNCHANGED AND STAYS UNCHANGED"*), and s192 measured as **RIGHT** at the
+mixed cells (0.54 dB rms). `Δbase` is a UNIFORM addend, so it moves the listening cell **0.58 dB**
+where pure K moves it 0.03. ⇒ a USER DECISION to reverse, not a tuning choice. Recorded, not taken.
+
+### 6. What shipped, and the verification
+
+`kNotchMixK[cut]`: `{−7.87, −8.61, −9.34, −9.50, −9.65}` → **`{−9.01, −11.72, −14.43, −12.04, −9.65}`**.
+
+⚠ **Entries 1 and 3 are RE-DERIVED, not left behind.** The row's own provenance note says DRIVE
+0.25/0.75 are the linear interpolants of their neighbours, and the shipped row satisfied that exactly
+(`−8.61 = mean(−7.87, −9.34)`). Moving entries 0 and 2 without recomputing them would leave the row
+self-inconsistent; the identity holds on the **rounded** values too (`−11.72 = mean(−9.01, −14.43)`
+and `−12.04 = mean(−14.43, −9.65)`, both exact). ⭐ Rounding to the table's own 2 dp costs
+**0.0036 dB** against the exact candidate that was rendered.
+
+- ✅ **`ctest` 22/22** (74.6 s, `-j 12`).
+- ⭐⭐ **TWO-SIDED SCOPE, RENDERED, 6/6 as predicted — and the predictions are non-trivial.** Because
+  entry 4 was HELD, DRIVE 1.00 must come back **BIT-IDENTICAL** while DRIVE 0.00 and 0.50 must move;
+  a guard that only demanded "cut moves" would have passed just as well had the whole row shipped.
+  `level-1700` MOVED · `drive-0700_level-1700` MOVED · **`drive-1700_level-1700` BIT-IDENTICAL** ·
+  `grunt-flat` BIT-IDENTICAL · `grunt-boost` BIT-IDENTICAL · `ref-clean` BIT-IDENTICAL.
+  ⭐ The "before" arm cost no second relink: `W.render` stamps argv but **not the binary** (s117's
+  trap), so the pre-edit renders were preserved on disk rather than silently refreshed.
+- ⭐⭐ **ACCEPTANCE: the shipped build reproduces the priced candidate to 0.00281 dB** over 6
+  comparisons, against a bar of **0.02 = the table's own 2-dp rounding** (predicted 0.0036).
+  ⇒ §3's rendered rows ARE the acceptance and no re-render of the corner cells is owed.
+  ⚠⚠ **That check was VACUOUS on its first run and said so.** It matched the candidate directory by
+  an exact float string (`-1.837045` against a directory named `-1.837028`), found nothing, and
+  compared **zero** arms — `empty-gate-must-fail`, and **the same trap s196 hit on the same check**,
+  where it printed a ✅. Here the asserted comparison COUNT caught it; fixed with a nearest-offset
+  match plus a refusal if the nearest is further than 0.01.
+
+### 7. What is knowingly left open
+
+- **DRIVE 1.00's own corner error stays at +1.91 dB**, by §3 — its correction does not work.
+- **The ungraded diallable band now carries +2.67 dB at cut** (cf ≈ 0.210, i.e. LEVEL just below
+  max), joining flat's +4.26 and boost's +7.42. Accepted with the change, not dodged by it.
+- **`kNotchGainDb` is untouched** and the (Δbase, ΔK) frontier in §5 is unexplored by decision.
+- ⛔ **GATE BT has no `cutonly` arm** — this session's arms were built in a scratch probe against
+  BT's own imported machinery rather than added to the gate. Owed if this row is revisited.
+
+### 8. The matrix, priced — rendered s199, GRADED s200
+
+⚠⚠ **s199 ended with its 162-capture render finished on disk and never graded, and `CLAUDE.md`
+still naming `s196_mixk.json` as the current baseline** — i.e. the project carried a shipped DSP
+constant against an unpriced matrix. That is **s182's own documented trap, reproduced exactly**
+(*"a session that renders its matrix LAST hands over an unpriced baseline"* /
+*"a render is not a deliverable until something has GRADED it"*). The grading below is s200's first
+job, and nothing about the ship changed as a result.
+
+**Provenance, checked BEFORE any number was read** (s118's stale-epoch trap cost a retracted
+conclusion, so this is not optional): `OdToneRestore.h` last edited **09:36:14** → `OfflineRender`
+linked **09:37:36** (md5 `f28d51392c35137ac2d76374409ad6fc`, 3 730 032 bytes) → report written
+**10:03:07**. The binary postdates the source edit and the report postdates the binary ⇒ the matrix
+was rendered from the shipped build. Both reports carry `fit_overrides: []` (compiled defaults —
+correct, `kNotchMixK` is not `--fit` exposed).
+
+**Membership FIRST** (`aggregate-moved-check-membership-first`, 12 prior occurrences): the two
+reports' capture sets are **identical by name, 162/162**, and every gate cell's `n_rows` matches.
+Only then were deltas read.
+
+**Result: 6 of 14 gated rows over SHIP → 6, and NO verdict word changed on any row.**
+
+| gated row | s196 | s199 | Δ |
+|---|---|---|---|
+| OD 100 Hz–8 kHz median | 0.506 | **0.505** | −0.001 |
+| OD 100 Hz–8 kHz p90 | 2.854 | 2.854 | −0.000 |
+| OD 25–100 Hz median | 0.773 | 0.773 | −0.000 |
+| OD 25–100 Hz p90 | 3.361 | **3.357** | −0.004 |
+| OD 8–16.3 kHz median | 0.578 | 0.578 | +0.000 |
+| OD 8–16.3 kHz p90 | 5.295 | 5.295 | −0.000 |
+| OD ALL p99 | 9.292 | **9.291** | −0.001 |
+| OD ALL band-RMS | 1.765 | **1.762** | −0.003 |
+| CLEAN × 4 | — | — | **bit-identical** |
+| THD full send | 2.534 | 2.535 | **+0.001** |
+| THD gain-n12 | 1.626 | 1.627 | **+0.001** |
+
+⇒ **12 of 14 improve or are flat; the only two that worsen are the THD pair at +0.001 each**, SHIP
+and STRETCH respectively either way. ⚠ One **UNGATED** row worsens and is recorded so it is not
+rediscovered as a surprise: **OD 8–16.3 kHz p99 13.514 → 13.588 (+0.074)**, while every *gated* HF
+statistic is flat.
+
+#### 8a. ⭐⭐⭐ The full-inventory scope check, and its non-trivial prediction
+
+s199 verified scope on 6 hand-picked captures. Run across all 162, the prediction that could have
+failed is the held entry:
+
+- **70 of 162 moved — every one GRUNT = Cut at DRIVE < 1.00.**
+- **All 18 GRUNT = Cut captures at DRIVE 1.00 are BIT-IDENTICAL, worst |Δ| 0.000e+00** ⇒ entry 4
+  really was held, proven by render rather than by reading the table.
+- **21/21 GRUNT flat+boost unmoved. 51/51 CLEAN-named unmoved.** (`bypass.wav` has no `gruntIdx` —
+  architecturally outside the DSP, as at s196.)
+
+⚠ A guard demanding only *"GRUNT = Cut moves"* would have passed had the **whole** row shipped. The
+DRIVE-1.00 arm is what makes this a two-sided check.
+
+#### 8b. ⭐⭐ The LEVEL dose-response reproduces §2's price from a different instrument
+
+Worst |Δ| on the graded `plugin_db`, by LEVEL: **1.124 dB at LEVEL max** (the bleed-free corner the
+fix targets) → **0.331** (0.875) → **0.068** (0.75) → **0.054** (0.5) → **0.011** (0.25). And
+**`ref-od.wav`** — GRUNT cut, DRIVE 0.5, LEVEL noon, the user's own stated baseline — moves
+**0.0020 dB**.
+
+⇒ the composite dilutes an OD-branch change to ~nothing at every played setting. §2 measured that
+cell-by-cell on GATE BT's AREA reader (+0.07 / +0.06 / −0.00 dB); this is the same conclusion from
+the matrix's own per-band FR, which shares none of that machinery.
+
+#### 8c. ⛔⛔ The largest number in the diff is 87.8 and it is NOT dB
+
+A first pass walked the `fr` **and** `thd` blocks together and reported *"worst |Δ| = 87.844 dB"*.
+Localised, it is `thd.plugin_pct` at one band of `level-1700_attack-boost_base-od`, moving
+**304.4 % → 216.6 %** — a **THD PERCENTAGE**, not a level. That is GATE Z's / s122's documented
+**denominator artefact** (the model's fundamental collapses in a cancellation null, so
+THD-as-a-ratio explodes), and 304 % → 217 % moves *away* from an absurdity rather than toward one.
+
+⭐ GENERAL, and the reason it is written down: **a report block whose members carry different UNITS
+cannot be reduced to one "worst |Δ|"** — the mixed walker produced a plausible, alarming,
+unit-less number that would have been published as a level. Separated: **FR worst 1.124 dB**, THD
+worst 87.8 percentage points. Same family as
+`ratio-statistics-need-a-denominator-guard` and s107's *"a control is a curve until proven
+otherwise"*.
+
+#### 8d. What this report may and may not be quoted for
+
+⚠⚠ **57 % of the matrix cannot see this change by construction** (it is GRUNT = Cut × DRIVE < 1.00
+only), so *"essentially free"* is a statement about the matrix's GRUNT × DRIVE composition, not
+about the change's quality — the same caveat s195 and s196 carry for their own 13 %. **The evidence
+for the ship is the rendered corner measurement in §3/§6, not this report.** What the report does
+establish, and it is not nothing: the change costs the graded population **nothing outside its own
+corner**, crosses no class, and leaves CLEAN untouched.
+
+⚠ Instrument note for the next session: **`release_gate.py --compare` takes METHOD names
+(`csd`/`h1`/`h1band`) within ONE report — it does not compare two files**, and handing it a path
+fails with *"method '…json' not stored"*. Diff two epochs via `--json` on each and difference the
+`cells` dict, checking `n_rows` first.

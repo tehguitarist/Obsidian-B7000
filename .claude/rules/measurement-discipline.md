@@ -2038,6 +2038,39 @@
   frozen groups by content, so a later edit refuses instead of silently shifting five gates'
   stored numbers. (s186, GATE BO)
 
+- ⭐⭐⭐ **A "WORST |Δ| OVER THE WHOLE RECORD" IS MEANINGLESS THE MOMENT THE RECORD MIXES UNITS —
+  AND IT PRODUCES A PLAUSIBLE, ALARMING, UNIT-LESS NUMBER THAT READS AS A LEVEL.** Scoping a shipped
+  constant across the 162-capture matrix, a walker took the max |delta| over each capture's stored
+  blocks and reported **"worst |Δ| = 87.844 dB"** — a figure that would have gone into a baseline
+  block as a catastrophic level error. The report's per-capture record holds an `fr` block in **dB**
+  and a `thd` block in **PERCENT**, and 87.844 is `thd.plugin_pct` moving **304.4 % → 216.6 %** at one
+  band: GATE Z's / s122's documented denominator artefact (the model's fundamental collapses in a
+  cancellation null, so THD-as-a-ratio explodes), moving *away* from an absurdity. Split by block the
+  honest pair is **FR worst 1.124 dB / THD worst 87.8 percentage points**, and the graded quantity —
+  the only one the gate scores as a shape error — is the 1.124. ⭐ GENERAL: **before reducing a
+  structured record to one extremum, enumerate the units its fields carry**; if there is more than
+  one, the reduction must be per-block and every reported number must carry its unit. The tell is
+  free and was nearly missed — an implausible magnitude beside a quantity whose plausible range you
+  already know (a level error of 87 dB in a gain-matched matrix is not a physical outcome, it is a
+  units bug). ⚠ Two habits that caught it: `an-implausible-coincidence-is-a-bug-report` pointed at
+  one's own summary statistic, and localising the extremum to its **block, sweep, key and index**
+  before quoting it — which took one loop and turned a fabricated headline into a known artefact.
+  Same family as `ratio-statistics-need-a-denominator-guard` (the offending field IS a ratio) and
+  s107's *"a control is a curve until proven otherwise"*. (s200, grading `s199_cutmixk.json`)
+
+- ⚠⚠ **A SESSION THAT SHIPS A CONSTANT AND RENDERS ITS MATRIX LAST WILL HAND OVER AN UNPRICED
+  BASELINE — s182 DOCUMENTED THIS AND s199 REPRODUCED IT EXACTLY.** s199 shipped a table row, started
+  the 162-capture render, wrote up everything else, and ended with the finished report sitting on disk
+  **ungraded** while `CLAUDE.md` still named the previous session's report as CURRENT BASELINE. The
+  render was fine; nothing was corrupted; the project simply carried a shipped DSP change against a
+  matrix nobody had read. ⭐ The rule s182 already states — *"a render is not a deliverable until
+  something has GRADED it"* — needs one operational addition: **the grading is the NEXT session's
+  first job, and it must re-check provenance before reading a number** (binary mtime vs the last
+  `src/` edit vs the report mtime, plus `fit_overrides`), because by then nobody remembers whether
+  the render preceded the final edit. Here the chain was clean (source 09:36:14 → binary 09:37:36 →
+  report 10:03:07) and the report was valid; that is a fact to be *established*, not assumed —
+  s118's stale-epoch read cost a retracted conclusion for want of exactly this check. (s200)
+
 ## 3. Gates, controls and verdicts
 
 - ⭐⭐⭐ **WHEN A NEW FEATURE DELIBERATELY BREAKS AN INVARIANT AN OLD GUARD ASSERTS, HOLD THE
