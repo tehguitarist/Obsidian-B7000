@@ -28,9 +28,8 @@
 //
 // WHAT IS ASSERTED (and why each one is not vacuous):
 //
-//   1. Finiteness + non-zero checksum on every arm — `empty-gate-must-fail` in a
-//      probe is still `empty-gate-must-fail`; a probe that reports a NUMBER is a
-//      gate whatever it is called (measurement-discipline.md §5, session 118).
+//   1. Finiteness + non-zero checksum on every arm — a probe that reports a NUMBER
+//      is a gate whatever it is called, and an empty one must still fail loudly.
 //   2. **`k = 2.4653` + ADAA=Full is BIT-IDENTICAL to `k = 2.4653` + ADAA=Off.**
 //      `Clipper::adaaExact()` gates the substitution on `hardness == 2.0`, so ADAA
 //      is *silently inert* off the anchor (FitParams.h::clipAdaa says so). That

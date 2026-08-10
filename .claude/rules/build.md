@@ -9,7 +9,7 @@
   before chowdsp_wdf and `#include <xsimd/xsimd.hpp>` before `<chowdsp_wdf/chowdsp_wdf.h>`.
 - `-Wall -Wextra` on GCC/Clang. **MSVC's `cl.exe` misparses `-Wextra`** (error D8021: `/W` with a
   non-numeric arg), so gate the flags — `/W4` on MSVC, `-Wall -Wextra` otherwise — via a
-  `PEDAL_WARNING_FLAGS` variable (see `CMakeLists.txt.template`). A hardcoded `-Wextra` breaks the
+  `PEDAL_WARNING_FLAGS` variable (see `CMakeLists.txt`). A hardcoded `-Wextra` breaks the
   Windows CI build.
 - **Mark third-party headers (chowdsp_wdf, etc.) as SYSTEM includes.** `juce_recommended_warning_flags`
   enables `-Wshadow-field-in-constructor`, which fires harmlessly on chowdsp_wdf's header-only
@@ -34,8 +34,8 @@ git submodule update --init --recursive
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target <Pedal>_AU      # AU (primary)
-cmake --build build                          # everything (incl. test exes)
+cmake --build build --target ObsidianB7000_AU  # AU (primary)
+cmake --build build                            # everything (incl. test exes)
 ```
 `COPY_PLUGIN_AFTER_BUILD TRUE` installs the AU to `~/Library/Audio/Plug-Ins/Components/` on build.
 Logic caches AU components — **bump the project VERSION** to force a rescan after changes, or
@@ -44,7 +44,7 @@ remove/re-add the plugin.
 ## Project layout
 
 ```
-<pedal>/
+Obsidian-B7000/
 ├── CMakeLists.txt
 ├── CLAUDE.md
 ├── .claude/rules/{build,architecture,dsp,ui,circuit}.md
@@ -65,43 +65,32 @@ remove/re-add the plugin.
 ## Run tests in parallel — always, unless a specific test forbids it
 
 **Default to parallel execution for any test/analysis run, not just the big matrix renders.**
-Serial-by-default is the wrong instinct here — this project's own history shows the win is not
-marginal (session 28: `comprehensive_report.py`'s 63-capture A/B went **~30 min → 5m42s** at
-`--jobs 8`, no correctness change, verified bit-identical to serial). Apply this every time, not
-just when a run already feels slow:
+A full capture-matrix A/B is embarrassingly parallel (each capture is one independent render +
+analysis against a shared read-only reference) and the serial form is pure wall-clock waste.
 
 - **`ctest`**: run `ctest --output-on-failure -j $(sysctl -n hw.ncpu)` (or a fixed `-j 8`/`-j 4` if
   you want to leave headroom for other work), never bare `ctest`. The per-stage test exes are
   independent processes with no shared state — there's no correctness reason to serialise them.
-- **This applies to EVERY script under `analysis/`, not just `comprehensive_report.py`** — the whole
-  family of scan/fit/probe/gate tools (`a3_carrier_scan.py`, `a3_component_budget.py`,
-  `mid_perpos_fit.py`, `drive_taper_gate.py`, `clipper_onset_gate.py`, `grunt_span_probe.py`,
-  `a3_level_axis_scan.sh`, every `--selftest`/`--validate` sweep, etc.) whenever it renders/scores
-  more than a handful of independent items (candidate values, captures, bands, knob positions,
-  drive settings). Default assumption for a NEW analysis script: **it should be parallel from the
-  first draft**, not serial-until-slow.
-  - **`analysis/comprehensive_report.py`** and any other capture-matrix harness: pass `--jobs`/`-j`
-    (defaults to `min(8, cores−2)`) rather than accepting the default when running a **subset** via
-    `--only`, and never pass `--jobs 1` unless you're specifically debugging a cache/ordering issue.
-  - **New or existing throwaway scan/probe scripts** (candidate sweeps, per-band scans, per-position
-    fits, grid scans like `a3_carrier_scan`'s 249-file cache): if the work items are independent —
-    which they almost always are, since each is a fresh `OfflineRender` invocation or a fresh
-    capture-file read — write/rewrite them with a process pool / `multiprocessing.Pool` /
-    `concurrent.futures.ProcessPoolExecutor` rather than a serial `for` loop over candidates/bands/
-    captures. Don't wait until a run feels slow to add it — assume it's needed.
-  - **A serial-loop analysis script you're about to run or modify**: if it's about to iterate more
-    than ~4-5 independent items and will call `OfflineRender`/re-render per item, parallelise it
-    before running rather than after timing it once and complaining.
-  - Verify parallel output is bit-identical to a serial run once per script (as session 28 did for
-    `comprehensive_report.py`) before trusting it as the default — a shared mutable accumulator or
-    an un-guarded cache write is the usual way naive parallelisation of these scripts goes wrong.
+- **This applies to every script under `analysis/`**, not just `comprehensive_report.py` — any tool
+  that renders/scores more than a handful of independent items (candidate values, captures, bands,
+  knob positions, drive settings) should default to a process pool from the first draft, not
+  serial-until-slow.
+  - `analysis/comprehensive_report.py` and any other capture-matrix harness: pass `--jobs`/`-j`
+    rather than accepting the default when running a **subset**, and never pass `--jobs 1` unless
+    you're specifically debugging a cache/ordering issue.
+  - A new throwaway scan/probe script whose work items are independent — which they almost always
+    are, since each is a fresh `OfflineRender` invocation or a fresh capture-file read — should use
+    a process pool / `multiprocessing.Pool` / `concurrent.futures.ProcessPoolExecutor` rather than a
+    serial `for` loop.
+  - Verify parallel output is bit-identical to a serial run once per script before trusting it as
+    the default — a shared mutable accumulator or an un-guarded cache write is the usual way naive
+    parallelisation of these scripts goes wrong.
 - **Only exception:** a test that is itself measuring timing/CPU-load (`PerfBenchmark`) or that
   depends on shared mutable state (a single capture cache being written for the first time, a
   background render another step is waiting on) — run those serially, and say so explicitly in the
   command/comment so the exception doesn't get silently copied elsewhere as "tests are serial here."
-- Before trusting a "this got slower" read, remember `wallclock-is-not-runtime` (memory) — check
-  cache mtimes / `pmset -g log` before concluding a parallel run regressed; sleep/throttling can
-  masquerade as a parallelism problem.
+- Before trusting a "this got slower" read, check cache mtimes / `pmset -g log` before concluding a
+  parallel run regressed; sleep/throttling can masquerade as a parallelism problem.
 
 ### Authoring or editing a test/harness: build in parallelism, don't retrofit it
 
@@ -126,15 +115,11 @@ code compiles/runs fine serially and nothing forces the question.
   the authoring side, and it needs to happen before the first real run, not after timing one.
 - **Modifying an existing serial test or script**: if your edit adds a new independent axis to
   sweep (a new candidate parameter, a new capture subset, a new band list, a new knob range) and the
-  loop is still serial, parallelise it as part of the SAME change — don't leave a "parallelise this
-  later" note beside code you're already touching; that note is exactly the kind that never gets
-  picked up (see the file-wide rule about a stale handover reading as current).
+  loop is still serial, parallelise it as part of the same change — don't leave a "parallelise this
+  later" note beside code you're already touching.
 - **Prove the parallel version is a no-op once, before trusting it as the default**: bit-identical
-  output vs. a serial run on a small case (as session 28 did for `comprehensive_report.py`), or an
-  explicit comment if exact bit-identity isn't the right bar (e.g. floating-point reduction order
-  legitimately differs). This project has hit real shared-mutable-accumulator and un-guarded-
-  cache-write bugs from naive parallelisation before — the check is one extra run; the bug it
-  catches is a silently wrong baseline.
+  output vs. a serial run on a small case, or an explicit comment if exact bit-identity isn't the
+  right bar (e.g. floating-point reduction order legitimately differs).
 - **The exceptions are the same ones as above**: something that measures timing/CPU load itself, or
   genuinely shares mutable state it hasn't been made safe for. State the exception in a comment
   next to the serial loop, not just in a commit message, so the next person editing that file
@@ -181,12 +166,10 @@ included in the template root.
 
 ## CI / release (GitHub Actions)
 
-`.github/workflows/ci.yml` and `release.yml` are included as templates (replace `<Pedal>`/`<Cod1>`/
-`<Mfr1>`). They're inert inside the template folder — GitHub only reads `.github` at a repo root, so
-they activate once you copy the template out.
+`.github/workflows/ci.yml` and `release.yml` build + package the plugin on GitHub Actions.
 
 - **ci.yml** — builds + runs `ctest` on macOS/Windows/Linux on every push/PR. Register each pass/fail
-  test exe with `add_test()` (see `CMakeLists.txt.template`) so the whole suite runs as one gate.
+  test exe with `add_test()` (see `CMakeLists.txt`) so the whole suite runs as one gate.
 - **release.yml** — `workflow_dispatch` ONLY (no push trigger, so a release is never cut by accident):
   builds VST3 (+ AU on macOS) on all three OSes, packages a per-platform installer (see below)
   alongside a raw zip, publishes a draft GitHub Release. macOS signing/notarization steps are
@@ -253,8 +236,7 @@ scripts/configs, wired into `release.yml`'s "Build installer" step in each platf
   (preinstalled on `ubuntu-latest`).
 
 All three scripts take `<version> [artefacts-dir] [output-dir]` and expect the relevant build
-targets already built. Rename `<Pedal>` placeholders throughout (including inside `Pedal.nsi`'s
-filename and `installer/linux/control`'s package name/maintainer) when copying the template out.
+targets already built.
 
 ## Validation gates (do not skip ahead)
 

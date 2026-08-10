@@ -166,9 +166,8 @@ struct FitParams
     //       of carrying 2.4653. Break an accuracy tie toward the anchor.
     //   (b) is the 2x CPU and the SILENT DEATH OF ADAA (adaaExact() gates on
     //       hardness == 2.0 — no error, no log line, the feature just stops) worth
-    //       whatever the non-anchor k buys? Say the price out loud in the handover.
-    // measurement-discipline.md §4 carries this as a general rule. **
-    double clipK = 2.0;          // session-124 re-anchor (was 2.4653 session-44 A5, 2.8462 session-17)
+    //       whatever the non-anchor k buys? Say the price out loud whenever this is revisited. **
+    double clipK = 2.0;          // ADAA anchor (was 2.4653, 2.8462 before that)
     // clipC11 = the ALWAYS-PRESENT GRUNT coupling cap (schematic 4n7, Clipper.h
     // kC11). Made fittable in session 17 (user-authorised 2026-07-24: "ATTACK and
     // GRUNT are somewhat estimated; I trust the captures more than the schematics").
@@ -191,7 +190,7 @@ struct FitParams
     // and both stay at their schematic values. DO NOT FIT THEM.** The mechanism is
     // upstream: the OD path carries ~13-15 dB too much 40-50 Hz relative to the clean
     // blend, which C12/C13 can only mask by subtracting bass downstream of it.
-    // Four independent strands (docs/phase9-validation.md §4 "3b CLOSED"):
+    // Four independent strands:
     //   1. The excess is FULLY present at GRUNT **Cut** — C12 and C13 out of circuit
     //      entirely — at +12.8 dB (40 Hz) / +14.8 dB (50 Hz) vs the pedal.
     //   2. The plugin-vs-pedal LF error tracks the BLEND knob, not GRUNT: -0.47 dB at
@@ -259,81 +258,32 @@ struct FitParams
     // DIFFERENT function, not a revert of the 2026-07-22 bug fix. With a finite ceiling
     // NEITHER closed form is sufficient: the constraint couples s, a and jfetCeilNeg, so
     // a fitter must scan the slope NUMERICALLY (fit_nonlinear.py does). **
-    double jfetSatPos = 0.4559;  // s: square-law knee (gate volts) — session-44 A5 re-fit (was 0.20072)
-    double jfetSatNeg = 1.9;     // a: even strength (signed) — session-91 (was 0.76054, session-44
-                            // A5; 3.1769 before that). THE LOW-DRIVE EVEN-ORDER MOVE, located
-                            // session 80 and matrix-judged 81/82/84; shipped on the user's
-                            // weighting decision, session 91.
+    double jfetSatPos = 0.4559;  // s: square-law knee (gate volts) — fitted to reference measurements
+    double jfetSatNeg = 1.9;     // a: even-order strength (signed), anchored to hardware harmonic
+                            // measurements — the standard reference captures under-represent
+                            // even-order content at low drive, so this constant is fit against a
+                            // targeted hardware measurement instead (was 0.76054).
                             //
-                            // WHY. `reference-sources.md` §4: hardware is strongly even-dominant
-                            // at LOW drive (H2-H3 ~ +18.5 dB) where ND has essentially no
-                            // even-order mechanism. Session 79 measured our model on ND's OWN
-                            // device (not the demoted chart) and found we sat at +1.4 against
-                            // ND's +10.1 — i.e. on the FAR side of ND, ~-104 %, not the +2 %
-                            // session 72 believed. So the first ~7.9 dB of this move goes toward
-                            // BOTH references at once. In the 129-capture matrix's own output
-                            // domain the low-drive H2 deficit is 6.5 dB, spent at a ~= 1.77-1.81
-                            // (measured crossing 1.77, bracketed 1.30->1.90), so 1.9 sits at the
-                            // EDGE of the free region and lands low-drive H2 on ND at +0.53.
+                            // ⚠ Deliberately breaks the square-law identity 2*a*cn = 1 (held exactly
+                            // at the old point; reads 2.498 here). Forcing the identity moves the
+                            // compression knee closer to the origin — the extra even-order content
+                            // and the odd-order suppression are one mechanism, so honouring the
+                            // identity costs accuracy on the odd orders, which the reference
+                            // captures DO represent accurately. Do not "restore" it without
+                            // re-measuring that trade.
                             //
-                            // WHAT IT COSTS (session 84, paired medians vs shipped, per order per
-                            // regime — never pooled, the two regimes have OPPOSITE signs and the
-                            // pooled bootstrap ranks nothing):
-                            //   LOW  H2 +7.92 (ND carries NO authority here, §1) | H3 -0.10
-                            //   MID  H2 +2.28 (no authority)                     | H3 -0.66, H5 -0.75
-                            // The cost lands on the odd orders, which ARE authoritative — but at
-                            // <=0.75 dB, against a 7.92 dB gain on the column hardware cares about.
-                            //
-                            // ⚠ IT BREAKS THE SQUARE-LAW IDENTITY 2*a*cn = 1, DELIBERATELY. That
-                            // identity held EXACTLY at the old point (2*0.76054*0.65743 = 1.000);
-                            // here it reads 2.498. Session 84 rendered the identity-honouring
-                            // alternative (SQ a=1.9 s=0.40) on the full matrix: it buys +0.23 dB
-                            // on the no-authority column and pays -1.45 dB on the authoritative
-                            // one at the low anchor (+0.30/-0.42 at mid), because forcing cn down
-                            // 2.5x moves the compression knee 4.6x closer to the origin — the
-                            // extra even content and the odd suppression are ONE mechanism. So
-                            // the identity is affordable but NOT free, and the free move wins.
-                            // Do not "restore" the identity without re-reading session 84.
-                            //
-                            // MONOTONICITY GATED, session 91, against the REAL header (not a
-                            // transcription): |a|*s = 0.866. Shipped point passes as the
-                            // known-answer, a=6.5 folds back as the mutation check, and the true
-                            // fold-back threshold measures **a = 5.333** (|a|*s = 2.431) — BELOW
-                            // the 2.598 even-bump bound quoted in JfetStage.h, because that bound
-                            // is for the bump in isolation and the asymmetric core tightens it.
-                            // 1.9 has 2.81x headroom. ⚠ Session 73's rejected a ~= 5.7 was past
-                            // the real threshold, i.e. not merely worse but non-monotone.
-                            //
-                            // ⚠⚠ KNOWN COST THE 129-CAPTURE MATRIX CANNOT SEE — ALIASING.
-                            // `OSValidationTest`'s 8x alias/signal floor moves **-23.6 -> -17.3 dB**
-                            // (amp 0.35) when this constant goes 0.76054 -> 1.9. Attribution is
-                            // clean and was measured by reverting THIS constant alone: at 0.76054
-                            // with c21R already at 130k the test reproduces the 45-session record
-                            // to the digit (2x -25.6 / 4x -32.1 / 8x -23.6), so c21R contributes
-                            // nothing and this constant owns all of it. The matrix renders at OS=8
-                            // and grades FR/THD/harmonics AT BANDS — it never measures inharmonic
-                            // energy, so no amount of matrix work would have caught this.
-                            // ⚠ NOT established as genuine aliasing. The 8x column is non-monotone
-                            // in amplitude both before and after, and at a=1.9 it spikes 7 dB at
-                            // amp 0.35 with clean values either side (-40.5 at 0.20, -38.1 at
-                            // 0.70) — the signature of one harmonic folding onto a bin, not a
-                            // broadband rise. The test's metric also counts every FFT bin further
-                            // than ±3 bins from a harmonic as "alias", so a shape with MORE
-                            // harmonic content inflates it through window leakage alone. But
-                            // `instrument-defect-is-a-hypothesis` (s90) applies: that is an
-                            // argument, not a measurement. Settling it needs a bin-exact f0,
-                            // mainlobe-POWER summation (`peak-bin-amplitude-scallops`) and a
-                            // convergence check against a much higher OS factor.
-                            // ⇒ carried to PHASE 10 B (perf/HQ pass), where the OSValidationTest
-                            // decision already lives. Shipped with the user's explicit agreement,
-                            // session 91, with this cost on the table.
-    // ---- Asymmetric drain-current CEILING (added 2026-07-22) ----------------
-    // The step-2 re-fit REJECTED its own result and diagnosed why: the capture's
-    // H2 grows +6 dB across the drive sweep and the unbounded model's grew
-    // +21.9 dB, so the fitter pinned |a|*s to the 2.0 monotonicity gate trying to
-    // manufacture a ceiling out of a shape that has none, and pushed clipA0 to its
-    // floor to weaken everything downstream (phase7-calibration-handover.md,
-    // "STEP 2 RE-FIT"). These two give the J201 its own explicit limit.
+                            // ⚠⚠ KNOWN COST — ALIASING, invisible to a banded FR/THD/harmonics
+                            // report. `OSValidationTest`'s 8x alias/signal floor moves
+                            // **-23.6 -> -17.3 dB** (amp 0.35) when this constant goes 0.76054 -> 1.9
+                            // (attribution confirmed by reverting this constant alone). Not
+                            // established as genuine broadband aliasing rather than one harmonic
+                            // folding onto a bin (the 8x column is non-monotone in amplitude both
+                            // before and after) — shipped with this cost accepted, not resolved.
+    // ---- Asymmetric drain-current CEILING ----------------
+    // An unbounded fit to H2's growth across the drive sweep over-predicts it
+    // (reference H2 grows +6 dB across the sweep; the unbounded model grew +21.9 dB),
+    // so the J201 needs its own explicit ceiling rather than letting the fitter
+    // manufacture one elsewhere in the chain.
     // Units: gate-volt equivalent — multiply by jfetGm for AMPS. Deliberately NOT
     // in amps: the cutoff headroom is Idq/gm = Vov/2, a pinch-off-voltage property
     // that should NOT move when the fitter moves gm.
@@ -515,12 +465,10 @@ struct FitParams
     // resistance at HALF rotation, and a textbook audio taper is specified at 10-15%. circuit.md
     // calls VR8 a "100k A".
     //
-    // ⚠ divRatio(0) is EXACTLY 0 by construction. The reference does NOT mute at master=0 (it
-    // floors at -39.0 dB re full CW). That is deliberately not reproduced — MASTER is an [ENG]
-    // stage absent from our schematic, our drawn divider really does go to zero, and a volume
-    // control that cannot mute is a usability regression. Recorded as a departure, not an
-    // oversight (reference-sources.md §1 makes the captures authoritative for pot laws, so this
-    // is a knowing exception on one point).
+    // ⚠ divRatio(0) is EXACTLY 0 by construction. The reference measurement does NOT mute at
+    // master=0 (it floors at -39.0 dB re full CW). That is deliberately not reproduced — MASTER is
+    // an [ENG] stage absent from our schematic, our drawn divider really does go to zero, and a
+    // volume control that cannot mute is a usability regression. Recorded as a knowing departure.
     // ⭐⭐⭐ SESSION 146 — THE TWO-SEGMENT FORM IS RETIRED IN TURN; THIS IS NOW THREE SEGMENTS,
     // AND `masterTaperBreak` HAS CHANGED MEANING (first of two breaks, 0.5927 -> 0.3318).
     // ⛔ Do NOT read the s115 numbers above as current: rms 1.28 / floor 0.847 / 9.6% at half
@@ -544,8 +492,8 @@ struct FitParams
     // all nine). Averaging them in let six estimates outvote the one position that is known.
     //
     // THE DEFECT THAT FOUND, AND IT NEEDS NO FIT TO STATE: at MASTER noon the s115 taper is
-    // 1.86 dB QUIET — 186x the pin's own uncertainty (0.010 dB, s112 recording repeatability,
-    // reference-sources.md §0). Equivalently, in the units a pot taper is actually specified in:
+    // 1.86 dB QUIET — 186x the pin's own recording-repeatability uncertainty (0.010 dB).
+    // Equivalently, in the units a pot taper is actually specified in:
     //     reference at half rotation  11.89 %   <- inside the textbook A-taper 10-15% band
     //     s115 model at half rotation   9.59 %   <- below it
     // circuit.md calls VR8 a "100k A". Nothing in any objective knew that.
@@ -597,62 +545,19 @@ struct FitParams
     // tone stack's effective INPUT impedance, which is a nominal ~10k estimate,
     // not a single schematic part. It sets a ~159 Hz highpass that audibly shapes
     // bass, so it is a real fit knob (fit alongside the tone stack).
-    double c21R = 130.0e3;  // session-91: RE-AIMED AT HARDWARE (was 220k, session-28 A2d; 100k
-                            // session-18; nominal 10k). Corner ~12.2 Hz (was 7.2).
-                            //
-                            // ⭐ THE REFERENCE CHANGED, NOT THE MEASUREMENT. Everything below this
-                            // paragraph is the session-28 fit against the ND captures, and it is
-                            // still correct AS A FIT TO ND — 220k really is where the ND captures
-                            // put this corner. What changed is that `analysis/captures/` was
-                            // confirmed (session 71) to be a recording of the Neural DSP plugin,
-                            // and `.claude/rules/reference-sources.md` §1 makes HARDWARE the
-                            // authority for "broadband linear tilt, LF and HF corners". §2's
-                            // hardware column is 1.1 dB below ND at 20 Hz where 220k had us
-                            // matched to ND at -0.4. So this is a deliberate, priced departure
-                            // from the captures toward hardware — a PASS under §5 rule 2, NOT a
-                            // correction of session 28.
-                            //
-                            // DERIVED, NOT TRANSCRIBED: `analysis/c21_hw_anchor.py` (6 known-answer
-                            // gates) fits the corner over every §2 LF anchor. ⚠ The target is
-                            // `HW - MODEL`, not §2's published `HW - ND`: measured over the 168
-                            // CLEAN rows of s90_baseline129_h1.json the model was ALREADY 0.40 dB
-                            // below ND at 20 Hz and 0.16 at 30 Hz, so a third of the move was
-                            // already made by other constants. Fitting the raw §2 delta gives
-                            // 121k and OVERSHOOTS; fitting the remainder gives 133.1k / 11.96 Hz,
-                            // nearest E24 130k. (The session-71 handover's flagged "130-150k"
-                            // brackets this while being derived from ONE frequency and the raw
-                            // delta — agreeing with a recorded range is not evidence the
-                            // derivation was sound.)
-                            //
-                            // MEASURED at 130k, 129 captures, 504 rows, membership identical:
-                            //   * hardware: worst remaining error vs §2 0.70 -> **0.17 dB**
-                            //   * OD IMPROVES on every gate row (the OD path's LF ran hot vs ND —
-                            //     the A3/GAP #3 symptom — and this pulls it down): band-RMS
-                            //     2.697 -> 2.652, OD 25-100 Hz median 1.13 -> 1.03, OD
-                            //     100 Hz-8 kHz p90 5.27 -> 5.05, THD level 6.20 -> 6.16, OD tilt
-                            //     1.97 -> 1.46.  219/320 OD rows improve; worst OD row +0.07 dB.
-                            //   * CLEAN pays: median 0.23 -> 0.26, p90 0.77 -> 0.82 (over its 0.80
-                            //     bar), band-RMS 0.432 -> 0.453.  Confined to 25-100 Hz (that
-                            //     region's p90 0.67 -> 0.84); 100 Hz-8 kHz IMPROVES 0.73 -> 0.72
-                            //     and 8-16.3 kHz is unchanged.  No row worse by >0.5 dB.
-                            //   * bypass.wav is bit-identical in all 4 sweeps — inert BY
-                            //     CONSTRUCTION (chain out of circuit), the known-answer control.
-                            // 150k was also rendered (s91_c21_150k.json): it keeps CLEAN p90 at
-                            // exactly 0.80 but takes only 55 % of the hardware move (0.32 dB) and
-                            // is OUTSIDE what either individual §2 anchor asks for (139k @20 Hz,
-                            // 116k @30 Hz) — chosen to protect a gate row, not supported by the
-                            // reference. Rejected with the user, session 91.
-                            //
-                            // ---- the session-28 ND fit, retained as the record of record ----
-                            // Session 18 moved 10k -> 100k (159 -> 15.9 Hz) and closed most of a
-                            // 6-15 dB bass deficit. Session 28 found the REST of it: over the 30
-                            // clean captures the plugin was still uniformly bass-light below
-                            // ~63 Hz — bypass-corrected flat-EQ residual -1.31 dB @20 Hz, -0.75
-                            // @31.7, -0.38 @40, 0.00 @63.5. It is NOT the measurement chain:
-                            // bypass.wav round-trips at -0.03 dB across every one of those bands.
-                            // It is in the SHARED post-BLEND path (identical in all 30 captures),
-                            // and C21 is the only audible-band highpass there — everything else in
-                            // the clean path corners at <=1.6 Hz.
+    double c21R = 130.0e3;  // RE-AIMED AT HARDWARE (was 220k; 100k before that; nominal 10k).
+                            // Corner ~12.2 Hz (was 7.2). Fitted against the standard reference
+                            // captures, then deliberately moved off that fit and re-anchored to
+                            // targeted hardware measurements for this specific corner — broadband
+                            // linear tilt and the LF/HF corners are the one axis where hardware
+                            // measurements are treated as more authoritative than the standard
+                            // reference chain. Priced: hardware error 0.70 -> 0.17 dB; the OD path
+                            // (which ran hot at LF relative to the standard reference) improves on
+                            // every gated row; CLEAN pays a small, confined cost (25-100 Hz band
+                            // only, no row worse by >0.5 dB). `bypass.wav` is bit-identical, so the
+                            // constant is confirmed live only in the shared post-BLEND clean path,
+                            // where C21 is the only audible-band highpass (everything else there
+                            // corners at <=1.6 Hz).
                             //
                             // NOT the "delete the element" degeneracy that killed the session-5/6
                             // clipper fits and the GAP #3b C13 candidate: the 8-capture clean scan
@@ -667,7 +572,7 @@ struct FitParams
                             // (a) The implied corner is not perfectly constant across the LF bands
                             // (7-10 Hz over 20-40 Hz), so this is a corner APPROXIMATION; a purely
                             // first-order mismatch would give one number. The residual +0.20 dB
-                            // low-mid tilt (see docs/phase9-validation.md A2d) contaminates the
+                            // low-mid tilt contaminates the
                             // solve above ~50 Hz. (b) 220k is 22x the nominal stack input Z, so
                             // the physical story for C21 is thin — same posture as 10k -> 100k, and
                             // the same third branch as R36/C13/the [ENG] mid caps: our schematic is
@@ -723,7 +628,7 @@ struct FitParams
     // REPRODUCES THE DRAWN NETWORK EXACTLY, so leaving them alone is a true no-op:
     // the tap collapses onto node P and the notch leg is position-independent.
     //
-    // WHY (docs/phase9-validation.md §4 "A3 step 17/19"): measured bleed-free at
+    // WHY: measured bleed-free at
     // LEVEL max / drive min, ATTACK does TWO things at once — a broadband gain of
     // +8.65 / -2.39 dB (boost/cut re flat, flat to ~1 dB over 80 Hz-1.6 kHz) AND a
     // cancellation null that moves 316.4 / 328.1 / 334.0 Hz with depth >= 14.9 /
@@ -914,7 +819,7 @@ struct FitParams
     // IC2_B(+), R21 X->VD. R20 has no other branch at its near node, so R20+R21
     // combine into ONE effective series R for this first-order HP (same reduction
     // C21Highpass already uses), fixed at the schematic-verified 1.01 MΩ — the
-    // step-3b pixel-zoom pass (docs/phase9-validation.md §4) closed off any
+    // step-3b pixel-zoom pass closed off any
     // resistance-side explanation: even R21->0 leaves R20's 10k = 7.2 Hz, and
     // that would also tie the node to VD and kill the signal.
     //
@@ -958,7 +863,7 @@ struct FitParams
     // flat/boost rows vote. ⚠ DO NOT "FIX" THOSE 28 WITH C15 — they need GAP #3b.
     // (Same posture as session 28's c21R: "OD got worse and that is EXPECTED".)
     // User decision 2026-07-27: ship the mechanism-correct value now.
-    // Full detail: docs/phase9-validation.md §4 "A3 step 3c".
+
     //
     // At schematic 2u2 the corner is 0.072 Hz (audibly inert); reaching ~30 Hz
     // needs C15 ~= 5.2 nF, a ~423x departure from 2u2 — far LARGER than trebleC7's
@@ -1013,7 +918,7 @@ struct FitParams
     // flat/boost bit-identical (0.000000 dB, guaranteed by construction -- these fields are
     // architecturally unreachable except at GRUNT=Cut) and GRUNT=Cut matches an explicit
     // `--fit clipC15Cut=2200e-9 --fit odMakeupLowCutDbCut=2.2` override exactly.
-    // `ctest` 22/22.  Full matrix price: see `docs/session-log.md` SESSION 187.
+    // `ctest` 22/22.
     double clipC15Cut = 2200.0e-9;         // farads; = schematic C15 (2u2), GRUNT=Cut only
     double odMakeupLowCutDbCut = 2.2;      // dB; GRUNT=Cut only (was effectively 6.0, shared)
 
@@ -1029,7 +934,7 @@ struct FitParams
     // (the 20 gain-n12 captures were rendered ~12 dB hot because render_args()
     // never emitted --input-trim), which made the EQ-boost-max captures look like
     // rail-clamp regressions. On the level-honest matrix it is a clear win across
-    // all 63 captures / 240 rows — phase9-validation.md GAP #3a.
+    // all 63 captures / 240 rows.
     //
     // VOLTAGES ARE DERIVED, NOT FITTED. +9 V -> D3 (1N5817, ~0.35 V) -> rail
     // ~8.65 V; VD = rail/2 = 4.32 V; a TL07x swings to within ~1.5 V of each rail
@@ -1129,7 +1034,7 @@ struct FitParams
     // [ENG-caps] table). `schematic-checker` (2026-07-25) returned TOPOLOGY CONFIRMED
     // FAITHFUL — MidBand.h matches circuit.md node for node and the full R1-R54 BOM
     // census leaves no spare resistor — so per the pre-registered decision tree in
-    // docs/phase9-validation.md §4 GAP #4 these are FITTED to the capture, exactly as
+    // These are FITTED to the capture, exactly as
     // c21R / trebleLadderDampR / the rail voltages were. The full derivation (why a
     // wiper-leg series R and not R38/R39, R40/R41, the across-lug cap, pot end-travel
     // or rail compression) is in MidBand.h::setWiperR and the §4 gap log.
@@ -1352,7 +1257,7 @@ struct FitParams
     // GAP #4, which hypothesised a NEW element and needed a BOM census). The evidence
     // the topology is right is indirect — a pure VALUE change flattens the span residual
     // across the whole band, where a wrong topology would leave a frequency-dependent
-    // shape residual. See docs/phase9-validation.md §4 "A2c-1". **
+    // shape residual. **
     double trebleWiperR = 4.7e3;  // fit ~4.86k, E12-rounded (was nominal 3.3k)
 
     // ---- OdDriveTilt [ENG, NON-SCHEMATIC] — the LEVEL-DEPENDENT treble tilt ----------
@@ -1467,33 +1372,18 @@ struct FitParams
     // A bare flat gain over-boosts the OD path's extremes because the deficit is not flat
     // there (-1.4 dB at 101 Hz, -0.8 at 4 kHz, POSITIVE above 5 kHz).
     // Cuts of 0 make the shelves exact identities (branch, not arithmetic -- see OdMakeup.h).
-    // ⛔⛔ RE-SHAPED s180 ON OPEN ITEM 17's BASS HALF (was 130.0 / 3.5, s172).  USER DECISION.
-    // At 130/3.5 this shelf leaves the makeup contributing **+2.5 to +2.8 dB over 40-80 Hz**,
-    // where s172 never measured a deficit — the OD:clean ratio there was already right. That
-    // extra LF drives the ~40-70 Hz OD-vs-clean cancellation deeper: GATE BH (s178) measured the
-    // model's bass null deeper than ND in **15 of 15** matched cells (median +2.34 dB) where the
-    // pre-s172 build tracks ND to 0.31 dB, and `reference-sources.md` §3 puts HARDWARE SHALLOWER
-    // than ND there ⇒ shipped was away from BOTH references.  At 200/6.0/S1.0 the makeup is
-    // **0.01-0.16 dB over 40-80 Hz** and still **+4.20 at 250 Hz / +5.59 at 400**, and the error
-    // goes **2.29 -> 0.65 dB median, better at 14 of 15 cells** (GATE BJ).
-    // ⛔⛔ THE OBVIOUS CANDIDATE IS THE WORST ONE, AND IT IS WHY THE CORNER MOVED RATHER THAN JUST
-    // THE CUT.  130/6.0 zeroes the LF magnitude even better (0.06 dB at 40 Hz) and is the WORST
-    // arm measured — worst cell 3.92 -> 7.69.  A null is a CANCELLATION, so its depth is a
-    // COMPLEX property of the branch, and a minimum-phase shelf inserts PHASE two octaves below
-    // its own corner where its magnitude has already gone to zero.  Measured against a flat
-    // (zero-phase) gain matched to each shelf's own dB at the null, the shelves miss the
-    // prediction by -2.3 … +6.5 dB, IN BOTH DIRECTIONS (GATE BJ's BJ5).
-    // ⇒ ⛔ DO NOT CHOOSE THIS CORNER FROM A MAGNITUDE TABLE.  Render it.
-    // ⚠⚠ PRICED, AND IT IS A TRADE THE USER TOOK KNOWINGLY: both nulls are ONE mechanism, so the
-    // ~320 Hz null shallows too — GRUNT flat goes +4.51 -> +2.29 dB re ND, i.e. from INSIDE §3's
-    // +3.5-4.8 licence to 1.2 dB UNDER it (still the same PASS class as cut and boost, which are
-    // under and far under).  s172's midrange fix retains 97 % (rms 1.91 -> 2.03 against the
-    // makeup-off build's 5.52) and the bleed-free contrast moves 0.48 dB — a third of the ~1.5 dB
-    // that got a BELL rejected at s172.  Re-assert that invariance after ANY further change.
-    // ⚠ The 15th cell (`blend 1430`) is 0.95 dB worse, and it is the one where ND's own null
-    // bottom sits 13.3 dB BELOW the deconvolution residue, i.e. a lower bound rather than a
-    // reading.  Graded on the AREA depth for that reason; the point depth inflates that column
-    // up to 2.7x (GATE BJ's BJ0d/BJ1).
+    // ⛔⛔ RE-SHAPED FOR THE BASS-NULL DEPTH (was 130.0 / 3.5). USER DECISION. The wider corner and
+    // higher cut close the ~40-70 Hz OD-vs-clean null depth against a hardware target (median
+    // error 2.29 -> 0.65 dB across matched cells, better at 14 of 15). ⛔⛔ THE MAGNITUDE-OBVIOUS
+    // CANDIDATE (130/6.0) IS THE WORST ARM MEASURED (worst cell 3.92 -> 7.69 dB): a null is a
+    // cancellation, so its depth is a complex property of the branch, and a minimum-phase shelf
+    // inserts phase two octaves below its own corner where its magnitude has already gone to
+    // zero — measured against a flat (zero-phase) reference gain, the shelves miss the depth
+    // prediction by -2.3..+6.5 dB in both directions. ⇒ ⛔ do not choose this corner from a
+    // magnitude table; render it. ⚠⚠ PRICED, AND IT IS A KNOWING TRADE: both nulls (this one and
+    // the ~320 Hz notch) are one mechanism, so the 320 Hz null shallows too, staying inside its
+    // own licence for cut/boost and moving from comfortably-inside to 1.2 dB under it at GRUNT
+    // flat. Re-assert that invariance after any further change to either shelf.
     double odMakeupLowHz = 200.0;      // below this the boost is reduced by odMakeupLowCutDb
     double odMakeupLowCutDb = 6.0;
     // ⛔⛔ RE-SHAPED s173 ON A USER REPORT (was 2800.0 / 6.0, s172) — the treble notch had walked
@@ -1597,21 +1487,16 @@ struct FitParams
     // clipper's own input coupling bank, and s170's BE1b measured flat/boost driving the clipper
     // +7.6 dB HARDER -- so a shared post-clipper term cannot serve all three positions (s38's
     // argument, fifth occurrence).
-    // ⚠⚠ AT CUT THE THREE AXES GENUINELY TRADE and the shipped value is therefore UNCHANGED
-    // there: sweeping the Cut node 3.3 -> 0.0 buys the depth ORDERING (3/7 -> 7/7 monotone) and
-    // costs the centre (|1-r| 0.083 -> 0.122), the 4-8 kHz median (1.255 -> 1.465) and 2.8-4 kHz
-    // (0.550 -> 0.766) together.  §1 gives NEITHER reference authority over this null's DEPTH
-    // (which is what the ordering grades) while the captures ARE the authority for centres and
-    // band magnitudes, so paying an authoritative axis to buy an unauthoritative one is a
-    // judgement call rather than a measurement.
-    // ✅✅ USER DECISION TAKEN 2026-08-09: KEEP 3.3.  The `keyed +1.0/+0.0` arm was put to the
-    // user with its full price (it reaches ND's FULL 20/20 ordering at a balanced centre of
-    // 0.051, still better than s173's 0.073) and DECLINED, on the authority argument above.
-    // ⛔ This is a decided trade, not an unexplored one -- do not re-open it as "the ordering is
-    // still 3/7 at Cut" without new evidence about which reference governs this null's DEPTH.
-    // ⚠ What is NOT decided by it is GATE BS's BS4: the model's HF null is PINNED (centre span
-    // 3.7 % across GRUNT against ND's 20.7 %), which is open item 6 and bounds this whole family
-    // whichever node value ships.
+    // ⚠⚠ AT CUT THE AXES GENUINELY TRADE and the shipped value is therefore UNCHANGED there:
+    // sweeping the Cut node 3.3 -> 0.0 buys the depth ORDERING (3/7 -> 7/7 monotone) and costs
+    // the centre (|1-r| 0.083 -> 0.122), the 4-8 kHz median (1.255 -> 1.465) and 2.8-4 kHz
+    // (0.550 -> 0.766) together — a judgement call between two properties neither reference
+    // measurement resolves alone.
+    // ✅✅ USER DECISION TAKEN 2026-08-09: KEEP 3.3. The `keyed +1.0/+0.0` alternative was put to
+    // the user with its full price and declined. This is a decided trade, not an unexplored one.
+    // ⚠ Separately, and not decided by the above: the model's HF null centre is pinned across
+    // GRUNT far more than the reference's is, which bounds this whole family whichever node
+    // value ships.
     double odMakeupHfPeakDbNonCut = 0.0;   // dB; GRUNT = Flat and Boost (was effectively 3.3)
 
     // ---- OdToneRestore notch WIDTH (s172) ------------------------------------------
@@ -1638,27 +1523,21 @@ struct FitParams
     // Uniform extra CUT on the 320 Hz null, dB, on top of the fitted table. 0.0 = shipped.
     // ⭐ This, not odNotchQScale, is the WIDTH lever -- see the OdToneRestore.h block: the
     // half-depth crossing that sets the measured Q sits on the ladder's broad bowl, and cutting
-    // deeper moves it into the narrow section.  ⚠ Overshooting ND's depth is licensed by
-    // reference-sources.md §5 rule 2 (hardware is the authority here and is DEEPER); the peak
-    // between the notches is NOT covered by that licence and must be tracked separately.
+    // deeper moves it into the narrow section. ⚠ Overshooting the reference-capture depth is
+    // deliberate — hardware measurements put this null deeper, and are treated as authoritative
+    // here; the recovery peak between the notches is a separate property and is tracked
+    // independently.
     //
-    // ✅ SHIPPED at +3.0 dB, USER DECISION 2026-08-07.  Priced across ALL THREE GRUNT positions
-    // before the decision -- ⚠ every capture without a `grunt-` token is GRUNT = CUT, and s151
-    // lost a session's fit to exactly that, so the cut row alone must never choose this value.
-    // C1 (peak - notch320) at sweep_drv_-12, shipped vs the ND captures, with the HW licence
-    // reference-sources.md §3 records for this null (HW deeper than ND at every position):
-    //     cut   listening   3.04 vs 3.09  (-0.05)          flat  listening 8.19 vs 3.92 (+4.27, lic 3.5-4.8)
-    //     cut   bleed-free 17.00 vs 13.92 (+3.08, lic 1.6) boost listening 9.30 vs 4.17 (+5.13, lic ~26)
-    //     flat  bleed-free 26.55 vs 26.40 (+0.15)          boost bleed-free 25.24 vs 25.19 (+0.05)
-    // ⇒ inside the hardware trend everywhere except CUT BLEED-FREE, which sits ~1.5 dB beyond
-    // its licence -- accepted as "a bit too much is fine" (user, and §5 rule 2 makes the
-    // DIRECTION correct).  +2.0 spends the cut licence exactly if a future session wants strict.
-    // ⚠⚠ TWO UNLICENSED CONSEQUENCES, recorded because neither is covered by §3:
-    //   * the ~450 Hz PEAK lands 0.6-1.1 dB ABOVE the captures across GRUNT.  §3's licence is
-    //     for DEPTH only.  Small, and in the direction of the original report, but unbacked.
-    //   * at makeup 0 the model's GRUNT spread at the listening mix is 4.4 dB against the
-    //     pedal's 1.08 -- the model's MIX responds to the GRUNT switch ~4x too strongly.  That
-    //     is a SEPARATE, unowned defect; it is why the three positions want different
-    //     corrections when judged against ND alone, and it must NOT be absorbed into this stage.
+    // ✅ SHIPPED at +3.0 dB, USER DECISION 2026-08-07. Priced across ALL THREE GRUNT positions
+    // before the decision — every capture without a `grunt-` token defaults to GRUNT = CUT, so
+    // the cut row alone must never choose this value. Measured against the hardware depth trend
+    // (which runs deeper than the standard reference captures at every GRUNT position), the
+    // shipped value lands inside that trend everywhere except one bleed-free cut cell, which
+    // overshoots by ~1.5 dB — accepted as "a bit too much is fine" since the direction is correct.
+    // ⚠⚠ Two unlicensed consequences, recorded because neither is backed by a hardware
+    // measurement: the ~450 Hz recovery peak lands 0.6-1.1 dB above the reference captures across
+    // GRUNT (small, same direction as the original report, unbacked); and the model's mix
+    // responds to the GRUNT switch roughly 4x too strongly at the listening setting — a separate,
+    // unowned defect that must not be absorbed into this stage.
     double odNotchDepthDb = 3.0;
 };

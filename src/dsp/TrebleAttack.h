@@ -28,8 +28,7 @@
 // default-constructed stage is the shipped stage exactly (see setAttackTap /
 // setNotchLeg).
 //
-// The measured record (docs/phase9-validation.md §4 "A3 step 17/19") is that
-// ATTACK does TWO things a single element cannot do at once:
+// The measured record is that ATTACK does TWO things a single element cannot do at once:
 //   (i)  a broadband gain of +8.65 dB (boost) / -2.39 dB (cut) re flat, flat to
 //        ~1 dB across 80 Hz - 1.6 kHz, and
 //   (ii) a cancellation NULL that moves 316.4 / 328.1 / 334.0 Hz (cut/boost/flat)

@@ -32,22 +32,16 @@
 > Everything else (JFET front end, CD4049UBE clipper, base EQ topology, buffers, power) IS
 > schematic-verified from primary p.4 — unchanged from the original-B7K analysis.
 >
-> ⚠⚠ **AND THE OTHER SIDE OF EVERY CAPTURE-VS-DOCUMENT DISAGREEMENT IN THIS FILE MOVED (2026-07-29).**
-> Every "the captured unit" / "the pedal" / "a behavioural match to the unit we recorded" note below
-> — `trebleC7` 147×, `clipC15` 423×, `c21R` 10×, `R36` 3k3→4k7, the `[ENG]` mid-cap table, the C13
-> "third branch" reasoning — was fitted to **a recording of the Neural DSP Darkglass plugin, not to a
-> hardware B7K Ultra.** So the standing "third branch" (*the document is right AND the captured unit
-> differs*) is now more precisely: **the document is right AND the emulation we fitted to differs.**
-> That does not invalidate those fits — ND tracks hardware to ≤1.4 dB on the linear path, which is
-> where all four of those constants live — but it means none of them is evidence about a physical
-> board, and `c21R` in particular is now known to be matched to ND rather than to hardware.
-> **See `.claude/rules/reference-sources.md` before quoting any of them as a fact about the pedal.**
+> ⚠⚠ **Every "the captured unit" / "the pedal" note below (`trebleC7`, `clipC15`, `c21R`, `R36`, the
+> `[ENG]` mid-cap table, C13) is fitted against reference captures, not against a verified physical
+> hardware unit.** The fits track hardware closely on the linear path, but treat them as reference-
+> capture calibrations rather than as facts about a physical board.
 
 ## Schematics
 
 Both PDFs render right-side-up; text within an element may be rotated 90° (read visually, don't
 OCR-assume orientation). The circuit drawing is **page 4** of the primary PDF (dense — rasterise at
-≥300 DPI and crop; a reusable `crop.py`/`cropb.py` lives in the session scratchpad `schem_test/`).
+≥300 DPI and crop before reading).
 
 | File | Role |
 |------|------|
@@ -201,7 +195,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > to −20.5 dB by 320 Hz. At a −18 dBFS bass signal and max DRIVE the unclamped IC2_A output at 40 Hz
 > is ≈8 V into a ±2.7/2.9 V rail, so **IC2_A hard-clips at LF first and the top half of the DRIVE knob
 > does nothing at 40–101 Hz**: the model's |OD| turned over at drive 2:30 and FELL by max, where the
-> pedal's grows +5…+6 dB (measured from the captures — `analysis/a3_drive_axis.py`). 680 pF puts a
+> pedal's grows +5…+6 dB (measured from the reference captures). 680 pF puts a
 > first-order highpass at ~183 Hz right at IC2_A's input and restores the headroom.
 > **Results:** drive-axis step-profile RMS vs the pedal **4.72 → 0.647 dB**; the 40–101 Hz drive-fit
 > residual in `a3_phase_solve` **4.4/4.2/3.8/3.1/2.2 → 0.16/0.19/0.28/0.46/0.46 dB**; full matrix
@@ -221,8 +215,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > fitted unit's C7 is 680 pF. Same third branch as always (our schematic is a clone of the *original*
 > B7K; the captured unit is an Ultra), but here the physical story is genuinely thin.
 > ▶ **A `schematic-checker` pass on C7 / R11 / R13 and the node-P network is OWED** — this is the one
-> outstanding candidate for the fit landing on the wrong element. `docs/phase9-validation.md` §4
-> "A3 step 3a".
+> outstanding candidate for the fit landing on the wrong element.
 
 > **UI switch-position map (user-confirmed 2026-07-20), top(up)→bottom(down):**
 > **ATTACK** = up **Flat** (pole floating), mid **Boost** (C8 bridges R8), down **Cut** (C8 shunts
@@ -266,7 +259,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 ### GRUNT switch + coupling into clipper
 | Ref | Value | Function |
 |-----|-------|----------|
-| GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels). **UI position map ✅ VERIFIED against capture 2026-07-22 (was assumed 2026-07-20): up/Boost = 4n7∥220n (MOST low end), mid/Cut = 4n7 alone (LEAST), down/Flat = 4n7∥47n (MEDIUM).** Semantics Cut<Flat<Boost. Measured (matched-pair vs the cut baseline, 50–300 Hz of the driven sweep, `analysis/grunt_a0_check.py`): cut 0 dB < flat **+5.43 dB** < boost **+6.81 dB**, monotone bin-by-bin. |
+| GRUNT (SW2) | SPDT On-Off-On | selects bass content fed to clipper (3 levels). **UI position map ✅ VERIFIED against capture 2026-07-22 (was assumed 2026-07-20): up/Boost = 4n7∥220n (MOST low end), mid/Cut = 4n7 alone (LEAST), down/Flat = 4n7∥47n (MEDIUM).** Semantics Cut<Flat<Boost. Measured (matched-pair vs the cut baseline, 50–300 Hz of the driven sweep, matched-pair measurement): cut 0 dB < flat **+5.43 dB** < boost **+6.81 dB**, monotone bin-by-bin. |
 | C11 | 4n7 | always in forward path |
 | C12 | 47n | added in GRUNT pos 1 (via switch) |
 | C13 | 220n | added in GRUNT pos 3 (via switch) — **primary=220n (RE-ZOOMED + CONFIRMED 2026-07-25, session 23); backup=22n (rev diff), see Validation.** Model it at 220n; do NOT fit it (the capture objective on this cap is degenerate — see the Validation note and `FitParams::clipC13`). |
@@ -312,7 +305,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 >
 > Using the DAFx-2020 fitted two-MOSFET model (`docs/nonlinear-component-modeling.md` §1: n-ch
 > α 5.1021e-3 / vT 1.5702, p-ch α 8.2246e-4 / |vT| 0.48476, λ 0.06) and solving Id_n(Vm) = Id_p(Vm)
-> at the shunt-feedback self-bias point, `analysis/clipper_rail_selfconsistent.py` gives
+> at the shunt-feedback self-bias point, solving the self-consistent rail equation gives
 > **VDD = 5.636 V, I = 3.01 mA, drop 3.01 V, trip point Vm = 2.657 V.** The feedback is
 > **self-limiting** — the crowbar current is super-quadratic in VDD (10.9 mA at 8.65 V → 0.20 mA at
 > 3 V → 0 below ~2.05 V), so a low rail cannot sustain the current that would be needed to produce
@@ -366,7 +359,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > to GND, verified at 600 DPI on primary p.4 *and* independently on the backup, n = 1 in the rail
 > solve), **not on the clipSat arithmetic.** Quote the schematic, not the 183 %.
 > ⛔ **DO NOT read the 5.442× as a defect to be re-fitted away** — session 142 measured that route
-> and the pedal's own supply forbids it. See `CLAUDE.md`'s CLOSED/REFUTED table (open-work item 5).
+> and the pedal's own supply forbids it.
 
 ### Recovery + bandlimiting (IC2_B, IC4_B, IC4_A)
 | Ref | Value | Function |
@@ -408,7 +401,7 @@ All ICs (TL072ACP dual, TL074ACN quad, CD4049UBE hex inverter) run on +9V / GND.
 > tested, worse than deleting the element. **Gate this value on the migrating NULL and the raw-capture
 > fit, never on matrix band-RMS:** at 5.2 nF the raw captures are explained to 0.904 dB with no added
 > element and no level correction (k = 0.995), against 3.339 dB and +5.6 dB of wanted gain at 1.5 nF;
-> null band 12/15 vs 0/15 over 3 stimulus levels × 5 drives. `docs/phase9-validation.md` §4 "A3 step 3c".
+> null band 12/15 vs 0/15 over 3 stimulus levels × 5 drives.
 >
 > ⚠ **IC2_B CORRECTION (2026-07-19 verification).** An earlier reading called IC2_B a "non-inv
 > high-shelf recovery, ~4× (+12 dB) above ~220 Hz." **That is WRONG** — it was inferred from the
@@ -517,7 +510,7 @@ only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
 > from the nodal sim run at Rw = 0. (3) A2c-2's own headline numbers (peak error 3.1 % mean, curve
 > RMS 1.82 dB) were measured with a fixed 5.12 kHz anchor that sits inside the HI-MID positions' own
 > skirts and flattered them; re-measured with a peak-relative baseline the same build reads 4.4 % and
-> 2.36 dB. `docs/phase9-validation.md` §4 "A2c-3".
+> 2.36 dB.
 
 > ✅ **Validated by full nodal sim of the verified topology (2026-07-19, open item c), and the sim
 > itself is cross-validated against the p.3 MEASURED tables** (triple-check pass): every table row
@@ -554,7 +547,7 @@ only (nearest E12; computed from p.3 Ultra-Mod f-vs-C fit, f ∝ 1/√C_series):
 > position is trustworthy. ⚠ The model shipped **9.59 %** (below the band) until s146; it now ships a
 > 3-segment PWL at 11.89 %. Nothing in the fitting objective knew what an A taper is, so this is a
 > genuine outside corroboration of the `[ENG]` choice of VR8's taper — not a circular one.
-> Derivation: `analysis/master_taper_makeup.py`, `FitParams::masterTaperBreak`.
+> Derivation: `FitParams::masterTaperBreak`.
 >
 > **Sim-checked (2026-07-19, open item c):** C36(2u2) into the 100k pot gives a 0.72 Hz HPF corner —
 > inaudible; the divider is flat, attenuation-only, unity at full CW; pot loading on the IC6_A op-amp
@@ -696,7 +689,7 @@ bass ±16–17 dB @40 Hz (±11.5 @100 Hz), treble ±16 dB @5 kHz (±18.5 @10 kHz
 > schematic; it is a behavioural match to the unit we recorded. TOPOLOGY is unchanged and is the one
 > thing that would justify revisiting this (a wrong topology would leave a frequency-dependent shape
 > residual, not the uniform range error observed) — no `schematic-checker` pass was run, deliberately;
-> see `docs/phase9-validation.md` §4 "A2c-1" for that reasoning in full.
+> topology change would leave a frequency-dependent shape residual, not the uniform range error observed.
 
 ### LO-MID (IC5_D) / HI-MID (IC6_A) — ✅ **NODES VERIFIED (2026-07-19)**; identical topology
 Flat inverting-unity path + frequency-selective pot leg. LO-MID designators (HI-MID in parens):
@@ -822,7 +815,7 @@ BLEND crossfade) — see Footswitches below; this is an Ultra-only addition, not
     matching the *stock* 22n rather than the engineered 47n). Sessions 21–23 have hit this three
     times; expect it, and do not let "the schematic is verified" imply "the captured unit matches".
   - **⛔ C13 is NOT the bass-into-clip lever, and must not be fitted.** Four independent strands, all
-    in `docs/phase9-validation.md` §4 "3b CLOSED": (i) the LF excess is FULLY present at GRUNT **cut**,
+    (i) the LF excess is FULLY present at GRUNT **cut**,
     with C12 and C13 out of circuit entirely (+12.8 dB at 40 Hz / +14.8 at 50 Hz vs the pedal); (ii)
     the plugin-vs-pedal LF error scales monotonically with the **BLEND** knob (−0.47 dB at pure clean
     → +9.51 dB at full OD) while the clean path matches to 0.32 dB; (iii) a proper 1-D scan of C13 is

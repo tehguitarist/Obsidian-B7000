@@ -2,7 +2,6 @@
 # installer per platform (.pkg/.exe/.deb) alongside a raw zip, and publishes everything to a
 # GitHub Release. No push/schedule trigger — it ONLY runs when you start it from the Actions tab
 # or `gh workflow run release.yml`, so a release is never cut accidentally.
-# TEMPLATE: replace <Pedal> (juce target / product name) everywhere. Inert until copied to a repo root.
 #
 # macOS signing/notarization is WIRED but gated on secrets that don't exist until you add them —
 # if APPLE_CERT_P12_BASE64 etc. aren't set, the macOS job's signing steps below will fail. Either

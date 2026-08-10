@@ -73,13 +73,11 @@ def transfer(out, inp):
     at drive. The CSD suppresses whatever is incoherent with the input, but a harmonic of a swept
     sine IS deterministically related to the input, and inside an 8192-point Welch segment the
     sweep moves little, so H2 of the fundamental one octave down lands in the same analysis bin and
-    is NOT rejected. Session 89 found every one of the twelve worst OD rows in the 129-capture
-    matrix sitting in a single HF band, with "ND aliases" and "our FR instrument is contaminated"
+    is NOT rejected — reference-side aliasing and an FR instrument contaminated by harmonics are
     indistinguishable on this estimator. `transfer_h1()` separates the linear response by Farina
     time-gating instead, which rejects harmonics by construction.
 
-    Kept for: clean-path reads (no nonlinear content to reject), historical reproduction, and the
-    labelled CONTROL column in `h1_fr_gate.py`."""
+    Kept for: clean-path reads (no nonlinear content to reject) and historical reproduction."""
     f, Pxy = sps.csd(inp, out, FS, nperseg=8192)
     f, Pxx = sps.welch(inp, FS, nperseg=8192)
     H = np.abs(Pxy) / (Pxx + 1e-20)

@@ -1,8 +1,4 @@
-# Build + test CI for a circuit-emulation pedal plugin.
-# TEMPLATE: replace <Pedal> (juce target / product name), <Cod1> (PLUGIN_CODE) and <Mfr1>
-# (PLUGIN_MANUFACTURER_CODE) to match your CMakeLists. This file is inert inside the template
-# folder (GitHub only reads .github at the repo root) — it activates once you copy the template
-# to a new repo's root.
+# Build + test CI for Obsidian B7000.
 name: CI
 
 on:

@@ -54,9 +54,8 @@
 // that would be a threshold nobody has derived):
 //
 //   1. Finiteness + non-zero on every arm. A probe that reports a NUMBER is a
-//      gate whatever it is called (measurement-discipline.md §5, session 118's
-//      `--os 3` probe that reported a clean 0.0000 % on nine renders that
-//      processed nothing).
+//      gate whatever it is called, and an empty run must fail loudly rather than
+//      report a clean-looking zero on renders that processed nothing.
 //   2. DETERMINISM: two fresh PedalDSP instances at identical settings are
 //      BIT-IDENTICAL. Free known answer, no threshold, and it is what licenses
 //      reading any cross-factor difference as a factor effect rather than as
@@ -66,10 +65,9 @@
 //      latency (PedalDSP.h) — and Goertzel magnitude is phase-invariant. So at
 //      BLEND = 0 the measured magnitude is *forbidden* to depend on the OS
 //      factor, and the residual is the FR instrument's own noise floor. This is
-//      the constructive known answer of measurement-discipline.md §1 ("look down
-//      the chain for a stage whose physics forbids some structure, and measure
-//      that structure"), and it certifies the render + Goertzel + bin-exact grid
-//      before a single OD number is read.
+//      a constructive known answer — a stage whose physics forbids some
+//      structure, measured — and it certifies the render + Goertzel + bin-exact
+//      grid before a single OD number is read.
 //   4. NON-VACUITY, gated on that measured floor rather than on a guessed bar:
 //      the OD path's 1x-vs-8x FR difference must exceed the clean control's
 //      residual by a wide margin. Without it, a probe in which the factor never

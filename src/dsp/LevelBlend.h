@@ -233,9 +233,7 @@ public:
     // requirement to fit a smoother curve AGAINST — the LEVEL law is inside its
     // own measurement noise everywhere, so any alternative shape chosen only to
     // improve the half-rotation number would be an unmeasured, self-selected
-    // pick with nothing behind it (`measurement-discipline.md`'s
-    // `self-selecting-scores` / `known-answer-must-not-start-at-its-answer`
-    // family). The shipped curve is the one thing on record that IS
+    // pick with nothing behind it. The shipped curve is the one thing on record that IS
     // measurement-grounded: it was fitted against the strictest epoch this law
     // has had (s172's, before `OdMakeup` diluted the requirement) and it still
     // satisfies the current one. Trading that for A-taper cosmetics — a

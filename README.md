@@ -69,13 +69,11 @@ parts of the circuit are schematic-verified versus engineered-to-spec.
 
 ## Accuracy vs. reference captures
 
-Sub-sample-aligned null depth, measured with `analysis/null_review_gate.py` against a
-pre-registered 12-capture set — fixed by control-axis coverage (clean path, both Blend/Drive
-extremes, both Attack throws, both off-flat Grunt throws) *before* any number was read, not chosen
-after the fact for how deep it goes. Same shape of measurement as `analysis/null_test.py` /
-`VALIDATION_REPORT.md` in the sibling [Monarch of Tone](https://github.com/tehguitarist/MoT)
-project. Figures are gain-matched — shape/phase agreement only, they say nothing about absolute
-level (checked separately, see `docs/calibration-and-gain-staging.md`).
+Sub-sample-aligned null depth, measured against a pre-registered 12-capture set — fixed by
+control-axis coverage (clean path, both Blend/Drive extremes, both Attack throws, both off-flat
+Grunt throws) *before* any number was read, not chosen after the fact for how deep it goes.
+Figures are gain-matched — shape/phase agreement only, they say nothing about absolute level
+(checked separately, see `docs/calibration-and-gain-staging.md`).
 
 | Mode / setting | Best null, 100 Hz–8 kHz band (gain-matched) | Reference capture |
 |---|---|---|
@@ -99,12 +97,10 @@ are specific to the box that produced them (Apple Silicon laptop, Release build)
 | **Render** *(auto, offline bounce)* | 6.6 % | n/a — not realtime-constrained | 64 samples | Maximum fidelity; engages automatically on DAW export (defaults to the 8× factor) |
 
 Oversampling is the CPU-vs-fidelity dial, and the CD4049 clipper's per-sample Newton solve is the
-dominant cost — but far less dominant than it was. Session 124's re-anchor of the clipper's knee
-exponent to `k = 2` put `sig()`/`sigDeriv()` back on their closed-form path instead of two
-`std::pow` each, which alone is worth **−54 to −58 % of the whole chain** at every factor; 1st-order
-ADAA (on at 1×/2× only) costs **+16 to +19 %** back at those two factors and nothing at 4×/8×. Net,
-the plugin is roughly **twice as fast as it was before session 124** — see `CLAUDE.md`'s open-work
-item 3 for the full table and the both-ends arithmetic check.
+dominant cost. Anchoring the clipper's knee exponent to `k = 2` puts `sig()`/`sigDeriv()` on their
+closed-form path instead of two `std::pow` each, worth roughly half the chain's total CPU at every
+factor; 1st-order ADAA (on at 1×/2× only) costs some of that back at those two factors and nothing
+at 4×/8×.
 
 ## Building
 
@@ -166,18 +162,18 @@ src/
   utils/TaperUtils.h        Pot taper math (audio/log vs. linear vs. fitted power-law)
 
 tests/        Per-stage DSP validation programs (see table above)
-analysis/     Real-pedal captures (gitignored — not in the repo), gen_test_signal.py (the A/B
-              capture signal), analyze.py (FR / Farina swept-THD / sub-sample null harness),
-              eq_reference.py (closed-form oracle for every linear stage), captures.py (capture
-              filename grammar + OfflineRender CLI-argument mapping), fit_nonlinear.py (nonlinear
-              parameter fitting), offline_render.cpp (source for the OfflineRender tool)
+analysis/     Real-pedal captures (gitignored — not in the repo), plus the reusable A/B harness:
+              gen_test_signal.py (the capture signal), analyze.py (FR / Farina swept-THD /
+              sub-sample null harness), eq_reference.py (closed-form oracle for every linear
+              stage), captures.py (capture filename grammar + OfflineRender CLI-argument
+              mapping), comprehensive_report.py / matrix_grade.py / shape_gate.py (the A/B report
+              + grading), fit_nonlinear.py + phase_harmonics.py (nonlinear parameter fitting),
+              offline_render.cpp (source for the OfflineRender tool) — see analysis/README.md
 docs/
   nonlinear-component-modeling.md   datasheets/papers/recommended approach for the J201 + CD4049
   calibration-and-gain-staging.md  ★ input/output level calibration, taper fitting, rail modelling
   validation-and-capture.md        ★ how the plugin is measured against real-pedal captures
   ui-peripheral-spec.md            full visual spec for the reusable UI chrome
-  phase7-calibration-handover.md   the working notes for the in-progress calibration fit
-  build-plan.md                    the full step-by-step build plan with validation gates
 .claude/rules/   Circuit topology (circuit.md — the source of truth for every component value and
                  node graph), DSP rules (dsp.md), plugin architecture (architecture.md), UI layout
                  (ui.md), and build setup (build.md)

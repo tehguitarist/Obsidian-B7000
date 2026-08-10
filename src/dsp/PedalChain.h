@@ -698,8 +698,8 @@ private:
     // treated as inert. circuit.md: C15 -> R20 -> node X -> IC2_B(+), R21 X->VD;
     // R20 carries no other branch at its near node, so R20+R21 combine into ONE
     // effective series R (same reduction as C21Highpass below), fixed at the
-    // schematic value 1.01 MΩ — ruled OUT as a fit target by the step-3b pixel-
-    // zoom pass (docs/phase9-validation.md §4): even R21->0 only reaches 7.2 Hz.
+    // schematic value 1.01 MΩ — ruled OUT as a fit target by a pixel-zoom pass
+    // confirming even R21->0 only reaches 7.2 Hz.
     // Only the capacitance is fittable (FitParams::clipC15) — see that field's
     // comment for the null-gate evidence and the honesty caveats on this element.
     // Same trapezoidal-companion single-node convention as C21Highpass; runs at

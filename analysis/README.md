@@ -1,9 +1,8 @@
-# Analysis Harness — Guitar Pedal Plugin Template
+# Analysis Harness
 
-This directory contains a **pedal-agnostic** A/B validation harness for comparing
-a circuit-emulation plugin against real-pedal captures. Every tool here was
-extracted from a production pedal project and stripped of pedal-specific
-dependencies (those live in `captures.py`, which you fill in).
+This directory holds the A/B validation harness used to check the plugin against
+real-pedal reference captures: FR shape, THD/harmonic structure, and null-depth
+tracking across the control surface.
 
 ## Quick Start
 
@@ -12,76 +11,33 @@ dependencies (those live in `captures.py`, which you fill in).
 python3 analysis/gen_test_signal.py
 # → writes analysis/test_signal_48k.wav
 
-# 2. Implement captures.py (see "First-time Setup" below)
-# 3. Build your OfflineRender binary (a CLI that mirrors processBlock)
+# 2. Populate analysis/captures/ with real-pedal recordings (see captures.py)
+# 3. Build the OfflineRender binary
 cmake --build build --target OfflineRender
 
 # 4. Run the comprehensive A/B (once captures exist in analysis/captures/)
 python3 analysis/comprehensive_report.py --os 8
 # → writes analysis/reports/comprehensive_data.json
 
-# 5. Generate the dashboard
-python3 analysis/dashboard_gen.py
-# → writes analysis/reports/dashboard.html  (open in browser)
-
-# 6. Audit against acceptance targets
-python3 analysis/report_audit.py --write
-# → writes analysis/reports/executive_summary.txt
+# 5. Grade the report
+python3 analysis/matrix_grade.py analysis/reports/comprehensive_data.json
 ```
 
 ## File Reference
 
-### Core Library
-
-| File | Lines | What It Does |
-|------|-------|-------------|
-| `analyze.py` | 297 | **Pedal-agnostic analysis library.** Load/align WAVs, frequency response (CSD/Welch), discrete-tone THD (harmonic binning), **Farina continuous THD(f)** with order-limiting (eliminates the spurious-edge-spike artefact), sub-sample fractional alignment, gain-matched null depth, linear-removed (coherence-based) null floor, generic capture-filename parser (clock HHMM or 0-10 scale). Everything else imports this. |
-| `gen_test_signal.py` | 173 | **Reference signal generator.** Exponential sine sweeps (Farina ESS) at clean + 3 driven levels, discrete harmonic tones, 1 kHz level steps for compression knee, SMPTE IMD (60 Hz + 7 kHz, 4:1), guitar-band IMD (220 Hz + 660 Hz), plucked decay notes. **Append-only** — inserting segments in the middle invalidates all existing captures. |
-| `captures.py` | — | **Pedal-specific interface (you implement).** Provides `find_captures()`, `load_capture()`, `render_args()`, and `RENDER_BIN`. The template scripts import from here. See "First-time Setup" below. |
-
-### Dashboard & Visualisation
-
-| File | Lines | What It Does |
-|------|-------|-------------|
-| `dashboard_gen.py` | 457 | Reads `comprehensive_data.json` and generates a **self-contained HTML dashboard** with: FR shape heatmap (capture × band, diverging colour scale), FR line charts per revision (pure SVG, no JS, no CDN), THD dumbbell charts vs. drive level, harmonic magnitude (H2–H7) heatmap, per-revision summary tiles. Supports dark mode via `prefers-color-scheme`. |
-
-### Report & Audit Tools
-
-| File | Lines | What It Does |
-|------|-------|-------------|
-| `report_audit.py` | 225 | Audits `comprehensive_data.json` against acceptance targets. **Generates `executive_summary.txt`**. Covers: (1) FR vs. target grading (per-band RMS, count exceeding tolerance), (2) THD data coverage — which bands have measurable THD vs. Nyquist-limited, (3) THD vs. drive level — is error clip-onset (level-dependent) or static (wrong fault type)?, (4) Harmonic magnitude deltas — correct per-order levels, not just RSS (THD). |
-| `gap_audit.py` | 174 | Grades every FR band + THD point against configurable thresholds (HUGE >3 dB / target >1.5 dB / good ≤1 dB). Reports **mean and spread** per band: large spread = setting-dependent error (taper/drive-tracking); consistent mean = fixed shape error (component value). |
-| `cascade_analysis.py` | 115 | Separates FR gaps by **which circuit stage** can cause them. Uses blend, drive, and frequency-region discriminators to prevent fitting a downstream stage to compensate for an upstream error. Runs on JSON only — no re-rendering. **Replace the `REGIONS` tuple with your pedal's frequency bands of interest.** |
-| `capture_outlier_scan.py` | 263 | Flags captures that disagree with all siblings. Separates **capture-intrinsic** physics violations (corrupt file — quarantine) from **plugin-vs-capture** disagreement (real gap — investigate). Never says "wrong"; hands you the question. Runs on JSON only. |
-
-### Phase-7 drive-axis probes + pre-registered gates (session 16)
-
-A **gate** runs BEFORE building a reshape and asks whether the proposed mechanism has the right
-signature and enough authority. Sessions 12 and 14 each built first and discovered the answer was
-no; the gates below are the standing protocol (`§3j`). A gate that fails is a result, not a waste —
-it is what stops a fit being run past a bad diagnosis.
-
 | File | What It Does |
 |------|-------------|
-| `drive_taper_bleedfree.py` | ⭐ **Measures the DRIVE taper with the clean BLEND bleed CANCELLED ALGEBRAICALLY, not estimated.** Only DriveStage is drive-dependent, so the output phasor is exactly affine in the gain-leg conductance, `Y = C + M·g(x)` — the bleed lives entirely in `C` and drops out. Anchored on the two taper-SHAPE-independent endpoints (`R=100k` at knob 0, `R=0` at knob 1). Two estimators that fail differently — complex-affine with a per-take delay solved jointly, and a magnitude-only 3-tone joint solve that is alignment-immune by construction — plus an L-006 self-test that must recover a KNOWN taper from model renders first. **Documents the alignment trap it found:** per-take sweep-anchor correlation is itself drive-dependent (lags drift 3.5 samples = 11° at 440 Hz), which silently biases any naive complex read. |
-| `drive_taper_gate.py` | §3j gate on the taper as the noon-H3−H2 lever. Sweeps VR3 resistance at noon, checks (A) authority, (B) direction, (C) whole-ramp regression, at two clipper points. **REFUTED** the taper as the noon fix. Also the first measurement of how much authority level has at noon at all (1.2 dB over an 11 dB range at a physical clipper). |
-| `drive_rail_gate.py` | §3j gate on the DRIVE op-amp **rail clamp** (`FitParams::railEnabled`, off since Phase 4 though its stated kInputRef precondition was met 2026-07-22). L-009 liveness check FIRST, then ramp steepening. **REFUTED**: live, but moves only 2:30/max — at noon the stage output never reaches the rail. |
-| `clipper_onset_gate.py` | §3j gate on **clipper onset POSITION** via `kInputRef`, the other half of the `kInputRef↔clipSat` degeneracy that `GainStaging.h` documents. Verdict is **JOINT** (one K must satisfy all conditions — taking the best row per condition would certify a sweep in which no single value works, L-003). Result: large authority (a fully PHYSICAL clipper beats anything session 15 reached with any clipper shape) but **necessary-not-sufficient**. |
-| `clipper_input_coupling_gate.py` | §3j gate on the **clipper INPUT COUPLING** (GRUNT bank + R16) as a drive-dependent memory effect, using a matched **2×2 factorial that already exists on disk** (drive {noon, max} × grunt {cut, boost}); its interaction term is a difference of differences, so bleed/makeup/tapers all cancel. ⚠ **Prints PASS, but the PASS IS NOT ACTIONABLE and the file says so in a box at the top** — condition (B) established authority by sweeping the coupling CAP, which is BOM-fixed. Read with `clipa0_grunt_corner_probe.py`, which refutes it. Also records a capture **ceiling check**: H3−H2 saturates ~+1 dB, so 3 of the 4 factorial cells are pinned and the interaction is weak evidence. |
-| `clipa0_grunt_corner_probe.py` | ⭐ The probe that **refuted** the coupling candidate and produced the session's structural result: sweeping `clipA0` 3→30 × `kInputRef` 0.87→2.40 moves the GRUNT corner 379→1941 Hz but leaves the min→noon leg **immobile at +0.9…+2.7 dB** (capture +12.6). Reason: lowering A0 drops the corner (≈+13 dB more 220 Hz into the clipper) and the closed-loop gain `−(R18/R16)·A0/(A0+1+R18/R16)` (≈−15 dB) **in cancelling proportions**. Separately finds that the model matches the capture's GRUNT boost-vs-cut effect at **A0 ≈ 8–12, not circuit.md's 20–30**. |
-| `drive_taper_curve.py` | Scores candidate DRIVE-taper curves against session 16's three measured resistances (no renders — closed form). **Overturns the session-16 plan's premise**: the reverse-log "C-taper" families fit *worse* (2.1–2.6 dB max stage-gain error) than a plain power law (0.95 dB). The shipped `p=2.5` is a wrong *exponent*, not a wrong *family*; re-deriving from the measurement gives **p ≈ 1.98**. Reports resistance error *and* stage-gain error, because the 330k feedback compresses the former. |
-
-### Tooling Integrity Tests
-
-These validate the estimators themselves before you trust any number they produce.
-
-| File | Lines | What It Does |
-|------|-------|-------------|
-| `farina_validate.py` | 201 | Validates the **Farina continuous-THD curve** against the discrete-tone THD estimator via a **bracket test**: `THD(−18) ≤ THD_tone(−14) ≤ THD(−12)`. `--probe` mode dumps per-order magnitudes to identify which harmonic order spikes where. **Re-renders the plugin** for each capture (needs `captures.render_args()`). |
-| `farina_regression_check.py` | 67 | Proves the order-limit fix is **bit-identical below 2714 Hz** on every capture. Run after any change to `harmonic_thd_curve()` in `analyze.py`. |
-| `hf_thd_flatness_check.py` | 125 | Cross-validates swept THD against an **independent** discrete-tone estimator at 2 kHz and 4 kHz. Separates two questions usually conflated: (1) does the magnitude agree? (2) is it monotonic in level? **Re-renders the plugin** (needs `captures.render_args()`). |
-| `tone_thd_nyquist_check.py` | 87 | Validates the discrete-tone THD estimator at HF. Unguarded `analyze.thd()` clamps out-of-band harmonics to the top FFT bin, inflating THD by up to √N of the near-Nyquist noise. Compares **guarded** (drop orders past Nyquist) vs. **unguarded**, quantifying the fabrication. |
-| `base_rate_warp_measure.py` | ~105 | Measures the model's own **base-rate bilinear top-octave warp** by rendering the dry/linear path at 48 kHz vs. 96 kHz (near-analog reference) and differencing the FR. Droop = what a calibration high-shelf should invert. |
+| `analyze.py` | **Analysis library.** Load/align WAVs, frequency response (CSD/Welch), discrete-tone THD (harmonic binning), **Farina continuous THD(f)** with order-limiting (eliminates the spurious-edge-spike artefact), sub-sample fractional alignment, gain-matched null depth, linear-removed (coherence-based) null floor, capture-filename parser. Everything else imports this. |
+| `gen_test_signal.py` | **Reference signal generator.** Exponential sine sweeps (Farina ESS) at clean + 3 driven levels, discrete harmonic tones, 1 kHz level steps for compression knee, SMPTE IMD (60 Hz + 7 kHz, 4:1), guitar-band IMD (220 Hz + 660 Hz), plucked decay notes. **Append-only** — inserting segments in the middle invalidates all existing captures. |
+| `captures.py` | **Capture interface.** Provides `find_captures()`, `load_capture()`, `render_args()`, and `RENDER_BIN`. Everything else imports from here. |
+| `parallel.py` | Shared parallel-map helper — every heavy tool loops over independent items (captures, candidate values, bands), which is embarrassingly parallel; this module gives that to a new tool for free. |
+| `eq_reference.py` | Closed-form analytic transfer functions for each linear WDF stage (treble/ATTACK ladder, Sallen-Key filters, Baxandall, mid bands, bridged-T, drive stage). The oracle every per-stage `ctest` target checks against. |
+| `comprehensive_report.py` | Reads every capture in `analysis/captures/`, renders the plugin at matching settings, and writes a JSON report (FR, THD, H2–H7 harmonics) to `analysis/reports/comprehensive_data.json`. Parallel by default (`--jobs N`). |
+| `matrix_grade.py` | Aggregate grade for a `comprehensive_report.py` JSON: per-row band-RMS of `|plugin_db - pedal_db|` over the graded band, plus the FR tilt. |
+| `shape_gate.py` | Decomposes every FR/THD residual into LEVEL + TILT + CURVATURE + LOCAL components instead of a single band-RMS — catches narrow features (nulls, peaks) that an aggregate statistic averages away. |
+| `fit_nonlinear.py` | Fits the clipper + gain-stage nonlinear parameters to captures, scoring on harmonic-to-harmonic ratios (not harmonic-to-fundamental, which is contaminated by any clean/wet mix in the signal path). |
+| `phase_harmonics.py` | Extracts complex (magnitude + phase) harmonics from a steady tone and reports the shift-invariant relative phase `psi_n = phi_n - n*phi_1`. Used by `fit_nonlinear.py`. |
+| `offline_render.cpp` | CLI renderer (built as the `OfflineRender` CMake target) that mirrors `processBlock()` gain staging outside the plugin host — every fit and every report above needs it. |
 
 ## Key Concepts
 
@@ -133,69 +89,13 @@ Without limiting, each order produces a large spurious spike at exactly
 7. **Re-run** full A/B; decompose residuals with `linear_removed_null()` before
    changing more constants.
 
-## First-time Setup
+## Capture File Naming
 
-### 1. Implement `captures.py`
-
-This is the only file you need to write. It provides four things:
-
-```python
-RENDER_BIN = "build/OfflineRender_artefacts/Release/OfflineRender"  # your renderer path
-
-def find_captures(directory="analysis/captures"):
-    """Return [(path, parsed_dict), ...] for each .wav."""
-
-def load_capture(path, expect_fs=48000):
-    """Return float64 mono audio, auto-correcting rate-mislabeled headers."""
-
-def render_args(parsed, extra_args=None):
-    """Parsed settings -> flat CLI args list for your OfflineRender."""
-```
-
-A skeleton is already in `captures.py` with `load_capture` pre-implemented
-(including the rate-mislabel fix). You only need to fill in `parse_capture()`
-and `render_args()`.
-
-### 2. Create your OfflineRender binary
-
-Your plugin must provide a console-mode executable (e.g. a JUCE `ConsoleApplication`)
-that mirrors `processBlock()` gain staging. Its CLI should accept:
-
-- Input WAV path
-- Output WAV path  
-- Knob/switch positions (whatever your pedal has)
-- `--os <factor>` for oversampling override
-- Calibration overrides (for parameter sweeps)
-
-### 3. Write your `comprehensive_report.py`
-
-Model it after this pattern (it's what ties everything together):
-
-```python
-# comprehensive_report.py — you write this
-import captures as C
-import analyze as A
-import json
-
-for path, parsed in C.find_captures():
-    cap = C.load_capture(path)
-    ren = render_plugin(C.render_args(parsed))  # call your CLI
-    # run A.transfer(), A.harmonic_thd_curve(), ...
-    # collect into a JSON structure matching the dashboard schema
-```
-
-The NoAmp project's production version is available as a reference in the
-`reports/example_dashboard.html` output format — study it to understand the
-expected JSON schema.
-
-## Naming Conventions for Capture Files
-
-The `analyze.parse_filename()` helper auto-detects two notations:
-- **Clock HHMM**: `V1200 B1330 T1200` — 0700=min, 1200=noon(0.5), 1700=max
-- **0–10 scale**: `G3 V4 B6 T4` — plain dial position / 10
-
-If your pedal uses different knob labels, write your own `parse_capture()` in
-`captures.py` instead.
+`captures.py`'s filename parser recognises knob settings as either clock notation
+(`level-1200`, `blend-1330` — 0700=min, 1200=noon, 1700=max) or a 0–10 dial scale
+(`grunt-3`), plus named tokens for the switches (`grunt-flat`, `attack-boost`, …).
+`analysis/captures/` itself is not tracked in this repository (it holds the raw
+reference recordings); populate it locally before running `comprehensive_report.py`.
 
 ## Known Gotchas
 
@@ -219,4 +119,4 @@ If your pedal uses different knob labels, write your own `parse_capture()` in
 - Python ≥ 3.9
 - `numpy`
 - `scipy` (for `scipy.io.wavfile`, `scipy.signal`)
-- Your pedal's `OfflineRender` binary (C++ or otherwise)
+- The `OfflineRender` binary (`cmake --build build --target OfflineRender`)

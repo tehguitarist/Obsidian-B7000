@@ -19,8 +19,8 @@
 // CLAUDE.md: "Output > 0 dBFS at extreme drive+volume is faithful, not a fault." This test catches
 // NaN / Inf / blow-up, NOT level.
 //
-// ⚠⚠ THE CLICK TEST USES NO INVENTED THRESHOLD.  An absolute "max jump" bar would be a number I
-// guessed (measurement-discipline §1). Instead each moving-knob run is scored against ITS OWN
+// ⚠⚠ THE CLICK TEST USES NO INVENTED THRESHOLD.  An absolute "max jump" bar would be a guessed
+// number. Instead each moving-knob run is scored against ITS OWN
 // static control: the same settings, the same tone, the knob held still at both endpoints. A click
 // is then "moving the knob produces a sample-to-sample step far larger than the signal itself ever
 // takes when the knob is still" — a ratio, self-calibrating, with the denominator guarded.

@@ -1,2 +1,0 @@
-/Users/leighpierce/Git/Obsidian-B7000/analysis/captures.py:288: WavFileWarning: Chunk (non-data) not understood, skipping it.
-  sr, x = wavfile.read(path)

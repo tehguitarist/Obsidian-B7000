@@ -69,11 +69,12 @@ warp (see "Top-octave accuracy" below), check this before reaching for a prewarp
 ## Nonlinear elements (clipping diodes)
 
 > **This pedal's actual nonlinearities are NOT diodes.** The two non-WDF-native nonlinear parts are
-> the **CD4049UBE CMOS-inverter clipper** and the **J201 JFET gain stage** — their modeling sources,
-> recommended fits (asymmetric-tanh VTC waveshaper; fitted gain+waveshaper), SPICE/datasheet data,
-> and pre-DSP capture plan live in **`docs/nonlinear-component-modeling.md`** (PDFs in `docs/refs/`).
-> D1/D2 (1N4148) here are only rail clamps that rarely conduct — the diode guidance below still
-> applies to modeling those clamps, and to the general WDF-nonlinearity patterns (ADAA, omega,
+> the **CD4049UBE CMOS-inverter clipper** and the **J201 JFET gain stage**, each modelled with a
+> fitted VTC/waveshaper against SPICE and datasheet data (PDFs in `docs/refs/`). See
+> `docs/nonlinear-component-modeling.md` for the general modelling approach (CMOS-inverter
+> clippers, JFET/MOSFET gain stages, op-amp rails) this project's fits are built on. D1/D2
+> (1N4148) here are only rail clamps that rarely conduct — the diode guidance below
+> still applies to modeling those clamps, and to the general WDF-nonlinearity patterns (ADAA, omega,
 > asymmetry) that the CMOS/JFET waveshapers reuse.
 
 ```cpp
@@ -97,14 +98,14 @@ wdft::DiodeT<double, decltype(next), wdft::DiodeQuality::Best, AccurateOmega> d 
 
 ### Asymmetric clip modes & even harmonics — use a PER-POLARITY diode mismatch
 
-> ⛔⛔ **FOR THIS PROJECT, "check the captures" DOES NOT APPLY TO EVEN HARMONICS.** `analysis/captures/`
-> is a recording of the Neural DSP emulation, and its **even-order ladder is ~27 dB below the real
-> B7K's** (odd orders match to the dB — see `.claude/rules/reference-sources.md` §4). So a capture-fit
-> even-harmonic target here is not merely noisy, it is systematically wrong in one direction, and a
-> fit that "matches the captures" on H2/H4 has matched an emulator with essentially no asymmetry
-> mechanism. Sessions 5–7 and session 44 all fitted asymmetry against that target. Fit even-order
-> structure to the hardware ladder in `reference-sources.md` §4, and let the ND matrix govern
-> everything the correction should NOT move. The odd-order guidance below is unaffected.
+> ⛔⛔ **DO NOT FIT EVEN-ORDER HARMONIC STRUCTURE TO THE STANDARD REFERENCE CAPTURES.** The odd-order
+> ladder matches the real device to the dB, but the standard capture chain's even-order ladder reads
+> ~27 dB below the real device's — so a capture-fit even-harmonic target is not merely noisy, it is
+> systematically wrong in one direction, and a fit that "matches the captures" on H2/H4 has matched
+> a signal path with essentially no asymmetry mechanism. Fit even-order structure to a harmonic
+> measurement of the real hardware instead (see `docs/validation-and-capture.md`), and re-check that
+> the correction doesn't disturb the odd-order match, which the standard captures do represent
+> accurately. The odd-order guidance below is unaffected.
 
 **Check captures for asymmetric harmonics on EVERY saturation stage, even ones the schematic draws
 as a textbook-symmetric antiparallel pair.** The schematic tells you the nominal topology, not the
@@ -341,7 +342,7 @@ frequency) — the two never interact.
   so root uniqueness and a bracketed solve survive — but the closed-form `|f| <= sat` bracket may
   not; bracket off the SLOPE instead (`|F'| >= sum of the linear conductances`, so the root is within
   `|F|/that` of any point). Measured on this pedal: **12.6–19.8 dB** of median alias-floor
-  improvement at OS 1×/2×. (session 123; `src/dsp/Clipper.h::setADAA`, `analysis/clip_adaa_gate.py`)
+  improvement at OS 1×/2× (`src/dsp/Clipper.h::setADAA`).
 - ⚠ **Gate ADAA BY OS FACTOR, and measure both ends before enabling it flat.** ADAA1 is a
   first-order approximation with its own residual, so its benefit shrinks as the OS factor rises and
   can go NEGATIVE where oversampling has already taken the floor low. On this pedal the median
@@ -353,16 +354,14 @@ frequency) — the two never interact.
   ⚠ **Read the WORST-tone column, not just the median** — that is what makes this a policy rather
   than an average, and the benefit is **not monotone in rate** (8× beats 4× at one amplitude and
   loses badly at another), so do not interpolate it or express the gate as a scale factor. A `<=`
-  threshold on the factor is the honest shape. Shipped here as `FitParams::clipAdaaMaxOs = 2`
-  (session 124).
-  ⭐ **Make the gate a KNOB, not a hardcoded `if`.** The gate's own validation needs to force ADAA on
-  at the factors the policy disables — otherwise those arms measure *the gate* instead of *the
-  mechanism* and report "ADAA bought nothing at 8×", which is true of the shipped policy and false of
-  the thing under test.
+  threshold on the factor is the honest shape. Shipped here as `FitParams::clipAdaaMaxOs = 2`.
+  ⭐ **Make the gate a KNOB, not a hardcoded `if`.** A test validating the policy needs to force ADAA
+  on at the factors the policy disables — otherwise it measures the gate instead of the mechanism and
+  reports "ADAA bought nothing at 8×", which is true of the shipped policy and false of the thing
+  under test.
   ⚠ **A factor-gated nonlinearity makes the processed path deliberately OS-factor-dependent**, which
   will break any existing test asserting factor-independence (here the delay-compensation check). Fix
-  that by holding the gate constant inside such a test, never by widening its bar — see
-  `measurement-discipline.md` §3.
+  that by holding the gate constant inside such a test, never by widening its bar.
   ⭐ **Resolve the policy from stored state, not in whichever setter happens to run last.** The mode
   and the OS factor are set independently, and callers do it in different orders — see
   `PedalChain::applyAdaaPolicy`.
@@ -374,10 +373,10 @@ frequency) — the two never interact.
   Chebyshev/table primitive — and note that the antiderivative's cancellation sets the midpoint
   fallback's threshold, which is looser than the usual `0/0` guard when the primitive carries a large
   linear-in-argument term.
-- ⛔ **Splitting a map to dodge ADAA1's 2-point-average cost does not work** — see
-  `measurement-discipline.md`'s "every part must be evaluated over the same interval". Averaging the
-  nonlinear residue while keeping the linear term pointwise injects a first difference with gain
-  `a0/2`, which reaches the full loop gain at Nyquist. Gate ADAA off, or accept the rolloff.
+- ⛔ **Splitting a map to dodge ADAA1's 2-point-average cost does not work.** Every part of the map
+  must be evaluated over the same interval; averaging the nonlinear residue while keeping the linear
+  term pointwise injects a first difference with gain `a0/2`, which reaches the full loop gain at
+  Nyquist. Gate ADAA off, or accept the rolloff.
 - Reference: Esqueda et al., "Antiderivative Antialiasing in Nonlinear Wave Digital Filters",
   DAFx 2020.
 

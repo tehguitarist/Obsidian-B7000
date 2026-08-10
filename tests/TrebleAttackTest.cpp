@@ -103,13 +103,10 @@ static double measureDb(double freq, double fs, TrebleAttack::Attack a, double d
     return (peak > 0.0) ? 20.0 * std::log10(peak) : -300.0;
 }
 
-// ---- Test 8's reference: the TWO-POLE ATTACK topology (session 62's proposal) ----
-// Regenerate with:  python3.11 analysis/attack_topology_goldens.py
-// ⚠ That script does not merely PRINT this table — it first gates the one piece of
-// new algebra in TrebleAttack.h, the per-throw SERIES COLLAPSE of the split top rail,
-// against attack_tap_screen.py's independent UNCOLLAPSED 8-node solve (worst 2.1e-14
-// dB at the split point). A golden table generated from the same derivation it is
-// meant to check would be circular; this one is not.
+// ---- Test 8's reference: the TWO-POLE ATTACK topology ----
+// Fixed reference values for the per-throw series collapse of the split top rail.
+// Cross-checked once against an independent uncollapsed 8-node solve (worst 2.1e-14 dB
+// at the split point) rather than derived from the same algebra being tested here.
 static constexpr double kTapRa = 470.0e3, kTapRb = 506.0e3, kTapRc = 78.5e3, kTapR11 = 212.0e3;
 static constexpr double kC5Base = 19.7e-9, kC5TrimBoost = 1.1e-9, kC5TrimCut = 2.7e-9;
 static constexpr double kRdFlat = 6.14e3, kRdBoost = 478.0, kRdCut = 6.04e3;
@@ -291,10 +288,9 @@ int main()
     }
 
     // ---- Test 8: the TWO-POLE ATTACK topology vs the oracle -----------------
-    // Validates BOTH new poles at once at session 62's proposed point: the moving
-    // tap on the split top rail (pole A) and the per-throw C5/Rd notch leg (pole B).
-    // The reference comes from analysis/attack_topology_goldens.py, which gates the
-    // series collapse against an independent 8-node solve before printing it.
+    // Validates both poles at once: the moving tap on the split top rail (pole A)
+    // and the per-throw C5/Rd notch leg (pole B). The reference table above was
+    // cross-checked against an independent 8-node solve before being fixed here.
     std::printf("\n=== TWO-POLE ATTACK topology vs oracle @ 48 kHz ===\n");
     for (int pi = 0; pi < 3; ++pi)
     {

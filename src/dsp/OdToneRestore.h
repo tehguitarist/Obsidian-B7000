@@ -52,14 +52,14 @@
 //       does was diluted before the analysis read it — the deficits came out 3-5x
 //       too small, AND a fit there silently prices in one LEVEL setting.
 //       ⇒ FIT BLEED-FREE (`drive-0700_level-1700`, `level-1700`, `drive-1700_level-1700`),
-//         then CHECK across LEVEL and BLEND. `analysis/od_tone_restore_fit.py`.
-//   (2) WRONG STATISTIC. They were tuned against GATE W `locate()`'s PROMINENCE,
+//         then CHECK across LEVEL and BLEND.
+//   (2) WRONG STATISTIC. They were tuned against a window-based prominence locator,
 //       whose `mid_notch` window is a FIXED [285, 358] Hz band and whose prominence
 //       is min(rise-to-left-edge, rise-to-right-edge). The model's curve declines
 //       across that whole window, so the argmin sat ON the right edge and the
-//       statistic read ~0 for ANY notch depth — `measurement-discipline.md`'s
-//       "A PROMINENCE MEASURED AT A WINDOW EDGE IS IDENTICALLY ZERO BY CONSTRUCTION"
-//       (s126). Chasing it drove Q to 32 (a 10 Hz needle) and the centre down to
+//       statistic read ~0 for ANY notch depth — a prominence measured at a window
+//       edge is identically zero by construction, and nobody had noticed.
+//       Chasing it drove Q to 32 (a 10 Hz needle) and the centre down to
 //       310 Hz, both purely to buy window room. A prominence is a fine DETECTOR
 //       and a bad OBJECTIVE. ⇒ measure DEPTH against the null's own shoulders, with
 //       the argmin search (285-372 Hz) decoupled from the shoulder search (210-520).
@@ -303,12 +303,12 @@ private:
     // (a knob-keyed stage cannot track a stimulus-dependent feature) measured for the first
     // time on the Q axis, and it bounds what any (gain, Q) table here can achieve.
     //
-    // ⭐ AND NOTE WHICH REFERENCE GOVERNS HERE. `reference-sources.md` §1 makes
-    // **HARDWARE**, not ND, the authority for this null's DEPTH, and §3 records
-    // hardware deeper than ND in all six measured conditions — **+1.6 dB at GRUNT
-    // cut rising to ~26 dB at GRUNT boost**.  So the ND-matched numbers below are a
-    // LOWER BOUND on what hardware wants, and increasingly so as GRUNT opens up.
-    // ⛔ §3 is a PNG read: sign and rough size only, never a fit target (§5 rule 3).
+    // ⭐ AND NOTE: hardware measurements, not the standard
+    // reference captures, are treated as authoritative for this null's depth — hardware reads deeper in
+    // all six measured conditions, **+1.6 dB at GRUNT cut rising to ~26 dB at GRUNT boost**. So
+    // the reference-matched numbers below are a LOWER BOUND on what hardware wants, and
+    // increasingly so as GRUNT opens up. The hardware readings themselves are sign/rough-size
+    // only (imprecise source material), never a fit target.
     //
     // ⛔⛔⛔ SESSION 153's DECISION BELOW IS **REVERSED AT s196 — BUT ONLY AT THE CORNER, AND
     // ONLY FOR `kNotchMixK`.  THIS TABLE (`kNotchGainDb`) IS UNCHANGED AND STAYS UNCHANGED.**
@@ -324,8 +324,9 @@ private:
     //     disagreement at 4 of 6 flat/boost cells, the populations separated by a 6.02 dB gap);
     //     and at a MIXED setting the two metrics agree to 1.0x (s191's AP1b).  ⇒ THE METRIC
     //     CHOICE ONLY BITES AT THE CORNER, AND THE CORNER IS WHERE POINT IS THE CENSORED READING.
-    //   * ⚠ s153's ground (2) — HARDWARE is the authority and is DEEPER than ND — is UNTOUCHED and
-    //     still argues the other way.  It was weighed and the decision was taken anyway.
+    //   * ⚠ s153's ground (2) — hardware is the authority and reads deeper than the standard
+    //     reference captures — is UNTOUCHED and still argues the other way.  It was weighed and
+    //     the decision was taken anyway.
     //   * ⚠ Ground (3) is untouched too: which metric the EAR follows is STILL established by
     //     nothing measured.  ⛔ This reversal is a statement about which reading is a BOUND, NOT
     //     a demonstration that the area depth is what a listener tracks.
@@ -341,8 +342,9 @@ private:
     //       table against 4.54 / 1.54 for the area-solved one, i.e. entries move by up to
     //       4.92 dB while achieved error moves ~0.5 dB ⇒ the constant is WEAKLY IDENTIFIED,
     //       which is s151 §6's stimulus-level limit priced in the constant's own units;
-    //   (2) HARDWARE is the authority for this feature (above) and is DEEPER than ND, so
-    //       the smaller area-solved table moves AWAY from the governing reference;
+    //   (2) hardware is the authority for this feature (above) and reads deeper than the
+    //       standard reference captures, so the smaller area-solved table moves AWAY from the
+    //       governing reference;
     //   (3) which metric the EAR follows is established by nothing measured so far.
     // ⚠ What is NOT refuted: the censoring itself is real (16 of 26 pedal readings bottom
     // at or below the residue) and the area estimator is 4.1x less sensitive to it.  The
@@ -363,7 +365,7 @@ private:
     // AR5a measures pedal and composite centres agreeing to within the reader's resolution
     // in 21 of 26 cells.  And AR6 measures the remainder CHANGING SIGN across stimulus, so
     // it is not a shape coordinate at all -- it is s151 section 6's architectural limit on a
-    // third axis.  `analysis/notch_residual_gate.py`; `docs/session-log.md` SESSION 154.
+    // third axis.
     // ⭐⭐⭐ RE-FITTED AS A MIX-KEYED LAW, SESSION 156 (GATE AT, `analysis/od_notch_mix_law.py`).
     // These are no longer the whole answer: the cut actually applied is
     //
@@ -511,7 +513,7 @@ private:
     // Every one needs dBase != 0, i.e. re-opening `kNotchGainDb` -- which s153 decided, s196
     // explicitly scoped out, and s192 measured as RIGHT at the mixed cells (0.54 dB rms).  It also
     // moves the listening cell 0.58 dB where pure K moves it 0.03.  That is a USER DECISION to
-    // reverse, not a tuning choice.  See `docs/session-log.md` SESSION 199 for the frontier table.
+    // reverse, not a tuning choice.
     //
     // ⚠ ENTRIES 1 AND 3 ARE RE-DERIVED, NOT LEFT BEHIND.  This row's own provenance note above says
     // DRIVE 0.25/0.75 are the linear interpolants of their neighbours, and the shipped row satisfied
@@ -542,8 +544,9 @@ private:
     // LEVEL/BLEND max: the user's explicit instruction that session ("if they need to be too deep,
     // I'd prefer that"); the CENSORING (GATE AT's AT1d measured the pedal's null bottom sitting
     // 0.10 dB above the deconvolution residue at that corner, so its depth is a LOWER bound); and
-    // `reference-sources.md` §1/§3, which make HARDWARE the authority for this null's depth and
-    // record it DEEPER than ND by +1.6 dB at GRUNT cut rising to ~26 dB at boost.  All three
+    // hardware measurements, which are treated as authoritative for this null's depth and
+    // record it deeper than the standard reference captures by +1.6 dB at GRUNT cut rising to
+    // ~26 dB at boost.  All three
     // pointed the same way and all three were outvoted by the measurement: clamped, the composite
     // null came out **9.6–11.6 dB TOO DEEP** at LEVEL/BLEND max while every other mix landed
     // within 1–3 dB.  ⭐ Re-examined, the raw non-monotone shape is what the physics predicts —
@@ -723,10 +726,10 @@ private:
         // lands on the BOWL, not the spike -- which is why scaling the section's Q x5 moves the
         // composite Q by <= 0.8 and non-monotonically (s172, measured).  Cutting DEEPER moves
         // that crossing INTO the spike, so depth and width move together here.
-        // ⚠⚠ AUTHORITY: overshooting the ND captures' depth is a PASS, not a regression.
-        // reference-sources.md §1/§3 make HARDWARE the authority for this null's depth and record
-        // it DEEPER than ND (+1.6 dB at GRUNT cut, rising toward ~26 dB at boost), and §5 rule 2
-        // says a move away from the captures toward a documented hardware trend is correct.
+        // ⚠⚠ AUTHORITY: overshooting the standard reference captures' depth here is a PASS, not a
+        // regression. Hardware measurements are treated as authoritative for this null's depth
+        // and record it deeper (+1.6 dB at GRUNT cut, rising toward ~26 dB at boost), so a move
+        // away from the captures toward the documented hardware trend is correct.
         // ⛔ That licence is for DEPTH ONLY and does not extend to the peak between the notches.
         const double cutDb = lerp5(kNotchGainDb[gi], lastDrive)
                              + lerp5(kNotchMixK[gi], lastDrive) * mixShape(lastCleanFrac)

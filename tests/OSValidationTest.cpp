@@ -168,9 +168,9 @@ int main()
         // here, and a widened bar would silently absorb it. Instead, hold the
         // INTENDED effect constant so the check measures only what it is for — the
         // original 0.1 bar then survives untouched, which is the tell that this is a
-        // correction (measurement-discipline.md: "if the rebuilt test is harder than
-        // the one it replaces and still passes, it is a correction; if it is easier,
-        // it is a concession"). The ADAA policy gets its OWN assertion, below.
+        // correction rather than a concession: a rebuilt test that is harder than the
+        // one it replaces and still passes is a correction; one that is easier is not.
+        // The ADAA policy gets its OWN assertion, below.
         FitParams delayFit;
         delayFit.clipAdaaMaxOs = 0; // ADAA off at EVERY factor => the only thing
                                     // differing between arms is the OS/delay path.
@@ -340,13 +340,12 @@ int main()
         // ---- what the shipped ADAA policy actually BUYS, in-chain (session 124) --
         // Test 1b proves the gate is live and correctly scoped; it says nothing about
         // whether the thing it enables is worth enabling. This does, on the FULL
-        // PedalDSP chain — an instrument sharing no machinery with GATE X
-        // (analysis/clip_adaa_gate.py), which is what makes the agreement below
-        // evidence rather than a restatement.
+        // PedalDSP chain — an instrument sharing no machinery with the calibration
+        // fit's own ADAA gate, which is what makes the agreement below evidence
+        // rather than a restatement.
         //
         // ⚠ Assert the SIGN, print the SIZE. A "must improve by >= N dB" bar would be
-        // a number I guessed (measurement-discipline.md: a threshold you guessed is
-        // not a guard), and the benefit is legitimately amplitude-dependent — so the
+        // a guessed number, and the benefit is legitimately amplitude-dependent — so the
         // guard is "the shipped policy is not WORSE than not having it", which is
         // parameter-free and still catches a regression that inverts the policy's
         // value. The column is printed so the size stays visible and quotable.

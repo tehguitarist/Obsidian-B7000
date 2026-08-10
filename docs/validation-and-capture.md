@@ -8,15 +8,12 @@ levels; this one verifies them and the rest of the model against the real thing)
 > SETTINGS MATRIX is.** A perfect signal captured at the wrong/confounded settings can't be fit.
 > Spend your recapture budget on the matrix (§3), not on the signal.
 >
-> ⚠⚠ **KNOW WHAT YOUR CAPTURES ARE OF, AND SAY SO IN EVERY NUMBER YOU QUOTE.** On this project
-> `analysis/captures/` is a recording of the **Neural DSP Darkglass emulation**, not of a hardware
-> B7K Ultra — a fact that went unrecorded for 70 sessions while ~40 of them quoted a "0.144 dB
-> pedal take-to-take floor" that, against a deterministic renderer, is not a physical floor at all.
-> **`.claude/rules/reference-sources.md` is the authority rule: which reference wins in which
-> domain, what the hardware↔emulation deltas are, and which conclusions it re-opens.** Read it
-> before applying §4 or §1 below. Generalise the lesson: a capture inherits every property of
-> whatever produced it, including its errors and its *lack* of noise — write the provenance into
-> the doc the first time, not the seventieth.
+> ⚠⚠ **KNOW WHAT YOUR CAPTURES ARE OF, AND SAY SO IN EVERY NUMBER YOU QUOTE.** A capture inherits
+> every property of whatever produced it, including its errors and its *lack* of noise — a
+> deterministic renderer used as a reference has no physical noise floor, so a "take-to-take
+> floor" measured from it is not a real acoustic/analogue floor, and treating it as one costs
+> a whole project's worth of miscalibrated bars. Write the provenance into the doc the first
+> time, not the seventieth.
 
 The reusable harness lives in `analysis/`:
 - `gen_test_signal.py` — the comprehensive A/B signal (full-range sweep + 3 driven sweeps for THD +
