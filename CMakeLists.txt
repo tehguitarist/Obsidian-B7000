@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(ObsidianB7000 VERSION 1.0.2)
+# The deployment target MUST be set before project(): CMake reads it there, and a later set() is silently ignored
+# (the build then takes the runner's own OS as its minimum, e.g. macOS 26, and loads on nothing older).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
+# Windows: link the C/C++ runtime statically (/MT), so the plug-in does not depend on the Visual C++ Redistributable
+# installed on the user's machine (a plug-in built with a newer MSVC than the user's redistributable fails to load or
+# crashes). Needs CMP0091 (NEW from cmake_minimum_required 3.15); must precede the targets, so JUCE.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+project(ObsidianB7000 VERSION 1.0.3)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
 
 enable_testing()
 
