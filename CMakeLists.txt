@@ -28,12 +28,19 @@ add_subdirectory(libs/chowdsp_wdf)
 get_target_property(_chowdsp_inc chowdsp_wdf INTERFACE_INCLUDE_DIRECTORIES)
 set_target_properties(chowdsp_wdf PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_chowdsp_inc}")
 
+# LV2 is built on Linux only (an empty value elsewhere, so the FORMATS list below is unchanged).
+set(PLUGIN_LV2_FORMAT "")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(PLUGIN_LV2_FORMAT LV2)
+endif()
+
 juce_add_plugin(ObsidianB7000
     COMPANY_NAME "Leigh Pierce"
     BUNDLE_ID com.leighpierce.obsidianb7000
     PLUGIN_MANUFACTURER_CODE LPrc
     PLUGIN_CODE Ob7k
-    FORMATS AU VST3
+    FORMATS AU VST3 ${PLUGIN_LV2_FORMAT}
+    LV2URI "https://github.com/tehguitarist/Obsidian-B7000"   # permanent: hosts identify the plug-in by it
     PRODUCT_NAME "Obsidian-B7000"
     PLUGIN_NAME "Obsidian B7000"
     COPY_PLUGIN_AFTER_BUILD TRUE

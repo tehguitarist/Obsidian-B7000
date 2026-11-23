@@ -106,8 +106,8 @@ at 4×/8×.
 
 ## Building
 
-**Requirements:** CMake 3.15+, a C++17 compiler. AU + VST3 on macOS 10.13+; VST3 on Windows/Linux
-(AU is an Apple-only format).
+**Requirements:** CMake 3.15+, a C++17 compiler. AU + VST3 on macOS 10.13+; VST3 on Windows; VST3 + LV2 on
+Linux (AU is an Apple-only format).
 
 ```bash
 git clone https://github.com/tehguitarist/Obsidian-B7000.git

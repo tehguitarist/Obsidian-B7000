@@ -4,5 +4,5 @@ Section: sound
 Priority: optional
 Architecture: amd64
 Maintainer: Leigh Pierce <leighpierce@github.com>
-Description: Obsidian-B7000 plugin (VST3)
+Description: Obsidian-B7000 plugin (VST3, LV2)
  Darkglass B7K Ultra circuit-level emulation bass overdrive/DI preamp.
