@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://opensource.org/license/agpl-v3)
 [![Downloads](https://img.shields.io/github/downloads/tehguitarist/Obsidian-B7000/total)](https://somsubhra.github.io/github-release-stats/?username=tehguitarist&repository=Obsidian-B7000&page=1&per_page=30)
 
-A circuit-accurate bass overdrive/DI preamp plugin (AU/VST3, JUCE 8) modelled directly from the
+A circuit-accurate bass overdrive/DI preamp plugin (AU/VST3, plus LV2 on Linux; JUCE 8) modelled directly from the
 schematic of a **Darkglass B7K Ultra** — solved as a Wave Digital Filter from real component
 values rather than approximated by ear. No neural captures, so turning the knob isn't moving between captures, it's reacting like the real pedal.
 
@@ -120,6 +120,7 @@ git submodule update --init --recursive
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target ObsidianB7000_AU      # Audio Unit (macOS only)
 cmake --build build --target ObsidianB7000_VST3    # VST3 (macOS/Windows/Linux)
+cmake --build build --target ObsidianB7000_LV2     # LV2 (Linux only)
 ```
 
 `COPY_PLUGIN_AFTER_BUILD` is on, so a build installs straight to your system's plugin folder.
